@@ -15,6 +15,8 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+from example_support import example_shown
+
 from tbook import check, config, doctor, html, lean, mathrender, mdscan, model, paths, render, site
 from test_core import (GID_3V, GID_DEF, GID_INT, CoreRepo, FakeLedger, lock_decls, make_lock, media_stub, messages,
                        write)
@@ -254,7 +256,7 @@ class LinkCheckTests(unittest.TestCase):
                 check.check_links(model.load_edition(book.edition(lang)), config.load_site(), issues)
                 self.assertEqual(issues, [], lang)
 
-    @unittest.skipUnless(EXAMPLE.is_dir(), "books/example-monograph was removed")
+    @unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
     def test_example_book_has_no_warnings(self):
         book = config.load_book("example-monograph")
         for ed in book.editions:

@@ -23,6 +23,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+from example_support import example_shown
+
 from tbook import config, lean, paths, slides
 
 ROOT = paths.ROOT
@@ -36,6 +38,7 @@ HAVE_UNO = HAVE_NODE and (ROOT / "node_modules" / "unocss").is_dir()
 GID_3V = "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"
 GID_INT = "D5/S1/Deficit/DeficitInteger.deficit_integer"
 GID_DEF = "D5/S1/Deficit/DeficitInteger.deficit"
+needs_listed_example = unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
 
 # A fake lock for the scratch-book tests: one Lean theorem, one Lean def.
 FAKE_THM = "D5/S1/Fake/FakeModule.fake_theorem"
@@ -306,9 +309,11 @@ class ExampleDeckTest(unittest.TestCase):
         self.assertEqual(en.head["htmlAttrs"]["lang"], "en")
         self.assertEqual(zh.meta["code"], self.book.code)
 
+    @needs_listed_example
     def test_check_passes(self):
         self.assertEqual([i.format() for i in slides.check(self.book)], [])
 
+    @needs_listed_example
     def test_cited_gids_are_locked(self):
         lock = lean.Lock.load()
         gids = {g for _, _, g in slides.cited_gids(self.book)}
@@ -387,6 +392,15 @@ class BrokenDeckTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="tbook-slides-"))
+        lock = fake_lock()
+        lock.declarations = {
+            gid: {"module": gid.rsplit(".", 1)[0], "name": gid.rsplit(".", 1)[1],
+                  "kind": kind, "statement_id": "sha256:x", "line": 1}
+            for gid, kind in ((GID_3V, "theorem"), (GID_INT, "theorem"), (GID_DEF, "def"))
+        }
+        patch = mock.patch.object(lean.Lock, "load", return_value=lock)
+        patch.start()
+        self.addCleanup(patch.stop)
         self.bdir = self.tmp / "scratch-book"
         shutil.copytree(EXAMPLE, self.bdir, ignore=shutil.ignore_patterns("slides", "viz", "films"))
         self.deck = self.bdir / "slides" / "d1"
@@ -530,6 +544,7 @@ class PublishTest(unittest.TestCase):
 
 
 @needs_example
+@needs_listed_example
 @unittest.skipUnless(HAVE_NODE, "node and node_modules needed")
 class CliNewTest(unittest.TestCase):
     """./tbook slides new in a scratch repository root, then ./tbook check on it."""

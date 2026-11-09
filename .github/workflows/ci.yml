@@ -134,8 +134,8 @@ jobs:
       - name: With the example books hidden (template repository only)
         # Books repositories keep the template's example books and hide them (site.toml [books].hide =
         # ["example-*"], skills/book-new), so that merging template changes never conflicts over deleted files.
-        # Repeat the checks and the unit tests in a worktree that hides them: every command must skip them,
-        # and no managed test may depend on seeing them.
+        # Repeat the checks and the unit tests after hiding them and refreshing the lock at another commit:
+        # every command must skip them, and no managed test may depend on their declarations or commit.
         if: github.repository == 'the-omega-institute/trureturing-books-template'
         env:
           PYTHONPATH: tools
@@ -150,6 +150,7 @@ jobs:
           if [ -d .cache ]; then ln -s "$GITHUB_WORKSPACE/.cache" "$dir/.cache"; fi
           cd "$dir"
           python3 - <<'PY'
+          import json
           import re
           from pathlib import Path
 
@@ -157,6 +158,10 @@ jobs:
           text, n = re.subn(r"(?m)^hide\s*=\s*\[\]", 'hide = ["example-*"]', site.read_text(encoding="utf-8"))
           assert n == 1, "site.toml: expected the line hide = [] under [books]"
           site.write_text(text, encoding="utf-8")
+          lock_path = Path("trureturing.lock.json")
+          lock = json.loads(lock_path.read_text(encoding="utf-8"))
+          lock.update(commit="4c76e4a56525afbb474bf04a03ee2ff4aec5da45", declarations={})
+          lock_path.write_text(json.dumps(lock, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           PY
           ./tbook check | tee "$RUNNER_TEMP/hidden-check.txt"
           grep -q '^check: hidden by site.toml \[books\]\.hide, not checked: example-' "$RUNNER_TEMP/hidden-check.txt"

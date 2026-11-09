@@ -79,7 +79,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -1589,7 +1589,7 @@ def scaffold(book: config.Book, film_id: str, title_zh: str, title_en: str, *, r
         "TITLE_EN": title_en.strip(),
         "COMMIT": lock.commit if lock else "0000000",
         "REPO": f"https://github.com/{lock.repo}" if lock else "https://github.com/the-omega-institute/trureturing",
-        "RELEASED": released or date.today().isoformat(),
+        "RELEASED": released or datetime.now(timezone.utc).date().isoformat(),
         "BOOK_CODE": book.code,
         **{f"OUT_{k.upper()}": v for k, v in outs.items()},
     }

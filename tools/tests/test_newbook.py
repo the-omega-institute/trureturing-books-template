@@ -16,6 +16,7 @@ import tempfile
 import textwrap
 import unittest
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -157,6 +158,13 @@ class NewChapterTests(unittest.TestCase):
 
 
 class NewBookTests(unittest.TestCase):
+    def test_default_date_uses_utc(self):
+        with Repo(), mock.patch.object(newbook.datetime, "datetime", wraps=datetime) as clock:
+            clock.now.return_value = datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc)
+            newbook.new_book("my-book", {"zh": "书", "en": "Book"})
+            clock.now.assert_called_once_with(timezone.utc)
+            self.assertEqual(config.load_book("my-book").date, "2026-12-31")
+
     def test_new_book_loads(self):
         with Repo() as repo:
             path = newbook.new_book("my-book", {"zh": "书", "en": "Book", "ja": "本"}, langs=["zh", " en", "ja "])

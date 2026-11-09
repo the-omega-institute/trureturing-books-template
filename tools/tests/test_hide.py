@@ -238,6 +238,36 @@ class CommandTests(unittest.TestCase):
 
 
 class PinTests(unittest.TestCase):
+    def test_hidden_examples_with_a_stripped_lock_keep_unit_tests_runnable(self):
+        """The downstream state after hiding both examples and pinning another commit."""
+        with CoreRepo(HIDE_SITE) as repo:
+            for name in ("tools", "templates", "theme", "node_modules"):
+                if (ROOT / name).exists():
+                    (repo.root / name).symlink_to(ROOT / name, target_is_directory=True)
+            for slug in ("example-monograph", "example-primer"):
+                repo.book(slug)
+            write(repo.root / "books/example-monograph/slides/overview/slides.md", "# Overview\n")
+            lock = make_lock({})
+            lock.commit = "4c76e4a56525afbb474bf04a03ee2ff4aec5da45"
+            lock.save()
+            self.assertEqual(lean.Lock.load().declarations, {})
+            self.assertEqual(config.book_slugs(), [])
+            tests = [
+                "test_film.ExampleFilmTest.test_example_cites_locked_theorems",
+                "test_viz.Links.test_pin_links",
+                "test_slides.ExampleDeckTest.test_cited_gids_are_locked",
+                "test_film.ValidationTest.test_lean_must_cite_theorems",
+                "test_viz.Scaffold.test_scaffold_creates_a_valid_draft",
+                "test_slides.FirstLanguageTest.test_english_first_book",
+            ]
+            env = dict(os.environ, TBOOK_ROOT=str(repo.root), PYTHONPATH=os.pathsep.join(
+                str(ROOT / p) for p in ("tools", "tools/tests")))
+            r = subprocess.run([sys.executable, "-m", "unittest", "-v", *tests], cwd=repo.root,
+                               env=env, capture_output=True, text=True, timeout=120)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("Ran 6 tests", r.stderr)
+            self.assertIn("OK (skipped=3)", r.stderr)
+
     def test_refresh_collects_visible_books_only(self):
         with CoreRepo(HIDE_SITE) as repo:
             repo.book()

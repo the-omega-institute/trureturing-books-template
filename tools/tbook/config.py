@@ -9,7 +9,7 @@ import re
 import subprocess
 import tomllib
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -436,7 +436,7 @@ def load_book(slug_or_dir: str | Path) -> Book:
         license=str(meta.get("license", "")),
         languages=languages,
         code=str(meta.get("code", slug.upper().replace("-", "//", 1))),
-        date=str(meta.get("date") or date.today().isoformat()),
+        date=str(meta.get("date") or datetime.now(timezone.utc).date().isoformat()),
         isbn=localized(meta.get("isbn"), f"{where} book.isbn"),
         outputs_html=bool(outputs.get("html", True)),
         outputs_pdf=list(pdf_variants),

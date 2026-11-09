@@ -16,9 +16,12 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
+
+from example_support import example_shown
 
 from tbook import config, film, lean, mdscan, paths, render
 
@@ -31,6 +34,7 @@ GIDDEF = "D5/S1/Deficit/DeficitInteger.deficit"  # a Lean def
 THEME_FILM = paths.THEME / "film"
 # Downstream repositories may delete the example book (skills/book-new); tests built on it skip then.
 needs_example = unittest.skipUnless(EXAMPLE.is_dir(), "books/example-monograph is absent")
+needs_listed_example = unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
 
 
 def fake_lock() -> lean.Lock:
@@ -94,11 +98,13 @@ def doc_for(book: config.Book, lang: str, chapter: str = "ch01-golden-deficit.md
 
 @needs_example
 class ExampleFilmTest(unittest.TestCase):
+    @needs_listed_example
     def test_example_film_is_valid(self):
         book = example_book()
         issues = film.check(book)
         self.assertEqual(errors(issues), [], [i.format() for i in issues])
 
+    @needs_listed_example
     def test_example_cites_locked_theorems(self):
         f = film.get(example_book(), "001-golden-deficit")
         self.assertIsNotNone(f)
@@ -123,6 +129,7 @@ class ExampleFilmTest(unittest.TestCase):
         self.assertIsNotNone(declared)
         self.assertLess(abs(declared - tl["duration"]), 0.25 * tl["duration"])
 
+    @needs_listed_example
     def test_example_has_no_release_keys(self):
         f = film.get(example_book(), "001-golden-deficit")
         self.assertFalse(set(f.meta) & set(film.LEGACY_KEYS))
@@ -161,6 +168,9 @@ class CheckRefTest(unittest.TestCase):
 
 class ValidationTest(unittest.TestCase):
     def setUp(self):
+        patch = mock.patch.object(film, "_lock", return_value=fake_lock())
+        patch.start()
+        self.addCleanup(patch.stop)
         self.tmp = Path(tempfile.mkdtemp())
         self.book = temp_book(self.tmp)
 
@@ -434,6 +444,7 @@ class NamesTest(unittest.TestCase):
 
 
 @needs_example
+@needs_listed_example
 class EmbedTest(unittest.TestCase):
     def setUp(self):
         self.book = example_book()
@@ -559,7 +570,8 @@ class Sandbox:
         env = {k: v for k, v in os.environ.items() if not k.startswith(("TBOOK_CACHE", "TBOOK_FILMS"))}
         for patch in (mock.patch.dict(os.environ, env, clear=True),
                       mock.patch.object(paths, "ROOT", self.root), mock.patch.object(paths, "BUILD", self.root / "build"),
-                      mock.patch.object(paths, "CACHE", self.root / ".cache")):
+                      mock.patch.object(paths, "CACHE", self.root / ".cache"),
+                      mock.patch.object(film, "_lock", return_value=fake_lock())):
             patch.start()
             case.addCleanup(patch.stop)
         self.book = temp_book(self.root / "books", "bk")
@@ -630,6 +642,7 @@ class VideoUnitTest(unittest.TestCase):
         self.assertNotEqual(key3, key2)
         # the lock: the HUD draws the pinned commit and the cited declarations' statement digests
         moved = fake_lock()
+        moved.commit = "c" * 40
         with mock.patch.object(film, "_lock", return_value=moved):
             key4 = self.sb.key()
             moved.commit = "b" * 40
@@ -1028,6 +1041,7 @@ class SiteHostingTest(unittest.TestCase):
 
 
 @needs_example
+@needs_listed_example
 class PublishTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -1082,6 +1096,13 @@ class ScaffoldTest(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
+
+    def test_default_release_date_uses_utc(self):
+        with mock.patch.object(film, "datetime", wraps=datetime) as clock:
+            clock.now.return_value = datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc)
+            created = film.scaffold(self.book, "002-carry-rules", "进位规则", "Carry Rules")
+            clock.now.assert_called_once_with(timezone.utc)
+        self.assertEqual(json.loads(created[0].read_text(encoding="utf-8"))["released"], "2026-12-31")
 
     def test_new_film_is_valid(self):
         created = film.scaffold(self.book, "002-carry-rules", "进位规则", "The Carry Rules", released="2026-11-08")
@@ -1152,7 +1173,8 @@ class PipelineTest(unittest.TestCase):
         try:
             book = temp_book(tmp)
             d = copy_example(book)
-            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            with mock.patch.object(film, "_lock", return_value=fake_lock()), \
+                    redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 page = self.build.build(d)
             html = page.read_text(encoding="utf-8")
             self.assertIn("window.FILM_TOKENS=", html)

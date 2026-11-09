@@ -68,7 +68,7 @@ def _write_book(target: Path, slug: str, titles: dict[str, str], langs: list[str
             .replace("{{TITLES}}", _table({lang: titles[lang] for lang in langs}))
             .replace("{{SUBTITLES}}", _table({lang: (subtitles or {}).get(lang, "") for lang in langs}))
             .replace("{{DESCRIPTIONS}}", _table({lang: "" for lang in langs}))
-            .replace("{{DATE}}", datetime.date.today().isoformat()))
+            .replace("{{DATE}}", datetime.datetime.now(datetime.timezone.utc).date().isoformat()))
     (target / "book.toml").write_text(text, encoding="utf-8")
 
 

@@ -23,6 +23,8 @@ import unittest
 import zipfile
 from pathlib import Path
 
+from example_support import example_shown
+
 from tbook import config, cover, lean, mathrender, paths
 from tbook import pandoc as tp
 from tbook.model import load_edition
@@ -1015,6 +1017,7 @@ class SpacedPathBuildTest(unittest.TestCase):
 
 
 @unittest.skipUnless(have_pandoc() and have_typst() and shutil.which("java"), "pandoc, typst or java missing")
+@unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
 class ExampleBookEpubcheckTest(unittest.TestCase):
     """The shipped example book must produce an EPUB that epubcheck accepts with zero errors."""
 

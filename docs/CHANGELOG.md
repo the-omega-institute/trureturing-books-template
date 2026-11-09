@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### 修复
+
+- 下游书库隐藏 `example-*` 并重新钉版后，依赖示例声明或提交的集成测试跳过，使用合成锁文件的测试照常运行；CI 在隐藏示例书时同时更换锁文件提交并清空声明，覆盖真实的下游状态。
+- 可视化、视频与新书脚手架的默认日期统一使用 UTC，书籍缺省日期也保持一致；补充 UTC+14、UTC−11 跨日边界测试，确保 Python 与 Node 生成的可视化文件相同。
+
 ## [0.2.0] - 2026-11-09
 
 升级时迁移 `tools/migrations/v0.2.0.py` 自动处理书库自有的内容：给每个 `books/*/films/*/film.json` 补上缺少的 `outputs.narrated_720p` 与 `outputs.cover`（默认文件名），删除不再使用的 `release_tag`、`published_tag`；已列出的 1080p 与纯配乐输出保持不变。它还在升级摘要中提示：视频如何改用 720p 默认、书库保留示例书时用 `[books] hide = ["example-*"]` 隐藏它们、调用 `ci.yml` 的书库工作流须授予 `pages: read`。

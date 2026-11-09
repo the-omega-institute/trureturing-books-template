@@ -62,7 +62,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1066,7 +1066,7 @@ def scaffold(book, viz_id: str, code: str, title: str, title_en: str = "", *, ad
     reg["visualizations"].append({
         "id": viz_id, "code": code, "title": title, "title_en": title_en, "summary": "", "summary_en": "",
         "path": f"{viz_id}/", "thumbnail": f"{viz_id}/thumb.jpg", "status": "draft",
-        "added": added or date.today().isoformat(), "tags": [], "tags_en": [], "theory": [], "lean": [],
+        "added": added or datetime.now(timezone.utc).date().isoformat(), "tags": [], "tags_en": [], "theory": [], "lean": [],
     })
     registry_path(book).write_text(json.dumps(reg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     created.append(registry_path(book))

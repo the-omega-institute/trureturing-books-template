@@ -15,11 +15,15 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
+
+from example_support import example_shown
 
 from tbook import config, lean, mdscan, paths, render, viz
 from tbook.model import load_edition
@@ -31,21 +35,7 @@ GIDI = "D5/S1/Deficit/DeficitInteger.deficit_integer"
 GIDDEF = "D5/S1/Deficit/DeficitInteger.deficit"  # a Lean def
 # Downstream repositories may delete the example book (skills/book-new); tests built on it skip then.
 needs_example = unittest.skipUnless(EXAMPLE.is_dir(), "books/example-monograph is absent")
-
-
-def _example_listed() -> bool:
-    """The example book is here and site.toml does not hide it ([books].hide), so commands such as
-    ``./tbook viz list`` see it (config.load_book loads it either way)."""
-    try:
-        return EXAMPLE.is_dir() and not config.load_site().hidden_by(EXAMPLE.name)
-    except config.ConfigError:
-        return False
-    finally:
-        config.load_site.cache_clear()  # read while the module is imported: cache nothing for the tests
-
-
-# Downstream repositories usually hide the example book instead (skills/book-new): commands skip it then.
-needs_listed_example = unittest.skipUnless(_example_listed(), "books/example-monograph is absent or hidden")
+needs_listed_example = unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
 
 
 def example_book():
@@ -100,12 +90,13 @@ def messages(issues) -> list[str]:
 class RegistryChecks(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="tbook-viz-"))
-        self.lock = lean.Lock.load()
+        self.lock = fake_lock()
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     @needs_example
+    @needs_listed_example
     def test_example_book_is_clean(self):
         issues = viz.check(example_book())
         self.assertEqual([i.format() for i in issues if i.severity == "error"], [])
@@ -201,6 +192,7 @@ class RegistryChecks(unittest.TestCase):
 
     @needs_example
     @unittest.skipUnless(NODE, "node not available")
+    @needs_listed_example
     def test_node_validator_agrees_with_python(self):
         book = self.broken_book()
         # messages name files relative to the repository (Node) or absolutely (Python, outside the repo)
@@ -215,6 +207,7 @@ class RegistryChecks(unittest.TestCase):
 
     @needs_example
     @unittest.skipUnless(NODE, "node not available")
+    @needs_listed_example
     def test_node_validator_passes_the_example(self):
         r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-validate.mjs"), str(EXAMPLE)],
                            capture_output=True, text=True, cwd=paths.ROOT, timeout=120)
@@ -234,6 +227,7 @@ class RegistryChecks(unittest.TestCase):
     @needs_example
     @unittest.skipUnless(lean.Ledger("the-omega-institute/trureturing", offline=True).sources[0].__class__.__name__ == "GitSource",
                          "needs a local trureturing checkout (TRURETURING_DIR or ../trureturing)")
+    @needs_listed_example
     def test_trureturing_paths_must_exist_at_the_pinned_commit(self):
         book = fake_book(self.tmp)
         copy_golden_carry(book)
@@ -363,6 +357,7 @@ class CheckRef(unittest.TestCase):
 
 class Links(unittest.TestCase):
     @needs_example
+    @needs_listed_example
     def test_pin_links(self):
         lock = lean.Lock.load()
         html_in = (f'<p><a class="x" data-lean-gid="{GID3}" href="https://old/link">a</a> '
@@ -377,6 +372,7 @@ class Links(unittest.TestCase):
 
     @needs_example
     @unittest.skipUnless(NODE, "node not available")
+    @needs_listed_example
     def test_node_pin_links_is_identical(self):
         lock = lean.Lock.load()
         page = (EXAMPLE / "viz" / "golden-carry" / "index.html").read_text(encoding="utf-8")
@@ -424,6 +420,7 @@ def _doc(path: str):
 
 
 @needs_example
+@needs_listed_example
 class Embeds(unittest.TestCase):
     def test_mdbook_iframe(self):
         book = example_book()
@@ -527,6 +524,7 @@ class Publish(unittest.TestCase):
         return out
 
     @needs_example
+    @needs_listed_example
     def test_build_layout_and_links(self):
         out = self.build(self.tmp / "viz")
         lock = lean.Lock.load()
@@ -554,6 +552,7 @@ class Publish(unittest.TestCase):
                 self.assertTrue(target.exists(), f"{f.name}: {url}")
 
     @needs_example
+    @needs_listed_example
     def test_hub(self):
         out = self.build(self.tmp / "viz")
         hub = (out / "index.html").read_text(encoding="utf-8")
@@ -572,6 +571,7 @@ class Publish(unittest.TestCase):
         self.assertTrue(reg["visualizations"][0]["theory"][1]["href"].startswith("https://github.com/"))
 
     @needs_example
+    @needs_listed_example
     def test_build_is_deterministic(self):
         a, b = self.build(self.tmp / "a"), self.build(self.tmp / "b")
         files = sorted(p.relative_to(a) for p in a.rglob("*") if p.is_file())
@@ -580,6 +580,7 @@ class Publish(unittest.TestCase):
             self.assertEqual((a / rel).read_bytes(), (b / rel).read_bytes(), str(rel))
 
     @needs_example
+    @needs_listed_example
     def test_build_replaces_stale_output(self):
         out = self.tmp / "viz"
         (out / "old-viz").mkdir(parents=True)
@@ -587,6 +588,7 @@ class Publish(unittest.TestCase):
         self.assertFalse((out / "old-viz").exists())
 
     @needs_example
+    @needs_listed_example
     def test_build_refuses_a_broken_registry(self):
         book = fake_book(self.tmp)
         copy_golden_carry(book)
@@ -596,6 +598,7 @@ class Publish(unittest.TestCase):
         self.assertIn("thumbnail does not exist", str(cm.exception))
 
     @needs_example
+    @needs_listed_example
     def test_drafts_are_not_published(self):
         book = fake_book(self.tmp)
         copy_golden_carry(book)
@@ -614,6 +617,7 @@ class Publish(unittest.TestCase):
         self.assertFalse(out.exists())
 
     @needs_example
+    @needs_listed_example
     def test_items(self):
         items = viz.items(example_book())
         self.assertEqual(len(items), 1)
@@ -662,7 +666,7 @@ class Scaffold(unittest.TestCase):
     def test_node_scaffold_is_identical(self):
         py_book, js_book = fake_book(self.tmp / "py"), fake_book(self.tmp / "js")
         args = ("fib-walk", "FIB//WALK", "斐波那契行走", "Fibonacci walk")
-        viz.scaffold(py_book, *args, added=date.today().isoformat())
+        viz.scaffold(py_book, *args)
         r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-new.mjs"), str(js_book.dir), *args],
                            capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -671,6 +675,42 @@ class Scaffold(unittest.TestCase):
         for rel in files:
             self.assertEqual((py_book.viz_dir / rel).read_text(encoding="utf-8"),
                              (js_book.viz_dir / rel).read_text(encoding="utf-8"), str(rel))
+
+    @unittest.skipUnless(NODE and hasattr(time, "tzset"), "node and time.tzset needed")
+    def test_node_scaffold_is_identical_at_utc_day_boundaries(self):
+        script = """
+        const RealDate = Date;
+        const [stamp, bookPath] = process.argv.slice(1);
+        globalThis.Date = class extends RealDate {
+          constructor(...args) { super(...(args.length ? args : [Number(stamp)])); }
+          static now() { return Number(stamp); }
+        };
+        const { scaffold } = await import('./tools/node/viz-new.mjs');
+        const { resolveBook } = await import('./tools/node/viz-common.mjs');
+        scaffold(resolveBook(bookPath), { id: 'fib-walk', code: 'FIB//WALK', title: '行走', titleEn: 'Walk' });
+        """
+        for zone in ("Pacific/Kiritimati", "Pacific/Pago_Pago"):
+            for instant in ("2026-12-31T00:01:00+00:00", "2026-12-31T23:59:00+00:00"):
+                with self.subTest(zone=zone, instant=instant), tempfile.TemporaryDirectory(dir=self.tmp) as tmp:
+                    stamp = datetime.fromisoformat(instant)
+                    py_book, js_book = fake_book(Path(tmp) / "py"), fake_book(Path(tmp) / "js")
+                    try:
+                        with mock.patch.dict(os.environ, TZ=zone):
+                            time.tzset()
+                            with mock.patch.object(viz, "datetime", wraps=datetime) as clock:
+                                clock.now.side_effect = lambda tz=None: datetime.fromtimestamp(stamp.timestamp(), tz)
+                                viz.scaffold(py_book, "fib-walk", "FIB//WALK", "行走", "Walk")
+                                clock.now.assert_called_once_with(timezone.utc)
+                            r = subprocess.run([NODE, "--input-type=module", "-e", script,
+                                                str(int(stamp.timestamp() * 1000)), str(js_book.dir)],
+                                               capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
+                    finally:
+                        time.tzset()
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertEqual(viz.entry(py_book, "fib-walk")["added"], "2026-12-31")
+                    files = lambda book: {p.relative_to(book.viz_dir): p.read_bytes()
+                                          for p in book.viz_dir.rglob("*") if p.is_file()}
+                    self.assertEqual(files(py_book), files(js_book))
 
     QUOTED = ("quote-viz", 'Q//"V"', '黄金 "进位" & <比较> */', "Golden 'carry' & <compare> */")
 
@@ -703,7 +743,7 @@ class Scaffold(unittest.TestCase):
     @unittest.skipUnless(NODE, "node not available")
     def test_node_scaffold_escapes_identically(self):
         py_book, js_book = fake_book(self.tmp / "py"), fake_book(self.tmp / "js")
-        viz.scaffold(py_book, *self.QUOTED, added=date.today().isoformat())
+        viz.scaffold(py_book, *self.QUOTED, added=datetime.now(timezone.utc).date().isoformat())
         r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-new.mjs"), str(js_book.dir), *self.QUOTED],
                            capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)

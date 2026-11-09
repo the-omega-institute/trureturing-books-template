@@ -19,6 +19,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from example_support import example_shown
+
 from tbook import config, html, lean, ledger, mathrender, paths
 from tbook.model import load_edition
 from tbook.summary import parse_summary
@@ -519,6 +521,7 @@ class SearchIndexTest(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_KATEX and MDBOOK, "node, katex and mdBook are required")
 @unittest.skipUnless(EXAMPLE.is_dir(), "books/example-monograph was removed")
+@unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
 class BuildExampleTest(unittest.TestCase):
     """Build both editions of books/example-monograph and check the published pages."""
 
