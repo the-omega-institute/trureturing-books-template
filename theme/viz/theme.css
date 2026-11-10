@@ -36,6 +36,8 @@
   --glow-cyan-strong: var(--tr-fx-glow-cyan-strong);
   --glow-amber: var(--tr-fx-glow-amber);
   --cut: var(--tr-fx-cut-corner);
+  --grid-line: var(--panel-edge);
+  --radius: 0px;
   --gutter: 16px;
 }
 
