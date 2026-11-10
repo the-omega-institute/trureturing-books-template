@@ -259,12 +259,82 @@
     E.trimmer = trimmer;
   }
 
+  // mdBook's 30-word teaser counts a whole unspaced CJK paragraph as one word.
+  // Use the stored document to show a bounded excerpt around the actual match.
+  function cjkSearchTeasers() {
+    const results = doc.getElementById("mdbook-searchresults");
+    const input = doc.getElementById("mdbook-searchbar");
+    if (!results || !input || !root || !window.MutationObserver) return;
+    const update = () => {
+      const config = window.search;
+      const docs = config && config.index && config.index.documentStore && config.index.documentStore.docs;
+      if (!docs || !config.doc_urls) return;
+      const sources = new Map(config.doc_urls.map((url, i) => [new URL(url, root).href.replace(/#$/, ""), docs[i]]));
+      const terms = [...new Set(input.value.toLowerCase().trim().split(/\s+/).filter(Boolean))];
+      for (const item of results.children) {
+        const link = item.querySelector("a[href]");
+        const teaser = item.querySelector(".teaser");
+        if (!link || !teaser) continue;
+        const url = new URL(link.href);
+        url.search = "";
+        const source = sources.get(url.href.replace(/#$/, ""));
+        const body = source && source.body;
+        if (typeof body !== "string" || !new RegExp(`[${CJK}]`).test(body)) continue;
+        const lower = body.toLowerCase();
+        const hits = terms.map(t => lower.indexOf(t)).filter(i => i >= 0);
+        const hit = hits.length ? Math.min(...hits) : 0;
+        const chars = Array.from(body);
+        const center = Array.from(body.slice(0, hit)).length;
+        const start = Math.max(0, center - 40);
+        const end = Math.min(chars.length, start + 160);
+        const excerpt = chars.slice(start, end).join("");
+        const folded = excerpt.toLowerCase();
+        teaser.textContent = start ? "…" : "";
+        let pos = 0;
+        while (pos < excerpt.length) {
+          const matches = terms.map(t => ({ term: t, at: folded.indexOf(t, pos) }))
+            .filter(m => m.at >= 0).sort((a, b) => a.at - b.at || b.term.length - a.term.length);
+          const match = matches[0];
+          if (!match) { teaser.append(doc.createTextNode(excerpt.slice(pos))); break; }
+          teaser.append(doc.createTextNode(excerpt.slice(pos, match.at)));
+          teaser.append(make("em", { text: excerpt.slice(match.at, match.at + match.term.length) }));
+          pos = match.at + match.term.length;
+        }
+        if (end < chars.length) teaser.append(doc.createTextNode("…"));
+      }
+    };
+    new MutationObserver(update).observe(results, { childList: true });
+    update();
+  }
+
+  function scrollLongInlineMath() {
+    const main = doc.querySelector("#mdbook-content main");
+    if (!main) return;
+    const nodes = [...main.querySelectorAll(".tr-nobr, .katex")].filter(node =>
+      !node.closest(".tr-math, .katex-display") &&
+      (node.classList.contains("tr-nobr") || !node.closest(".tr-nobr")));
+    const update = () => {
+      for (const node of nodes) {
+        const block = node.parentElement.closest("p, li, td, th, h1, h2, h3, h4, h5, h6") || main;
+        const style = getComputedStyle(block);
+        const available = block.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        node.classList.toggle("tr-inline-scroll", Math.max(node.scrollWidth, node.getBoundingClientRect().width) > available + 1);
+      }
+    };
+    update();
+    if (window.ResizeObserver) new ResizeObserver(update).observe(main);
+    else window.addEventListener("resize", update);
+    if (doc.fonts) doc.fonts.ready.then(update);
+  }
+
   function run() {
     cjkSearch();
+    cjkSearchTeasers();
     menuBar();
     sidebarBrand();
     localize();
     ledgerPage();
+    scrollLongInlineMath();
   }
 
   if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", run);

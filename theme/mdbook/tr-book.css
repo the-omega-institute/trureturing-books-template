@@ -369,6 +369,12 @@ pre > .buttons button:hover { color: var(--tr-cyan); }
 
 .content main .katex { font-size: 1.08em; text-rendering: auto; }
 .tr-nobr { white-space: nowrap; }
+/* Long inline formulas/identifiers get their own scrollable line (tr-book.js),
+   so a narrow screen can reach the complete expression. */
+.content main .tr-inline-scroll {
+  display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden;
+  white-space: nowrap; margin-block: 0.25em; padding-block: 0.15em; scrollbar-width: thin;
+}
 .content main div.tr-math { margin: 1.1em 0; overflow-x: auto; overflow-y: hidden; padding: 0.15em 0; scrollbar-width: thin; }
 .content main div.tr-math > .katex-display { margin: 0; }
 .content main .katex-display { overflow-x: auto; overflow-y: hidden; }

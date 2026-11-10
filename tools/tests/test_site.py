@@ -512,6 +512,25 @@ class SiteBuildTest(SiteCase):
         self.assertFalse(kdir.exists())
         self.assertNotIn("katex", (out / "test-book" / "index.html").read_text())
 
+    @unittest.skipUnless(HAVE_KATEX, "node and node_modules/katex are required")
+    def test_contents_formulas_are_rendered_including_parts_and_drafts(self):
+        book = make_book(self.tmp)
+        for ed in book.editions:
+            (ed.dir / "SUMMARY.md").write_text(
+                "# Summary\n\n[Intro](README.md)\n\n# Part $\\psi = \\psi(\\psi)$\n\n"
+                "- [Projector $P^2 = P$](ch01.md)\n"
+                "  - [Nested $x_1$](nested.md)\n"
+                "- [Draft $\\varphi$]()\n", encoding="utf-8")
+            (ed.dir / "nested.md").write_text("# Nested\n", encoding="utf-8")
+        fake_build(self.build_root, book)
+        out = self.run_build([book])
+        landing = (out / "test-book" / "index.html").read_text()
+        self.assertEqual(landing.count('class="katex"'), 8)  # four per edition
+        for raw in ("$P^2 = P$", "$\\psi", "$x_1$", "$\\varphi$"):
+            self.assertNotIn(raw, landing)
+        self.assertIn('href="../assets/katex/katex.min.css', landing)
+        self.assertIn('class="draft"', landing)
+
     @unittest.skipUnless((site.mathrender.KATEX_DIST / "katex.min.css").is_file(), "node_modules/katex is required")
     def test_site_css_leaves_katex_classes_alone(self):
         """KaTeX lays formulas out with its own classes (.vlist, .base, .mord …): a site.css rule keyed on one of
@@ -595,6 +614,83 @@ class BrowserLayoutTest(SiteCase):
                            env=dict(os.environ, TBOOK_ROOT_DIR=str(paths.ROOT), TBOOK_CHROMIUM=doctor.chromium_path()))
         self.assertEqual(r.returncode, 0, r.stderr)
         return json.loads(r.stdout)
+
+    def test_cjk_search_teasers_are_bounded_and_show_the_match(self):
+        """An unspaced paragraph must not fill the results page or lose a match far from its start."""
+        script = (paths.THEME / "mdbook" / "tr-book.js").as_uri()
+        page = write(self.tmp / "search.html", '<!doctype html><meta charset="utf-8">'
+                     '<input id="mdbook-searchbar"><ol id="mdbook-searchresults"></ol>'
+                     '<script>window.TR_EDITIONS = {strings: {}}; window.path_to_root = "./";</script>'
+                     f'<script src="{script}"></script>')
+        expr = r"""(async () => {
+          const input = document.getElementById('mdbook-searchbar');
+          const list = document.getElementById('mdbook-searchresults');
+          const cases = [
+            ['几何积', '前文😀'.repeat(400) + '几何积<img src=x onerror=alert(1)>后文'.repeat(60)],
+            ['needle', '前文'.repeat(400) + 'needle <script>bad()</script> 后文'.repeat(60)],
+            ['末尾', '前文'.repeat(400) + '末尾'],
+            ['不存在', '正文'.repeat(400)],
+            ['English', 'English body '.repeat(400)]
+          ];
+          const out = [];
+          for (const [i, [query, body]] of cases.entries()) {
+            window.search = {doc_urls: [i % 2 ? 'part/a.html#section' : 'part/a.html'],
+                             index: {documentStore: {docs: {0: {body}}}}};
+            input.value = query;
+            list.innerHTML = '<li><a href="part/a.html?highlight=x#' + (i % 2 ? 'section' : '') + '">Result</a>' +
+              '<span class="teaser">Original <em>English</em> teaser</span></li>';
+            await new Promise(resolve => setTimeout(resolve, 0));
+            const teaser = list.querySelector('.teaser');
+            out.push({text: teaser.textContent, size: Array.from(teaser.textContent).length,
+                      marks: [...teaser.querySelectorAll('em')].map(e => e.textContent),
+                      injected: teaser.querySelectorAll('img,script').length});
+          }
+          return out;
+        })()"""
+        results, = self.browse([{"url": page.as_uri(), "width": 390, "expr": expr}])
+        for result, term in zip(results[:4], ("几何积", "needle", "末尾", "不存在")):
+            self.assertLessEqual(result["size"], 162)
+            self.assertEqual(result["injected"], 0)
+            if term != "不存在":
+                self.assertIn(term, result["text"])
+                self.assertIn(term, result["marks"])
+        self.assertTrue(results[0]["text"].startswith("…"))
+        self.assertTrue(results[0]["text"].endswith("…"))
+        self.assertIn('<img src=x onerror=alert(1)>', results[0]["text"])
+        self.assertEqual(results[-1]["text"], "Original English teaser")
+        self.assertEqual(results[-1]["marks"], ["English"])
+
+    @unittest.skipUnless(HAVE_KATEX, "node and node_modules/katex are required")
+    def test_long_inline_math_is_scrollable_on_a_phone(self):
+        formula = site.mathrender.render_formulas([
+            (r"g = \operatorname{relativeSemanticDiagonal}(\operatorname{twist},\operatorname{latent},\operatorname{decoderCatalog})", False)
+        ])[0]["html"]
+        css = (paths.THEME / "mdbook" / "tr-book.css").as_uri()
+        katex = (site.mathrender.KATEX_DIST / "katex.min.css").as_uri()
+        script = (paths.THEME / "mdbook" / "tr-book.js").as_uri()
+        page = write(self.tmp / "math.html", '<!doctype html><meta charset="utf-8">'
+                     f'<link rel="stylesheet" href="{katex}"><link rel="stylesheet" href="{css}">'
+                     '<style>html{font-size:10px} body{margin:16px} main{max-width:780px;margin:auto;font-size:16px}</style>'
+                     '<div id="mdbook-content" class="content"><main><p>Inline ' + formula + '</p>'
+                     '<p><span class="tr-nobr"><code>' + 'long_identifier_' * 4 + '</code>，</span></p></main></div>'
+                     '<script>window.TR_EDITIONS = {strings: {}};</script>'
+                     f'<script src="{script}"></script>')
+        expr = """(async () => {
+          await document.fonts.ready;
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          return [...document.querySelectorAll('main .tr-inline-scroll')].map(node => {
+            node.scrollLeft = node.scrollWidth;
+            return {right: node.getBoundingClientRect().right, client: node.clientWidth,
+                    full: node.scrollWidth, scrolled: node.scrollLeft};
+          });
+        })()"""
+        narrow, wide = self.browse([{"url": page.as_uri(), "width": w, "expr": expr} for w in (390, 1440)])
+        self.assertEqual(len(narrow), 2)
+        for item in narrow:
+            self.assertLessEqual(item["right"], 390)
+            self.assertGreater(item["full"], item["client"])
+            self.assertGreater(item["scrolled"], 0)
+        self.assertEqual(wide, [])
 
     def test_hub_shows_whole_covers(self):
         """A card taller than its cover (a long description) still shows the whole 5:8 cover, at every width."""

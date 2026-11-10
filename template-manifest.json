@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -60,7 +60,7 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "9e520d3786409a8b7f69b9ba883e8dc0b2afe62183ff5e7d3a23d54bbc332acb",
+      "sha256": "88cce409997c6f01bd1f8215090f908ab036378ff62cb028a3f497d1e4793548",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "f0a9231f3f54a31e4263984dbb3e6fe02d5512f0dc061f68e0fa6c7a656612b6",
+      "sha256": "6f143b6734aca3813ff7c66ce676ebb13e0178a977d7d783ce892248752e01f8",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -320,11 +320,11 @@
       "mode": "100644"
     },
     "theme/mdbook/tr-book.css": {
-      "sha256": "fe01ebda3d12c50c325682cbbcd9d2718a9f242709ef5f9fe9da3f327a379112",
+      "sha256": "df2f1c16cbf069f5a397a8eeada391c317fda7452f65757926a7439cadb66ec9",
       "mode": "100644"
     },
     "theme/mdbook/tr-book.js": {
-      "sha256": "ba8ade47f5ec76c9482714833ecbea0f878868df2d44213f8f9738bdf9f127a8",
+      "sha256": "d22772e195c3541191e13cf598e36316e0d12c2090d0d5b4fee754cf34b9aaec",
       "mode": "100644"
     },
     "theme/site/favicon.svg": {
@@ -332,7 +332,7 @@
       "mode": "100644"
     },
     "theme/site/site.css": {
-      "sha256": "24222889d1b8ddc71231b686376576aa65ccf171061dd5edf1ca465ffed26955",
+      "sha256": "8ea4558b5045282831f9fbec4b53e66174ee30e72b9fb859b239d3a74f740a8f",
       "mode": "100644"
     },
     "theme/site/site.js": {
@@ -640,7 +640,7 @@
       "mode": "100644"
     },
     "tools/tbook/site.py": {
-      "sha256": "b23fc5a6aebd88ddd8a5430786234bbdde74159868d33a5e28a083b10d8031a0",
+      "sha256": "66ea17124c58e8c0069ffd88b97743b67e1f112dcc99cc1156a9b2657ddc5824",
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
@@ -724,7 +724,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "79e4d865a40d57913da6e2c68e6005430d6e7c17da6c83095ff4ca3f4eed2e83",
+      "sha256": "7d2cf1eeb4ab89683f6ca2b774bbac7aae5a1dddc99a5d35bb22ccd2de39e731",
       "mode": "100644"
     },
     "tools/tests/test_slides.py": {

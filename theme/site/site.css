@@ -336,7 +336,8 @@ ul.vlist.lean .ref { color: var(--tr-ok); }
 ul.vlist.open .ref { color: var(--tr-warn); }
 ul.vlist .ref:hover { color: var(--tr-ink); }
 ul.vlist .ttl { color: var(--tr-ink); min-width: 0; }
-ul.vlist .ttl .katex { font-size: 1.06em; } /* formulas of titles, rendered at build time (assets/katex/katex.min.css) */
+ul.vlist .ttl .katex, .toc .katex { font-size: 1.06em; } /* formulas rendered at build time */
+.toc .part :is(.katex, code) { text-transform: none; letter-spacing: normal; }
 ul.vlist .decls { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 10px; }
 ul.vlist .decls a { color: var(--tr-dim); text-decoration: none; border-bottom: 1px dotted var(--hot); overflow-wrap: break-word; min-width: 0; }
 ul.vlist .decls a:hover { color: var(--tr-ok); border-bottom-color: var(--tr-ok); }

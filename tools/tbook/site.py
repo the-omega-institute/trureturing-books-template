@@ -947,7 +947,7 @@ def _chapter_counts(model: EditionModel, lock: lean.Lock | None) -> tuple[Counte
     return formal, opened
 
 
-def toc_html(view: BookView, ed_lang: str, ui_lang: str) -> str:
+def toc_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | None = None) -> str:
     model = view.models.get(ed_lang)
     if model is None or model.summary is None:
         return f'<p class="note">{esc(t(ui_lang, "toc_missing"))}</p>'
@@ -956,7 +956,7 @@ def toc_html(view: BookView, ed_lang: str, ui_lang: str) -> str:
     formal, opened = _chapter_counts(model, view.lock)
 
     def item(ch) -> str:
-        title = f'<span class="t-title">{esc(ch.title)}</span>'
+        title = f'<span class="t-title">{title_html(ch.title_md or ch.title, math)}</span>'
         tags = []
         if ch.path and formal.get(ch.path):
             tags.append(f'<span class="k ok">LEAN ✓ {formal[ch.path]}</span>')
@@ -977,7 +977,7 @@ def toc_html(view: BookView, ed_lang: str, ui_lang: str) -> str:
             continue
         if ch.part and ch.part != part:
             part = ch.part
-            out.append(f'<li class="part" aria-hidden="true">{esc(part)}</li>')
+            out.append(f'<li class="part" aria-hidden="true">{title_html(part, math)}</li>')
         out.append(item(ch))
     ledger_page = chapter_html(LEDGER_FILE)
     if built and (root / ledger_page).is_file():
@@ -1013,19 +1013,24 @@ def render_title_math(views: list[BookView]) -> dict[str, str]:
     """KaTeX HTML (inline) of every formula in the titles the landing pages list, by TeX: one Node process
     for the whole site. Empty, with a warning, when Node or KaTeX is missing; a formula KaTeX cannot render
     is left out (:func:`title_html` then shows its TeX source)."""
-    texs = list(dict.fromkeys(span.tex for v in views for model in v.models.values() for env in _listed_envs(model)
-                              if env.title for span in _title_formulas(model.title_markdown(env)).values()))
+    titles = []
+    for view in views:
+        for model in view.models.values():
+            titles.extend(model.title_markdown(env) for env in _listed_envs(model) if env.title)
+            if model.summary:
+                titles.extend(title for ch in model.summary.chapters for title in (ch.title_md or ch.title, ch.part))
+    texs = list(dict.fromkeys(span.tex for title in titles for span in _title_formulas(title).values()))
     if not texs:
         return {}
     try:
         answers = mathrender.render_formulas([(tex, False) for tex in texs])
     except mathrender.MathError as exc:
-        _warn(f"theorem titles show their formulas as TeX: {exc}")
+        _warn(f"landing-page titles show their formulas as TeX: {exc}")
         return {}
     rendered = {tex: a["html"].replace("\n", " ") for tex, a in zip(texs, answers) if isinstance(a.get("html"), str)}
     failed = [tex for tex in texs if tex not in rendered]
     if failed:
-        _warn(f"KaTeX cannot render {len(failed)} formula(s) of theorem titles, shown as TeX: "
+        _warn(f"KaTeX cannot render {len(failed)} formula(s) of landing-page titles, shown as TeX: "
               + ", ".join(f"${tex}$" for tex in failed))
     return rendered
 
@@ -1315,7 +1320,7 @@ def landing_html(frame: Frame, view: BookView) -> str:
         '<section id="contents" class="sec panel" aria-labelledby="contents-title">'
         f'<div class="sec-head"><h2 id="contents-title">{bi.s("ui.contents")}</h2>'
         f'<span class="aside">{view.chapters()} · {bi.t("stat_chapters")}</span></div>'
-        + bi.block(lambda lang: (toc_html(view, view.edition_for(lang), lang), view.edition_for(lang)))
+        + bi.block(lambda lang: (toc_html(view, view.edition_for(lang), lang, frame.math), view.edition_for(lang)))
         + "</section>"
     )
     pin = ""
