@@ -6,14 +6,14 @@
       "code": "GOLDEN//CARRY",
       "title": "黄金进位 · 两个 Zeckendorf 表示相加时的进位亏量",
       "title_en": "Golden carry · the carry deficit when two Zeckendorf representations are added",
-      "summary": "把 v₁、v₂ 的 Zeckendorf 数字串逐位相加，再按 trureturing 的进位顺序一步一步规范化。页面在 ℤ[φ] 中精确算出亏量 c(v₁, v₂) = β(v₁) + β(v₂) − β(v₁ + v₂)：它的 φ 系数为 0，是整数，等于最低两条重复进位规则的带符号计数，并且只取 −1、0、1——这两条结论已由 Lean 内核验证并冻结。热图逐格画出 0 … N 上的 c。",
-      "summary_en": "Add the Zeckendorf digit strings of v₁ and v₂ digit by digit, then normalize one carry at a time in trureturing's order. The page computes the deficit c(v₁, v₂) = β(v₁) + β(v₂) − β(v₁ + v₂) exactly in ℤ[φ]: its φ-coefficient is 0, so it is an integer, the signed count of the two lowest repeated carries, and it only takes the values −1, 0 and 1 — both facts kernel-verified in Lean and frozen. A heat map draws c cell by cell over 0 … N.",
+      "summary": "把 v₁、v₂ 的 Zeckendorf 数字串逐位相加，再一次一条规则地进位。亏量 c(v₁, v₂) = β(v₁) + β(v₂) − β(v₁ + v₂) 在 ℤ[φ] 中精确算出：它是整数，等于最低两条重复进位规则的带符号计数，并且只取 −1、0、1（已由 Lean 内核验证并冻结）。四个场景各看一面：筹码与进位、亏量图、相位正方形、收缩面上长度为 1 的窗口；十张实验卡都可以在正文中单独引用。",
+      "summary_en": "Add the Zeckendorf digit strings of v₁ and v₂ digit by digit, then carry one rule at a time. The deficit c(v₁, v₂) = β(v₁) + β(v₂) − β(v₁ + v₂) is computed exactly in ℤ[φ]: it is an integer, the signed count of the two lowest repeated carries, and it only takes the values −1, 0 and 1 (kernel-verified in Lean and frozen). Four scenes show one face each: tokens and carries, the deficit map, the phase square, and the window of length 1 on the contraction face; each of the ten experiment cards can be cited from the text on its own.",
       "path": "golden-carry/",
       "thumbnail": "golden-carry/thumb.jpg",
       "status": "live",
       "added": "2026-11-08",
-      "tags": ["Zeckendorf", "黄金比", "进位", "ℤ[φ]", "第一章"],
-      "tags_en": ["Zeckendorf", "golden ratio", "carries", "ℤ[φ]", "chapter 1"],
+      "tags": ["Zeckendorf", "黄金比", "进位", "相位", "ℤ[φ]", "第一章"],
+      "tags_en": ["Zeckendorf", "golden ratio", "carries", "phases", "ℤ[φ]", "chapter 1"],
       "theory": [
         {
           "label": "本书第一章 · 黄金整数的进位亏量",
@@ -29,7 +29,13 @@
       ],
       "lean": [
         { "gid": "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" },
-        { "gid": "D5/S1/Deficit/DeficitInteger.deficit_integer" }
+        { "gid": "D5/S1/Deficit/DeficitInteger.deficit_integer" },
+        { "gid": "D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit" },
+        { "gid": "D5/S1/Deficit/ChargedCarryPath.deficit_eq_beattyDeficit" },
+        { "gid": "D5/S1/Words/Expansions/BasePhiNegativeBridge.betaContraction_mem_window" },
+        { "gid": "D5/S1/Deficit/DoubleFaceLength.betaReal_sub_betaContraction" },
+        { "gid": "D5/S1/Deficit/GoldenPhaseDistribution.limiting_deficit_distribution" },
+        { "gid": "D5/S1/Digit/Addition.zeck_add" }
       ]
     }
   ]

@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "08d6c658e20446a0716a3d73c419fd1ee519bbdbac85ff1e08224a6b2e0fc500",
+      "sha256": "6e1448945dfa25f66366d8c193e65d0c42ff734f90a36c101567aa054422fddd",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "9e0a2474ee3869954c68f7a30c4ee16822124a3787c1a1f1b2830e0f261605e7",
+      "sha256": "d1bad1940426a4b8974fe2db8fb31de3416725ac7fbf34c8766d82b5f39f77f9",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -196,7 +196,7 @@
       "mode": "100644"
     },
     "templates/viz/README.md": {
-      "sha256": "8bf0c01010a3258861f9d5a26002d11433eb1ffe1aba99447dc2730bddc2011b",
+      "sha256": "6395879467feea0f6ab9eb55a8391b2788034ddcbc21cc9446d4ddc962e20c91",
       "mode": "100644"
     },
     "templates/viz/index.html": {
@@ -752,7 +752,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "b6caefd5847172c23408af74eec512e866faff55842076a1f4b4a9e3e6a3ff5e",
+      "sha256": "a6d4557b044556353d2f25d5efb7e5e48ecafafb88da9cfcffe659f0efd551c2",
       "mode": "100644"
     }
   }

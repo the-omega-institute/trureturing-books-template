@@ -33,6 +33,16 @@ EXAMPLE = paths.BOOKS / "example-monograph"
 GID3 = "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"
 GIDI = "D5/S1/Deficit/DeficitInteger.deficit_integer"
 GIDDEF = "D5/S1/Deficit/DeficitInteger.deficit"  # a Lean def
+# every theorem the example page cites, in the order of its registry entry
+EXAMPLE_GIDS = [
+    GID3, GIDI,
+    "D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit",
+    "D5/S1/Deficit/ChargedCarryPath.deficit_eq_beattyDeficit",
+    "D5/S1/Words/Expansions/BasePhiNegativeBridge.betaContraction_mem_window",
+    "D5/S1/Deficit/DoubleFaceLength.betaReal_sub_betaContraction",
+    "D5/S1/Deficit/GoldenPhaseDistribution.limiting_deficit_distribution",
+    "D5/S1/Digit/Addition.zeck_add",
+]
 # Downstream repositories may delete the example book (skills/book-new); tests built on it skip then.
 needs_example = unittest.skipUnless(EXAMPLE.is_dir(), "books/example-monograph is absent")
 needs_listed_example = unittest.skipUnless(example_shown(), "books/example-monograph is absent or hidden")
@@ -43,13 +53,13 @@ def example_book():
 
 
 def fake_lock() -> lean.Lock:
-    """A lock with two theorems and one definition (independent of the repository's lock)."""
+    """A lock with the theorems of the example page and one definition (independent of the repository's lock)."""
     def decl(gid: str, kind: str) -> dict:
         module, name = gid.rsplit(".", 1)
         return {"module": module, "name": "D5.S1.Deficit." + name, "kind": kind, "statement_id": "sha256:x", "line": 7}
 
     return lean.Lock(repo="the-omega-institute/trureturing", branch="dev", commit="a" * 40,
-                     declarations={GID3: decl(GID3, "theorem"), GIDI: decl(GIDI, "theorem"), GIDDEF: decl(GIDDEF, "def")})
+                     declarations={**{g: decl(g, "theorem") for g in EXAMPLE_GIDS}, GIDDEF: decl(GIDDEF, "def")})
 
 
 def fake_book(root: Path, slug: str = "tbook-viz-fixture"):
@@ -148,7 +158,7 @@ class RegistryChecks(unittest.TestCase):
         half.mkdir()
         page = (EXAMPLE / "viz" / "golden-carry" / "index.html").read_text(encoding="utf-8")
         page = page.replace('data-viz-id="golden-carry"', 'data-viz-id="half"')
-        page = page.replace('<span class="en">Inputs</span>', "", 1)  # break zh/en parity
+        page = page.replace('<span class="en">The pair</span>', "", 1)  # break zh/en parity
         page = page.replace('href="../assets/theme.css"', 'href="/assets/theme.css"')
         page = page.replace(f'data-lean-gid="{GIDI}"', 'data-lean-gid="D5/S1/Nowhere/Missing.thing"', 1)
         (half / "index.html").write_text(page, encoding="utf-8")
@@ -244,7 +254,7 @@ class RegistryChecks(unittest.TestCase):
     @needs_example
     def test_cited_gids(self):
         gids = {g for _, _, g in viz.cited_gids(example_book())}
-        self.assertEqual(gids, {GID3, GIDI})
+        self.assertEqual(gids, set(EXAMPLE_GIDS))
 
 
 @unittest.skipUnless(NODE, "node not available")
@@ -399,7 +409,7 @@ class CitedCards(unittest.TestCase):
         self.assertIn("demo, second-card", unknown)
         self.assertIn("not a card name", viz.check_preset(book, "golden-carry", "a b"))
         self.assertIn("not a card name", viz.check_preset(book, "golden-carry", ""))
-        self.assertIn("not a card name", viz.check_preset(book, "golden-carry", "1,1"))  # the pair presets of the ledger page
+        self.assertIn("not a card name", viz.check_preset(book, "golden-carry", "1,1"))  # card names are identifiers
         self.assertIsNone(viz.check_preset(book, "trureturing-visualize:zeno-watch", "itano", "zh"))  # not on disk
 
     def test_mdbook_figure_opens_the_cited_card(self):
@@ -596,16 +606,22 @@ class Embeds(unittest.TestCase):
             for lang in ("zh", "en"):
                 model = load_edition(book.edition(lang))
                 doc = next(d for d in model.chapters if d.chapter.path == "ch01-golden-deficit.md")
-                self.assertEqual([m.attrs.get("src") for m in doc.media if m.kind == "viz"], ["golden-carry"])
+                cited = [(m.attrs.get("src"), m.attrs.get("preset")) for m in doc.media if m.kind == "viz"]
+                # four cards cited where the text talks about them, then the whole lab at the end of the chapter
+                self.assertEqual(cited, [("golden-carry", c) for c in ("window", "cancel", "map", "fill", "")])
                 ctx = render.RenderContext(config.load_site(), book, book.edition(lang), model, lean.Lock.load(), "mdbook",
                                            env_href=render.mdbook_env_href(model))
                 html_md = render.chapter_markdown(doc, ctx)
                 self.assertIn(f'src="../viz/golden-carry/index.html?embed=1&amp;lang={lang}"', html_md)
+                self.assertIn(f'src="../viz/golden-carry/index.html?embed=1&amp;lang={lang}&amp;preset=window"', html_md)
                 ctx = render.RenderContext(config.load_site(), book, book.edition(lang), model, lean.Lock.load(), "pandoc")
                 pd = render.chapter_markdown(doc, ctx)
                 self.assertIn("::: {.tr-media .tr-viz}", pd)
                 self.assertIn("_book/viz/golden-carry/thumb.jpg", pd)
-                self.assertIn((bdir / "viz" / "golden-carry" / "thumb.jpg").resolve(), ctx.book_files)
+                self.assertIn(f"_book/viz/golden-carry/fig-window.{lang}.jpg", pd)  # a cited card prints its own still
+                self.assertEqual(ctx.issues, [])
+                for name in ("thumb.jpg", f"fig-window.{lang}.jpg", f"fig-fill.{lang}.jpg"):
+                    self.assertIn((bdir / "viz" / "golden-carry" / name).resolve(), ctx.book_files)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -725,7 +741,7 @@ class Publish(unittest.TestCase):
         self.assertTrue(it["thumb_file"].is_file())
         self.assertTrue(it["title"]["zh"].startswith("黄金进位"))
         self.assertTrue(it["title"]["en"].startswith("Golden carry"))
-        self.assertEqual([x["gid"] for x in it["lean"]], [GID3, GIDI])
+        self.assertEqual([x["gid"] for x in it["lean"]], EXAMPLE_GIDS)
         self.assertEqual(it["lean"][0]["label"], "deficit_three_valued")
         self.assertEqual(it["theory"][0]["href"]["en"], "../en/ch01-golden-deficit.html")
 

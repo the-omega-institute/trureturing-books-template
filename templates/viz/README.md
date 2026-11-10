@@ -19,6 +19,10 @@
 
 The generated page runs as it is and passes its own test: a point on the unit circle, its shadow and its height. Replace the subject and keep the shape: the stage is the page; experiment cards are named situations a chapter can cite; the tour bar steps through them next to the stage; few readouts with the evidence close by; one rail driving one quantity.
 
+完整的成品示例是 `books/example-monograph/viz/golden-carry/`：同一套版式与工具包，四个场景共用一条时间轴，十张实验卡，四张在第一章按卡引用，测试先过质量门再用独立算法核对。起始页面是它的最小形态。
+
+The finished example is `books/example-monograph/viz/golden-carry/`: the same layout and kit, four scenes on one rail, ten experiment cards, four of them cited from chapter 1, and a suite that runs the quality gates and then checks every claim independently. The starter is its smallest form.
+
 ## 注册表 · Registry (`books/<book>/viz/visualizations.json`)
 
 ```json

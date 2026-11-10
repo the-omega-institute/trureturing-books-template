@@ -90,7 +90,15 @@ $$
 即 $\varphi - 3 \le c(v_1, v_2) \le \varphi$，约为 $-1.382 \le c \le 1.618$。这个区间中的整数只有 $-1$、$0$、$1$，这就是 [@thm-deficit-three-valued]。完整证明由 Lean 内核检查。
 :::
 
+::: {.viz src="golden-carry" preset="window" height="500"}
+收缩面上的窗口。上半部分每个点是一个 $v \le 34$ 的读数 $\beta'(v)$，横向是它的值：所有的点都在 $-1/\varphi^2$ 与 $1/\varphi$ 两条竖线之间。琥珀色的点是 $v_1 = v_2 = 2$ 与 $v_1 + v_2 = 4$ 的读数；下方的数轴标出由它们算出的 $c = -1$，阴影是 $c$ 能落入的范围，其中的整数只有 $-1$、$0$、$1$。
+:::
+
 [@thm-deficit-integer] 的第三部分把同一个整数读成进位的计数。按 [@thm-zeck-add]，$v_1 + v_2$ 的 Zeckendorf 数位，就是把两组数位逐位相加、再用进位规范化的结果。内部的进位在两个面上都不改变值（[@lem-face-invariant]）；只有最低的两条重复进位改变 $\beta$：$2F_2 = F_3$ 使它减少 $1$，$2F_3 = F_2 + F_4$ 使它增加 $1$，亏量等于前者的次数减去后者的次数。无论按什么顺序进位，只要最后得到规范的数位，终点与带符号的总数都相同（[@thm-charge-unique]）。进位规则见[附录 A 的“进位”一节](appendix-a-zeckendorf.md#sec-carries)。
+
+::: {.viz src="golden-carry" preset="cancel" height="500"}
+$6 + 6$ 的三次进位。每一行是一步之后的数位，格子里的筹码数就是那一位的数字，连线标出每次进位把筹码从哪里换到哪里。第一步把权重 $1$ 上的两枚换成权重 $2$ 上的一枚（$2F_2 = F_3$），记 $+1$；第三步把权重 $2$ 上的两枚换成权重 $1$ 与 $3$ 上各一枚（$2F_3 = F_2 + F_4$），记 $-1$；中间一步不改变 $\beta$，记 $0$。上方的标尺量的是当前数位的 $\beta$ 比结果的 $\beta$ 多出多少：它从 $0$ 出发，最后回到 $0$，所以 $c(6, 6) = 0$。
+:::
 
 ## 亏量何时取哪个值 {#sec-phases}
 
@@ -159,6 +167,10 @@ $$
 以 $c(2, 2) = -1$ 为例。$2 + 2 = 4 = F_4 + F_2$，所以 $c(2, 2) = 2\varphi^3 - \varphi^4 - \varphi^2 = -1$。Beatty 形式给出 $s(2) + s(2) - s(4) = 3 + 3 - 7 = -1$。相位上 $p(2) = \{3\varphi\} \approx 0.854$，所以 $p(2) + p(2) \approx 1.708 \ge \varphi$。进位上，两组数位相加后 $F_3$ 处的数位是 $2$，规范化恰好用一次 $2F_3 = F_2 + F_4$，记 $-1$。第一行与第一列全是 $0$，因为 $\beta(0) = 0$；表关于对角线对称。
 :::
 
+::: {.viz src="golden-carry" preset="map" height="500"}
+把上表延伸到 $0 \le v_1, v_2 \le 34$：横轴是 $v_1$，纵轴是 $v_2$，青色格 $c = +1$，品红格 $c = -1$，暗格 $c = 0$。左下角的 $8 \times 8$ 就是上表；琥珀色十字标出 $(17, 17)$。
+:::
+
 ::: {.proposition #prop-phase-areas title="三种取值的面积" lean="D5/S1/Deficit/GoldenPhaseDistribution.limiting_deficit_distribution"}
 令
 
@@ -190,14 +202,18 @@ $P$ 是图中左下三角形 $\{p_1 + p_2 < 1/\varphi\}$ 的面积，按竖直�
 | 10000 | 0.1910 | 0.0729 |
 :::
 
+::: {.viz src="golden-carry" preset="fill" height="500"}
+相位正方形：每个点是一对 $(p(v_1), p(v_2))$，$v_1, v_2$ 取遍小于 $n$ 的自然数，$n$ 写在图的标题里。青色点 $c = +1$，品红点 $c = -1$，灰点 $c = 0$，三种颜色被两条斜线分开；标题下一行给出两种颜色所占的比例与两块三角形的面积。
+:::
+
 [^equi]: 这是 Weyl 等分布定理的特例：$\alpha$ 为无理数时，序列 $\{n\alpha\}$（$n = 1, 2, 3, \dots$）在 $[0, 1)$ 中等分布，即对任意 $0 \le a < b \le 1$，满足 $\{n\alpha\} \in [a, b)$ 的 $n \le m$ 所占的比例当 $m \to \infty$ 时趋于 $b - a$（H. Weyl, Über die Gleichverteilung von Zahlen mod. Eins, *Math. Ann.* 77 (1916), 313–352）。取 $\alpha = \varphi$ 并把下标平移一位，$p(v) = \{(v+1)\varphi\}$ 也等分布。$v_1$ 与 $v_2$ 各自取遍 $0, \dots, n-1$ 时，相位对的经验分布是两个一维经验分布的乘积，因而趋于正方形上的均匀分布；两个三角形的边界面积为零，所以比例趋于面积。
 
 ## 动手看一看
 
 下面的交互可视化与视频都由本书仓库构建：画面上的数值只是页面上的计算，帮助理解；结论成立与否以 Lean 为准。
 
-::: {.viz src="golden-carry" height="560"}
-拖动滑块或点击亏量图选择 $v_1, v_2$，逐步观察进位；亏量 $c(v_1, v_2)$ 总是 $-1$、$0$、$1$ 之一（[@thm-deficit-three-valued]）。
+::: {.viz src="golden-carry" height="620"}
+完整的实验室：换一对数 $v_1, v_2$，在进位、亏量图、相位、窗口四个场景之间切换，或沿实验卡逐张看；亏量 $c(v_1, v_2)$ 总是 $-1$、$0$、$1$ 之一（[@thm-deficit-three-valued]）。
 :::
 
 ::: {.film src="001-golden-deficit"}
