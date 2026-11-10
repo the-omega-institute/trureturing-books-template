@@ -34,6 +34,10 @@ function M.rename(code)
     for _, r in ipairs(M.RENAMES) do
       chunk = chunk:gsub(pattern(r[1]), r[2])
     end
+    -- texmath puts fixed-size delimiters in scale's markup body. Named symbols
+    -- there are literal text unless explicitly interpolated (chevron.l, ceil.l, ...).
+    -- Quoted TeX text is handled separately below and must remain literal.
+    chunk = chunk:gsub("(#scale%b())%[([%a][%w%.]*)%]", "%1[#sym.%2]")
     out[#out + 1] = chunk
     if not q then break end
     local j = q + 1

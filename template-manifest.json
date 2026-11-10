@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "72299017870b2b5ae90cb8b042cdfce17f10768596628abb4c2d63995c19106d",
+      "sha256": "fb1a8fdb479699bdab8b2263a59dc1ad0ef6aa6b01bf32f8e7f606b7813e3e2e",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -484,7 +484,7 @@
       "mode": "100644"
     },
     "tools/filters/typst-compat.lua": {
-      "sha256": "318962993917a91a6b7b2eed538b2c011bfa2052d2f028e3d80d3288ac0a1db7",
+      "sha256": "aec141f207b76a42735f851f08d59245813b2958685f53e16c9e7f75f1ba6969",
       "mode": "100644"
     },
     "tools/migrations/README.md": {
@@ -716,7 +716,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "3bc7a7fadeddc6cce1cd39e41abdb5843251df6797e61f914b5caf8f574773c5",
+      "sha256": "e7b3c37dd14b02242595aceecb823717a3787087c5f4e07285b097ce2d087e01",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {

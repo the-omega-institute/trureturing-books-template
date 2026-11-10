@@ -606,6 +606,30 @@ class TypstSymbolTest(unittest.TestCase):
 
     META = LuaFilterTest.META
 
+    @unittest.skipUnless(have_typst(), "typst not available")
+    def test_fixed_size_delimiters_are_symbols_in_text_and_titles(self):
+        import typst
+        import xml.etree.ElementTree as ET
+
+        formula = r"\Bigl\langle x,y\Bigr\rangle + \bigl\lceil x\bigr\rceil + \bigl\lfloor y\bigr\rfloor"
+        out = run_filters(f"${formula}$", "typst", self.META)
+        for name in ("chevron.l", "chevron.r", "ceil.l", "ceil.r", "floor.l", "floor.r"):
+            self.assertIn(f"[#sym.{name}]", out)
+        # These delimiters must occupy glyph widths, not the widths of their names.
+        svg = typst.compile(('#set page(width: auto, height: auto, margin: 0pt)\n' + out).encode(),
+                            format="svg")
+        width = ET.fromstring(svg).attrib["width"]
+        self.assertLess(float(width.removesuffix("pt")), 150)
+        title = formula.replace("\\", "\\\\")
+        env = (':::::: {.tr-env .remark tr-kind="remark" tr-status="informal" '
+               f'tr-label="Remark" tr-ref="Remark 1.1" tr-title="${title}$"}}\nBody.\n::::::\n')
+        titled = run_filters(env, "typst", self.META)
+        self.assertIn("title: [", titled)
+        for name in ("chevron.l", "chevron.r", "ceil.l", "ceil.r", "floor.l", "floor.r"):
+            self.assertIn(f"[#sym.{name}]", titled)
+        literal = run_filters(r'$\text{chevron.l} + \text{ceil.l} + \text{floor.l}$', "typst", self.META)
+        self.assertNotIn("#sym.", literal)
+
     def test_renamed_symbols(self):
         md = ("Meet $A \\cap B$, $\\bigcap_i A_i$, $A \\Cap B$, $a \\sqcap b$, $a \\odot b$, $\\bigodot_i a_i$, "
               "$a \\otimes b$, $\\bigotimes_i a_i$, $a \\ominus b$, $a \\circleddash b$, $\\text{sect} \\cap x$, "
