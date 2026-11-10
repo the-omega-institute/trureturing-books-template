@@ -44,6 +44,7 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 5. **Apple Books 显示**：不要在 CSS 中强制页面背景色；夜间主题由 `prefers-color-scheme: dark` 和 Apple 的主题选择器切换霓虹配色。用 Books（macOS/iOS）打开实测一次。
 6. **图片**：放在 `books/<slug>/assets/`，章节中写 `../assets/x.svg`；构建会复制进 `_book/`。PDF 支持 SVG/PNG/JPG。
 7. **mdBook**：版本须为 0.5.4（`MDBOOK` 环境变量或 PATH）。0.4.x 的预处理协议不同。
+8. **PDF 重叠与越界**：同时检查中英文的 screen/print 四版，尤其是窄表格中的 Lean 标识符、公式及长章名页眉。模板会让表格内代码换行，并把超宽公式缩至当前单元格、列表或定理框宽度；缩得过小的公式应在正文用 `aligned` 显式分行，源码换行本身不会产生公式换行。宽审计表可用 Pandoc 的管道表格列宽：分隔行总宽超过 72 字符时，各列横线数量决定 PDF 列宽比例，把更多空间留给精确契约。实际渲染问题页，确认内容完整可读后再交付，不能只检查编译是否成功。
 
 ## 完成标准
 

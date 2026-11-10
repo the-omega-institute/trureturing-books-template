@@ -102,6 +102,16 @@
 
 #let breakable-name(s) = s.replace(".", ".\u{200B}").replace("/", "/\u{200B}")
 
+// Keep indivisible formulas inside their actual container (also inside lists/frames).
+// scale must reflow: reserving the original height makes neighbouring rows drift.
+#let fit-width(body, width) = {
+  let natural = measure(body)
+  if natural.width > width {
+    let ratio = width / natural.width * 100%
+    scale(x: ratio, y: ratio, reflow: true, body)
+  } else { body }
+}
+
 // ------------------------------------------------------------------ environments
 
 #let lean-footer(lean, colour) = {
@@ -253,7 +263,7 @@
   } else if is-print {
     grid(columns: (auto, 1fr), column-gutter: 8pt, align: (left, right), code, chapter-title)
   } else {
-    grid(columns: (1fr, auto), column-gutter: 8pt, align: (left, right), book-title, chapter-title)
+    grid(columns: (1fr, 2fr), column-gutter: 8pt, align: (left, right), book-title, chapter-title)
   }
   v(-4pt)
   stack(dir: ltr,
@@ -395,6 +405,7 @@
     })
   show math.equation: set text(font: ("New Computer Modern Math",), fallback: true)
   show math.equation.where(block: true): set block(above: 0.9em, below: 0.9em)
+  show math.equation.where(block: true): it => layout(size => fit-width(it, size.width))
   show link: set text(fill: link-colour)
   show footnote: set text(fill: pal.magenta)
   set footnote.entry(separator: line(length: 22%, stroke: 0.5pt + pal.line-hot), gap: 0.45em, indent: 0em)
@@ -421,6 +432,15 @@
   // which would inherit the centring: default cells to the start edge instead.
   show table: set align(start)
   show table: set par(justify: false, first-line-indent: 0pt, leading: 0.55em)
+  show table: it => {
+    // Raw identifiers can contain a segment wider than an entire narrow column.
+    show raw.where(block: false): code => text(code.text.clusters().join("\u{200B}"))
+    show table.cell: cell => layout(size => {
+      show math.equation.where(block: false): equation => fit-width(equation, size.width)
+      cell
+    })
+    it
+  }
   show table.cell.where(y: 0): set text(font: f-display, weight: "semibold", fill: pal.cyan, size: 0.95em)
   show figure.where(kind: table): set figure.caption(position: top)
   show figure.where(kind: table): set block(breakable: true)
