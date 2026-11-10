@@ -10,7 +10,7 @@
 // The suite reuses the server started by tools/node/viz-test.mjs (env VIZ_ORIGIN) or starts its own, so a suite also
 // runs alone:  node books/<slug>/viz/tests/<id>.test.mjs.  Chromium honours PW_CHROMIUM_PATH. Google Fonts requests are
 // answered with the local @fontsource files, so pages render with their real fonts offline.
-import { chromiumOptions, loadChromium, localFontsCss } from './viz-common.mjs';
+import { FORMAL_KINDS, chromiumOptions, leanUrl, loadChromium, localFontsCss, readLock, readRegistry, resolveBook } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
 
 /** Route Google Fonts to the local @fontsource copies served by the viz server at `origin`. */
@@ -135,10 +135,34 @@ export async function session(opts = {}) {
 }
 
 /**
+ * Honest labels (skills/book-viz, "如实标注"), checked on the page as served. `page` is open on the visualization.
+ *   every Lean link names a theorem of trureturing.lock.json and points at its pinned commit, file and line;
+ *   the registry entry lists exactly the theorems the page cites;
+ *   green boxes (.lean without .num / .model / .argued / .open) are exactly the boxes that cite a Lean theorem;
+ *   the theory drawer says in both languages that the page is not a proof.
+ */
+export async function evidenceChecks(T, slug, id, page) {
+  const { check } = T, lock = readLock();
+  const entry = (readRegistry(resolveBook(slug)).visualizations || []).find((v) => v.id === id) || {};
+  const links = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => [a.dataset.leanGid, a.href]));
+  const bad = links.find(([gid, href]) => { const d = lock && (lock.declarations || {})[gid]; return !d || !FORMAL_KINDS.includes(d.kind) || href !== leanUrl(lock, gid); });
+  check('evidence: every Lean link names a frozen theorem and points at its pinned commit, file and line', !bad, bad ? bad.join(' → ') : '');
+  const cited = [...new Set(links.map(([g]) => g))].sort(), listed = (entry.lean || []).map((l) => l.gid).sort();
+  const diff = [...cited.filter((g) => !listed.includes(g)).map((g) => `page only: ${g}`), ...listed.filter((g) => !cited.includes(g)).map((g) => `registry only: ${g}`)];
+  check('evidence: the registry lists exactly the theorems the page cites', diff.length === 0, diff.slice(0, 3).join(' | '));
+  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open)(\s|$)/.test(b.className), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
+  const wrong = boxes.find((b) => b.green !== b.link);
+  check('evidence: green boxes are exactly the boxes that cite a Lean theorem', !wrong, wrong ? `${wrong.green ? 'green without a Lean link' : 'Lean link in a box of another colour'}: ${wrong.text}` : '');
+  const drawer = await page.$eval('#drawer', (d) => d.textContent).catch(() => null);
+  if (drawer != null) check('evidence: the drawer says in both languages that the page is not a proof', /不是证明/.test(drawer) && /not a proof/.test(drawer));
+}
+
+/**
  * The checks every stage-first page must pass, whatever it shows (skills/book-viz, "质量门"). They cannot tell a good
  * picture from a bad one, but they catch the regressions that make a page unreadable inside a book:
  *   desktop   the stage holds at least `minShare` of the viewport; every experiment card applies and explains itself;
  *             the theory drawer opens and closes; no stage labels sit on top of each other
+ *   evidence  honest labels: see evidenceChecks above
  *   English   no Chinese left on screen after going through every card
  *   embed     (740 × 620, ?embed=1) the page chrome is gone, the stage starts at the top and fills most of the first
  *             screen, the tour bar is on that first screen, nothing scrolls sideways
@@ -150,10 +174,11 @@ export async function session(opts = {}) {
  *   motion    under prefers-reduced-motion the page loads and a card still applies
  * and no page error, console error or failed request anywhere.
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
- *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), settle (ms to wait after a click).
+ *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
+ *       settle (ms to wait after a click).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
-  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, settle: 120, ...opts };
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, settle: 120, ...opts };
   const { check } = T;
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
   const runCards = async (page, tag) => {
@@ -187,6 +212,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
     await page.keyboard.press('Escape');
     check('desktop: Escape closes the drawer', await page.evaluate(() => document.getElementById('drawer').hidden));
   }
+  if (o.evidence) await evidenceChecks(T, slug, id, page);
 
   // English
   await page.click('[data-lang-set="en"]'); await settle(page, 150);

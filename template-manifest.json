@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "6e1448945dfa25f66366d8c193e65d0c42ff734f90a36c101567aa054422fddd",
+      "sha256": "1831c2f99fae8309dbca505dea30733cbb56af67358b0ed21bb447fc5cc320f5",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "d1bad1940426a4b8974fe2db8fb31de3416725ac7fbf34c8766d82b5f39f77f9",
+      "sha256": "79164937891cb68c94e2482d44cd97994bfe4998d997a279c5e9cf1c96ccefcf",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -544,7 +544,7 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "4adc240bd6f10994cef8709159926fce383db0249c596db23db34c3b13489589",
+      "sha256": "afab64ea51e1adfd83b71e068997d766143e1bd2512b62cb6372667fc9e69239",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
