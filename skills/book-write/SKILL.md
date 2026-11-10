@@ -53,6 +53,10 @@ description: 撰写或修改 books/<slug>/<lang>/ 下的章节时使用：定理
 ::: {.viz src="golden-carry" height="560"}
 图注。
 :::
+
+::: {.viz src="my-viz" preset="half" height="500"}
+**一句标题。** 引用可视化的一张实验卡，贴在讲到它的那句话旁边（见 `skills/book-viz`）。
+:::
 ```
 
 - 形式结论、定义、开放条目必须有 `#id`；id 一经发布不要改（外链依赖它）。

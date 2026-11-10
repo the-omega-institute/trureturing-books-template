@@ -1,12 +1,19 @@
 #!/usr/bin/env node
-// Capture hub/landing-page thumbnails (1280×720 JPEG) with Playwright + Chromium (software WebGL):
+// Capture the still images of visualizations with Playwright + Chromium (software WebGL):
 //   node tools/node/viz-thumbs.mjs                          every registered entry of every book
 //   node tools/node/viz-thumbs.mjs example-monograph        every entry of one book (slug or directory)
 //   node tools/node/viz-thumbs.mjs example-monograph golden-carry [more ids]
+// Two kinds of image are written into books/<slug>/viz/<id>/ (commit them):
+//   thumb.jpg                 the wordless 1280×720 cover for the hub, the landing page and uncited embeds
+//   fig-<card>.<lang>.jpg     the labelled still (1600×900) of every experiment card that a chapter cites with
+//                             `::: {.viz src="<id>" preset="<card>"}`, one per language edition citing it; PDF and
+//                             EPUB show it in place of the cover. Stills that no chapter cites any more are removed.
 // The page is opened as <id>/?thumb=1&lang=zh, served with the runtime mounted at ../assets like the published site.
 // shell.js then sets <html data-thumb-mode>, theme.css makes the page's [data-thumb] region (else its .stage) fill the
 // viewport and hides toasts and HUD text, so one cover serves both languages. A page may define window.TRV_THUMB()
-// (sync or async) to put itself into a representative cover state first. Chromium honours PW_CHROMIUM_PATH.
+// (sync or async) to put itself into a representative cover state first. A still is the page opened as
+// <id>/?shot=1&lang=<lang>&preset=<card>: the same region with its title, labels and legend kept (TRV.still is set, so
+// the page shows the card's telling frame instead of playing). Chromium honours PW_CHROMIUM_PATH.
 // Adapted from trureturing-visualize/scripts/thumbs.mjs (Apache-2.0, the-omega-institute).
 import path from 'node:path';
 import fs from 'node:fs';
@@ -15,6 +22,28 @@ import { startServer, vizUrl } from './viz-server.mjs';
 import { routeLocalFonts } from './viz-testkit.mjs';
 
 export const WIDTH = 1280, HEIGHT = 720;
+/** Stills are captured at 800×450 CSS pixels, twice over: labels sized for a reader stay legible on a printed page. */
+export const STILL = { width: 800, height: 450, scale: 2 };
+const VIZ_BLOCK = /^:::+\s*\{([^}]*\.viz\b[^}]*)\}/gm;
+const attr = (text, name) => { const m = new RegExp(`\\b${name}="([^"]*)"`).exec(text); return m ? m[1] : null; };
+/** The cards of `vizId` that the chapters of `book` cite: [{ preset, lang }], from every language directory. */
+export function citedCards(book, vizId) {
+  const out = new Map();
+  for (const lang of fs.readdirSync(book.dir, { withFileTypes: true }).filter((d) => d.isDirectory() && fs.existsSync(path.join(book.dir, d.name, 'SUMMARY.md'))).map((d) => d.name)) {
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const f = path.join(dir, e.name);
+        if (e.isDirectory()) walk(f);
+        else if (e.name.endsWith('.md')) for (const m of fs.readFileSync(f, 'utf8').matchAll(VIZ_BLOCK)) {
+          const preset = attr(m[1], 'preset');
+          if (attr(m[1], 'src') === vizId && preset && /^[A-Za-z0-9][\w-]*$/.test(preset)) out.set(`${preset}.${lang}`, { preset, lang });
+        }
+      }
+    };
+    walk(path.join(book.dir, lang));
+  }
+  return [...out.values()];
+}
 const args = process.argv.slice(2);
 let books = listBooks(), ids = [];
 if (args.length) {
@@ -60,6 +89,36 @@ try {
     console.log(`${book.slug}/${v.id} → ${rel(out)}${errors.length ? `  (page errors: ${errors.join('; ')})` : ''}`);
     if (errors.length) failures++;
     await context.close();
+
+    // the labelled stills of the cards that chapters cite
+    const dir = path.join(book.dir, 'viz', v.id), cited = citedCards(book, v.id), keep = new Set(cited.map((c) => `fig-${c.preset}.${c.lang}.jpg`));
+    for (const old of fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => /^fig-.*\.jpg$/.test(n) && !keep.has(n)) : []) { fs.unlinkSync(path.join(dir, old)); console.log(`${book.slug}/${v.id}: removed ${old} (no chapter cites it)`); }
+    for (const { preset, lang } of cited) {
+      const ctx = await browser.newContext({ viewport: { width: STILL.width, height: STILL.height }, deviceScaleFactor: STILL.scale, locale: lang === 'zh' ? 'zh-CN' : lang, reducedMotion: 'reduce' });
+      await routeLocalFonts(ctx, origin);
+      const pg = await ctx.newPage();
+      const errs = [];
+      pg.on('pageerror', (e) => errs.push(e.message));
+      pg.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+      await pg.goto(vizUrl(origin, book.slug, v.id, `?shot=1&lang=${lang}&preset=${preset}`), { waitUntil: 'load' });
+      await pg.evaluate(() => document.fonts && document.fonts.ready);
+      await pg.waitForTimeout(500);
+      const state = await pg.evaluate((card) => {
+        if (!document.querySelector('[data-thumb]')) { const s = document.querySelector('.stage'); if (s) s.setAttribute('data-thumb', ''); }
+        window.dispatchEvent(new Event('resize'));
+        if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush();
+        const b = document.querySelector(`[data-preset="${card}"]`);
+        return { has: !!b, on: !!b && b.getAttribute('aria-pressed') === 'true' };
+      }, preset);
+      await pg.waitForTimeout(700);
+      const file = path.join(dir, `fig-${preset}.${lang}.jpg`);
+      if (!state.has) { console.error(`${book.slug}/${v.id}: no card data-preset="${preset}" (cited by a ${lang} chapter)`); failures++; await ctx.close(); continue; }
+      if (!state.on) errs.push(`the page did not open on card "${preset}" (does it call cards.initial()?)`);
+      await pg.screenshot({ path: file, type: 'jpeg', quality: 82, clip: { x: 0, y: 0, width: STILL.width, height: STILL.height } });
+      console.log(`${book.slug}/${v.id} [${preset} · ${lang}] → ${rel(file)}${errs.length ? `  (page errors: ${errs.join('; ')})` : ''}`);
+      if (errs.length) failures++;
+      await ctx.close();
+    }
   }
 } finally {
   await browser.close();

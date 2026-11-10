@@ -12,147 +12,136 @@
 <link rel="stylesheet" href="../assets/theme.css">
 <link rel="stylesheet" href="style.css">
 <script src="../assets/shell.js"></script>
+<script src="../assets/kit.js"></script>
 </head>
 <body data-viz-id="__ID__">
-<div class="app" id="app">
+<!-- A working stage-first page. Replace the unit circle with your subject and keep the shape:
+     the stage is the page; each experiment card is one figure a chapter can cite; every claim is labelled.
+     Read skills/book-viz/SKILL.md before changing anything, and look at the result (node tools/node/viz-shots.mjs). -->
+<div class="app lab" id="app">
   <header class="top">
     <div class="brand">
       <a class="crumb" href="../"><span class="zh">◂ 可视化索引</span><span class="en">◂ Visualizations</span></a>
       <h1 class="logo" data-text="__CODE__">__CODE_HTML__</h1>
-      <div class="tagline"><span class="zh">__TITLE__ · <em>一句话写出这个页面让人看见的关系</em></span><span class="en">__TITLE_EN__ · <em>one line on the relation this page makes visible</em></span></div>
+      <div class="tagline">
+        <span class="zh">__TITLE__ · <em>用一句读者能复述的话说出这个页面的结论</em></span>
+        <span class="en">__TITLE_EN__ · <em>say the point of the page in one sentence a reader could repeat</em></span>
+      </div>
     </div>
-    <div class="status">
+    <div class="status" aria-live="polite">
+      <span class="pill" id="pillAngle">θ <strong>—</strong></span>
+      <span class="pill hot" id="pillSum"><span class="zh">平方和</span><span class="en">SUM</span> <strong>1</strong></span>
       <div class="langs" role="group" aria-label="语言 Language"><button data-lang-set="zh" aria-pressed="true">中</button><button data-lang-set="en" aria-pressed="false">EN</button></div>
     </div>
   </header>
 
-  <aside class="col deck" aria-label="输入与读数" data-aria-en="Inputs and readouts">
-    <section class="panel sec" id="inputs">
-      <h2><span class="zh">输入</span><span class="en">Inputs</span><span class="aside">a, b</span></h2>
-      <div class="num-field">
-        <label for="aNum">a</label>
-        <div class="stepper">
-          <button type="button" id="aDec" aria-label="a 减一" data-aria-en="Decrease a">−</button>
-          <input type="number" id="aNum" min="1" max="16" step="1" value="6">
-          <button type="button" id="aInc" aria-label="a 加一" data-aria-en="Increase a">+</button>
-        </div>
-        <input type="range" id="aRange" min="1" max="16" step="1" value="6" aria-label="a 滑块" data-aria-en="a slider">
+  <aside class="col deck" aria-label="实验控制" data-aria-en="Experiment controls">
+    <section class="panel sec">
+      <h2><span class="zh">实验卡带</span><span class="en">Experiments</span><span class="aside">PRESETS</span></h2>
+      <!-- one card = one named situation with one sentence of explanation; a chapter cites it with preset="<id>" -->
+      <div class="presets cards" id="presets">
+        <button class="preset" data-preset="shadow" aria-pressed="false"><span class="code">ALL-SHADOW</span><span class="cn zh">全是影子</span><span class="cn en">All shadow</span></button>
+        <button class="preset" data-preset="even" aria-pressed="false"><span class="code">EVEN</span><span class="cn zh">45°：一半一半</span><span class="cn en">45°: half and half</span></button>
+        <button class="preset" data-preset="height" aria-pressed="false"><span class="code">ALL-HEIGHT</span><span class="cn zh">全是高度</span><span class="cn en">All height</span></button>
+        <button class="preset" data-preset="sweep" aria-pressed="false"><span class="code">SWEEP</span><span class="cn zh">转一圈：平方和不动</span><span class="cn en">Once around: the sum stays put</span></button>
       </div>
-      <div class="num-field">
-        <label for="bNum">b</label>
-        <div class="stepper">
-          <button type="button" id="bDec" aria-label="b 减一" data-aria-en="Decrease b">−</button>
-          <input type="number" id="bNum" min="1" max="16" step="1" value="5">
-          <button type="button" id="bInc" aria-label="b 加一" data-aria-en="Increase b">+</button>
-        </div>
-        <input type="range" id="bRange" min="1" max="16" step="1" value="5" aria-label="b 滑块" data-aria-en="b slider">
-      </div>
-      <div class="chips presets" id="presets">
-        <button type="button" class="chip" id="swapBtn"><span class="zh">交换 a ↔ b</span><span class="en">Swap a ↔ b</span></button>
-        <button type="button" class="chip" id="randBtn"><span class="zh">随机</span><span class="en">Random</span></button>
-      </div>
+      <p class="note" id="presetNote"></p>
     </section>
-
-    <section class="panel sec" id="readouts">
-      <h2><span class="zh">读数</span><span class="en">Readouts</span><span class="aside">Δ(a, b)</span></h2>
-      <dl class="ro">
-        <div class="c"><dt><span class="zh">输入 a</span><span class="en">Input a</span></dt><dd id="roA">—</dd></div>
-        <div class="c"><dt><span class="zh">输入 b</span><span class="en">Input b</span></dt><dd id="roB">—</dd></div>
-        <div class="a"><dt><span class="zh">和 a + b</span><span class="en">Sum a + b</span></dt><dd id="roSum">—</dd></div>
-        <div><dt><span class="zh">步数 K</span><span class="en">Steps K</span></dt><dd id="roSteps">—</dd></div>
-        <div class="wide deficit">
-          <dt><span class="zh">不变量 Δ(a, b)</span><span class="en">Invariant Δ(a, b)</span></dt>
-          <dd><b id="roDeficit">—</b><span class="sub" id="roDeficitSub"></span><span class="okmark">✓</span></dd>
-        </div>
-      </dl>
-      <p class="note" id="roNote"><span class="zh">把这里换成你的量与不变量。</span><span class="en">Replace this with your quantities and invariants.</span></p>
+    <section class="panel sec">
+      <h2><span class="zh">角度</span><span class="en">Angle</span><span class="aside">θ</span></h2>
+      <div class="field">
+        <label for="theta"><span class="zh">角度 θ</span><span class="en">Angle θ</span><small class="zh">也可以在圆上直接拖动</small><small class="en">or drag the point on the circle</small></label><output id="oTheta" for="theta">60°</output>
+        <input type="range" id="theta" min="0" max="360" step="1" value="60">
+      </div>
     </section>
   </aside>
 
-  <main class="center" aria-label="分步账本" data-aria-en="Step ledger">
-    <section class="panel ledger" id="ledgerPanel" aria-labelledby="ledgerTitle">
-      <div class="head">
-        <h2 id="ledgerTitle"><span class="zh">分步账本</span><span class="en">Step ledger</span></h2>
-        <span class="aside" id="ledgerSub">—</span>
-      </div>
-      <div class="rules" aria-label="改写规则" data-aria-en="Rewrite rules">
-        <span class="rule r0"><b>R₀</b> <span class="zh">正步</span><span class="en">pos step</span> <i>+1</i></span>
-        <span class="rule r1"><b>R₁</b> <span class="zh">负步</span><span class="en">neg step</span> <i>−1</i></span>
-      </div>
-      <div class="sheetwrap" id="sheetWrap">
-        <div class="digits" id="ledger" role="region" aria-label="逐轮账本" data-aria-en="Step-by-step ledger"></div>
-      </div>
-      <div class="tape-row">
-        <span class="tape-label"><span class="zh">每轮贡献</span><span class="en">Per-pass sign</span></span>
-        <div class="tape" id="tape" role="group" aria-label="每轮符号" data-aria-en="Sign of each pass"></div>
-        <span class="tape-sum" id="tapeSum"></span>
+  <main class="center">
+    <div class="stage still" id="stage" data-thumb aria-label="单位圆上的一点，它在横轴上的影子与它的高度" data-aria-en="A point on the unit circle, its shadow on the horizontal axis and its height">
+      <canvas class="fill" id="cv"></canvas>
+      <div class="scan"></div><div class="vig"></div>
+      <span class="bracket tl"></span><span class="bracket tr"></span><span class="bracket bl"></span><span class="bracket br"></span>
+      <div class="hud-tl"><span class="big" id="hudBig"></span><span class="sub" id="hudSub"></span></div>
+      <div class="hud-bl">
+        <span><i class="sw cy"></i><span class="zh">影子 cos θ</span><span class="en">shadow cos θ</span></span>
+        <span><i class="sw mg"></i><span class="zh">高度 sin θ</span><span class="en">height sin θ</span></span>
+        <span><i class="sw am"></i><span class="zh">当前的点</span><span class="en">the current point</span></span>
       </div>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    </section>
-
-    <footer class="rail" id="rail">
-      <div class="transport" role="group" aria-label="步进控制" data-aria-en="Pass transport">
-        <button type="button" class="tbtn" id="first" title="0 (Home)" aria-label="回到初始态" data-aria-en="Initial state">⏮</button>
-        <button type="button" class="tbtn" id="prev" title="←" aria-label="上一轮" data-aria-en="Previous pass">◀</button>
-        <button type="button" class="tbtn" id="play" title="Space" aria-pressed="false" aria-label="播放或暂停" data-aria-en="Play or pause">▶</button>
-        <button type="button" class="tbtn" id="next" title="→" aria-label="下一轮" data-aria-en="Next pass">▶▶</button>
-        <button type="button" class="tbtn" id="last" title="End" aria-label="跳到最终态" data-aria-en="Final state">⏭</button>
-      </div>
-      <div class="clock">
-        <span class="tau" id="passLabel"><span class="zh">第 0 / 0 轮</span><span class="en">Pass 0 / 0</span></span>
-        <input type="range" id="pass" min="0" max="1" step="1" value="1" aria-label="当前轮次" data-aria-en="Current pass">
-      </div>
-      <div class="keys"><kbd>Space</kbd> <span class="zh">播放</span><span class="en">play</span> · <kbd>←</kbd><kbd>→</kbd> <span class="zh">单步</span><span class="en">step</span> · <kbd>R</kbd> <span class="zh">随机</span><span class="en">random</span></div>
-    </footer>
+    </div>
+    <div class="tour" id="tour">
+      <button class="tbtn" data-tour="prev" aria-label="上一个实验" data-aria-en="Previous experiment">◀</button>
+      <div class="what"></div>
+      <button class="tbtn" data-tour="next" aria-label="下一个实验" data-aria-en="Next experiment">▶</button>
+    </div>
+    <div class="strip">
+      <section class="panel">
+        <div class="head"><h2><span class="zh">两个平方此消彼长</span><span class="en">One square grows as the other shrinks</span></h2><span id="plotMeta"></span></div>
+        <canvas id="plot" aria-label="cos²θ 与 sin²θ 随角度的变化" data-aria-en="cos²θ and sin²θ against the angle"></canvas>
+      </section>
+    </div>
   </main>
 
-  <aside class="col side" aria-label="相图与依据" data-aria-en="Phase map and evidence">
-    <section class="panel sec heatpanel" id="heatPanel" data-thumb>
-      <h2 class="thumb-hide"><span class="zh">二维相图 Δ(a, b)</span><span class="en">Phase map Δ(a, b)</span><span class="aside" id="heatRange">16 × 16</span></h2>
-      <div class="heatwrap">
-        <canvas id="heat" role="img" aria-label="Δ(a, b) 二维相图：点击选一对 (a, b)" data-aria-en="2D phase map of Δ(a, b): click a cell to pick (a, b)"></canvas>
-        <div class="scan"></div>
-      </div>
-      <ul class="legend thumb-hide" aria-label="颜色图例" data-aria-en="Colour legend">
-        <li><span class="sw pos"></span><span>+1</span></li>
-        <li><span class="sw zero"></span><span>0</span></li>
-        <li><span class="sw neg"></span><span>−1</span></li>
-        <li><span class="sw cur"></span><span><span class="zh">当前 (a, b)</span><span class="en">current (a, b)</span></span></li>
-      </ul>
-      <p class="note thumb-hide" id="heatCounts">—</p>
-      <p class="note thumb-hide" id="heatHover">&nbsp;</p>
+  <aside class="col side" aria-label="读数与依据" data-aria-en="Readouts and evidence">
+    <section class="panel sec" id="readouts" aria-live="polite">
+      <h2><span class="zh">读数</span><span class="en">Readouts</span><span class="aside">cos² + sin²</span></h2>
+      <dl class="ro">
+        <div class="key"><dt><span class="zh">影子² + 高度²</span><span class="en">shadow² + height²</span></dt><dd><b id="roSum">—</b><span id="roSumSub"></span></dd></div>
+        <div class="c"><dt><span class="zh">影子 cos θ</span><span class="en">shadow cos θ</span></dt><dd id="roCos">—</dd></div>
+        <div class="m"><dt><span class="zh">高度 sin θ</span><span class="en">height sin θ</span></dt><dd id="roSin">—</dd></div>
+      </dl>
+      <p class="note" id="roNote"></p>
     </section>
-
     <section class="panel sec" id="evidence">
-      <h2><span class="zh">依据</span><span class="en">Evidence</span><span class="aside">NUM</span></h2>
-      <div class="lean num"><span class="ok">NUM</span><span><span class="zh">页面数值，不是定理。引用已冻结定理时改为 <code>.lean</code> 并写 <code>data-lean-gid</code>。</span><span class="en">Computed on the page; not a theorem. Use <code>.lean</code> with <code>data-lean-gid</code> when citing a frozen theorem.</span></span></div>
-      <button type="button" class="chip" id="infoBtn"><span class="zh">理论接口 DATA SHARD</span><span class="en">DATA SHARD · theory</span></button>
+      <h2><span class="zh">依据</span><span class="en">Evidence</span><span class="aside">trureturing</span></h2>
+      <!-- To cite a theorem of trureturing.lock.json, copy a green box from templates/viz/README.md ("LEAN ✓" with a
+           link that carries the GID), list the GID under "lean" in visualizations.json and run ./tbook pin --refresh.
+           Green is for kernel-verified theorems only. -->
+      <div class="lean argued"><span class="ok">ARGUED</span><span><span class="zh">起始模板的占位说明：cos²θ + sin²θ = 1 是勾股定理，这里没有引用任何冻结的 Lean 定理。把这一框换成你的页面真正依据的定理。</span><span class="en">Placeholder of the starter: cos²θ + sin²θ = 1 is the Pythagorean theorem, and no frozen Lean theorem is cited here. Replace this box with the theorems your page really rests on.</span></span></div>
+      <div class="lean num"><span class="ok">NUM</span><span><span class="zh">页面上的数都是按双精度实时算出的数值演示，不是证明。</span><span class="en">Every number on the page is computed live in double precision: an illustration, not a proof.</span></span></div>
+      <button class="chip" id="infoBtn"><span class="zh">理论接口 DATA SHARD</span><span class="en">DATA SHARD · theory</span></button>
     </section>
   </aside>
+
+  <footer class="rail" id="rail">
+    <div class="transport">
+      <button class="tbtn" id="rew" aria-label="回到起点" data-aria-en="Back to the start">⏮</button>
+      <button class="tbtn" id="play" aria-label="播放 / 暂停" data-aria-en="Play / pause" aria-pressed="false">▶</button>
+      <span class="chips" id="speedChips" role="group" aria-label="播放速度" data-aria-en="Playback speed">
+        <button class="chip" data-speed="0.35" aria-pressed="false">0.35×</button><button class="chip" data-speed="1" aria-pressed="true">1×</button><button class="chip" data-speed="2.5" aria-pressed="false">2.5×</button>
+      </span>
+    </div>
+    <div class="clock">
+      <span class="tau" id="tau"></span>
+      <input type="range" id="now" min="0" max="360" step="any" value="60" aria-label="角度" data-aria-en="Angle">
+    </div>
+    <div class="keys">
+      <kbd>Space</kbd> <span class="zh">播放</span><span class="en">play</span> · <kbd>←</kbd><kbd>→</kbd> <span class="zh">每次 15°</span><span class="en">15° at a time</span>
+    </div>
+  </footer>
 </div>
 
 <div class="drawer" id="drawer" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-    <div class="row"><h2 id="drawerTitle"><span class="zh">理论接口 · __TITLE__</span><span class="en">Theory interface · __TITLE_EN__</span></h2><button class="chip" id="drawerClose"><span class="zh">关闭 Esc</span><span class="en">Close Esc</span></button></div>
+    <div class="row"><h2 id="drawerTitle"><span class="zh">理论接口 · 这个页面在演示什么</span><span class="en">Theory interface · what this page shows</span></h2><button class="chip" id="drawerClose"><span class="zh">关闭 Esc</span><span class="en">Close Esc</span></button></div>
     <div class="zh">
-      <p class="lede">逐条写出页面上每个控件和读数对应书中的哪一节，哪些结论在 trureturing 中已由 Lean 冻结，哪些只是页面上的数值计算或示意模型。本页是数值演示，不是证明。</p>
+      <p class="lede">用两三句话说明：页面画的是什么对象，读者拖动的是什么，哪个量保持不变。并说明本页是数值演示，不是证明。</p>
       <ol>
-        <li><b>书中条目。</b>章节与定理编号（链接到本书）。</li>
-        <li><b>已验证部分。</b>冻结定理名与链接：写成 <code>&lt;a data-lean-gid="D5/…/Module.name"&gt;</code>，构建时链接固定到所钉的 trureturing 提交；没有就写“无”。</li>
-        <li><b>模型边界。</b>页面做了哪些简化，数值能信到什么程度。</li>
+        <li><b>依据的章节。</b>写出本书的章节（相对链接，如 <code>../../zh/chapter.html#thm-…</code>，加 <code>target="_top"</code>）。</li>
+        <li><b>已验证的定理。</b>逐条写出陈述与 <code>data-lean-gid</code> 链接；陈述与 Lean 一致，不夸大。</li>
+        <li><b>示意与简化。</b>哪些是为了画面选定的模型，哪些是文献结果、未在本书形式化，哪些仍是开放问题。</li>
       </ol>
     </div>
     <div class="en">
-      <p class="lede">For each control and readout, name the section of the book it comes from, which results are frozen in Lean in trureturing, and which parts are computations on the page or a schematic model. The page is a numerical illustration, not a proof.</p>
+      <p class="lede">Say in two or three sentences what object the page draws, what the reader moves, and which quantity stays the same. Say that the page is a numerical illustration, not a proof.</p>
       <ol>
-        <li><b>Book sections.</b> Chapter and theorem numbers (linked to the book).</li>
-        <li><b>Verified results.</b> Frozen theorem names with links: write <code>&lt;a data-lean-gid="D5/…/Module.name"&gt;</code> and the build pins the link to the locked trureturing commit; or “none”.</li>
-        <li><b>Model limits.</b> What the page simplifies and how far its numbers can be trusted.</li>
+        <li><b>The chapters behind it.</b> Name the sections of this book (relative links such as <code>../../en/chapter.html#thm-…</code>, with <code>target="_top"</code>).</li>
+        <li><b>Verified theorems.</b> State each one as Lean states it, with its <code>data-lean-gid</code> link; do not overstate.</li>
+        <li><b>Models and simplifications.</b> What was chosen for the picture, what is a literature result not formalized in this book, and what is still open.</li>
       </ol>
     </div>
   </div>
 </div>
-
 <script src="main.js"></script>
 </body>
 </html>

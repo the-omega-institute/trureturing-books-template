@@ -119,6 +119,10 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 图注（可选）。
 :::
 
+::: {.viz src="my-viz" preset="half" height="500"}
+引用一张实验卡：HTML 中开在那张卡上（`&preset=half`，不带内部滚动），PDF/EPUB 中用 `viz/my-viz/fig-half.<lang>.jpg`。
+:::
+
 ::: {.viz src="trureturing-visualize:robin-lattice"}
 :::
 

@@ -1,114 +1,182 @@
 ---
 name: book-viz
-description: 为书做交互可视化时使用：按 trureturing-visualize 与 books/example-monograph/viz/golden-carry/ 范式新建、编写、测试、登记并嵌入书内可视化（三栏网格、左栏步进器+滑块与 6+1+2 读数、中栏规则徽章+分步 HTML 账本 .drow+符号带 #tape+底部播放栏 footer.rail、右栏 1:1 二维相图 #heatPanel[data-thumb]+标准依据徽章 #evidence、?thumb=1 无文字左右分栏封面 drawCover()），或嵌入 trureturing-visualize 的现成页面。
+description: 为书做交互可视化时使用：先定这张图要让读者看见什么，再按“舞台优先、每张实验卡都是可被正文引用的图”的方法设计、实现、看图、测试、登记，并在章节里按卡引用（::: {.viz src=… preset=…}）；也用于修改或排查已有可视化、嵌入 trureturing-visualize 的现成页面。
 ---
 
 # 交互可视化
 
 ## 适用范围
 
-**用**：书中某一节需要可操作的对象（步进器、滑块、分步推演账本、二维相图、逐步动画）帮助理解；修改或排查已有可视化；把可视化嵌入章节。
+**用**：书中某个想法需要读者亲手推一下才看得见（拖动、逐步、扫参数）；修改、排查或重做已有可视化；在章节里引用可视化。
 
 **不用**：静态插图（放 `books/<slug>/assets/`，章节里写图片）；视频（`book-film`）；演示文稿（`book-slides`）。
 
-**权威**：`books/example-monograph/viz/golden-carry/{index.html,style.css,main.js}`（唯一视觉与结构样板）、`templates/viz/README.md`（登记表字段与页面契约）、`tools/tbook/viz.py`。
+**权威**：`templates/viz/`（起始模板，本身是一个能运行的舞台优先页面）与 `templates/viz/README.md`（登记表与页面契约）、`theme/viz/{theme.css,shell.js,kit.js}`（共享外观与运行时）、`tools/node/viz-testkit.mjs`（质量门）、`tools/tbook/viz.py`（校验与嵌入）。成品参照：[trureturing-visualize](https://the-omega-institute.github.io/trureturing-visualize/) 的页面（见下“形态”）。
 
-## 原则
+## 什么算好
 
-1. **可视化只改变看法，不证明任何东西。** 页面上能写 `LEAN ✓` 的只有锁文件中的 `theorem`（`.lean`）；页面上的数值计算标 `NUM`（`.lean.num`），示意模型标 `MODEL`（`.lean.model`），有纸面证明但未在本书形式化的文献结论标 `ARGUED`（`.lean.argued`），开放问题标 `OPEN`（`.lean.open`）。严禁自创 `.lean.interp`、`LIT`、`.lean-badge`、`.tier` 等非标类名。
-2. **结构与元素对齐 `golden-carry`。** 每个书内可视化页面都采用 `books/example-monograph/viz/golden-carry/` 的三栏结构与元素体系（见下节“三栏结构与视觉元素规范”），不自创脱离示例框架的私有布局、顶栏主题切换按钮或额外运行时脚本。
-3. **数字必须真实。** 页面上显示的每个数都由页面精确算出（或取自所钉提交），不编造“实验结果”。
-4. **双语逐条成对。** 每段可见文字都写成 `<span class="zh">…</span><span class="en">…</span>`（`.zh` 与 `.en` 数量相等）；脚本文字用 `TRV.L('中文', 'English')`，并在 `TRV.onLang(…)` 中重绘。
-5. **颜色只来自令牌**（`var(--cyan)` 等，脚本用 `TRV.palette` / `TRV.rgb`，不在 `style.css` 或 `main.js` 中硬编码 `#rrggbb`）。绿色只给 Lean 已验证；琥珀色只给“现在/当前选择”；红色标开放问题。
-6. **只用相对链接**；Lean 与 trureturing 文件链接写成 `data-lean-gid` / `data-trureturing-path`，由构建固定到所钉提交。
+读者正读到某一句话。五秒之内，他看见这句话在图上发生；三十秒之内，他亲手推了一下，发现那个量推不动。做不到这两点的页面，数字再全也没有用。
 
-## 三栏结构与视觉元素规范（对齐 `golden-carry`）
+由此得到三条判断，每次动手前后都拿来对照：
 
-1. **入口与顶栏（`header.top`）**
-   - 页面只加载 `../assets/theme.css`、`style.css`、`../assets/shell.js`（`<head>` 内）与底部的 `<script src="main.js"></script>`。
-   - `<header class="top">` 含 `.brand`（`<a class="crumb" href="../">`、`<h1 class="logo" data-text="CODE//NAME">`、`.tagline`）与 `.status`（状态 `span.pill` 及 `<div class="langs">` 中英切换按钮 `data-lang-set="zh|en"`）。
-2. **三栏 `.app` 网格（`style.css`）**
-   - 桌面端：`grid-template-columns: minmax(270px, 310px) minmax(0, 1fr) minmax(320px, 400px)`，`grid-template-rows: auto minmax(0, 1fr)`；`1180px` 以下折为双栏，`760px` 以下及 `:root[data-embed]` 折为紧凑布局。直接沿用 `templates/viz/style.css`（与 `golden-carry/style.css` 一致）。
-3. **左栏：输入与精炼读数（`<aside class="col deck">`）**
-   - **`<section class="panel sec" id="inputs">`**：
-     - 2–3 组 `.num-field`：顶部 `.row`（`<label>` + `.stepper` `−` / `<input type="number">` / `+`），下方 `<input type="range">` 滑块；
-     - `<div class="chips presets" id="presets">`：预设按钮 + `Swap` / `Random` / `Reset` 动作按钮。
-   - **`<section class="panel sec" id="readouts">`**：
-     - `<dl class="ro">` 采用 **6 + 1 + 2** 精炼结构（避免十余行长列表）：6 个半宽 `<div><dt>…</dt><dd>…</dd></div>` 读数 + **1 个全宽主读数 `<div class="wide deficit">`**（`24px` 发光主值 `<b class="vpos|vneg|vzero">`、副说明 `<span class="sub">`、绿色校验勾 `<span class="okmark">✓</span>`）+ 2 个全宽 `.wide` 定理核验行；
-     - 底部 `<p class="note" id="roNote">`。
-4. **中栏：分步交互账本与底部播放栏（`<main class="center">`）**
-   - **`<section class="panel ledger" id="ledgerPanel">`**：
-     - `.head`：`<h2 id="ledgerTitle">` + `<span class="aside" id="ledgerSub">`；
-     - `.rules`：4 枚 `.rule`（`.r0`、`.r1`、`.rj`、`.ra`）核心公式/改写规则徽章（`<b>符号</b> 条件 <i>效果</i>`）；
-     - 可选几何舞台 `.stage`（含 `<canvas>`、`.scan`、四角 `.bracket.tl/.tr/.bl/.br`、`.hud-tl`、`.hud-tr.chips`）：画布内只绘制干净的几何图形，**不在 `<canvas>` 内手绘多框文字表格或产生文字重叠**；
-     - **分步 HTML 账本 `.sheetwrap > .digits#ledger > .drow`**：用真实 HTML DOM 渲染表头 `.drow.hdr`、输入/初态行 `.drow.input`、逐轮推演行 `.drow.pass`（带 `[data-pass]` 点击跳步、当前步琥珀色发光 `.drow.now`、未来步半透明 `.drow.future`、触发格 `.touch`、右侧动作徽章 `<span class="what"><span class="sgn pos|neg|zero"><code><span class="name">`）与终态行 `.drow.final`；
-     - **底部符号带 `.tape-row`**：`<span class="tape-label">` + `<div class="tape" id="tape">`（可点击 `<i class="pos|neg|zero now|future" data-pass="…">` 方块序列）+ `<span class="tape-sum" id="tapeSum">`；
-     - `<div class="toast" id="toast">`。
-   - **`<footer class="rail" id="rail">`**：
-     - `.transport`：`#first`（`⏮`）、`#prev`（`◀`）、`#play`（`▶`）、`#next`（`▶▶`）、`#last`（`⏭`）；
-     - `.clock`：`<span class="tau" id="passLabel">` + `<input type="range" id="pass">`；
-     - `.keys`：键盘快捷键提示（`Space`、`←/→`、`Home/End`、`R`）。
-5. **右栏：二维交互相图与依据面板（`<aside class="col side">`）**
-   - **`<section class="panel sec heatpanel" id="heatPanel" data-thumb>`**：
-     - `<h2 class="thumb-hide">…<span class="aside" id="heatRange">…</span></h2>`；
-     - `<div class="heatwrap"><canvas id="heat"></canvas><div class="scan"></div></div>`：1:1 交互二维相图/参数热图/矩阵图，带琥珀色十字准星与当前选中格琥珀色发光框，支持点击/拖拽选点；
-     - `<div class="chips thumb-hide" id="nChips">` 范围/维度切换按钮；
-     - `<ul class="legend thumb-hide">` 四色图例（`.sw.pos`、`.sw.zero`、`.sw.neg`、`.sw.cur`）；
-     - `<p class="note thumb-hide" id="heatCounts">` 与 `<p class="note thumb-hide" id="heatHover">`。
-   - **`<section class="panel sec" id="evidence">`**：
-     - `.lean`（含 `data-lean-gid`）、`.lean.num`、`.lean.model`、`.lean.argued`、`.lean.open` 依据框；
-     - `<button class="chip" id="infoBtn">` 打开 `<div class="drawer" id="drawer" hidden><div class="sheet">…</div></div>` 理论接口。
-6. **无文字左右分栏缩略图封面（`?thumb=1` `drawCover()`）**
-   - 当 `TRV.thumbMode` 为真时，在 `canvas#heat`（`1280×720`）上绘制左右分栏缩略图（并注册 `window.TRV_THUMB = drawCover`）：左半幅（`ox = 64*u, side = 600*u`）为二维相图/矩阵 + 琥珀色十字准星与选中框；右半幅（`x0 = 760*u`）为账本行 `#1..#k` + 青/品红格 + 琥珀色发光末行边框；**不在缩略图上绘制自然语言标题或散文说明**。
+1. **舞台就是页面。** 画对象本身（球、格点、矩阵、曲线、轨迹），画得大，让读者直接拖它。关于对象的数字表、账本、读数墙不是主角。
+2. **不变的东西要看得见。** 一个结论通常是“别的都在动，只有它不动”或“它出不了这个范围”。把那个量画成不动的线、推不过去的边界、永远剩下的一格。
+3. **书里引用的是一张图，不是一台实验室。** 正文讲到哪个情形，旁边就该是那个情形的图。所以每张实验卡都要能被章节单独引用，并且在 PDF 里有自己的静态图。
 
-## 流程
+## 方法（按顺序做）
+
+### 0. 先读正文，写下一句话和几张卡
+
+读完要配图的章节，在动手之前写出（放在 PR 说明里即可，不必另存文件）：
+
+- **一句话**：读者看完能复述的结论，不带术语。它就是页面顶栏的 tagline。
+- **3–8 张实验卡**：每张是一个有名字的情形，写清四件事：状态（参数取什么）、读者会看到什么、一句解释、正文哪一处会引用它。写不出“正文哪一处”的卡通常不该存在。
+- **依据清单**：哪几条是锁文件里的定理（`LEAN ✓`），哪些是页面的数值（`NUM`）、示意模型（`MODEL`）、文献结果（`ARGUED`）、开放问题（`OPEN`）。
+
+如果一个主题需要两个以上互不相同的对象，分成场景（同一页的几个舞台，共用一条时间轴），每个场景仍然回答同一个问题。
+
+### 1. 选舞台，不选版式
+
+版式服从内容：先问“这个结论的对象长什么样”，再决定画什么。常见的几种：
+
+| 对象 | 舞台 | 参照页面 |
+| --- | --- | --- |
+| 方向、态、旋转 | 可拖动的球（`kit.stage3`） | trureturing-visualize：`zeno-watch`、`tomo-glance` |
+| 整数、格点、逼近 | 格点平面加放大镜（`kit.plot` 的 `equal`） | `prime-gaps`、`robin-lattice` |
+| 清单、表、矩阵 | 可点击的格子 | `perm-complement`、`hard-squares` |
+| 随时间展开的过程 | 时空图或轨迹，时间轴驱动 | `chrono-slit`、`cat-ledger` |
+| 逐步改写的记号串 | 分步账本 | 本模板的 `books/example-monograph/viz/golden-carry/` |
+
+账本形态只在对象本身就是一串逐步改写的记号时使用。不要把别的主题套进账本：那样读者看到的是一墙数字，中间挤着一个指甲盖大的图。
+
+“缝很小但永远不为零”这类结论，用放大镜：主图按真实比例画，旁边一个不断放大的窗口一直把那条缝放大到看得见。
+
+### 2. 用共享的实验室版式
+
+`<div class="app lab">`（`theme.css`）给出：左栏实验卡与控制、中间舞台（下面可有一条 `.strip` 小图）、右栏读数与依据、底部时间轴。它在窄屏和书内 iframe 里自动把舞台放到最前。在这个版式里：
+
+- **舞台**占视口的三成以上（质量门会量）。舞台上只留图形、短标签（`st.tag`）、左上角一行标题一行说明（`.hud-tl`）和底边图例（`.hud-bl`）。
+- **实验卡**（`.presets.cards` 里的 `button.preset[data-preset]`）：`.code` 是英文代号，`.cn` 是一句人话。点一张卡，舞台应当动起来（`kit.tween` 过渡），而不是硬切。
+- **条带小图**回答“沿时间轴，什么在变、什么不变”。一到两张，每张一个问题，标题就是那个问题。
+- **读数**不超过六项，外加一行放大的关键读数（`dl.ro .key`），用读者的话写标签（“线² + 面积²”，而不是变量名）。
+- **依据**就近：紧挨着它所担保的读数放一个 `LEAN ✓` 框，其余放在依据面板和理论抽屉里。
+- **时间轴**（`footer.rail` + `kit.clock`）只驱动一个量：步数、角度、时间。
+
+### 3. 每张卡都是可引用的图
+
+- 页面用 `cards.pick(cards.initial('<默认卡>'))` 开场：章节用 `preset` 指定了卡时就开在那张卡上。
+- 每张卡在数据里写三样东西：起始状态、是否播放（`play`）、静态图该停在哪一帧（`still`）。约定：`TRV.still`（封面与静态图）和整页打开时停在 `still`；书内的图用 `kit.autoplay` 在读者滚到它时才播放；读者点卡则立即播放。
+- 卡片说明只说图里看得见的东西。被引用的图只显示舞台、说明条和时间轴，条带小图和读数栏不在场。
+- 章节里这样引用，各语言版本都要加，位置、`src` 与 `preset` 相同：
+
+  ```markdown
+  ::: {.viz src="<id>" preset="<卡>" height="500"}
+  **一句标题。** 图注用与图例相同的颜色词和符号（“青色的线”“品红的面积”），并指向定理（[@thm-…]）。
+  :::
+  ```
+
+  HTML 中它是不带内部滚动的一张图（舞台、一句说明、◀ ▶、时间轴）；“全屏打开”进入同一状态的完整实验室。PDF/EPUB 中它是那张卡的带标签静态图（`fig-<卡>.<语言>.jpg`）。不带 `preset` 的嵌入是完整实验室，通常每个可视化在章末放一处。
+
+### 4. 诚实标注
+
+- `LEAN ✓`（`.lean`，绿色）只给锁文件里种类为 `theorem` 的声明，链接写 `data-lean-gid`。陈述与 Lean 一致，不夸大。
+- 页面算出的数标 `NUM`（`.lean.num`）；为画面选定的模型与本书的诠释标 `MODEL`（`.lean.model`）；有纸面证明但未在本书形式化的结论标 `ARGUED`（`.lean.argued`），正文写明“文献结果，未在本书形式化”；开放问题标 `OPEN`（`.lean.open`）。不自创别的类名。
+- 页面上的每个数都是真算出来的。几个事实并排展示时，说明它们是不同的事实，页面不声称其中一个推出另一个。
+- 绿色只给 Lean 已验证；琥珀色只给“现在/当前选择”；颜色只来自令牌（`var(--cyan)`、`TRV.palette`），不写十六进制色值。
+- 所有可见文字中英成对（静态 `.zh`/`.en`，脚本用 `TRV.L` 并在语言切换时重绘，`kit.painter` 已代办）。
+
+### 5. 看图
+
+测试分不清清楚的图和杂乱的图，必须亲眼看。每做完一轮：
 
 ```bash
-./tbook viz new <book> <id> "<CODE//NAME>" "<中文标题>" "<English title>"   # 从 templates/viz/ 生成三栏骨架与测试，登记为 draft
-node tools/node/viz-server.mjs                       # http://127.0.0.1:8766/site/<book>/viz/<id>/（?embed=1、?thumb=1、?lang=en）
+node tools/node/viz-shots.mjs <book> <id>                 # 桌面、书内、手机、封面，中英各一，写到 build/viz-shots/
+node tools/node/viz-shots.mjs <book> <id> --views desk --do "document.querySelector('[data-preset=x]').click()" --name x
 ```
 
-1. 在 `books/<book>/viz/<id>/` 中对照 `golden-carry` 编写 `index.html`、`style.css`、`main.js`。
-2. 支持 `?embed=1`（书中 iframe，隐藏页眉）与 `?thumb=1`（缩略图，`[data-thumb]` 充满画面，`window.TRV_THUMB = drawCover`）；手机宽度 390px 无横向滚动；尊重 `prefers-reduced-motion`。
-3. 完善登记表 `books/<book>/viz/visualizations.json`：`title_en`、`summary`/`summary_en`、`tags`/`tags_en`、至少一条 `theory`（本书章节写 `../zh/<chapter>.html`，trureturing 文件写 `{trureturing}/<path>`）、`lean`（GID 列表）。
-4. 写浏览器测试 `books/<book>/viz/tests/<id>.test.mjs`（参照 `golden-carry.test.mjs`：交互、双语、无控制台错误、无横向滚动、关键数值与独立实现互证）。
-5. 生成缩略图并转为发布状态：
+打开每一张，逐条问：
 
-   ```bash
-   node tools/node/viz-test.mjs <book>
-   node tools/node/viz-thumbs.mjs <book> <id>      # 1280×720 thumb.jpg，提交入库
-   ```
+- 不读任何文字，能看出主角是什么吗？舞台够大吗？
+- 琥珀色是不是只标着“现在”？两种对比色各自只表示一样东西吗？
+- 标签有没有压在一起、压在线上、被控件挡住？
+- 书内那张（740 宽）第一屏是不是舞台加一句说明？
+- 英文版有没有残留中文、有没有换行把标题挤成三行？
+- 封面缩成卡片大小还认得出吗？
 
-   把登记表中的 `"status"` 改为 `"live"`（`draft` 不发布，也不能嵌入书中）。
-6. 新引用了 GID 时运行 `./tbook pin --refresh`（它收集可视化引用的 GID），然后：
+和参照页面并排比一比。不如它们清楚，就回到第 1 步，而不是加更多读数。
 
-   ```bash
-   node tools/node/viz-validate.mjs <book>
-   ./tbook check
-   ```
+### 6. 测试
 
-7. 嵌入章节——**所有语言版本都要加**，位置与 `src` 相同，只翻译图注：
+`books/<book>/viz/tests/<id>.test.mjs`：
 
-   ```markdown
-   ::: {.viz src="<id>" height="560"}
-   图注（可含数学与 [@thm-…] 引用）。
-   :::
-   ```
+```js
+import { session, stageFirstChecks, settle } from '../../../../tools/node/viz-testkit.mjs';
+const T = await session();
+await stageFirstChecks(T, '<book>', '<id>');     // 所有舞台优先页面都要过的质量门
+// 然后是这个页面自己的检查
+```
 
-   外部页面：`::: {.viz src="trureturing-visualize:<id>"}`。HTML 中为 iframe + “全屏打开”；PDF/EPUB 中为缩略图、图注与在线地址。
-8. 构建并查看：`./tbook build html site --book <book> && ./tbook serve`，在中英文、深浅主题、手机宽度下各看一次；`./tbook build pdf --book <book>` 检查 PDF 中的缩略图面板。
+- `stageFirstChecks` 检查：舞台占比、每张卡能点且有说明、标签不重叠、抽屉与 Lean 链接、英文无残留中文、书内第一屏、被引用的图不滚动、静态图、手机无横向滚动、封面非空白、减少动效。
+- 页面自己的检查：每个控件一条；页面声称的每条性质一条，**用测试里另写的独立算法核对**（另一种表示、暴力枚举、数值积分），不调用页面自己的函数。页面通过只读探针 `window.<NAME>_DEBUG` 暴露状态。
+- 读状态前调用 `settle(page)`：无头浏览器每秒只渲染几帧，不要靠等待碰运气。
+
+### 7. 登记、出图、检查
+
+```bash
+./tbook viz new <book> <id> "<CODE//NAME>" "<中文标题>" "<English title>"   # 从起始模板生成，登记为 draft
+node tools/node/viz-server.mjs                       # http://127.0.0.1:8766/site/<book>/viz/<id>/（?lang=en、?embed=1、?preset=…）
+node tools/node/viz-test.mjs <book>
+node tools/node/viz-thumbs.mjs <book> <id>           # 封面 thumb.jpg，以及章节引用到的每张卡的 fig-<卡>.<语言>.jpg；提交入库
+node tools/node/viz-validate.mjs <book> && ./tbook check
+./tbook build html site --book <book> && ./tbook serve
+```
+
+完善 `books/<book>/viz/visualizations.json`（`title_en`、`summary`/`summary_en`、`tags`/`tags_en`、`theory`、`lean`），把 `status` 改为 `live`；新引用了 GID 时先 `./tbook pin --refresh`。改了卡片或图注之后重新运行 `viz-thumbs.mjs`：`./tbook check` 会核对被引用的卡存在、各语言版本引用一致、静态图齐全。
+
+## kit 速查（`theme/viz/kit.js`，在 `<head>` 里排在 `shell.js` 之后）
+
+| 用途 | 调用 |
+| --- | --- |
+| 重绘 | `const paint = kit.painter(draw, [要监听尺寸的元素])`；`paint()` 请求一帧，`kit.flush()` 立即重绘（测试用） |
+| 三维舞台（二维画布上） | `const st = kit.stage3(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `st.begin()` … `st.sphere()`、`st.arc(u, v)`、`st.arrow(a, b)`、`st.path(pts)`、`st.poly(pts)`、`st.dot(p)`、`st.circle(c, n, r)`、`st.tag(key, p, html, cls)` … `st.end()`；`st.pick(ev)` 取指针下的球面点，`st.view('iso' \| 'front' \| 'top')` |
+| 二维舞台与小图 | `const g = kit.plot(canvas, { x, y, pad, equal, logY })`；`g.axes()`、`g.line()`、`g.area()`、`g.rect()`、`g.poly()`、`g.dot()`、`g.vline()`、`g.hline()`、`g.text()`、`g.legend()`；`g.invX/invY` 把指针换回数据坐标 |
+| 时间轴 | `kit.clock({ range, play, label, speeds, max, rate, step, format, onChange })` → `set`、`setMax`、`play`、`pause`、`stepBy`；键盘 Space / ← → / Home / End 已绑定 |
+| 实验卡与导览条 | `kit.cards(el, { notes, noteEl, tour, idle, onPick })` → `pick`、`mark(null)`（读者动了控件）、`initial(默认卡)`、`step(±1)` |
+| 进入视野才播放 | `kit.autoplay(clock, stageEl)` |
+| 过渡 | `kit.tween(ms, step, done)`（尊重 `prefers-reduced-motion`） |
+| 其余 | `kit.chips`（互斥按钮组）、`kit.field`（滑块与读数）、`kit.keys`（快捷键）、`kit.v3`（向量、`rot`、`slerp`、`sph`）、`kit.fix` / `kit.sgn`（不出现 `-0.00` 的数字） |
+
+运行时状态（`shell.js`）：`TRV.embed`（书内）、`TRV.preset`（被引用的卡）、`TRV.figure`（书内且被引用）、`TRV.thumbMode`（无字封面）、`TRV.shot`（带标签静态图）、`TRV.still`（后两者之一：不播放，直接显示关键帧）。
+
+## 反模式
+
+| 现象 | 为什么不行 | 改法 |
+| --- | --- | --- |
+| 所有页面同一副骨架，舞台只有一小块 | 版式先于内容，读者看到的是数字墙 | 回到第 1 步，按对象选舞台 |
+| 读数十几行，全是符号 | 读者不知道看哪一行 | 留一行关键读数，其余进抽屉 |
+| 画布里手绘表格或大段文字 | 不能缩放、不能翻译、会重叠 | 画布只画图形；文字用 `st.tag` 或 DOM |
+| 卡片说明提到图里没有的东西 | 被引用时条带小图和读数栏不在场 | 说明只说舞台上看得见的 |
+| 一进页面就自动播放，或在视野外播完 | 读者错过了演示 | `kit.autoplay`；整页打开停在关键帧 |
+| 章末一台大实验室，正文没有图 | 读到那句话时图不在旁边 | 在那句话旁按卡引用 |
+| 为“看起来丰富”加第三张小图、第四个场景 | 每多一样东西，主角就淡一分 | 删到每样东西都回答一个问题 |
+| 用 `sleep` 等渲染的测试 | 无头环境帧率低，时过时不过 | `settle(page)` |
+
+## 嵌入 trureturing-visualize 的现成页面
+
+`::: {.viz src="trureturing-visualize:<id>" height="560"}`。HTML 中是指向该站点的 iframe，PDF/EPUB 中是文字卡片与地址。外部页面不在本仓库，`preset` 只检查写法，不出静态图；需要按卡引用和纸面静态图时，把它做成本书的可视化。
 
 ## 常见问题
 
 | 现象 | 处理 |
 | --- | --- |
-| `check` 报 draft 不能嵌入 | 完成第 5 步，把状态改为 `live` |
-| `LEAN ✓` 链接 404 或 GID 未登记 | GID 不在锁文件中：`./tbook pin --refresh`；GID 必须是已冻结的声明 |
-| “is a Lean def, not a theorem” | 登记表 `lean` 与页面 `data-lean-gid` 只能引用种类为 `theorem` 的声明（显示为 LEAN ✓）；定义写成 `data-trureturing-path="<module>.lean"` 或 `theory` 中的 `{trureturing}/<path>` |
-| iframe 内显示完整页眉 | 页面没有处理 `?embed=1`（共享运行时会处理，确认引用了 `shell.js`） |
-| 缩略图过期或含杂乱文字 | 在 `drawCover()` 中按 `golden-carry` 左右分栏绘制无字图形，重新运行 `viz-thumbs.mjs` |
+| `check` 报 draft 不能嵌入 | 完成登记表与测试，把状态改为 `live` |
+| `no experiment card data-preset="…"` | 章节引用的卡在页面里不存在；核对卡名，各语言版本一致 |
+| `the still of card "…" for <lang> is missing` | 运行 `node tools/node/viz-thumbs.mjs <book> <id>` 并提交生成的 `fig-*.jpg` |
+| 静态图没有停在想要的画面 | 给那张卡写 `still`，并在 `TRV.still` 时跳到它 |
+| `LEAN ✓` 链接 404 或 GID 未登记 | `./tbook pin --refresh`；GID 必须是已冻结的 `theorem`，定义写成 `data-trureturing-path` |
 | 手机宽度横向滚动 | 网格列用 `minmax(0, 1fr)`，长数字允许换行 |
+| 书里的图内部出现滚动条 | 被引用的图（带 `preset`）不应滚动；检查是否有固定高度的元素撑破了舞台 |
 
 ## 完成标准
 
-结构与元素对齐 `golden-carry`；`viz-validate`、`viz-test`、`./tbook check` 全部通过；登记表为 `live` 且有缩略图；各语言章节都已嵌入；在站点与 PDF 中实际看过。
+一句话与每张卡都能在正文里找到对应的句子；看过全部截图并与参照页面比过；`stageFirstChecks` 与页面自己的检查全部通过；`viz-validate`、`./tbook check` 通过；登记表为 `live`，封面与被引用卡的静态图已提交；各语言章节的引用一致；在站点与 PDF 中实际看过。

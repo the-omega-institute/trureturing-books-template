@@ -217,7 +217,10 @@ canvas.plot { width: 100%; display: block; }
 /* ---------- 2D / 3D stage ---------- */
 .stage { position: relative; min-height: 0; overflow: hidden; background: var(--stage-bg); border: 1px solid var(--panel-edge); touch-action: none; cursor: grab; }
 .stage:active { cursor: grabbing; }
-.stage > canvas.gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage > canvas.gl, .stage > canvas.fill { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage.still { cursor: default; touch-action: auto; }
+.stage.still:active { cursor: default; }
+.stage .tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .stage .scan, .scan { position: absolute; inset: 0; pointer-events: none; background: var(--tr-fx-scanlines); mix-blend-mode: overlay; }
 .stage .vig, .vig { position: absolute; inset: 0; pointer-events: none; background: var(--tr-fx-vignette); }
 .bracket { position: absolute; width: 22px; height: 22px; border-color: var(--cyan); border-style: solid; pointer-events: none; opacity: 0.8; }
@@ -240,6 +243,16 @@ canvas.plot { width: 100%; display: block; }
 .tag.cy { color: var(--cyan); font-size: 12px; }
 .tag.mg { color: var(--magenta); font-size: 12px; }
 .tag.tick { font-family: var(--font-data); letter-spacing: 0; text-transform: none; font-size: 10px; color: var(--faint); transform: translate(-100%, -50%); }
+.tag.raw { text-transform: none; letter-spacing: 0.04em; font-family: var(--font-body); font-size: 12px; }
+.tag.num { text-transform: none; letter-spacing: 0; font-family: var(--font-data); font-size: 11.5px; color: var(--ink); }
+.tag.ink { color: var(--ink); }
+/* legend along the bottom edge of a stage: what each colour on the stage means */
+.hud-bl { position: absolute; left: 20px; right: 20px; bottom: 12px; pointer-events: none; display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 11.5px; color: var(--ink); text-shadow: 0 0 6px var(--tr-void-deep), 0 0 2px var(--tr-void-deep); }
+.hud-bl span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 3px; display: inline-block; background: var(--cyan); flex: none; }
+.sw.box { height: 10px; width: 10px; }
+.sw.cy { background: var(--cyan); } .sw.mg { background: var(--magenta); } .sw.am { background: var(--amber); }
+.sw.ok { background: var(--ok); } .sw.vi { background: var(--violet); } .sw.dm { background: var(--dim); } .sw.wn { background: var(--warn); }
 .toast {
   position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(560px, calc(100% - 40px));
   background: color-mix(in srgb, var(--tr-void-deep) 90%, transparent); border: 1px solid var(--amber); color: var(--ink); padding: 8px 12px; font-size: 12.5px;
@@ -283,12 +296,105 @@ footer.rail { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; ga
 .sheet .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
 .sheet .lean { margin: 4px 0; }
 
+/* ---------- stage-first "lab" layout ----------
+   <div class="app lab">  header.top · aside.deck | main.center | aside.side · footer.rail
+   The stage is the page: it takes the middle column and most of the height; an optional .strip of small plots sits
+   under it; experiment cards and controls are on the left, readouts and evidence on the right, the clock along the
+   bottom. Narrow screens and the book's iframe (?embed=1) put the stage first and the columns below it. */
+body:has(> .app.lab) { overflow: hidden; }
+.app.lab {
+  height: 100%; display: grid; gap: 10px; padding-block: 10px; padding-inline: var(--gutter);
+  grid-template-columns: minmax(240px, 290px) minmax(0, 1fr) minmax(270px, 330px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.app.lab > header.top, .app.lab > footer.rail { grid-column: 1 / -1; }
+.lab .center { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 10px; min-height: 0; min-width: 0; }
+.lab .center > .stage { min-height: 220px; }
+.strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; height: 176px; min-height: 0; }
+.strip .panel { display: flex; flex-direction: column; min-height: 0; }
+.strip .head { display: flex; justify-content: space-between; align-items: baseline; gap: 2px 10px; padding: 7px 12px 0; flex-wrap: wrap; }
+.strip .head h2 { margin: 0; font-family: var(--font-display); font-size: 11.5px; letter-spacing: 0.14em; color: var(--cyan); font-weight: 600; text-transform: uppercase; }
+.strip .head span { font-family: var(--font-data); font-size: 11px; color: var(--dim); }
+.strip canvas { flex: 1; min-height: 0; width: 100%; display: block; }
+/* experiment cards: one click = one named scenario; the note under them says what to look at */
+.presets.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.preset {
+  text-align: left; border: 1px solid var(--line-hot); background: color-mix(in srgb, var(--panel-solid, var(--void)) 60%, transparent); cursor: pointer;
+  padding: 6px 8px; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+}
+.preset .code { font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; color: var(--cyan); text-transform: uppercase; }
+.preset .cn { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.preset:hover { border-color: var(--cyan); }
+.preset[aria-pressed="true"] { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber), 0 0 14px color-mix(in srgb, var(--amber) 25%, transparent); }
+.preset[aria-pressed="true"] .code { color: var(--amber); }
+/* tour bar: step through the experiment cards without leaving the stage (shown where the deck is out of view) */
+.tour { display: none; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--panel-edge); background: var(--panel); padding: 6px 8px; }
+.tour .what { min-width: 0; font-size: 12px; color: var(--dim); line-height: 1.4; }
+.tour .what b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 11.5px; letter-spacing: 0.1em; color: var(--amber); text-transform: uppercase; }
+/* readouts: one line that matters, set large */
+dl.ro .key { grid-column: 1 / -1; }
+dl.ro .key dd { font-size: 12px; color: var(--dim); }
+dl.ro .key dd b { display: block; font-weight: 600; font-size: 19px; line-height: 1.3; color: var(--ink); text-shadow: 0 0 12px color-mix(in srgb, currentColor 45%, transparent); }
+dl.ro dd small { font-size: 11px; color: var(--dim); }
+dl.ro .ok dd, .okmark { color: var(--ok); }
+.c-cy { color: var(--cyan); } .c-mg { color: var(--magenta); } .c-am { color: var(--amber); } .c-ok { color: var(--ok); } .c-wn { color: var(--warn); } .c-vi { color: var(--violet); }
+.marks { position: relative; height: 12px; grid-column: 2; }
+.marks i { position: absolute; top: 0; font-style: normal; font-family: var(--font-data); font-size: 10px; color: var(--dim); transform: translateX(-50%); white-space: nowrap; }
+.marks i:first-child { transform: none; } .marks i:last-child { transform: translateX(-100%); }
+@media (max-width: 1080px) {
+  body:has(> .app.lab) { overflow: auto; }
+  html:has(.app.lab), body:has(> .app.lab) { height: auto; }
+  .app.lab { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .app.lab > header.top { order: 0; }
+  .lab .center { order: 1; grid-template-rows: minmax(300px, 58vh) auto auto; }
+  .app.lab > footer.rail { order: 2; grid-template-columns: minmax(0, 1fr); }
+  .lab .side { order: 3; overflow: visible; }
+  .lab .deck { order: 4; overflow: visible; }
+  .lab .tour { display: grid; }
+  .lab .strip { grid-auto-flow: row; height: auto; }
+  .lab .strip canvas { height: 170px; flex: none; }
+  .lab .keys { text-align: left; }
+  .lab .hud-tr { max-width: calc(100% - 24px); }
+}
+@media (max-width: 520px) {
+  .presets.cards { grid-template-columns: minmax(0, 1fr); }
+  .hud-bl { font-size: 10.5px; left: 12px; right: 12px; }
+}
+
 /* ---------- embed mode (?embed=1): a compact page inside an <iframe> of the book ---------- */
 .embed-only { display: none !important; }
 :root[data-embed] .embed-only { display: revert !important; }
 :root[data-embed] header.top, :root[data-embed] .crumb, :root[data-embed] .embed-hide { display: none !important; }
 :root[data-embed] body { background-image: none; }
 :root[data-embed] { --gutter: 10px; }
+/* lab layout inside the book: the stage, the tour bar and the clock fit the first screen of the iframe; the plots,
+   then readouts and controls in two columns, follow below */
+:root[data-embed]:has(.app.lab), :root[data-embed] body:has(> .app.lab) { height: auto; overflow: auto; }
+:root[data-embed] .app.lab { height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; padding-block: 8px; }
+:root[data-embed] .lab .center { grid-column: 1 / -1; order: 1; grid-template-rows: clamp(280px, calc(100vh - 150px), 520px) auto auto; }
+:root[data-embed] .app.lab > footer.rail { order: 2; }
+:root[data-embed] .lab .side { order: 3; overflow: visible; }
+:root[data-embed] .lab .deck { order: 4; overflow: visible; }
+:root[data-embed] .lab .tour { display: grid; }
+:root[data-embed] .lab .strip { height: 160px; }
+:root[data-embed] .lab .keys { display: none; }
+:root[data-embed] .app.lab > footer.rail { grid-template-columns: auto minmax(0, 1fr); }
+@media (max-width: 600px) {
+  :root[data-embed] .app.lab { grid-template-columns: minmax(0, 1fr); }
+  :root[data-embed] .lab .strip { grid-auto-flow: row; height: auto; }
+}
+
+/* cited figure (?embed=1&preset=<card>, i.e. `::: {.viz src=… preset=…}` in a chapter): the stage, the one-sentence
+   note with ◀ ▶, and the transport. Nothing scrolls inside the frame; "open full screen" under the figure leads to
+   the whole lab in the same state. */
+:root[data-embed][data-figure]:has(.app.lab), :root[data-embed][data-figure] body:has(> .app.lab) { height: 100%; overflow: hidden; }
+:root[data-embed][data-figure] .app.lab { height: 100%; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 6px; padding-block: 6px; }
+:root[data-embed][data-figure] .lab .deck, :root[data-embed][data-figure] .lab .side, :root[data-embed][data-figure] .lab .strip,
+:root[data-embed][data-figure] .lab .transport .chips { display: none !important; }
+:root[data-embed][data-figure] .lab .center { grid-template-rows: minmax(0, 1fr) auto; gap: 6px; }
+:root[data-embed][data-figure] .lab .center > .stage { min-height: 0; }
+:root[data-embed][data-figure] .app.lab > footer.rail { border-top: 0; padding-top: 0; gap: 10px; }
+:root[data-embed][data-figure] .lab .tour { padding: 5px 8px; }
 
 /* ---------- thumbnail mode (?thumb=1, used by tools/node/viz-thumbs.mjs): [data-thumb] fills the viewport, no text ---------- */
 :root[data-thumb-mode] body { overflow: hidden; }
@@ -296,7 +402,16 @@ footer.rail { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; ga
   position: fixed !important; inset: 0 !important; z-index: 1000; width: 100vw !important; height: 100vh !important;
   max-width: none !important; max-height: none !important; margin: 0 !important; clip-path: none !important; border: 0 !important;
 }
-:root[data-thumb-mode] .toast, :root[data-thumb-mode] .hud-tl, :root[data-thumb-mode] .hud-tr, :root[data-thumb-mode] .thumb-hide { opacity: 0 !important; }
+:root[data-thumb-mode] .toast, :root[data-thumb-mode] .hud-tl, :root[data-thumb-mode] .hud-tr, :root[data-thumb-mode] .hud-bl, :root[data-thumb-mode] .tags, :root[data-thumb-mode] .thumb-hide { opacity: 0 !important; }
+
+/* still of a cited card (?shot=1): the same region fills the viewport, with its title, labels and legend kept, in the
+   language of the edition; only the controls on the stage and the toast are hidden */
+:root[data-shot] body { overflow: hidden; }
+:root[data-shot] [data-thumb] {
+  position: fixed !important; inset: 0 !important; z-index: 1000; width: 100vw !important; height: 100vh !important;
+  max-width: none !important; max-height: none !important; margin: 0 !important; clip-path: none !important; border: 0 !important;
+}
+:root[data-shot] .toast, :root[data-shot] .hud-tr { opacity: 0 !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .glitching .logo::before, .glitching .logo::after { animation: none; }

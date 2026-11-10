@@ -66,6 +66,9 @@ def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
                 try:
                     mod = importlib.import_module(f"tbook.{env.kind}")
                     problem = mod.check_ref(model.edition.book, env.attrs.get("src"))
+                    if not problem and env.kind == "viz" and "preset" in env.attrs.kv:
+                        # a cited experiment card: it must exist, and so must its still for this edition
+                        problem = mod.check_preset(model.edition.book, env.attrs.get("src"), env.attrs.get("preset"), model.lang)
                 except Exception as exc:  # noqa: BLE001 - surface any media checker failure
                     problem = f"cannot check {env.kind} src: {exc}"
                 if problem:
@@ -142,7 +145,8 @@ def _env_signature(model: EditionModel) -> list[tuple[str, list[tuple[str, str, 
     sig = []
     for ch in model.chapters:
         items = [(e.kind, e.id, tuple(e.lean)) for e in ch.envs if e.kind in NUMBERED + PROOF]
-        items += [(e.kind, e.attrs.get("src"), ()) for e in ch.media]
+        # a cited card (viz preset=…) is part of the citation: every edition cites the same card at the same place
+        items += [(e.kind, e.attrs.get("src"), (e.attrs.get("preset"),) if e.attrs.get("preset") else ()) for e in ch.media]
         sig.append((ch.chapter.path or "", items))
     return sig
 

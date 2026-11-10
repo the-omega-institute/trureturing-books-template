@@ -44,7 +44,14 @@ preview) rewrite those hrefs to the pinned commit, so a re-pin never leaves a pa
 Embedding in a chapter: ``::: {.viz src="golden-carry" height="560"}`` (a local id) or
 ``src="trureturing-visualize:<id>"`` (a page of https://the-omega-institute.github.io/trureturing-visualize/).
 HTML gets an ``<iframe>`` of ``<id>/index.html?embed=1&lang=<lang>``; PDF/EPUB get the thumbnail, the caption
-and the address of the interactive version (:func:`render_embed`). The iframe of a local visualization also
+and the address of the interactive version (:func:`render_embed`).
+
+Citing one experiment card: ``::: {.viz src="<id>" preset="<card>" height="480"}``. The page must carry a button
+``data-preset="<card>"`` (:func:`check_preset`). HTML gets the same iframe with ``&preset=<card>``: the page opens
+on that card as a figure (the stage, one sentence, the transport; nothing scrolls inside the frame). PDF/EPUB get
+the labelled still ``<id>/fig-<card>.<lang>.jpg`` of that card in the language of the edition, captured by
+tools/node/viz-thumbs.mjs, instead of the wordless cover. One visualization can so be cited at several places of
+a book, each time in the state the surrounding text talks about. The iframe of a local visualization also
 carries its target relative to the book in ``data-tr-src``: mdBook's print.html copies chapters of every depth
 to ``<lang>/`` without rewriting iframe sources, and :func:`tbook.site.fix_print_media` repairs them from it.
 
@@ -73,8 +80,10 @@ ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STATUSES = ("live", "draft")
 RESERVED = ("tests", "assets")
-RUNTIME_FILES = ("theme.css", "shell.js", "hub.css", "hub.js", "favicon.svg")
+RUNTIME_FILES = ("theme.css", "shell.js", "kit.js", "hub.css", "hub.js", "favicon.svg")
 THUMB_EXT = (".jpg", ".jpeg", ".png", ".webp")
+PRESET_RE = re.compile(r"^[A-Za-z0-9][\w-]*$")
+_PRESET_ATTR_RE = re.compile(r'\bdata-preset="([^"]+)"')
 EXTERNAL_PREFIX = "trureturing-visualize:"
 EXTERNAL_BASE = "https://the-omega-institute.github.io/trureturing-visualize/viz/"
 TRURETURING_HREF = "{trureturing}/"
@@ -401,6 +410,41 @@ def check_ref(book, src: str) -> str | None:
     return None
 
 
+def still_name(preset: str, lang: str) -> str:
+    """File name, inside ``viz/<id>/``, of the labelled still of an experiment card for one language."""
+    return f"fig-{preset}.{lang}.jpg"
+
+
+def page_presets(book, viz_id: str) -> list[str]:
+    """The experiment cards (``data-preset`` values) of a local page, in document order."""
+    page = book.viz_dir / viz_id / "index.html"
+    try:
+        found = _PRESET_ATTR_RE.findall(page.read_text(encoding="utf-8"))
+    except OSError:
+        return []
+    return list(dict.fromkeys(found))
+
+
+def check_preset(book, src: str, preset: str, lang: str | None = None) -> str | None:
+    """Error message when ``preset`` of ``::: {.viz src=… preset=…}`` cannot be cited, else None.
+
+    A local page must have the card, and (when ``lang`` is given) the still shown by PDF/EPUB must exist. A page
+    of trureturing-visualize is not on disk: only the form of the name is checked."""
+    src, preset = (src or "").strip(), (preset or "").strip()
+    if not PRESET_RE.match(preset):
+        return f'viz "{src}": preset "{preset}" is not a card name (letters, digits, "-" and "_")'
+    if src.startswith(EXTERNAL_PREFIX):
+        return None
+    cards = page_presets(book, src)
+    if preset not in cards:
+        have = ", ".join(cards) or "none: the page has no data-preset buttons"
+        return f'viz "{src}": no experiment card data-preset="{preset}" in {paths.rel(book.viz_dir / src / "index.html")} (cards: {have})'
+    if lang and not (book.viz_dir / src / still_name(preset, lang)).is_file():
+        return (f'viz "{src}": the still of card "{preset}" for {lang} is missing ({paths.rel(book.viz_dir / src / still_name(preset, lang))}); '
+                f"run node tools/node/viz-thumbs.mjs {book.slug} {src}")
+    return None
+
+
 def _line_of(text: str, viz_id: str) -> int:
     m = re.search(r'"id"\s*:\s*"' + re.escape(viz_id) + '"', text)
     return text.count("\n", 0, m.start()) + 1 if m else 0
@@ -722,8 +766,14 @@ def render_embed(env, ctx, inner: str, doc) -> str:
     title = (_localized(v, "title", lang) if v else "") or (f"trureturing-visualize · {vid}" if external else vid)
     code = (v or {}).get("code", "")
     problem = check_ref(ctx.book, src)
+    preset = (env.attrs.get("preset") or "").strip()
+    if not problem and preset:
+        problem = check_preset(ctx.book, src, preset)
+        if problem:
+            preset = ""  # an unusable card: show the page in its default state rather than a broken figure
     if problem:
         ctx.issues.append(f"{doc.path}: {problem}")
+    cite = f"&preset={preset}" if preset else ""
     if ctx.target == "mdbook":
         book_src = ""  # the iframe target relative to the book (<slug>/), for pages at another depth
         if external:
@@ -731,14 +781,14 @@ def render_embed(env, ctx, inner: str, doc) -> str:
         else:
             depth = (doc.chapter.path or "").count("/")
             page = "../" * (depth + 1) + f"viz/{vid}/index.html"
-            book_src = f' data-tr-src="{esc(f"viz/{vid}/index.html?embed=1&lang={lang}")}"'
-        frame = f"{page}?embed=1&lang={lang}"
-        full = f"{page}?lang={lang}"
+            book_src = f' data-tr-src="{esc(f"viz/{vid}/index.html?embed=1&lang={lang}{cite}")}"'
+        frame = f"{page}?embed=1&lang={lang}{cite}"
+        full = f"{page}?lang={lang}{cite}"
         h = _height(env, ctx)
         caption = inner or esc(title)
         label = f"{code} · {title}" if code else title
         return "\n".join([
-            f'<figure class="tr-media tr-viz" data-viz="{esc(src)}">',
+            f'<figure class="tr-media tr-viz" data-viz="{esc(src)}"' + (f' data-preset="{esc(preset)}"' if preset else "") + ">",
             f'<iframe class="tr-viz-frame" src="{esc(frame)}"{book_src} title="{esc(label)}" loading="lazy" height="{h}" '
             f'style="height:{h}px" allow="fullscreen" allowfullscreen></iframe>',
             '<figcaption class="tr-media-caption">',
@@ -761,6 +811,14 @@ def render_embed(env, ctx, inner: str, doc) -> str:
         where = f"<{url}>" if url else f"`{ctx.book.slug}/viz/{vid}/`"
     lines = ["::: {.tr-media .tr-viz}"]
     thumb_rel = str((v or {}).get("thumbnail") or f"{vid}/thumb.jpg")
+    if preset and not external:
+        # a cited card: its own labelled still in this language; the wordless cover only when it has not been captured
+        still_rel = f"{vid}/{still_name(preset, lang)}"
+        if (ctx.book.viz_dir / still_rel).is_file():
+            thumb_rel = still_rel
+        else:
+            ctx.issues.append(f"{doc.path}: viz {vid}: no still {paths.rel(ctx.book.viz_dir / still_rel)} for card "
+                              f'"{preset}"; the PDF/EPUB shows the cover (run node tools/node/viz-thumbs.mjs {ctx.book.slug} {vid})')
     thumb_abs = ctx.book.viz_dir / thumb_rel
     if not external and thumb_abs.is_file():
         ctx.book_files.add(thumb_abs.resolve())
@@ -984,7 +1042,8 @@ def published_registry(book, lock: lean.Lock | None) -> dict:
 
 
 def _ignore(_dir: str, names: list[str]) -> list[str]:
-    return [n for n in names if n.startswith(".") or n == "node_modules"]
+    # fig-<card>.<lang>.jpg are the stills of cited cards for PDF/EPUB; the site shows the live page instead
+    return [n for n in names if n.startswith(".") or n == "node_modules" or (n.startswith("fig-") and n.endswith(".jpg"))]
 
 
 def build(site, book, out_dir: Path) -> None:

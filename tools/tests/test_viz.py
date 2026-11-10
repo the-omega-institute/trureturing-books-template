@@ -355,6 +355,104 @@ class CheckRef(unittest.TestCase):
         self.assertIn("does not exist", viz.check_ref(fake_book(self.tmp), "golden-carry"))
 
 
+@needs_example
+class CitedCards(unittest.TestCase):
+    """``::: {.viz src=… preset=…}``: a chapter cites one experiment card of a visualization."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tbook-viz-"))
+        self.book = fake_book(self.tmp)
+        copy_golden_carry(self.book)
+        page = self.book.viz_dir / "golden-carry" / "index.html"
+        page.write_text(page.read_text(encoding="utf-8").replace(
+            "</body>", '<button class="preset" data-preset="demo"></button><button data-preset="second-card"></button></body>'),
+            encoding="utf-8")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _ctx(self, lang: str, target: str):
+        return SimpleNamespace(site=config.load_site(), book=self.book, lang=lang, target=target, issues=[],
+                               book_files=set(), book_prefix="_book")
+
+    def _still(self, card: str, lang: str) -> Path:
+        f = self.book.viz_dir / "golden-carry" / viz.still_name(card, lang)
+        f.write_bytes(b"jpg")
+        return f
+
+    def test_page_presets(self):
+        cards = viz.page_presets(self.book, "golden-carry")
+        self.assertEqual(cards[-2:], ["demo", "second-card"])
+        self.assertEqual(viz.page_presets(self.book, "no-such-page"), [])
+
+    def test_check_preset(self):
+        book = self.book
+        self.assertIsNone(viz.check_preset(book, "golden-carry", "demo"))
+        missing = viz.check_preset(book, "golden-carry", "demo", "zh")
+        self.assertIn("fig-demo.zh.jpg", missing)
+        self.assertIn("viz-thumbs.mjs", missing)
+        self._still("demo", "zh")
+        self.assertIsNone(viz.check_preset(book, "golden-carry", "demo", "zh"))
+        self.assertIn("fig-demo.en.jpg", viz.check_preset(book, "golden-carry", "demo", "en"))  # one still per edition
+        unknown = viz.check_preset(book, "golden-carry", "nope")
+        self.assertIn('no experiment card data-preset="nope"', unknown)
+        self.assertIn("demo, second-card", unknown)
+        self.assertIn("not a card name", viz.check_preset(book, "golden-carry", "a b"))
+        self.assertIn("not a card name", viz.check_preset(book, "golden-carry", ""))
+        self.assertIn("not a card name", viz.check_preset(book, "golden-carry", "1,1"))  # the pair presets of the ledger page
+        self.assertIsNone(viz.check_preset(book, "trureturing-visualize:zeno-watch", "itano", "zh"))  # not on disk
+
+    def test_mdbook_figure_opens_the_cited_card(self):
+        ctx = self._ctx("en", "mdbook")
+        out = viz.render_embed(_env(src="golden-carry", preset="demo", height="480"), ctx, "Caption.", _doc("part/ch.md"))
+        self.assertIn('<figure class="tr-media tr-viz" data-viz="golden-carry" data-preset="demo">', out)
+        self.assertIn('src="../../viz/golden-carry/index.html?embed=1&amp;lang=en&amp;preset=demo" '
+                      'data-tr-src="viz/golden-carry/index.html?embed=1&amp;lang=en&amp;preset=demo"', out)
+        self.assertIn('href="../../viz/golden-carry/index.html?lang=en&amp;preset=demo"', out)  # full screen, same card
+        self.assertEqual(ctx.issues, [])
+
+    def test_mdbook_without_preset_is_unchanged(self):
+        ctx = self._ctx("zh", "mdbook")
+        out = viz.render_embed(_env(src="golden-carry"), ctx, "", _doc("ch.md"))
+        self.assertIn('<figure class="tr-media tr-viz" data-viz="golden-carry">', out)
+        self.assertNotIn("preset", out)
+
+    def test_unknown_card_is_reported_and_not_linked(self):
+        ctx = self._ctx("zh", "mdbook")
+        out = viz.render_embed(_env(src="golden-carry", preset="nope"), ctx, "", _doc("ch.md"))
+        self.assertNotIn("preset", out)
+        self.assertTrue(any('data-preset="nope"' in m for m in ctx.issues), ctx.issues)
+
+    def test_pandoc_shows_the_still_of_the_edition(self):
+        still = self._still("demo", "zh")
+        ctx = self._ctx("zh", "pandoc")
+        out = viz.render_embed(_env(src="golden-carry", preset="demo"), ctx, "图注。", _doc("ch.md"))
+        self.assertIn("](_book/viz/golden-carry/fig-demo.zh.jpg){width=100%}", out)
+        self.assertEqual(ctx.book_files, {still.resolve()})
+        self.assertEqual(ctx.issues, [])
+        # the English edition has no still yet: the cover is shown and the build says how to capture one
+        ctx = self._ctx("en", "pandoc")
+        out = viz.render_embed(_env(src="golden-carry", preset="demo"), ctx, "", _doc("ch.md"))
+        self.assertIn("](_book/viz/golden-carry/thumb.jpg){width=100%}", out)
+        self.assertTrue(any("fig-demo.en.jpg" in m and "viz-thumbs.mjs" in m for m in ctx.issues), ctx.issues)
+
+    def test_stills_are_not_published_with_the_site(self):
+        names = ["index.html", "thumb.jpg", "fig-demo.zh.jpg", "fig-demo.en.jpg", ".DS_Store", "figure.jpg"]
+        self.assertEqual(viz._ignore("x", names), ["fig-demo.zh.jpg", "fig-demo.en.jpg", ".DS_Store"])
+
+    def test_editions_must_cite_the_same_card(self):
+        from tbook import check
+
+        def model(preset):
+            kv = {"src": "golden-carry"} | ({"preset": preset} if preset else {})
+            media = [SimpleNamespace(kind="viz", attrs=mdscan.Attrs(classes=["viz"], kv=kv))]
+            return SimpleNamespace(chapters=[SimpleNamespace(chapter=SimpleNamespace(path="ch.md"), envs=[], media=media)])
+
+        self.assertEqual(check._env_signature(model("demo")), [("ch.md", [("viz", "golden-carry", ("demo",))])])
+        self.assertEqual(check._env_signature(model(None)), [("ch.md", [("viz", "golden-carry", ())])])
+        self.assertNotEqual(check._env_signature(model("demo")), check._env_signature(model("second-card")))
+
+
 class Links(unittest.TestCase):
     @needs_example
     @needs_listed_example
@@ -795,7 +893,7 @@ class Strings(unittest.TestCase):
     def test_runtime_has_no_hard_coded_palette(self):
         """theme/viz colours come from tokens.css; hex values appear only in marked fallbacks."""
         tokens = json.loads(paths.TOKENS.read_text(encoding="utf-8"))
-        for name in ("theme.css", "hub.css", "hub.js"):
+        for name in ("theme.css", "hub.css", "hub.js", "kit.js"):
             text = (paths.THEME / "viz" / name).read_text(encoding="utf-8")
             bare = re.sub(r"var\(--tr-[a-z-]+, #[0-9a-f]{6}\)", "", text)
             self.assertFalse(re.search(r"#[0-9a-fA-F]{6}\b", bare), name)

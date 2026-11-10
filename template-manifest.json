@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -56,19 +56,19 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "4845088c9018af37c7b1cd28d81ab9191c0889baa32f4c11d8877857113bb742",
+      "sha256": "0f68c56111d6df8079b3854d458cbca633cfb46f6c7965eabe0e95247c60f5ad",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "88cce409997c6f01bd1f8215090f908ab036378ff62cb028a3f497d1e4793548",
+      "sha256": "d8f81e64ff6ee1f46500be95118a1417a8d8f5444566e13fb061f815242479ff",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "980b8ab44458fbf64c63aeb972b7f0a251326b1e3329e73457e9f36e9163aefb",
+      "sha256": "ef59bcc03dad6fab23ccaed28acb6d06851737bc3d64d6d7b00d5d67dbb90d04",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "fb1a8fdb479699bdab8b2263a59dc1ad0ef6aa6b01bf32f8e7f606b7813e3e2e",
+      "sha256": "08d6c658e20446a0716a3d73c419fd1ee519bbdbac85ff1e08224a6b2e0fc500",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -116,11 +116,11 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "b4cd4f180be408f58a8f9142557bf799d13b9a79863866a7edfe405b8cefbd30",
+      "sha256": "9e0a2474ee3869954c68f7a30c4ee16822124a3787c1a1f1b2830e0f261605e7",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "02ad295d126c249da44038f66ba890c8be89ef386ee95da0056e63ed60d3234b",
+      "sha256": "49410d5bc81f3fe5fd7e6ea156df76324186509e8da036f9aa0a9365a5379dfe",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
@@ -196,23 +196,23 @@
       "mode": "100644"
     },
     "templates/viz/README.md": {
-      "sha256": "9fc9e6363c5ab76df5aba0d9e8ff5537200540ae203732a54036371c970f81b6",
+      "sha256": "8bf0c01010a3258861f9d5a26002d11433eb1ffe1aba99447dc2730bddc2011b",
       "mode": "100644"
     },
     "templates/viz/index.html": {
-      "sha256": "220c421cf0e578a62fa1ee565a596d78f5ef19d7416e3437ef0def728eaab235",
+      "sha256": "a5c353543cee9f6b6d56d645866380323206cd563611be364587964541a1a035",
       "mode": "100644"
     },
     "templates/viz/main.js": {
-      "sha256": "7f0fe54ac43a6131f3deb5b7a99b77d0e67c85ab37a8143ce82ed2830240c04a",
+      "sha256": "48f54c5e834fd74a63ea930dd33acd38a2be33fa2d6e9ac6b53ca85dcb1ce7e0",
       "mode": "100644"
     },
     "templates/viz/style.css": {
-      "sha256": "d5198d5ca4b27c1edeb8b4d1fa2905eba66e5d47d969b5767c6f3eb1d5ef707c",
+      "sha256": "e24b927ecb8d87052375c19bf1de130b1d4dca5e89b4d617a0b2384e2a028364",
       "mode": "100644"
     },
     "templates/viz/test.mjs": {
-      "sha256": "a449835ecfddb31e43cdb960fa95fd5bcef9b3f8e621dacfc1949d9774c03784",
+      "sha256": "4fbdc610a21cc03e29bedd868521fd8a3bf5766bfb0d280b65f62454c3be93ba",
       "mode": "100644"
     },
     "theme/epub/book.css": {
@@ -463,12 +463,16 @@
       "sha256": "a03bb3d9a66b6484ce03bbf84e90d12d09c23aa791d048380b839b61de9b6dc9",
       "mode": "100644"
     },
+    "theme/viz/kit.js": {
+      "sha256": "63ecfcd926e4157421e8228bd37bd5c2d78c70b7d61bf102aae7f1d7c7aa8171",
+      "mode": "100644"
+    },
     "theme/viz/shell.js": {
-      "sha256": "b38c11dbdfff5439c1f1b5e711cabf94fb67f5a3c0808f37c6fa87016f068410",
+      "sha256": "516d283027c0182e6607e8681d519373263d6c7ff35e111214b1e0d15f72c39a",
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "180f3d2377232055eae37b292418a53eb472e45adfa0ca1154d4296b9eb04eb3",
+      "sha256": "c271d2721cfd6981ed73d9212e4d1eb37998aa2c6bf6f47c83d0b5f56e21df04",
       "mode": "100644"
     },
     "tools/fetch-fonts.sh": {
@@ -520,7 +524,7 @@
       "mode": "100644"
     },
     "tools/node/viz-common.mjs": {
-      "sha256": "597a5ca85be40bd917bd4747096764a3f6780503344bffb7b98af0ad7b93ea20",
+      "sha256": "7df2a2dbbbfae85270cf7da8fdcd62b478315b96f4e0a96db78310cf368c8af4",
       "mode": "100644"
     },
     "tools/node/viz-new.mjs": {
@@ -531,16 +535,20 @@
       "sha256": "e3e84fc1240f3432318cf6d29ba83b13876d8a025f5e4a20e8c0689c9d75c100",
       "mode": "100644"
     },
+    "tools/node/viz-shots.mjs": {
+      "sha256": "e7149b57b9420c37420964a09e765eefe7e055ee78e1a28b1dde444b93ba4331",
+      "mode": "100644"
+    },
     "tools/node/viz-test.mjs": {
       "sha256": "02fd73454e37bd88a5fec3e958a57a8d93e28df7accfa2e96569019454f97d9c",
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "1099a3d987722685a33ac76431d048ecb941a0a85a9e634b0a92382da09f9acd",
+      "sha256": "4adc240bd6f10994cef8709159926fce383db0249c596db23db34c3b13489589",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
-      "sha256": "9951ef8ea8c51890286a85e158ec80b08ac25d104c29c96dd73db148e6a439ea",
+      "sha256": "f3b8ea90c773851751866e4701c932dd1085497bd99559a6a1729f05a203073b",
       "mode": "100644"
     },
     "tools/node/viz-validate.mjs": {
@@ -564,7 +572,7 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "4f2abced76b60d12ace0bee6213b6b16da4a8ce4259df4510acfba3c7db91a49",
+      "sha256": "aaece227b4310e1f777271af859f9af8a9b9ee2f21e8c03904a8b40ddeec0d6d",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
@@ -660,7 +668,7 @@
       "mode": "100644"
     },
     "tools/tbook/viz.py": {
-      "sha256": "20e91665b737a2adddbbac269da887f42f3389f8118ec05a8b5471c6e4f149bb",
+      "sha256": "bf8d40c8bb2cc4af06d9a8b741b2f6c15eba1d0f7efb9176f50a5e724dabd7cb",
       "mode": "100644"
     },
     "tools/tests/example_support.py": {
@@ -744,7 +752,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "39a9c8eaf5ce7e8599281db50580045954bcc0b953b27346b32aaf80ece9e901",
+      "sha256": "b6caefd5847172c23408af74eec512e866faff55842076a1f4b4a9e3e6a3ff5e",
       "mode": "100644"
     }
   }

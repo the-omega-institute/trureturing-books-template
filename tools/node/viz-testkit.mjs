@@ -4,6 +4,7 @@
 //   const T = await session();                       // server + browser + page (zh-CN, 1440×900)
 //   await T.goto('example-monograph', 'golden-carry', '?lang=zh');
 //   T.check('c(1, 1) = 1', value === 1, `got ${value}`);
+//   await stageFirstChecks(T, 'my-book', 'my-viz');  // the quality gates every stage-first page must pass (see below)
 //   await T.finish();                                // prints the tally and exits non-zero on any failure
 //
 // The suite reuses the server started by tools/node/viz-test.mjs (env VIZ_ORIGIN) or starts its own, so a suite also
@@ -38,6 +39,43 @@ export async function cjkLeftovers(page) {
 
 /** Horizontal overflow of the document in CSS pixels (0 = no sideways scrolling). */
 export const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+/** Bring the page's DOM and canvases up to date now (kit.flush), then wait `ms`. Headless Chromium may render only a
+    few frames per second, so a suite should settle the page rather than hope that a frame has passed. */
+export async function settle(page, ms = 0) {
+  if (ms) await page.waitForTimeout(ms);
+  await page.evaluate(() => { if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush(); });
+}
+
+/** The fraction of the viewport covered by the visible part of an element (0 when it is absent or off-screen). */
+export const viewportShare = (page, selector) => page.evaluate((sel) => {
+  const el = document.querySelector(sel); if (!el) return 0;
+  const r = el.getBoundingClientRect();
+  const w = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)), h = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+  return (w * h) / (innerWidth * innerHeight);
+}, selector);
+
+/** The fraction of a 2D canvas that is drawn on (sampled pixels with non-zero alpha): 0 for a blank canvas. */
+export const inkShare = (page, selector) => page.evaluate((sel) => {
+  const cv = document.querySelector(sel); if (!cv || !cv.width || !cv.height) return 0;
+  const data = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  let drawn = 0, total = 0;
+  for (let i = 3; i < data.length; i += 4 * 5) { total++; if (data[i] > 8) drawn++; }
+  return total ? drawn / total : 0;
+}, selector);
+
+/** Visible stage labels whose boxes overlap by more than `share` of the smaller box: [[textA, textB], …]. */
+export const labelOverlaps = (page, selector = '.stage .tag', share = 0.5) => page.evaluate(([sel, tol]) => {
+  const boxes = [...document.querySelectorAll(sel)].filter((el) => !el.hidden && el.offsetParent !== null && el.textContent.trim())
+    .map((el) => ({ r: el.getBoundingClientRect(), t: el.textContent.trim() })).filter((b) => b.r.width > 0 && b.r.height > 0);
+  const bad = [];
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i].r, b = boxes[j].r;
+    const w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+    if (w > 0 && h > 0 && (w * h) / Math.min(a.width * a.height, b.width * b.height) > tol) bad.push([boxes[i].t, boxes[j].t]);
+  }
+  return bad;
+}, [selector, share]);
 
 /**
  * Open a browser session. Options: viewport, locale, reducedMotion ('reduce' | 'no-preference').
@@ -74,6 +112,18 @@ export async function session(opts = {}) {
   const url = (slug, id, query = '') => vizUrl(origin, slug, id, query);
   const goto = async (slug, id, query = '', p = page) => { await p.goto(url(slug, id, query), { waitUntil: 'load' }); return p; };
   const newPage = async () => watch(await context.newPage());
+  /** A watched page in its own context (another viewport, locale or motion preference), already at the visualization. */
+  const open = async (slug, id, query = '', o = {}) => {
+    const ctx = await browser.newContext({
+      viewport: o.viewport || { width: 1440, height: 900 }, locale: o.locale || 'zh-CN',
+      reducedMotion: o.reducedMotion || 'no-preference', deviceScaleFactor: 1
+    });
+    await routeLocalFonts(ctx, origin);
+    const p = watch(await ctx.newPage());
+    await p.goto(url(slug, id, query), { waitUntil: 'load' });
+    await p.evaluate(() => document.fonts && document.fonts.ready);
+    return p;
+  };
   async function finish() {
     await browser.close();
     if (server) server.close();
@@ -81,5 +131,154 @@ export async function session(opts = {}) {
     console.log(`\n${results.length - failed}/${results.length} passed`);
     process.exit(failed || !results.length ? 1 : 0);
   }
-  return { page, context, browser, origin, errors, results, check, goto, url, newPage, finish };
+  return { page, context, browser, origin, errors, results, check, goto, url, newPage, open, finish };
+}
+
+/**
+ * The checks every stage-first page must pass, whatever it shows (skills/book-viz, "质量门"). They cannot tell a good
+ * picture from a bad one, but they catch the regressions that make a page unreadable inside a book:
+ *   desktop   the stage holds at least `minShare` of the viewport; every experiment card applies and explains itself;
+ *             the theory drawer opens and closes; no stage labels sit on top of each other
+ *   English   no Chinese left on screen after going through every card
+ *   embed     (740 × 620, ?embed=1) the page chrome is gone, the stage starts at the top and fills most of the first
+ *             screen, the tour bar is on that first screen, nothing scrolls sideways
+ *   figure    (740 × 500, ?embed=1&preset=<card>, what a chapter shows when it cites one card) the page opens on
+ *             that card; the stage, the one-sentence note and ◀ ▶ fit the frame and nothing scrolls inside it;
+ *             ?shot=1 (the still that PDF/EPUB print) fills the frame on the same card, labels kept, in one language
+ *   phone     (390 × 844) nothing scrolls sideways and the stage comes before the control deck
+ *   cover     (?thumb=1) [data-thumb] fills 1280 × 720, window.TRV_THUMB runs, and the cover canvas is not blank
+ *   motion    under prefers-reduced-motion the page loads and a card still applies
+ * and no page error, console error or failed request anywhere.
+ * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
+ *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), settle (ms to wait after a click).
+ */
+export async function stageFirstChecks(T, slug, id, opts = {}) {
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, settle: 120, ...opts };
+  const { check } = T;
+  const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
+  const runCards = async (page, tag) => {
+    for (const c of await cardIds(page)) {
+      await page.click(`[data-preset="${c}"]`); await settle(page, o.settle);
+      const state = await page.evaluate((cid) => {
+        const b = document.querySelector(`[data-preset="${cid}"]`), note = document.querySelector('#presetNote, .presets + .note');
+        return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1 };
+      }, c);
+      check(`${tag}: card ${c} applies and explains itself`, state.pressed === 'true' && state.note !== 0, JSON.stringify(state));
+    }
+  };
+
+  // desktop
+  const page = await T.goto(slug, id, '?lang=zh');
+  await page.evaluate(() => document.fonts && document.fonts.ready); await settle(page, 400);
+  const share = await viewportShare(page, o.stage);
+  check(`desktop: the stage holds ≥ ${Math.round(o.minShare * 100)}% of the viewport`, share >= o.minShare, `${(share * 100).toFixed(1)}%`);
+  check('desktop: no sideways scrolling', (await overflowX(page)) <= 0);
+  if (o.cards) {
+    const n = (await cardIds(page)).length;
+    check('desktop: at least four experiment cards', n >= 4, `${n}`);
+    await runCards(page, 'desktop');
+  }
+  if (o.labels) { const bad = await labelOverlaps(page, `${o.stage} .tag`); check('desktop: stage labels do not sit on top of each other', bad.length === 0, JSON.stringify(bad.slice(0, 4))); }
+  if (await page.$('#infoBtn')) {
+    await page.click('#infoBtn');
+    check('desktop: the theory drawer opens', await page.evaluate(() => !document.getElementById('drawer').hidden));
+    const pinned = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => a.href));
+    check('desktop: every Lean theorem cited on the page links to the pinned commit', pinned.every((h) => /\/blob\/[0-9a-f]{40}\//.test(h)), pinned.find((h) => !/\/blob\/[0-9a-f]{40}\//.test(h)) || `${pinned.length} links`);
+    await page.keyboard.press('Escape');
+    check('desktop: Escape closes the drawer', await page.evaluate(() => document.getElementById('drawer').hidden));
+  }
+
+  // English
+  await page.click('[data-lang-set="en"]'); await settle(page, 150);
+  if (o.cards) for (const c of await cardIds(page)) { await page.click(`[data-preset="${c}"]`); await settle(page, o.settle); const left = await cjkLeftovers(page); check(`English: no Chinese left with card ${c}`, left.length === 0, left.slice(0, 3).join(' | ')); }
+  else { const left = await cjkLeftovers(page); check('English: no Chinese left on screen', left.length === 0, left.slice(0, 3).join(' | ')); }
+  if (await page.$('#infoBtn')) {
+    await page.click('#infoBtn'); const left = await cjkLeftovers(page);
+    check('English: no Chinese left in the theory drawer', left.length === 0, left.slice(0, 3).join(' | '));
+    await page.keyboard.press('Escape');
+  }
+  await page.click('[data-lang-set="zh"]');
+
+  // embed: the first screen of the iframe inside a chapter
+  const embed = await T.open(slug, id, '?embed=1&lang=zh', { viewport: { width: 740, height: 620 } });
+  await settle(embed, 400);
+  const e = await embed.evaluate((sel) => {
+    const st = document.querySelector(sel).getBoundingClientRect(), head = document.querySelector('header.top'), tour = document.querySelector('.tour');
+    const tr = tour && getComputedStyle(tour).display !== 'none' ? tour.getBoundingClientRect() : null;
+    return { top: st.top, header: head ? getComputedStyle(head).display : 'none', tourBottom: tr ? tr.bottom : null, vh: innerHeight };
+  }, o.stage);
+  check('embed: the page chrome is hidden', e.header === 'none');
+  check('embed: the stage starts at the top of the frame', e.top < 40, `top ${e.top.toFixed(0)}px`);
+  const eshare = await viewportShare(embed, o.stage);
+  check(`embed: the stage fills ≥ ${Math.round(o.minEmbedShare * 100)}% of the first screen`, eshare >= o.minEmbedShare, `${(eshare * 100).toFixed(1)}%`);
+  if (o.tour) check('embed: the tour bar is on the first screen', e.tourBottom != null && e.tourBottom <= e.vh + 1, `bottom ${e.tourBottom} of ${e.vh}`);
+  check('embed: no sideways scrolling', (await overflowX(embed)) <= 0);
+  if (o.tour && e.tourBottom != null) {
+    const before = await embed.evaluate(() => (document.querySelector('[data-preset][aria-pressed="true"]') || {}).dataset?.preset || null);
+    await embed.click('.tour [data-tour="next"]'); await settle(embed, o.settle);
+    const after = await embed.evaluate(() => (document.querySelector('[data-preset][aria-pressed="true"]') || {}).dataset?.preset || null);
+    check('embed: the tour bar steps to the next experiment', after && after !== before, `${before} → ${after}`);
+    check('embed: the tour bar names the experiment', (await embed.textContent('.tour .what')).trim().length > 8);
+  }
+  await embed.context().close();
+
+  // cited figure: a chapter cites one card with `::: {.viz src=… preset=…}`
+  if (o.cards) {
+    const cards = await cardIds(page), cite = cards[Math.min(1, cards.length - 1)];
+    const fig = await T.open(slug, id, `?embed=1&lang=zh&preset=${cite}`, { viewport: { width: 740, height: 500 } });
+    await settle(fig, 400);
+    const f = await fig.evaluate(([sel, card]) => {
+      const b = document.querySelector(`[data-preset="${card}"]`), tour = document.querySelector('.tour'), st = document.querySelector(sel).getBoundingClientRect();
+      return { figure: document.documentElement.dataset.figure === '1', pressed: !!b && b.getAttribute('aria-pressed') === 'true', scrollY: document.documentElement.scrollHeight - innerHeight,
+        tour: tour ? tour.getBoundingClientRect().bottom : null, stageBottom: st.bottom, vh: innerHeight };
+    }, [o.stage, cite]);
+    check(`cited figure: ?preset=${cite} opens on that card`, f.figure && f.pressed, JSON.stringify(f));
+    check('cited figure: nothing scrolls inside the frame', f.scrollY <= 0 && (await overflowX(fig)) <= 0, `${f.scrollY}px`);
+    const fshare = await viewportShare(fig, o.stage);
+    check('cited figure: the stage fills ≥ 60% of the frame', fshare >= 0.6, `${(fshare * 100).toFixed(1)}%`);
+    check('cited figure: the one-sentence note and ◀ ▶ are in the frame', f.tour != null && f.tour <= f.vh + 1 && (await fig.textContent('.tour .what')).trim().length > 8);
+    await fig.context().close();
+    const shot = await T.open(slug, id, `?shot=1&lang=en&preset=${cite}`, { viewport: { width: 800, height: 450 }, locale: 'en-US', reducedMotion: 'reduce' });
+    await settle(shot, 400);
+    const sh = await shot.evaluate(([card]) => {
+      const el = document.querySelector('[data-thumb]'), r = el ? el.getBoundingClientRect() : null, b = document.querySelector(`[data-preset="${card}"]`), hud = document.querySelector('.hud-tl');
+      return { fills: !!r && r.left === 0 && r.top === 0 && Math.abs(r.width - innerWidth) < 1 && Math.abs(r.height - innerHeight) < 1, pressed: !!b && b.getAttribute('aria-pressed') === 'true',
+        title: hud ? getComputedStyle(hud).opacity !== '0' && hud.textContent.trim().length > 0 : true, still: !!(window.TRV && window.TRV.still) };
+    }, [cite]);
+    check('still for PDF/EPUB: ?shot=1 fills the frame on the cited card, with its title kept', sh.fills && sh.pressed && sh.title && sh.still, JSON.stringify(sh));
+    const leftovers = await cjkLeftovers(shot);
+    check('still for PDF/EPUB: the English still carries no Chinese', leftovers.length === 0, leftovers.slice(0, 3).join(' | '));
+    await shot.context().close();
+  }
+
+  // phone
+  const phone = await T.open(slug, id, '?lang=zh', { viewport: { width: 390, height: 844 } });
+  await settle(phone, 400);
+  check('phone: no sideways scrolling', (await overflowX(phone)) <= 0, `${await overflowX(phone)}px`);
+  const order = await phone.evaluate((sel) => { const s = document.querySelector(sel), d = document.querySelector('.deck'); return { stage: s.getBoundingClientRect().top, deck: d ? d.getBoundingClientRect().top : Infinity }; }, o.stage);
+  check('phone: the stage comes before the controls', order.stage < order.deck, JSON.stringify(order));
+  if (o.cards) await runCards(phone, 'phone');
+  check('phone: still no sideways scrolling after every card', (await overflowX(phone)) <= 0, `${await overflowX(phone)}px`);
+  await phone.context().close();
+
+  // cover
+  const thumb = await T.open(slug, id, '?thumb=1&lang=zh', { viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
+  await thumb.waitForTimeout(300);
+  const hooked = await thumb.evaluate(async () => { if (typeof window.TRV_THUMB !== 'function') return false; await window.TRV_THUMB(); return true; });
+  await settle(thumb, 500);
+  check('cover: the page defines window.TRV_THUMB', hooked);
+  const box = await thumb.evaluate(() => { const el = document.querySelector('[data-thumb]'); if (!el) return null; const r = el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+  check('cover: [data-thumb] fills 1280 × 720', !!box && box[0] === 0 && box[1] === 0 && Math.abs(box[2] - 1280) < 1 && Math.abs(box[3] - 720) < 1, JSON.stringify(box));
+  const ink = await inkShare(thumb, o.cover);
+  check('cover: the cover canvas is not blank', ink > 0.01, `${(ink * 100).toFixed(2)}% drawn`);
+  await thumb.context().close();
+
+  // reduced motion
+  const calm = await T.open(slug, id, '?lang=zh', { reducedMotion: 'reduce' });
+  await calm.waitForTimeout(300);
+  if (o.cards) { const ids = await cardIds(calm); await calm.click(`[data-preset="${ids[ids.length - 1]}"]`); await calm.waitForTimeout(700); }
+  check('reduced motion: the page loads and a card applies', (await calm.evaluate(() => !!document.querySelector('[data-preset][aria-pressed="true"]'))) || !o.cards);
+  await calm.context().close();
+
+  check('no page error, console error or failed request', T.errors.length === 0, T.errors.slice(0, 4).join(' | '));
 }

@@ -2,6 +2,25 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [0.3.0] - 2026-11-10
+
+### 新增
+
+- 可视化：每张实验卡都可以在章节里单独引用，`::: {.viz src="<id>" preset="<卡>" height="500"}`。HTML 中它是开在那张卡上、不带内部滚动的一张图（舞台、一句说明、◀ ▶、时间轴），“全屏打开”进入同一状态的完整实验室；PDF/EPUB 中它是那张卡的带标签静态图 `viz/<id>/fig-<卡>.<语言>.jpg`，取代通用封面。`./tbook check` 核对被引用的卡存在、各语言版本引用同一张卡、静态图齐全；`node tools/node/viz-thumbs.mjs` 在生成封面的同时为被引用的卡生成静态图，并删除不再被引用的。运行时新增 `TRV.preset`、`TRV.figure`、`TRV.shot`、`TRV.still`。
+- 可视化运行时 `theme/viz/kit.js`（`TRV.kit`，可选）：二维画布上的三维舞台（轨道相机、深度淡化、球面拾取、DOM 标签）、二维舞台与小图、时间轴、实验卡与导览条、进入视野才播放、过渡、互斥按钮组、滑块绑定、快捷键与数字格式。`theme/viz/theme.css` 新增舞台优先的实验室版式 `.app.lab`、实验卡 `.presets.cards`、条带小图 `.strip`、导览条 `.tour`、舞台图例 `.hud-bl` 与关键读数 `dl.ro .key`，以及书内引用图与静态图两种模式的样式。
+- 质量门 `stageFirstChecks`（`tools/node/viz-testkit.mjs`）：舞台占视口的比例、每张卡可点且有说明、舞台标签不重叠、英文无残留中文、书内第一屏、被引用的图不滚动、PDF 静态图、手机无横向滚动、封面非空白、减少动效。另有 `settle`（让页面立即重绘，测试不靠等待）、`viewportShare`、`inkShare`、`labelOverlaps`。
+- `node tools/node/viz-shots.mjs <book> <id>`：按读者会看到的样子截图（桌面、书内、手机、封面，中英各一），可用 `--do` 先切到某个状态。
+
+### 变更
+
+- `skills/book-viz/SKILL.md` 重写。起因：0.2.3 把起始模板与技能统一成 `golden-carry` 的三栏账本骨架之后，下游书库的四个可视化主题各异（布洛赫球、对角线、佩尔方程、格拉姆行列式），却都被套进同一副骨架，舞台只剩一小块，读者看到的是数字墙，并且每个可视化只在章末整台嵌入一次，正文讲到某个情形时图不在旁边。新的技能给出方法而不是骨架：先写一句话与几张实验卡，按对象选舞台，每张卡都是正文可引用的图，诚实标注，亲眼看截图，再过质量门；并列出反模式。
+- 起始模板 `templates/viz/` 换成一个可运行、可通过自带测试的舞台优先页面（单位圆上的影子与高度）；`templates/viz/README.md` 与 `docs/AUTHORING.md` 相应更新。`CLAUDE.md` 第 6 条改为“版式服从内容，契约不可改”。`golden-carry` 保留为“分步账本”这一种形态的示例，不再是所有页面的唯一样板。
+- 站点构建不再发布 `fig-*.jpg`（只供 PDF/EPUB 使用）。
+
+### 下游需要手动操作
+
+- 无强制迁移：已有页面与嵌入照常工作。建议按新技能检查已有可视化；要在正文里按卡引用，页面需改用 `cards.pick(cards.initial('<默认卡>'))` 开场并在 `TRV.still` 时显示关键帧（起始模板演示了写法）。
+
 ## [0.2.5] - 2026-11-11
 
 ### 修复

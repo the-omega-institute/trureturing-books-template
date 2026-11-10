@@ -27,7 +27,7 @@ export const FORMAL_KINDS = ['theorem'];
 /** Directory names inside books/<slug>/viz/ that are not visualizations. */
 export const RESERVED = ['tests', 'assets'];
 /** Files of theme/viz/ published into <slug>/viz/assets/ (hub.html is a template, not an asset). */
-export const RUNTIME_FILES = ['theme.css', 'shell.js', 'hub.css', 'hub.js', 'favicon.svg'];
+export const RUNTIME_FILES = ['theme.css', 'shell.js', 'kit.js', 'hub.css', 'hub.js', 'favicon.svg'];
 export const EXTERNAL_PREFIX = 'trureturing-visualize:';
 export const EXTERNAL_BASE = 'https://the-omega-institute.github.io/trureturing-visualize/viz/';
 const GID_RE = /^(D[0-9]+\/S[0-9]+\/(?:[A-Za-z_][A-Za-z0-9_]*\/)*[A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*)$/;

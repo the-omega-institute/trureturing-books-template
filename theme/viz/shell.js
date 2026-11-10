@@ -7,7 +7,11 @@
      TRV.fitCanvas, TRV.toast, TRV.glitch, TRV.startGlitch, TRV.drawer, TRV.mulberry32, TRV.gauss, TRV.smooth, TRV.reduceMotion
    Additions for books:
      TRV.embed        true with ?embed=1 (the page is inside an <iframe> of the book: header chrome hidden, compact layout)
-     TRV.thumbMode    true with ?thumb=1 (tools/node/viz-thumbs.mjs is capturing the [data-thumb] region)
+     TRV.thumbMode    true with ?thumb=1 (tools/node/viz-thumbs.mjs is capturing the wordless cover of [data-thumb])
+     TRV.preset       the experiment card a chapter cites: ?preset=<id> (null when absent)
+     TRV.figure       true with ?embed=1&preset=<id>: a cited figure (the stage, one sentence, the transport; no scrolling)
+     TRV.shot         true with ?shot=1 (viz-thumbs.mjs is capturing the labelled still of a cited card for PDF/EPUB)
+     TRV.still        thumbMode || shot: no animation; show a representative state at once
      TRV.css(name)    the computed value of a CSS custom property, e.g. TRV.css('--tr-cyan')
      TRV.esc(text)    HTML-escape a string for innerHTML
    Load it in <head>, after theme.css and before any page script (src="../assets/shell.js" from a viz page).
@@ -20,8 +24,12 @@
   try { params = new URLSearchParams(location.search); } catch (e) { params = new URLSearchParams(''); }
   const embed = params.get('embed') === '1';
   const thumbMode = params.get('thumb') === '1';
+  const shot = params.get('shot') === '1';
+  const preset = /^[A-Za-z0-9][\w-]*$/.test(params.get('preset') || '') ? params.get('preset') : null;
   if (embed) root.dataset.embed = '1';
   if (thumbMode) root.dataset.thumbMode = '1';
+  if (shot) root.dataset.shot = '1';
+  if (embed && preset) root.dataset.figure = '1';
 
   /* ---------- language: ?lang= beats the remembered choice, which beats the browser language ----------
      The choice is remembered under "tr-lang", shared with the library, the book landing pages, the films page and
@@ -135,14 +143,14 @@
 
   /** One glitch pulse on the .logo inside root. */
   function glitch(el) {
-    if (reduceMotion || !el || embed || thumbMode) return;
+    if (reduceMotion || !el || embed || thumbMode || shot) return;
     el.classList.remove('glitching');
     void el.offsetWidth;
     el.classList.add('glitching');
   }
   function startGlitch(el, every) {
     glitch(el);
-    if (!reduceMotion && !embed && !thumbMode) setInterval(() => glitch(el), every || 9000);
+    if (!reduceMotion && !embed && !thumbMode && !shot) setInterval(() => glitch(el), every || 9000);
   }
 
   /** Wire a theory drawer. Escape closes it; returns { isOpen, open, close }. */
@@ -176,6 +184,6 @@
 
   window.TRV = {
     reduceMotion, palette, rgb, fonts, alpha, css, esc, fitCanvas, toast, glitch, startGlitch, drawer, mulberry32, gauss, smooth,
-    embed, thumbMode, L, lang: () => lang, setLang, onLang: (fn) => langListeners.push(fn)
+    embed, thumbMode, shot, still: thumbMode || shot, preset, figure: embed && !!preset, L, lang: () => lang, setLang, onLang: (fn) => langListeners.push(fn)
   };
 })();

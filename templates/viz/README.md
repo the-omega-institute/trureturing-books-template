@@ -2,17 +2,22 @@
 
 `./tbook viz new <book> <id> "<CODE//NAME>" "<中文标题>" "<English title>"`（或 `node tools/node/viz-new.mjs …`）从本目录生成
 `books/<book>/viz/<id>/{index.html,style.css,main.js}` 与 `books/<book>/viz/tests/<id>.test.mjs`，并在注册表里登记为 `draft`。
-本 README 不会被复制。方案沿用 [trureturing-visualize](https://github.com/the-omega-institute/trureturing-visualize)，并在三栏布局与交互元素上严格对齐示例 `books/example-monograph/viz/golden-carry/`：
-纯 HTML/CSS/JS，无构建步骤，只用相对链接；共享运行时在 `theme/viz/`（发布为 `<slug>/viz/assets/`）。
+本 README 不会被复制。运行时与页面契约沿用 [trureturing-visualize](https://github.com/the-omega-institute/trureturing-visualize)：
+纯 HTML/CSS/JS，无构建步骤，只用相对链接；共享运行时在 `theme/viz/`（发布为 `<slug>/viz/assets/`）。怎样设计一个好的页面，见 `skills/book-viz/SKILL.md`。
 
-`./tbook viz new …` scaffolds a 3-column page matching `books/example-monograph/viz/golden-carry/` from this directory and registers it as a draft. The scheme is that of trureturing-visualize: plain HTML/CSS/JS, no build step, relative links only; the shared runtime lives in `theme/viz/` and is published as `<slug>/viz/assets/`.
+`./tbook viz new …` scaffolds a working stage-first page from this directory and registers it as a draft: plain HTML/CSS/JS, no build step, relative links only; the shared runtime lives in `theme/viz/` and is published as `<slug>/viz/assets/`. For how to design a good page, read `skills/book-viz/SKILL.md`.
 
-## 三栏结构 · 3-Column Layout (`books/example-monograph/viz/golden-carry/`)
+## 起始页面 · The starter
 
-- **左栏 `aside.col.deck`**：`#inputs`（`.num-field` 步进器 `−` / `<input type="number">` / `+` + `<input type="range">` 滑块，配 `.chips.presets#presets`）与 `#readouts`（`<dl class="ro">`：6 项半宽读数 + 1 项 `.wide.deficit` 24px 发光主读数 + 2 项 `.wide` 核验行）。
-- **中栏 `main.center`**：`<section class="panel ledger" id="ledgerPanel">`（`.head` + `.rules` 四枚 `.rule.r0/.r1/.rj/.ra` 规则徽章 + 可选几何舞台 `.stage` + `.sheetwrap > .digits#ledger > .drow` 可点击分步 HTML 账本 + `.tape-row` 可点击 `#tape` 符号带 + `#toast`）与 `<footer class="rail" id="rail">`（`.transport` `⏮ ◀ ▶ ▶▶ ⏭` + `.clock` `#passLabel` & `#pass` + `.keys`）。
-- **右栏 `aside.col.side`**：上方 `<section class="panel sec heatpanel" id="heatPanel" data-thumb>`（`.heatwrap > canvas#heat + .scan` 1:1 二维交互相图/矩阵 + `#nChips` + `<ul class="legend">` + `#heatCounts` + `#heatHover`）与下方 `<section class="panel sec" id="evidence">`（`.lean`、`.lean.num`、`.lean.model`、`.lean.argued`、`.lean.open` + `#infoBtn` 打开 `#drawer`）。
-- **缩略图模式 `?thumb=1`**：`window.TRV_THUMB = drawCover` 在 `canvas#heat`（1280×720）左半幅绘制二维相图 + 琥珀色十字准星与选中框，右半幅绘制分步账本行 + 琥珀色发光末行边框，不绘自然语言散文标题。
+生成的页面可以直接运行并通过它自带的测试：一个单位圆上的点、它的影子与高度。把主题换成你的，保留它的形状：
+
+- **舞台就是页面**：`<div class="app lab">` 的中间一栏是 `.stage`，画对象本身，读者直接拖它；下面的 `.strip` 小图回答“沿时间轴什么在变”。
+- **实验卡**：`.presets.cards > button.preset[data-preset]`，每张是一个有名字的情形加一句解释。章节可以按卡引用（见下）。
+- **导览条**：`.tour`，在书内和手机上让读者不离开舞台就能逐张看卡。
+- **读数与依据**：右栏少量读数（一行 `.key` 放大）与依据框；`#infoBtn` 打开理论接口抽屉。
+- **时间轴**：`footer.rail`，只驱动一个量。
+
+The generated page runs as it is and passes its own test: a point on the unit circle, its shadow and its height. Replace the subject and keep the shape: the stage is the page; experiment cards are named situations a chapter can cite; the tour bar steps through them next to the stage; few readouts with the evidence close by; one rail driving one quantity.
 
 ## 注册表 · Registry (`books/<book>/viz/visualizations.json`)
 
@@ -42,7 +47,7 @@
 | 字段 field | 规则 rule |
 | --- | --- |
 | `id` | kebab-case，等于目录名；不能是 `tests`、`assets` |
-| `path` / `thumbnail` | 相对 `viz/`：`<id>/` 与 `<id>/thumb.jpg`（1280×720，`node tools/node/viz-thumbs.mjs <book> <id>`） |
+| `path` / `thumbnail` | 相对 `viz/`：`<id>/` 与 `<id>/thumb.jpg`（1280×720 无字封面，`node tools/node/viz-thumbs.mjs <book> <id>`；同一命令为章节引用到的每张卡生成 `<id>/fig-<卡>.<语言>.jpg`） |
 | `status` | `draft`（不发布，不可嵌入书中）或 `live`（需要 `title_en`、`summary`、`summary_en`、至少一条 `theory`、缩略图；应有浏览器测试） |
 | `tags_en` | 逐条翻译 `tags` |
 | `theory[].href` | `https://…`；`{trureturing}/<path>`（所钉提交上的该文件，必须存在）；或本书章节，相对 `viz/`：`../zh/<chapter>.html`；`href_en` 可选 |
@@ -51,30 +56,52 @@
 ## 页面契约 · Page contract (checked by `./tbook check` and `node tools/node/viz-validate.mjs`)
 
 - `<body data-viz-id="<id>">`；`<html data-title-en="…">` 与 `<title>`。
-- `<link rel="stylesheet" href="../assets/theme.css">`；`<head>` 内 `<script src="../assets/shell.js"></script>`（`window.TRV`）。
+- `<link rel="stylesheet" href="../assets/theme.css">`；`<head>` 内 `<script src="../assets/shell.js"></script>`（`window.TRV`），其后可加 `<script src="../assets/kit.js"></script>`（`TRV.kit`：舞台、小图、时间轴、实验卡等辅助，见 skill 的速查表）。
 - `<a class="crumb" href="../">` 返回本书的可视化索引；语言切换 `data-lang-set="zh"` / `data-lang-set="en"`。
-- 所有可见文字成对：`<span class="zh">…</span><span class="en">…</span>`；脚本文字用 `TRV.L('中文', 'English')` 并在 `TRV.onLang(…)` 中重绘；`aria-label` 写中文、`data-aria-en` 写英文。
-- Lean 定理引用写成 `<a data-lean-gid="<GID>" href="…">`（GID 须是锁文件中种类为 `theorem` 的声明）；定义等其他 trureturing 文件写成 `<a data-trureturing-path="<path>" href="…">`：构建与本地预览把 href 固定到所钉提交。只有 Lean 已验证的定理用绿色 `LEAN ✓`；页面计算用 `.lean.num`（NUM）；示意模型 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。
+- 所有可见文字成对：`<span class="zh">…</span><span class="en">…</span>`；脚本文字用 `TRV.L('中文', 'English')` 并在语言切换时重绘（`kit.painter` 已代办）；`aria-label` 写中文、`data-aria-en` 写英文。
+- Lean 定理引用写成 `<a data-lean-gid="<GID>" href="…">`（GID 须是锁文件中种类为 `theorem` 的声明）；定义等其他 trureturing 文件写成 `<a data-trureturing-path="<path>" href="…">`：构建与本地预览把 href 固定到所钉提交。依据框：
+
+  ```html
+  <div class="lean"><span class="ok">LEAN ✓</span><span><span class="zh">陈述，与 Lean 一致。已冻结：</span><span class="en">The statement, as in Lean. Frozen: </span><a class="leanref" data-lean-gid="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" href="https://github.com/the-omega-institute/trureturing/blob/dev/D5/S1/Deficit/DeficitThreeValued.lean" target="_blank" rel="noopener"><code>deficit_three_valued</code></a></span></div>
+  ```
+
+  只有 Lean 已验证的定理用绿色 `LEAN ✓`；页面计算用 `.lean.num`（NUM）；示意模型与诠释 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。
 - 颜色只来自令牌：CSS 用 `var(--cyan)` 等（映射到 `--tr-*`），脚本用 `TRV.palette` / `TRV.rgb`。琥珀色只给“现在/当前选择”。
-- `?embed=1`（书中 iframe）隐藏页眉；`?thumb=1`（缩略图）让 `[data-thumb]` 充满画面，页面定义 `window.TRV_THUMB = drawCover`。
+- 运行模式（`shell.js` 按网址设置，页面不必自己解析）：
+
+  | 网址 | 含义 | 页面看到的 |
+  | --- | --- | --- |
+  | `?embed=1` | 书内 iframe：隐藏页眉，舞台在最前 | `TRV.embed` |
+  | `?embed=1&preset=<卡>` | 章节引用的一张图：舞台、一句说明、时间轴，不滚动 | `TRV.figure`、`TRV.preset` |
+  | `?thumb=1` | 无字封面（1280×720）：`[data-thumb]` 充满画面，调用 `window.TRV_THUMB()` | `TRV.thumbMode`、`TRV.still` |
+  | `?shot=1&preset=<卡>&lang=<语言>` | 被引用卡的带标签静态图，供 PDF/EPUB | `TRV.shot`、`TRV.still` |
+
+  `TRV.still` 为真时不播放动画，直接显示那张卡的关键帧。
 - 手机宽度（390px）无横向滚动；尊重 `prefers-reduced-motion`。
 
 ## 嵌入书中 · Embedding in a chapter
 
 ```markdown
-::: {.viz src="golden-carry" height="560"}
-图注（可选，可含数学）。
+::: {.viz src="my-viz" preset="half" height="500"}
+**一句标题。** 引用一张实验卡：图贴在讲到它的那句话旁边。
+:::
+
+::: {.viz src="my-viz" height="620"}
+完整实验室的图注（可选，可含数学）。
 :::
 ```
 
-HTML：`<iframe>` 指向 `../viz/<id>/index.html?embed=1&lang=<lang>`，附“全屏打开”。PDF/EPUB：缩略图、图注与在线地址。
+带 `preset`：HTML 中是开在那张卡上的一张图（`?embed=1&lang=<lang>&preset=<卡>`，不带内部滚动），附“全屏打开”；PDF/EPUB 中是 `viz/<id>/fig-<卡>.<语言>.jpg`、图注与在线地址。不带 `preset`：HTML 中是完整实验室的 iframe；PDF/EPUB 中是封面 `thumb.jpg`、图注与在线地址。各语言版本的 `src` 与 `preset` 必须相同。
+
+With `preset` the chapter shows one card as a figure that does not scroll inside its frame, and PDF/EPUB print that card's labelled still in the language of the edition; without it the chapter embeds the whole lab and print shows the cover.
 
 ## 工具 · Tools
 
 ```bash
 node tools/node/viz-server.mjs                 # local preview at http://127.0.0.1:8766/site/<book>/viz/
+node tools/node/viz-shots.mjs <book> <id>      # review screenshots (desktop, in-book frame, phone, cover) → build/viz-shots/
 node tools/node/viz-validate.mjs [book]        # registry + page contract + links + JS syntax
 node tools/node/viz-test.mjs [book] [--shard i/n]   # browser suites books/*/viz/tests/*.test.mjs
-node tools/node/viz-thumbs.mjs <book> [id …]   # 1280×720 thumb.jpg (honours PW_CHROMIUM_PATH)
+node tools/node/viz-thumbs.mjs <book> [id …]   # thumb.jpg and the stills fig-<card>.<lang>.jpg of cited cards (honours PW_CHROMIUM_PATH)
 ./tbook viz list
 ```
