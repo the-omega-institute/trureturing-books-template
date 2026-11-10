@@ -521,6 +521,60 @@ class SearchIndexTest(unittest.TestCase):
 # --------------------------------------------------------------------------- end to end
 
 
+class CjkEmphasisTest(unittest.TestCase):
+    def test_literal_regions_are_unchanged(self):
+        for text in (
+            r"`中文**（code）**后文`", r"中文\*\*（literal）\*\*后文",
+            "```markdown\n中文**（code）**后文\n```",
+            "> ```\n> 中文**（code）**后文\n> ```",
+            "    中文**（code）**后文",
+            "<!-- 中文**（comment）**后文 -->",
+            '<span title="中文**（attribute）**后文">text</span>',
+            "<div>\n中文**（raw HTML）**后文\n</div>",
+            "[link](https://example.org/中文**（url）**后文)",
+            r"$\text{中文**（formula）**后文}$",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(html.cjk_emphasis(text), text)
+
+    @unittest.skipUnless(HAVE_KATEX and MDBOOK, "node, katex and mdBook are required")
+    def test_punctuation_math_and_nested_emphasis_render_as_strong(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bdir = write_book(root)
+            text = (
+                "# CJK emphasis\n\n"
+                "这是**术语（term）**的说明。\n\n"
+                "也是**“正交一次、正交两次”**两步。\n\n"
+                "这里**《书名》**接汉字。\n\n"
+                "这是**含 *斜体* 的（术语）**后文。\n\n"
+                "这是**$x^2$**后文。\n\n"
+                "**普通加粗**；*斜体*；***加粗斜体***；English **bold (term)** text.\n\n"
+                "> 这是**「引用」**后文。\n\n"
+                "| 名称 |\n| --- |\n| 这是**【表格】**后文 |\n"
+            )
+            self.assertEqual(html.cjk_emphasis(html.cjk_emphasis(text)), html.cjk_emphasis(text))
+            (bdir / "zh" / "a.md").write_text(text, encoding="utf-8")
+            book = config.load_book(bdir)
+            out = root / "out"
+            html.build_edition(config.load_site(), book, book.editions[0], None, STAGE_LOCK, out)
+            for name in ("a.html", "print.html"):
+                page = (out / name).read_text(encoding="utf-8")
+                page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
+                self.assertIn("<strong>术语（term）</strong>", page)
+                self.assertIn("<strong>“正交一次、正交两次”</strong>", page)
+                self.assertIn("<strong>《书名》</strong>", page)
+                self.assertIn("<strong>含 <em>斜体</em> 的（术语）</strong>", page)
+                self.assertRegex(page, r'<strong><span class="katex".*?</span></strong>')
+                self.assertIn("<strong>「引用」</strong>", page)
+                self.assertIn("<strong>【表格】</strong>", page)
+                self.assertIn("<strong>普通加粗</strong>", page)
+                self.assertIn("<em>斜体</em>", page)
+                self.assertIn("<em><strong>加粗斜体</strong></em>", page)
+                self.assertIn("<strong>bold (term)</strong>", page)
+                self.assertNotIn("**", page.split("<main>", 1)[1].split("</main>", 1)[0])
+
+
 @unittest.skipUnless(HAVE_KATEX and MDBOOK, "node, katex and mdBook are required")
 class BuildTitleMathTest(unittest.TestCase):
     def test_titles_in_both_tocs_metadata_and_nested_pages(self):

@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [0.2.3] - 2026-11-11
+
+### 修复
+
+- mdBook：中文加粗中含括号、引号或公式，且标记外紧接汉字时，按 PDF/EPUB 的语义保留加粗。HTML 暂存阶段以不可见注释隔开 CommonMark 的标点边界，不给中文正文插入空格；代码、转义、公式内部、链接地址与原始 HTML 保持原样。新增真实 mdBook 构建回归，覆盖正文、引用、表格、公式和嵌套斜体。
+
 ## [0.2.2] - 2026-11-11
 
 ### 修复

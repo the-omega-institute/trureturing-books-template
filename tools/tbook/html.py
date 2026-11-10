@@ -52,6 +52,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -401,6 +402,46 @@ def editions_data(site: config.Site, book: config.Book, edition: config.Edition,
     }
 
 
+def cjk_emphasis(text: str) -> str:
+    """Keep Chinese punctuation inside ``**strong**`` as in Pandoc's Markdown reader.
+
+    CommonMark rejects a delimiter between a word and punctuation: in
+    ``中文**“术语”**后文`` neither pair can delimit emphasis. Invisible inline HTML
+    comments separate those boundaries without adding spaces to Chinese prose.
+    Code, formulas, escaped markers, destinations and raw HTML stay literal.
+    """
+    if "**" not in text:
+        return text
+    mask, html_lines = mathrender._mask(text)
+    for span in mathrender.find_math(text)[0]:
+        mask[span.start:span.end] = b"\x01" * (span.end - span.start)
+    offset = 0
+    for line, raw in zip(text.split("\n"), html_lines):
+        if raw:
+            mask[offset:offset + len(line)] = b"\x01" * len(line)
+        offset += len(line) + 1
+
+    def cjk(char: str) -> bool:
+        return bool(re.fullmatch(r"[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af\U00020000-\U0003134f]", char))
+
+    def punct(char: str) -> bool:
+        return bool(char) and (unicodedata.category(char).startswith("P") or
+                               char.isascii() and not char.isalnum() and not char.isspace())
+
+    out, last = [], 0
+    for match in re.finditer(r"(?<!\*)\*\*(?!\*)", text):
+        a, b = match.span()
+        if mask[a] or mask[a + 1] or mathrender._escaped(text, a):
+            continue
+        before, after = text[a - 1:a] if a else "", text[b:b + 1]
+        prefix = "<!-- -->" if cjk(before) and punct(after) else ""
+        suffix = "<!-- -->" if punct(before) and cjk(after) else ""
+        if prefix or suffix:
+            out.extend((text[last:a], prefix, "**", suffix))
+            last = b
+    return "".join(out) + text[last:]
+
+
 def stage_edition(site: config.Site, book: config.Book, edition: config.Edition,
                   model: EditionModel, lock, root: Path | None = None) -> Stage:
     """Write the mdBook project for one edition (math rendered); return what was staged."""
@@ -425,7 +466,7 @@ def stage_edition(site: config.Site, book: config.Book, edition: config.Edition,
         if path == ledger.LEDGER_FILE:
             raise HtmlError(f"{paths.rel(doc.path)}: the file name {ledger.LEDGER_FILE} is reserved "
                             "for the generated verification ledger; rename the chapter")
-        text = render.chapter_markdown(doc, ctx).rstrip("\n") + "\n"
+        text = cjk_emphasis(render.chapter_markdown(doc, ctx)).rstrip("\n") + "\n"
         out = src / path
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text, encoding="utf-8")
