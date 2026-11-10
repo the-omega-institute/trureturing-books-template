@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -56,7 +56,7 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "32b5069e81fa0a50ffa94d0c7c4c37dec45a6f475ca9ec23140daf46e612099f",
+      "sha256": "4845088c9018af37c7b1cd28d81ab9191c0889baa32f4c11d8877857113bb742",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "6f143b6734aca3813ff7c66ce676ebb13e0178a977d7d783ce892248752e01f8",
+      "sha256": "8b5cf48bd4ddd2ff418cc46c6538808bcafbc9fe223d5f7cc70fb9cabc148cb4",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "47ea4f0ca6ec9991163789f00e3b1e20a267487fe9d26c4f8b5ac5792b376d48",
+      "sha256": "b4cd4f180be408f58a8f9142557bf799d13b9a79863866a7edfe405b8cefbd30",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -196,19 +196,19 @@
       "mode": "100644"
     },
     "templates/viz/README.md": {
-      "sha256": "1cc7b32aba28b273bf90d5666fa85cf1fd1dc05d993e7ab26e751af8d48fa202",
+      "sha256": "9fc9e6363c5ab76df5aba0d9e8ff5537200540ae203732a54036371c970f81b6",
       "mode": "100644"
     },
     "templates/viz/index.html": {
-      "sha256": "51598806454d2441e8af719b4f7b094d45ae7d1c7bcdc9d60ced1d44d43e53e6",
+      "sha256": "220c421cf0e578a62fa1ee565a596d78f5ef19d7416e3437ef0def728eaab235",
       "mode": "100644"
     },
     "templates/viz/main.js": {
-      "sha256": "fab101531ed984b367fc5c8fb1225337ef3fbdac3207ac00e9d1ba9f6fcd7b96",
+      "sha256": "7f0fe54ac43a6131f3deb5b7a99b77d0e67c85ab37a8143ce82ed2830240c04a",
       "mode": "100644"
     },
     "templates/viz/style.css": {
-      "sha256": "c4f781c221a2bd08f7e66f73a9ae9cac44dd73806be127645e34a1d3302b56ee",
+      "sha256": "d5198d5ca4b27c1edeb8b4d1fa2905eba66e5d47d969b5767c6f3eb1d5ef707c",
       "mode": "100644"
     },
     "templates/viz/test.mjs": {
@@ -468,7 +468,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "e021a3877219d84113f0c2b2444c216848a1dc7862ded7375e19470de6a70953",
+      "sha256": "180f3d2377232055eae37b292418a53eb472e45adfa0ca1154d4296b9eb04eb3",
       "mode": "100644"
     },
     "tools/fetch-fonts.sh": {

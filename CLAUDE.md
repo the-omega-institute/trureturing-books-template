@@ -20,9 +20,10 @@
 3. **多语言逐条对齐。** 各语言版本章节文件名与顺序相同，每章环境序列（种类、`#id`、`lean`）与媒体序列相同。先改权威版本，再同步其他版本；英文自然准确，不逐字硬译。
 4. **锁文件只由工具写。** `./tbook pin` 更新所钉提交；`./tbook pin --refresh` 解析新增引用。升级提交时复核“陈述摘要变化”的定理（`skills/trureturing-pin`）。所钉提交必须在 `site.toml` 的 trureturing 分支（默认 `dev`）上，`./tbook pin` 与 `./tbook check` 都会核对；不要钉未合入的 PR 提交。
 5. **托管文件不在书库里改。** `template.toml` 的 `[managed].paths` 下的文件归模板所有；改进请回馈模板仓库（`skills/template-update`）。书库自己的 skill 放 `skills/local-<name>/`，自己的文档放 `docs/project/`。
-6. **只用相对链接。** 站点挂在 `/<repo>/` 下，以 `/` 开头的站内链接会断。
-7. **提交前验证。** 至少运行 `./tbook check`（0 错误）；改动影响输出时运行对应的 `./tbook build …`，用 `./tbook serve` 在中英文、深浅主题、手机宽度下实际查看。改动工具时运行 `PYTHONPATH=tools python3 -m unittest discover -s tools/tests`。
-8. **不在提交、文档或书中写模型标识。**
+6. **严循示例与模板规范。** 交互可视化、视频与演示文稿须严格对齐 `books/example-monograph/` 示例（`viz/golden-carry/`、`films/001-golden-deficit/`、`slides/overview/`）与 `templates/` 的版式、组件和元素，不自创脱离示例框架的布局、非标徽章类名或私有运行时。
+7. **只用相对链接。** 站点挂在 `/<repo>/` 下，以 `/` 开头的站内链接会断。
+8. **提交前验证。** 至少运行 `./tbook check`（0 错误）；改动影响输出时运行对应的 `./tbook build …`，用 `./tbook serve` 在中英文、深浅主题、手机宽度下实际查看。改动工具时运行 `PYTHONPATH=tools python3 -m unittest discover -s tools/tests`。
+9. **不在提交、文档或书中写模型标识。**
 
 ## 常用命令
 

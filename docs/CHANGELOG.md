@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [0.2.3] - 2026-11-11
+
+### 变更
+
+- 可视化模板与技能（`templates/viz/`、`skills/book-viz/SKILL.md`、`CLAUDE.md`、`theme/viz/theme.css`）：将 `./tbook viz new` 生成的起始脚手架从双栏干涉示例升级为与 `books/example-monograph/viz/golden-carry/` 完全一致的三栏结构（左栏 `.deck` 步进器+滑块输入与 `dl.ro` 主读数，中栏 `.ledger` 规则徽章、真实 HTML `.drow` 分步可点击账本、`#tape` 符号带与底部 `footer.rail` 播放控制栏，右栏 `#heatPanel[data-thumb]` 二维交互相图与 `#evidence` 标准依据徽章，以及 `?thumb=1` 左右分栏无字缩略图 `drawCover()`）；在 `skills/book-viz/SKILL.md`、`templates/viz/README.md` 与 `CLAUDE.md` 中明确三栏元素与标准依据类名规范，并在 `theme/viz/theme.css` 补齐 `--grid-line` 与 `--radius` 令牌映射。
+
 ## [0.2.2] - 2026-11-11
 
 ### 修复

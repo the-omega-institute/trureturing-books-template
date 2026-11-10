@@ -26,28 +26,107 @@
     </div>
   </header>
 
-  <main class="stage" id="stage" data-thumb aria-label="__TITLE__ 主视图" data-aria-en="__TITLE_EN__ main view">
-    <canvas class="gl" id="view"></canvas>
-    <div class="scan"></div><div class="vig"></div>
-    <span class="bracket tl"></span><span class="bracket tr"></span><span class="bracket bl"></span><span class="bracket br"></span>
-    <div class="hud-tl"><span class="big">STARTER</span><span class="sub"><span class="zh">示例：两个点源的干涉场。换成你的可视化。</span><span class="en">Example: the interference field of two point sources. Replace it with your visualization.</span></span></div>
-    <div class="toast" id="toast"></div>
+  <aside class="col deck" aria-label="输入与读数" data-aria-en="Inputs and readouts">
+    <section class="panel sec" id="inputs">
+      <h2><span class="zh">输入</span><span class="en">Inputs</span><span class="aside">a, b</span></h2>
+      <div class="num-field">
+        <label for="aNum">a</label>
+        <div class="stepper">
+          <button type="button" id="aDec" aria-label="a 减一" data-aria-en="Decrease a">−</button>
+          <input type="number" id="aNum" min="1" max="16" step="1" value="6">
+          <button type="button" id="aInc" aria-label="a 加一" data-aria-en="Increase a">+</button>
+        </div>
+        <input type="range" id="aRange" min="1" max="16" step="1" value="6" aria-label="a 滑块" data-aria-en="a slider">
+      </div>
+      <div class="num-field">
+        <label for="bNum">b</label>
+        <div class="stepper">
+          <button type="button" id="bDec" aria-label="b 减一" data-aria-en="Decrease b">−</button>
+          <input type="number" id="bNum" min="1" max="16" step="1" value="5">
+          <button type="button" id="bInc" aria-label="b 加一" data-aria-en="Increase b">+</button>
+        </div>
+        <input type="range" id="bRange" min="1" max="16" step="1" value="5" aria-label="b 滑块" data-aria-en="b slider">
+      </div>
+      <div class="chips presets" id="presets">
+        <button type="button" class="chip" id="swapBtn"><span class="zh">交换 a ↔ b</span><span class="en">Swap a ↔ b</span></button>
+        <button type="button" class="chip" id="randBtn"><span class="zh">随机</span><span class="en">Random</span></button>
+      </div>
+    </section>
+
+    <section class="panel sec" id="readouts">
+      <h2><span class="zh">读数</span><span class="en">Readouts</span><span class="aside">Δ(a, b)</span></h2>
+      <dl class="ro">
+        <div class="c"><dt><span class="zh">输入 a</span><span class="en">Input a</span></dt><dd id="roA">—</dd></div>
+        <div class="c"><dt><span class="zh">输入 b</span><span class="en">Input b</span></dt><dd id="roB">—</dd></div>
+        <div class="a"><dt><span class="zh">和 a + b</span><span class="en">Sum a + b</span></dt><dd id="roSum">—</dd></div>
+        <div><dt><span class="zh">步数 K</span><span class="en">Steps K</span></dt><dd id="roSteps">—</dd></div>
+        <div class="wide deficit">
+          <dt><span class="zh">不变量 Δ(a, b)</span><span class="en">Invariant Δ(a, b)</span></dt>
+          <dd><b id="roDeficit">—</b><span class="sub" id="roDeficitSub"></span><span class="okmark">✓</span></dd>
+        </div>
+      </dl>
+      <p class="note" id="roNote"><span class="zh">把这里换成你的量与不变量。</span><span class="en">Replace this with your quantities and invariants.</span></p>
+    </section>
+  </aside>
+
+  <main class="center" aria-label="分步账本" data-aria-en="Step ledger">
+    <section class="panel ledger" id="ledgerPanel" aria-labelledby="ledgerTitle">
+      <div class="head">
+        <h2 id="ledgerTitle"><span class="zh">分步账本</span><span class="en">Step ledger</span></h2>
+        <span class="aside" id="ledgerSub">—</span>
+      </div>
+      <div class="rules" aria-label="改写规则" data-aria-en="Rewrite rules">
+        <span class="rule r0"><b>R₀</b> <span class="zh">正步</span><span class="en">pos step</span> <i>+1</i></span>
+        <span class="rule r1"><b>R₁</b> <span class="zh">负步</span><span class="en">neg step</span> <i>−1</i></span>
+      </div>
+      <div class="sheetwrap" id="sheetWrap">
+        <div class="digits" id="ledger" role="region" aria-label="逐轮账本" data-aria-en="Step-by-step ledger"></div>
+      </div>
+      <div class="tape-row">
+        <span class="tape-label"><span class="zh">每轮贡献</span><span class="en">Per-pass sign</span></span>
+        <div class="tape" id="tape" role="group" aria-label="每轮符号" data-aria-en="Sign of each pass"></div>
+        <span class="tape-sum" id="tapeSum"></span>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </section>
+
+    <footer class="rail" id="rail">
+      <div class="transport" role="group" aria-label="步进控制" data-aria-en="Pass transport">
+        <button type="button" class="tbtn" id="first" title="0 (Home)" aria-label="回到初始态" data-aria-en="Initial state">⏮</button>
+        <button type="button" class="tbtn" id="prev" title="←" aria-label="上一轮" data-aria-en="Previous pass">◀</button>
+        <button type="button" class="tbtn" id="play" title="Space" aria-pressed="false" aria-label="播放或暂停" data-aria-en="Play or pause">▶</button>
+        <button type="button" class="tbtn" id="next" title="→" aria-label="下一轮" data-aria-en="Next pass">▶▶</button>
+        <button type="button" class="tbtn" id="last" title="End" aria-label="跳到最终态" data-aria-en="Final state">⏭</button>
+      </div>
+      <div class="clock">
+        <span class="tau" id="passLabel"><span class="zh">第 0 / 0 轮</span><span class="en">Pass 0 / 0</span></span>
+        <input type="range" id="pass" min="0" max="1" step="1" value="1" aria-label="当前轮次" data-aria-en="Current pass">
+      </div>
+      <div class="keys"><kbd>Space</kbd> <span class="zh">播放</span><span class="en">play</span> · <kbd>←</kbd><kbd>→</kbd> <span class="zh">单步</span><span class="en">step</span> · <kbd>R</kbd> <span class="zh">随机</span><span class="en">random</span></div>
+    </footer>
   </main>
 
-  <aside class="col side" aria-label="控制与读数" data-aria-en="Controls and readouts">
-    <section class="panel sec">
-      <h2><span class="zh">参数</span><span class="en">Controls</span><span class="aside">d</span></h2>
-      <div class="field">
-        <label for="sep"><span class="zh">源间距</span><span class="en">Source separation</span></label><output id="oSep" for="sep">0.40</output>
-        <input type="range" id="sep" min="0.1" max="0.9" step="0.01" value="0.4">
+  <aside class="col side" aria-label="相图与依据" data-aria-en="Phase map and evidence">
+    <section class="panel sec heatpanel" id="heatPanel" data-thumb>
+      <h2 class="thumb-hide"><span class="zh">二维相图 Δ(a, b)</span><span class="en">Phase map Δ(a, b)</span><span class="aside" id="heatRange">16 × 16</span></h2>
+      <div class="heatwrap">
+        <canvas id="heat" role="img" aria-label="Δ(a, b) 二维相图：点击选一对 (a, b)" data-aria-en="2D phase map of Δ(a, b): click a cell to pick (a, b)"></canvas>
+        <div class="scan"></div>
       </div>
-      <p class="note"><span class="zh">每个控件都要对应理论里的一个量；在理论接口里写明它是哪一个。</span><span class="en">Every control should stand for a quantity in the theory; name it in the theory drawer.</span></p>
+      <ul class="legend thumb-hide" aria-label="颜色图例" data-aria-en="Colour legend">
+        <li><span class="sw pos"></span><span>+1</span></li>
+        <li><span class="sw zero"></span><span>0</span></li>
+        <li><span class="sw neg"></span><span>−1</span></li>
+        <li><span class="sw cur"></span><span><span class="zh">当前 (a, b)</span><span class="en">current (a, b)</span></span></li>
+      </ul>
+      <p class="note thumb-hide" id="heatCounts">—</p>
+      <p class="note thumb-hide" id="heatHover">&nbsp;</p>
     </section>
-    <section class="panel sec">
-      <h2><span class="zh">读数</span><span class="en">Readout</span><span class="aside">λ</span></h2>
-      <dl class="ro"><div class="a"><dt><span class="zh">条纹间距</span><span class="en">Fringe spacing</span></dt><dd id="roFringe">—</dd></div></dl>
-      <div class="lean num"><span class="ok">NUM</span><span><span class="zh">页面数值，不是定理。</span><span class="en">Computed on the page; not a theorem.</span></span></div>
-      <button class="chip" id="infoBtn"><span class="zh">理论接口 DATA SHARD</span><span class="en">DATA SHARD · theory</span></button>
+
+    <section class="panel sec" id="evidence">
+      <h2><span class="zh">依据</span><span class="en">Evidence</span><span class="aside">NUM</span></h2>
+      <div class="lean num"><span class="ok">NUM</span><span><span class="zh">页面数值，不是定理。引用已冻结定理时改为 <code>.lean</code> 并写 <code>data-lean-gid</code>。</span><span class="en">Computed on the page; not a theorem. Use <code>.lean</code> with <code>data-lean-gid</code> when citing a frozen theorem.</span></span></div>
+      <button type="button" class="chip" id="infoBtn"><span class="zh">理论接口 DATA SHARD</span><span class="en">DATA SHARD · theory</span></button>
     </section>
   </aside>
 </div>
