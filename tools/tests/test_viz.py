@@ -486,7 +486,7 @@ class Links(unittest.TestCase):
         page = (EXAMPLE / "viz" / "golden-carry" / "index.html").read_text(encoding="utf-8")
         page = page.replace(lock.commit, "0" * 40)  # make the rewrite observable
         script = ("import { pinLinks, readLock } from './tools/node/viz-common.mjs';"
-                  "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(pinLinks(s, readLock())));")
+                  "process.stdin.setEncoding('utf8');let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(pinLinks(s, readLock())));")
         r = subprocess.run([NODE, "--input-type=module", "-e", script], input=page, capture_output=True, text=True,
                            cwd=paths.ROOT, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
