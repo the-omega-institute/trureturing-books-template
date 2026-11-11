@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import unittest
 from pathlib import Path
 
@@ -276,6 +277,11 @@ class CheckTests(unittest.TestCase):
             self.assertIsNotNone(figure.caption_problem(bad), bad)
         self.assertIsNone(figure.caption_problem("图 13 的左半边是一条线"))
         self.assertIsNone(figure.caption_problem("fig"), "a word is a caption, however short; only a bare number is not")
+        self.assertIsNone(figure.caption_problem("3 qubits"))
+        self.assertIsNotNone(figure.caption_problem("（图 2-3）"))
+        start = time.perf_counter()
+        self.assertIsNone(figure.caption_problem("0-" + " -" * 20000 + "x"), "no backtracking on a long run of dashes")
+        self.assertLess(time.perf_counter() - start, 1.0)
         with Repo() as repo:
             book = demo(repo)
             figure.build(book)

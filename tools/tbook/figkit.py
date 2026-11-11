@@ -73,7 +73,7 @@ def esc(text: str) -> str:
     return html.escape(str(text), quote=True).replace("$", "&#36;").replace("\\", "&#92;")
 
 
-_WIDE = re.compile(r"[⺀-鿿가-힯豈-﫿＀-￯　-〿]")
+_WIDE = re.compile("[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]")  # CJK with its punctuation, Hangul, full-width forms
 
 
 def text_width(text: str, size: float = 14.0, mono: bool = False) -> float:

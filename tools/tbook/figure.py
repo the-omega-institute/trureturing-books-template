@@ -31,6 +31,7 @@ import importlib.util
 import json
 import posixpath
 import re
+import string
 import subprocess
 import sys
 from pathlib import Path
@@ -42,8 +43,8 @@ FIG_DIR = "figures"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TEMPLATE = paths.TEMPLATES / "figure" / "figure.py"
 NODE_SHOTS = paths.TOOLS / "node" / "fig-shots.mjs"
-# A caption that only numbers the figure says nothing: "图 13", "Figure 2.1", "Fig. 3:".
-PLACEHOLDER_RE = re.compile(r"^\W*(?:(?:图|圖|figure|fig\.?|abb\.?|abbildung)\s*)?[0-9０-９]+(?:\s*[.\-–—·:：]\s*[0-9０-９]*)*\W*$", re.I)
+# The word that may precede the number of a caption that says nothing else: "图 13", "Figure 2.1", "Fig. 3:".
+_FIGURE_WORD_RE = re.compile(r"(?:图|圖|figure|fig|abbildung|abb)\.?", re.I)
 _STYLE_RE = re.compile(r"<style>.*?</style>\n?", re.S)
 _ROOT_RE = re.compile(r"<svg\b[^>]*>")
 _PANEL_RE = re.compile(r'<svg class="tr-fig-panel" x="[^"]*" y="[^"]*" width="(?P<w>[^"]*)" height="(?P<h>[^"]*)" '
@@ -240,12 +241,22 @@ def check_ref(book, src: str) -> str | None:
     return None
 
 
+def only_a_number(plain: str) -> bool:
+    """True when ``plain`` holds a number and nothing to read: digits and punctuation, perhaps after
+    the word for a figure (one pass over the text; no pattern that could backtrack)."""
+    s = plain.lstrip(string.punctuation + string.whitespace + "（【《「“‘")
+    m = _FIGURE_WORD_RE.match(s)
+    if m:
+        s = s[m.end():]
+    return any(ch.isdigit() for ch in s) and not any(ch.isalpha() or ch == "_" for ch in s)
+
+
 def caption_problem(text: str) -> str | None:
     """Why ``text`` is no caption (empty, or only a number), or None."""
     plain = re.sub(r"\s+", " ", text or "").strip()
     if not re.search(r"\w", plain):
         return "has no caption: say in one sentence what the figure shows"
-    if PLACEHOLDER_RE.match(plain):
+    if only_a_number(plain):
         return f'has a placeholder caption ("{plain}"): say in one sentence what the figure shows'
     return None
 

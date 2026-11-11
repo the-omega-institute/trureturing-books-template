@@ -608,11 +608,11 @@
       "mode": "100644"
     },
     "tools/tbook/figkit.py": {
-      "sha256": "916584d432b42f7d3c7c71347d1f1201dcb05b95c30429ec12df6ca343732b97",
+      "sha256": "b4b4eb14c5701ccfab55084a1fa32506d4a8586e31acfeb0269c5a2d41b89758",
       "mode": "100644"
     },
     "tools/tbook/figure.py": {
-      "sha256": "8a111bd263e9bb1dc7d85640d8179544de271a0401a6b6583beb0aebaf2b6ab6",
+      "sha256": "0c265769d9362d86a0d433400320be2fee5f42340eb2d950ab11d81dfaf55d7d",
       "mode": "100644"
     },
     "tools/tbook/film.py": {
@@ -712,7 +712,7 @@
       "mode": "100644"
     },
     "tools/tests/test_figure.py": {
-      "sha256": "aae90b5b49bc0a41619104e165aec968d414bad4d7c077dcec6953f4cdb38e10",
+      "sha256": "773efb2a5351534861274adb03d536a32a1796933bf030d7b179a300258edf5f",
       "mode": "100644"
     },
     "tools/tests/test_film.py": {
