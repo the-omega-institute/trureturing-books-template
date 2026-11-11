@@ -98,7 +98,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 
 ```bash
 ./tbook check          # 图注为空或只有编号（错误）；提交的 SVG 与脚本不一致（错误）；各语言的图序列不一致（错误）；
-                       # assets/ 里没有被引用的文件、没有脚本的 SVG（警告）
+                       # assets/ 里没有被引用的文件、没有脚本的 SVG、没有章节引用的图（警告）
 ./tbook build html pdf epub --book <book>     # 实际构建，在站点与 PDF 里看一眼
 ```
 

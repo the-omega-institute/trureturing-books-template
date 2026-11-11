@@ -11,7 +11,7 @@
   - **引用**：`::: {.figure src="<name>"}` 加图注（普通 Markdown，可含数学与 `[@id]`），与可视化、视频一样是媒体块，各语言版本的图序列由 `./tbook check` 逐条核对。
   - **各端渲染**：HTML 中图内联进页面，角色类取页面的 `--tr-*` 令牌，随主题切换与浏览器打印变化；带分栏的图（`WRAP = True`）在宽屏并排、在手机上叠放。PDF 的屏幕版与印刷版各用自己的配色（`theme/typst/book.typ` 的 `tr-fig-ext` 按变体取文件），EPUB 用浅色配色加不透明底。
   - **命令**：`./tbook fig new <book> <name>`（起始脚本 `templates/figure/figure.py`）、`./tbook fig build [--book <slug>] [--check] [<name> …]`、`./tbook fig list`、`./tbook fig shots <book> [<name> …]`（深色、浅色、手机、印刷四种画面与拼版图，`tools/node/fig-shots.mjs`）。`./tbook build html|pdf|epub` 先重画图，再构建。
-  - **检查**（`./tbook check`）：`.figure` 块没有图注、或图注与图片说明只是编号（“图 13”“Figure 2.1”），报错；提交的 SVG 与脚本现在画出的不一致，报错；`assets/` 里没有任何章节、幻灯片、视频或可视化用到的文件，以及没有脚本的 `figures/*.svg`，警告；各语言版本同一章的图片（`![…](…)`）张数不同，警告（`.figure` 块与其他媒体一样逐条比对）。
+  - **检查**（`./tbook check`）：`.figure` 块没有图注、或图注与图片说明只是编号（“图 13”“Figure 2.1”），报错；提交的 SVG 与脚本现在画出的不一致，报错；`assets/` 里没有任何章节、幻灯片、视频或可视化用到的文件，没有脚本的 `figures/*.svg`，以及没有任何章节引用的图，警告；各语言版本同一章的图片（`![…](…)`）张数不同，警告（`.figure` 块与其他媒体一样逐条比对）。
   - 示例专著的两张图（`phase-square`、`carry-rules`）改由脚本生成，作为示例；`books/example-monograph/assets/` 中的两个旧 SVG 删除。
   - **需要手动操作（仅当书里有只写编号的图注时）**：`![图 13](…)` 这样的图片说明现在是错误，请改成一句说明这张图的话。原有的 `![图注](../assets/x.svg)` 写法照常构建，不需要改；要让旧图随主题变化，按 `skills/book-figure` 的“把旧图换成标准图”重做。
 

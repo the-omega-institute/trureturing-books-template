@@ -268,6 +268,7 @@ class CheckTests(unittest.TestCase):
             check.check_captions(m, out)
         check.check_parity(book, models, out)
         check.check_image_parity(book, models, out)
+        check.check_unused_figures(book, models, out)
         check.check_unused_assets(book, models, config.load_site(), out)
         return out
 
@@ -308,6 +309,17 @@ class CheckTests(unittest.TestCase):
             errors = [i.message for i in self.issues(book) if i.severity == "error"]
             self.assertTrue(any("differs between editions" in e for e in errors), errors)
 
+    def test_a_figure_no_chapter_cites_is_reported(self):
+        with Repo() as repo:
+            book = demo(repo, {"line": SCRIPT, "two": PANELS})
+            figure.build(book)
+            for lang in ("zh", "en"):
+                chapter(repo, lang, '# One\n\n::: {.figure src="line"}\nA line and a dot on it.\n:::\n')
+            found = self.issues(book)
+            self.assertEqual([i for i in found if i.severity == "error"], [])
+            self.assertEqual([(i.path.name, i.message.split(";")[0]) for i in found if i.severity == "warning"],
+                             [("two.py", "no chapter cites this figure")])
+
     def test_editions_show_the_same_number_of_images(self):
         with Repo() as repo:
             book = demo(repo)
@@ -316,7 +328,7 @@ class CheckTests(unittest.TestCase):
             chapter(repo, "en", "# One\n\n![A picture](../assets/a.png)\n")
             found = self.issues(book)
             self.assertEqual([i for i in found if i.severity == "error"], [])
-            warnings = [i.message for i in found if i.severity == "warning"]
+            warnings = [i.message for i in found if i.severity == "warning" and "image(s)" in i.message]
             self.assertEqual(warnings, ["the en edition shows 1 image(s) in this chapter, the zh edition 2: editions show the "
                                         "same pictures at the same places"])
 

@@ -183,6 +183,18 @@ def check_image_parity(book: config.Book, models: dict[str, EditionModel], issue
                                            f"{book.languages[0]} edition {m}: editions show the same pictures at the same places")
 
 
+def check_unused_figures(book: config.Book, models: dict[str, EditionModel], issues: list[Issue]) -> None:
+    """Figures that no chapter of any edition cites: drawn and committed, but shown nowhere (a warning)."""
+    from . import figure
+
+    cited = {env.attrs.get("src") for model in models.values() for doc in model.chapters
+             for env in doc.media if env.kind == "figure"}
+    for name in figure.names(book):
+        if name not in cited:
+            _warn(issues, figure.script_path(book, name), 0,
+                  f'no chapter cites this figure; cite it with ::: {{.figure src="{name}"}} or delete it and its SVG files')
+
+
 def check_unused_assets(book: config.Book, models: dict[str, EditionModel], site: config.Site, issues: list[Issue]) -> None:
     """Files in ``assets/`` that no chapter of any edition and no slide deck or visualization names:
     left-overs that the builds never publish (a warning; delete them or cite them)."""
@@ -477,6 +489,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
                 _warn(issues, model.edition.summary, 0, "edition has no chapters yet")
         check_parity(book, models, issues)
         check_image_parity(book, models, issues)
+        check_unused_figures(book, models, issues)
         check_unused_assets(book, models, site, issues)
         for kind in MEDIA:
             try:

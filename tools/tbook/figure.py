@@ -263,7 +263,7 @@ def caption_problem(text: str) -> str | None:
 
 def check(book) -> list[Issue]:
     """Scripts that cannot be drawn or whose committed output is stale (errors); outputs without a
-    script and figures no chapter cites (warnings)."""
+    script (warnings). Figures that no chapter cites are :func:`tbook.check.check_unused_figures`'s."""
     issues: list[Issue] = []
     d = figures_dir(book)
     if not d.is_dir():
