@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "3f738cce580cb42d8473633f57a1f90a157b1a9705235577d8fbd2e7507786a1",
+      "sha256": "550dbdd0a01df777bce20fbc257fd251436482ef0f79b28eb2e4e5b1a78fc9e9",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
-      "sha256": "180fb3fa7362036b6ca74bb37558b935a7a44ec6a2618e680062b49dbfe73f6e",
+      "sha256": "4b098b56d8dd0073974b296abd1b6f49835271aecba12f1e732eb99384d9ba6c",
       "mode": "100644"
     },
     "skills/book-film/SKILL.md": {
@@ -124,7 +124,7 @@
       "mode": "100644"
     },
     "skills/book-slides/SKILL.md": {
-      "sha256": "b89639855e7f3311fd514c3268a2b2828216043f586725b44e95179a9d98355f",
+      "sha256": "5a59b9164b248941ae0f6c3c3f7d67adaffa1c42e6d369cba867d3c1caea5dee",
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
@@ -644,7 +644,7 @@
       "mode": "100644"
     },
     "tools/tbook/figure.py": {
-      "sha256": "f80ef20dad8478b5972071ad7ae25f0f1edb20157767e8b8c126e7737f95549f",
+      "sha256": "1845740a51878ceb5c0c118ef7406f14b75dc54118be4e77765340bb85b5208b",
       "mode": "100644"
     },
     "tools/tbook/film.py": {
@@ -748,7 +748,7 @@
       "mode": "100644"
     },
     "tools/tests/test_figure.py": {
-      "sha256": "5cf33c53a6c67f3c41a3bd47ab6c9e56a22dc3e581bd526ee6079d41a6e6a9b0",
+      "sha256": "081df906f57449b8d3fdf54d39b1dc32736fb88c65edc9adb480ab598de1bea3",
       "mode": "100644"
     },
     "tools/tests/test_film.py": {

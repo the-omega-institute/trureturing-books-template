@@ -31,7 +31,8 @@ npx slidev books/<book>/slides/<deck>/slides.md                  # 本地预览�
 2. 每页用 `layout: cover`（封面、结尾）、`layout: section`（章节页，`chapter: "01"`）或默认版式（带 `section: "…"` 页眉）。正文用 `.body`、`.kicker`、`h2.t`、`.lead`、`.card`、`.flow`、`.g2`/`.g3` 等类。
 3. 数学：Markdown 段落里写 `$…$`；HTML 块里写 `<Tex t="…" />`。组件插槽中的 Markdown 不缩进，前后空一行。
 4. 先写第一语言，再逐页同步其他语言。新引用了 GID 时运行 `./tbook pin --refresh`（它收集幻灯片引用的 GID）。
-5. 检查与构建：
+5. 要用书里的静态图（`books/<book>/figures/<name>.py`），就在 `books/<book>/slides/<deck>/img/` 放一个同名文件 `<name>.<lang>.svg`，页面里写 `<img src="./img/<name>.zh.svg" …>`。不要手工拷贝：`./tbook fig build --book <book>` 把它写成这张图的深色配色版（`figure.materialize(svg, "screen")`），图重画后也跟着更新；`./tbook check` 发现它过期或带着纸面配色时报错。演示文稿是纯深色的，而 `<img>` 里的 SVG 跟随浏览者的系统配色，原样拷贝的规范 SVG 在浅色系统和无头导出里会用纸面配色画在深色背景上。
+6. 检查与构建：
 
    ```bash
    node tools/node/slides-check.mjs
@@ -40,7 +41,7 @@ npx slidev books/<book>/slides/<deck>/slides.md                  # 本地预览�
    ```
 
    输出在 `build/slides/<book>/<deck>/<lang>/` 与 `build/slides/<book>/<deck>-<lang>.pdf`。PDF 的每页背景是一张图（`theme/slides/styles/backdrop.jpg`，见 `theme/slides/README.md`“背景与 PDF 导出”），翻页因此不卡；它与 `backdrop.css`、配色不符时构建会重新渲染，提交更新后的 `backdrop.jpg` 与 `backdrop.json`。某一页换了背景，就在它的 frontmatter 写 `class: tr-own-bg <类名>`，否则构建报错。快速迭代时可设 `TBOOK_SLIDES_NO_PDF=1` 跳过 PDF；此时不发布 PDF，章节卡片、幻灯片目录与演示页都不给 PDF 链接，发布前去掉它重新构建。
-6. 嵌入章节——**所有语言版本都要加**，`src` 相同，只翻译说明：
+7. 嵌入章节——**所有语言版本都要加**，`src` 相同，只翻译说明：
 
    ```markdown
    ::: {.slides src="<deck>"}
@@ -49,7 +50,7 @@ npx slidev books/<book>/slides/<deck>/slides.md                  # 本地预览�
    ```
 
    HTML 中为链接卡片（在线演示、下载 PDF）；PDF/EPUB 中为标题与在线地址。
-7. `./tbook build site --book <book> && ./tbook serve`：站点在 `<slug>/slides/` 发布索引、各语言演示（第一语言在 `<deck>/`，其他语言在 `<deck>/<lang>/`）与 PDF（`<slug>-<deck>-<lang>.pdf`）；Release 也附上这些 PDF。
+8. `./tbook build site --book <book> && ./tbook serve`：站点在 `<slug>/slides/` 发布索引、各语言演示（第一语言在 `<deck>/`，其他语言在 `<deck>/<lang>/`）与 PDF（`<slug>-<deck>-<lang>.pdf`）；Release 也附上这些 PDF。
 
 ## 常见问题
 
