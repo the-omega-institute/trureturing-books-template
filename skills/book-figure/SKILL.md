@@ -94,10 +94,12 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 
 图注是普通的 Markdown：可以有行内数学、`[@id]` 引用与加粗；必须有，且不能只是编号（“图 13”）。HTML 中图内联在页面里，颜色随主题切换；PDF 的屏幕版与印刷版各用自己的配色；EPUB 用浅色配色。
 
+演示文稿要用同一张图时，在 `slides/<deck>/img/` 放同名的 `<name>.<lang>.svg`，由 `./tbook fig build` 写成深色配色版并随图更新（见 `book-slides`），不要手工拷贝。
+
 ### 5. 检查
 
 ```bash
-./tbook check          # 图注为空或只有编号（错误）；提交的 SVG 与脚本不一致（错误）；各语言的图序列不一致（错误）；
+./tbook check          # 图注为空或只有编号（错误）；提交的 SVG（含演示文稿 img/ 里的同名副本）与脚本不一致（错误）；各语言的图序列不一致（错误）；
                        # assets/ 里没有被引用的文件、没有脚本的 SVG、没有章节引用的图（警告）
 ./tbook build html pdf epub --book <book>     # 实际构建，在站点与 PDF 里看一眼
 ```

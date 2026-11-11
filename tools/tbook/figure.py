@@ -115,6 +115,18 @@ def out_path(book, name: str, lang: str) -> Path:
     return figures_dir(book) / f"{name}.{lang}.svg"
 
 
+def slide_copies(book, name: str, lang: str) -> list[Path]:
+    """Copies of figure ``name`` that ``book``'s slide decks show: ``slides/<deck>/img/<name>.<lang>.svg``.
+    The decks are dark, and an SVG in an ``<img>`` follows the viewer's colour scheme rather than the
+    page, so a copy holds the screen palette only (:func:`slide_svg`); ``build`` keeps it current."""
+    return sorted((book.dir / "slides").glob(f"*/img/{name}.{lang}.svg"))
+
+
+def slide_svg(svg: str) -> str:
+    """What a slide deck's copy of the canonical figure ``svg`` holds."""
+    return materialize(svg, "screen")
+
+
 def names(book) -> list[str]:
     """The figures of ``book``: its scripts, except helpers (``_common.py``)."""
     d = figures_dir(book)
@@ -174,22 +186,25 @@ def render(book, name: str, lang: str) -> str:
 
 
 def build(book, only: list[str] | None = None, *, check: bool = False) -> tuple[list[Path], list[str]]:
-    """Write (or with ``check`` only compare) the outputs of ``book``'s figures. Returns the
-    files that changed (would change) and the errors of scripts that could not be drawn."""
+    """Write (or with ``check`` only compare) the outputs of ``book``'s figures and the copies its
+    slide decks show (:func:`slide_copies`). Returns the files that changed (would change) and the
+    errors of scripts that could not be drawn."""
     changed: list[Path] = []
     errors: list[str] = []
     for name in only if only is not None else names(book):
         for ed in book.editions:
-            dst = out_path(book, name, ed.lang)
             try:
                 svg = render(book, name, ed.lang)
             except figkit.FigureError as exc:
                 errors.append(str(exc))
                 continue
-            if not dst.is_file() or dst.read_text(encoding="utf-8") != svg:
-                changed.append(dst)
-                if not check:
-                    dst.write_text(svg, encoding="utf-8")
+            wanted = [(out_path(book, name, ed.lang), svg)]
+            wanted += [(p, slide_svg(svg)) for p in slide_copies(book, name, ed.lang)]
+            for dst, text in wanted:
+                if not dst.is_file() or dst.read_text(encoding="utf-8") != text:
+                    changed.append(dst)
+                    if not check:
+                        dst.write_text(text, encoding="utf-8")
     return changed, errors
 
 
@@ -287,7 +302,10 @@ def check(book) -> list[Issue]:
     for msg in errors:
         issues.append(Issue("error", d, 0, msg))
     for p in changed:
-        what = "is stale: its script draws something else" if p.is_file() else "has not been generated"
+        if p.parent.name == "img" and p.parent.parent.parent.name == "slides":
+            what = "is not the screen-palette copy of the figure its script draws now (slide decks are dark)"
+        else:
+            what = "is stale: its script draws something else" if p.is_file() else "has not been generated"
         issues.append(Issue("error", p, 0, f"{what} (run ./tbook fig build --book {book.slug} and commit the result)"))
     langs = {ed.lang for ed in book.editions}
     for p in sorted(d.glob("*.svg")):

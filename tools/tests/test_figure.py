@@ -168,6 +168,35 @@ class GenerationTests(unittest.TestCase):
             self.assertIn("is stale", messages[0])
             self.assertFalse(list((repo.root / "books").rglob("__pycache__")), "running a script leaves no bytecode")
 
+    def test_slide_decks_keep_a_screen_palette_copy(self):
+        with Repo() as repo:
+            book = demo(repo)
+            figure.build(book)
+            canonical = figure.out_path(book, "line", "zh").read_text(encoding="utf-8")
+            self.assertIn("prefers-color-scheme:dark", canonical)
+            img = repo.root / "books/demo/slides/overview/img"
+            write(img / "line.zh.svg", canonical)  # a raw copy: paper palette in a light colour scheme
+            write(img / "photo.zh.svg", "<svg/>\n")  # not a figure: left alone
+            stale, errors = figure.build(book, check=True)
+            self.assertEqual((errors, [p.name for p in stale]), ([], ["line.zh.svg"]))
+            messages = [i.message for i in figure.check(book) if i.severity == "error"]
+            self.assertEqual(len(messages), 1)
+            self.assertIn("screen-palette copy", messages[0])
+            changed, _ = figure.build(book)
+            self.assertEqual([p.name for p in changed], ["line.zh.svg"])
+            copy = (img / "line.zh.svg").read_text(encoding="utf-8")
+            self.assertEqual(copy, figure.materialize(canonical, "screen"))
+            self.assertNotIn("prefers-color-scheme", copy)
+            self.assertEqual((img / "photo.zh.svg").read_text(encoding="utf-8"), "<svg/>\n")
+            self.assertFalse((img / "line.en.svg").exists(), "only the copies a deck already has are kept")
+            self.assertEqual(figure.build(book, check=True), ([], []))
+            script = figure.script_path(book, "line")
+            script.write_text(SCRIPT.replace("fig.dot(150", "fig.dot(160"), encoding="utf-8")
+            stale, _ = figure.build(book, check=True)
+            self.assertEqual(sorted(p.name for p in stale), ["line.en.svg", "line.zh.svg", "line.zh.svg"])
+            figure.build(book)
+            self.assertIn('cx="160"', (img / "line.zh.svg").read_text(encoding="utf-8"), "the copy follows the script")
+
     def test_scripts_may_share_a_helper(self):
         with Repo() as repo:
             book = demo(repo, {"_common": "def mark(fig):\n    fig.dot(10, 10, 4, 'cyan')\n",
