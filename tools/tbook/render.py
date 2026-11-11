@@ -84,6 +84,9 @@ class RenderContext:
     # where the staged edition puts files from the book directory (relative to the edition root)
     book_prefix: str = "_book"
     book_files: set[Path] = field(default_factory=set)
+    # generated text files staged next to them: path under the book directory → content (tbook.figure
+    # stages a figure once per palette for the PDF and EPUB)
+    book_texts: dict[str, str] = field(default_factory=dict)
     # files inside the edition directory that links point at (staged with the edition; ``check`` reads it)
     edition_files: set[Path] = field(default_factory=set)
     issues: list[str] = field(default_factory=list)

@@ -519,6 +519,9 @@ def stage_edition(site: config.Site, book: config.Book, edition: config.Edition,
     shutil.copy2(paths.GENERATED / "tokens.css", assets / "tokens.css")
     (assets / "tr-palette.css").write_text(paper_palette_css(), encoding="utf-8")
     shutil.copy2(MDBOOK_THEME / "tr-book.css", assets / "tr-book.css")
+    from . import figure
+
+    (assets / "tr-figure.css").write_text(figure.mdbook_css(), encoding="utf-8")
     (assets / "katex" / "katex.min.css").write_text(_katex_css(), encoding="utf-8")
     fonts = src / ASSET_DIR / "katex" / "fonts"
     fonts.mkdir(parents=True)
@@ -530,7 +533,7 @@ def stage_edition(site: config.Site, book: config.Book, edition: config.Edition,
         f"window.TR_EDITIONS = {json.dumps(data, ensure_ascii=False, indent=2)};\n", encoding="utf-8")
     shutil.copy2(MDBOOK_THEME / "tr-book.js", assets / "tr-book.js")
     css = [f"{ASSET_DIR}/tokens.css", f"{ASSET_DIR}/tr-palette.css", f"{ASSET_DIR}/katex/katex.min.css",
-           f"{ASSET_DIR}/tr-book.css"]
+           f"{ASSET_DIR}/tr-book.css", f"{ASSET_DIR}/tr-figure.css"]
     js = [f"{ASSET_DIR}/tr-editions.js", f"{ASSET_DIR}/tr-book.js"]
     # mdBook strips markup while parsing SUMMARY and escapes it again in its TOC helper.
     # Render title fragments with the chapters, give mdBook their visible text (also used

@@ -72,6 +72,18 @@ def _cached(make_unit, build_fn, out: Path) -> Path:
     return out
 
 
+def _figures(book: config.Book) -> None:
+    """Draw the book's figures (``./tbook fig build``): the editions show the committed files, which
+    must be what the scripts draw now."""
+    from . import figure
+
+    changed, errors = figure.build(book)
+    for p in changed:
+        print(f"  figure redrawn: {paths.rel(p)} (commit it)", flush=True)
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+
 def build(targets: list[str], books: list[config.Book], langs: list[str] | None = None,
           *, pdf_variants: list[str] | None = None) -> BuildResult:
     unknown = [lang for lang in langs or [] if not any(lang in book.languages for book in books)]
@@ -86,6 +98,11 @@ def build(targets: list[str], books: list[config.Book], langs: list[str] | None 
     if "all" in want:
         want = set(TARGETS)
     for book in books:
+        if want & {"html", "pdf", "epub"}:
+            from . import figure
+
+            if figure.names(book):
+                _timed(f"figures {book.slug}", lambda b=book: _figures(b), result)
         models = load_book_models(book) if want & {"html", "pdf", "epub"} else {}
         for ed in book.editions:
             if langs and ed.lang not in langs:

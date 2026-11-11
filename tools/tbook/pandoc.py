@@ -1378,6 +1378,12 @@ def stage(site: config.Site, book: config.Book, edition: config.Edition, model: 
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
         staged_files.add(f"_book/{rel}")
+    # Files the renderer generated for this target (a figure with the palette of each output written in).
+    for rel, text in sorted(ctx.book_texts.items()):
+        dst = out_dir / "_book" / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(text, encoding="utf-8")
+        staged_files.add(f"_book/{rel}")
     result.files = sorted(staged_files)
     _stage_theme(out_dir)
     result.meta = book_meta(site, book, edition, model, lock, result)

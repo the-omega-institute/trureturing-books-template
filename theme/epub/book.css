@@ -227,6 +227,9 @@ section.tr-media, div.tr-media {
   text-align: center;
 }
 :root section.tr-media p, :root div.tr-media p { text-indent: 0; }
+/* static figures (tbook.figure): the drawing on the page, no frame; the paragraphs below it are its caption */
+section.tr-figure, div.tr-figure { border: 0; padding: 0; font-size: 0.85em; line-height: 1.45; color: var(--tr-dim); }
+section.tr-figure img, div.tr-figure img { border: 0; }
 
 /* ------------------------------------------------------------------ blocks */
 

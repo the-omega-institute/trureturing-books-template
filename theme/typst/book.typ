@@ -7,7 +7,7 @@
 //   sys.inputs "tr-variant"          "screen" (dark void, neon accents) | "print" (white paper)
 //   /_theme/typst/code-<variant>.tmTheme   code highlighting derived from tokens.json
 // Functions called from raw Typst emitted by tools/filters/tr-book.lua and tr-env.lua:
-//   tr-chapter, tr-part, tr-env, tr-proof, tr-proof-label, tr-qed, tr-media, tr-code-break
+//   tr-chapter, tr-part, tr-env, tr-proof, tr-proof-label, tr-qed, tr-media, tr-fig-ext, tr-code-break
 // and `horizontalrule`, which Pandoc's Typst writer emits for `---`.
 //
 // Colours come only from theme/generated/tokens.typ (tr-screen / tr-paper). Semantics:
@@ -172,14 +172,28 @@
     body
   })
 
-#let tr-media(kind: "media", body) = block(width: 100%, breakable: false, above: 1.4em, below: 1.4em,
-  fill: panel-fill, stroke: 0.5pt + pal.panel-edge, inset: 10pt, {
-    cut-corner(size: 10pt, dx: 10.25pt, dy: -10.25pt, stroke: 0.5pt + pal.panel-edge)
-    set par(first-line-indent: 0pt)
-    mono-text(size: 6.8pt, fill: pal.cyan, tracking: 0.16em, upper(kind))
-    v(4pt)
+// A figure (tbook.figure) is staged with each palette written in; the variant picks the file.
+#let tr-fig-ext = if is-print { ".print.svg" } else { ".screen.svg" }
+
+#let tr-media(kind: "media", body) = if kind == "figure" {
+  // a static figure: the drawing on the page itself, its caption below in the caption style
+  block(width: 100%, breakable: false, above: 1.4em, below: 1.4em, {
+    set par(first-line-indent: 0pt, justify: false)
+    set align(center)
+    set text(size: 8.5pt, fill: pal.dim)
+    show strong: set text(fill: pal.ink)
     body
   })
+} else {
+  block(width: 100%, breakable: false, above: 1.4em, below: 1.4em,
+    fill: panel-fill, stroke: 0.5pt + pal.panel-edge, inset: 10pt, {
+      cut-corner(size: 10pt, dx: 10.25pt, dy: -10.25pt, stroke: 0.5pt + pal.panel-edge)
+      set par(first-line-indent: 0pt)
+      mono-text(size: 6.8pt, fill: pal.cyan, tracking: 0.16em, upper(kind))
+      v(4pt)
+      body
+    })
+}
 
 // ------------------------------------------------------------------ chapters
 

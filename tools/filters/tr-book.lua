@@ -159,6 +159,12 @@ end
 
 local function typst_image(img)
   local src = img.src
+  if img.attributes["tr-fig"] and src:match("%.svg$") then
+    -- A figure (tbook.figure): staged once per palette, theme/typst/book.typ picks the file of the variant.
+    local width = img.attributes.width or "100%"
+    return pandoc.RawInline("typst", "#box(image(" .. typst_str(url_decode((src:gsub("%.svg$", "")))) ..
+      " + tr-fig-ext, width: " .. width .. "))")
+  end
   if src:match("^[%a][%w+.-]*:") and not src:match("^file:") then
     warn("remote image " .. src .. " cannot be embedded in the PDF; linked instead")
     local text = #img.caption > 0 and img.caption or pandoc.Inlines({ pandoc.Str(src) })
@@ -193,7 +199,7 @@ end
 
 local function media_block(div)
   local kind = "media"
-  for _, c in ipairs({ "viz", "film", "slides" }) do
+  for _, c in ipairs({ "viz", "film", "slides", "figure" }) do
     if div.classes:includes("tr-" .. c) or div.classes:includes(c) then kind = c end
   end
   local out = pandoc.Blocks({ pandoc.RawBlock("typst", "#tr-media(kind: " .. typst_str(kind) .. ")[") })

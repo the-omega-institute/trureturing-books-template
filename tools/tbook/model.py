@@ -10,7 +10,7 @@ definition     definition — ``lean`` optional; when given it must resolve (any
 open           conjecture, problem — MUST NOT cite Lean; rendered with the OPEN badge.
 informal       example, remark — ``lean`` optional; when given it must resolve.
 proof          proof — unnumbered; ``lean`` optional.
-media          viz, film, slides — embeds, not numbered.
+media          viz, film, slides, figure — embeds, not numbered.
 =============  ==================================================================
 
 Numbered kinds share one counter per top-level chapter: ``定理2.1``, ``定义2.2``…
@@ -30,7 +30,7 @@ DEFINITION = ("definition",)
 OPEN = ("conjecture", "problem")
 INFORMAL = ("example", "remark")
 PROOF = ("proof",)
-MEDIA = ("viz", "film", "slides")
+MEDIA = ("viz", "film", "slides", "figure")
 NUMBERED = FORMAL + DEFINITION + OPEN + INFORMAL
 ENV_KINDS = NUMBERED + PROOF
 ALL_KINDS = ENV_KINDS + MEDIA

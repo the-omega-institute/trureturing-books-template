@@ -132,6 +132,89 @@ def check_links(model: EditionModel, site: config.Site, issues: list[Issue]) -> 
                 _warn(issues, doc.path, lineno, msg[len(prefix):] if msg.startswith(prefix) else msg)
 
 
+_IMAGE_SUFFIXES = (".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif")
+
+
+def check_captions(model: EditionModel, issues: list[Issue]) -> None:
+    """A figure says what it shows: ``::: {.figure}`` blocks need a caption, and neither they nor an
+    image (``![caption](file)``, whose description is its caption in the PDF and EPUB) may carry
+    only a number ("图 13"), which every reader sees as an unfinished page."""
+    from . import figure
+
+    for doc in model.chapters:
+        for env in doc.media:
+            if env.kind != "figure" or env.div is None:
+                continue
+            inner = mdscan.render_blocks(env.div.children, div_fn=lambda d, i: i, text_fn=lambda t: "\n".join(t.lines))
+            problem = figure.caption_problem(inner)
+            if problem:
+                _err(issues, doc.path, env.line, f"figure {env.attrs.get('src') or '?'} {problem}")
+        for lineno, text, url in _images(doc):
+            problem = figure.caption_problem(text)
+            if problem:
+                _err(issues, doc.path, lineno, f"image {url} {problem}")
+
+
+def _images(doc) -> list[tuple[int, str, str]]:
+    """(line, description, destination) of every image a chapter shows (``![…](file)``, not in code)."""
+    out = []
+    for lineno, line, _role in mdscan.iter_text(doc.blocks):
+        for m in mdscan.find_outside_code(render.LINK_RE, line):
+            url = mdscan.unangle(m.group("url")).partition("#")[0].partition("?")[0]
+            if m.group("bang") and url.lower().endswith(_IMAGE_SUFFIXES):
+                out.append((lineno, m.group("text"), url))
+    return out
+
+
+def check_image_parity(book: config.Book, models: dict[str, EditionModel], issues: list[Issue]) -> None:
+    """Editions show the same pictures: figure blocks are compared one by one with the other media
+    (:func:`check_parity`); plain images may be language-specific files, so only their number per
+    chapter is compared (a warning)."""
+    if len(models) < 2:
+        return
+    primary = models[book.languages[0]]
+    counts = {doc.chapter.path: len(_images(doc)) for doc in primary.chapters}
+    for lang in book.languages[1:]:
+        for doc in models[lang].chapters:
+            n = len(_images(doc))
+            m = counts.get(doc.chapter.path)
+            if m is not None and n != m:
+                _warn(issues, doc.path, 0, f"the {lang} edition shows {n} image(s) in this chapter, the "
+                                           f"{book.languages[0]} edition {m}: editions show the same pictures at the same places")
+
+
+def check_unused_assets(book: config.Book, models: dict[str, EditionModel], site: config.Site, issues: list[Issue]) -> None:
+    """Files in ``assets/`` that no chapter of any edition and no slide deck or visualization names:
+    left-overs that the builds never publish (a warning; delete them or cite them)."""
+    assets = book.dir / "assets"
+    if not assets.is_dir():
+        return
+    used: set[Path] = set()
+    for model in models.values():
+        for doc in model.chapters:
+            ctx = render.RenderContext(site, model.edition.book, model.edition, model, None, target="pandoc")
+            for _lineno, line, role in mdscan.iter_text(doc.blocks):
+                render.rewrite_links(line, doc, ctx, role)
+            used.update(p.resolve() for p in ctx.book_files)
+    # decks, films and pages name assets in their own sources: a file whose name appears there counts as used
+    elsewhere = ""
+    for sub in ("slides", "viz", "films"):
+        d = book.dir / sub
+        if d.is_dir():
+            for p in d.rglob("*"):
+                if p.is_file() and p.suffix.lower() in (".md", ".html", ".js", ".json", ".vue", ".css") and "node_modules" not in p.parts:
+                    try:
+                        elsewhere += p.read_text(encoding="utf-8", errors="ignore")
+                    except OSError:
+                        pass
+    for p in sorted(assets.rglob("*")):
+        if not p.is_file() or p.name.startswith("."):
+            continue
+        if p.resolve() in used or p.name in elsewhere:
+            continue
+        _warn(issues, p, 0, "no chapter, deck, film or visualization of this book uses this file")
+
+
 def check_footnotes(model: EditionModel, issues: list[Issue]) -> None:
     """Footnotes that the HTML edition and the PDF/EPUB would show differently (:func:`tbook.pandoc.footnote_problems`)."""
     from . import pandoc
@@ -389,9 +472,12 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
             check_orphans(model, issues)
             check_links(model, site, issues)
             check_footnotes(model, issues)
+            check_captions(model, issues)
             if model.summary is not None and not model.chapters:
                 _warn(issues, model.edition.summary, 0, "edition has no chapters yet")
         check_parity(book, models, issues)
+        check_image_parity(book, models, issues)
+        check_unused_assets(book, models, site, issues)
         for kind in MEDIA:
             try:
                 mod = importlib.import_module(f"tbook.{kind}")

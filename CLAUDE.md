@@ -8,7 +8,7 @@
 
 ## 结构
 
-- `books/<slug>/`：一本书。`book.toml` 元数据；`<lang>/` 每个语言版本一个目录（默认 `zh`、`en`，第一个为权威版本）；`assets/` 共享图片；`viz/` 可视化；`films/` 视频；`slides/` 演示文稿。
+- `books/<slug>/`：一本书。`book.toml` 元数据；`<lang>/` 每个语言版本一个目录（默认 `zh`、`en`，第一个为权威版本）；`figures/` 静态图（脚本与生成的 SVG）；`assets/` 共享图片；`viz/` 可视化；`films/` 视频；`slides/` 演示文稿。
 - `site.toml`：站点配置。`trureturing.lock.json`：所钉的 trureturing 提交与已解析的声明（只由 `./tbook pin` 写）。
 - `tools/tbook/`：构建与校验（`./tbook <命令>`）。`theme/`：赛博朋克主题，配色唯一来源 `theme/tokens.json`。`skills/`：内置 skills。
 - 架构与契约：`docs/ARCHITECTURE.md`；写作手册：`docs/AUTHORING.md`；验证模型：`docs/VERIFICATION.md`；发布：`docs/PUBLISHING.md`；升级：`docs/UPGRADING.md`。
@@ -20,7 +20,7 @@
 3. **多语言逐条对齐。** 各语言版本章节文件名与顺序相同，每章环境序列（种类、`#id`、`lean`）与媒体序列相同。先改权威版本，再同步其他版本；英文自然准确，不逐字硬译。
 4. **锁文件只由工具写。** `./tbook pin` 更新所钉提交；`./tbook pin --refresh` 解析新增引用。升级提交时复核“陈述摘要变化”的定理（`skills/trureturing-pin`）。所钉提交必须在 `site.toml` 的 trureturing 分支（默认 `dev`）上，`./tbook pin` 与 `./tbook check` 都会核对；不要钉未合入的 PR 提交。
 5. **托管文件不在书库里改。** `template.toml` 的 `[managed].paths` 下的文件归模板所有；改进请回馈模板仓库（`skills/template-update`）。书库自己的 skill 放 `skills/local-<name>/`，自己的文档放 `docs/project/`。
-6. **版式服从内容，契约不可改。** 交互可视化按 `skills/book-viz` 的方法做：舞台就是页面，每张实验卡都是正文可以单独引用的图（`::: {.viz src=… preset=…}`）；按对象选舞台，不把所有主题套进同一副骨架。共享运行时（`theme/viz/`）、页面契约、依据标注类名与质量门（`stageFirstChecks`）是硬约束，不自造私有运行时或非标徽章。视频与演示文稿对齐 `books/example-monograph/` 的示例（`films/001-golden-deficit/`、`slides/overview/`）与 `templates/`。
+6. **版式服从内容，契约不可改。** 交互可视化按 `skills/book-viz` 的方法做：舞台就是页面，每张实验卡都是正文可以单独引用的图（`::: {.viz src=… preset=…}`）；按对象选舞台，不把所有主题套进同一副骨架。共享运行时（`theme/viz/`）、页面契约、依据标注类名与质量门（`stageFirstChecks`）是硬约束，不自造私有运行时或非标徽章。静态图按 `skills/book-figure` 由脚本生成（`books/<slug>/figures/`），只写颜色角色、不写色值，在讲到它的那句话旁用 `::: {.figure src=…}` 引用。视频与演示文稿对齐 `books/example-monograph/` 的示例（`films/001-golden-deficit/`、`slides/overview/`）与 `templates/`。
 7. **只用相对链接。** 站点挂在 `/<repo>/` 下，以 `/` 开头的站内链接会断。
 8. **提交前验证。** 至少运行 `./tbook check`（0 错误）；改动影响输出时运行对应的 `./tbook build …`，用 `./tbook serve` 在中英文、深浅主题、手机宽度下实际查看。改动工具时运行 `PYTHONPATH=tools python3 -m unittest discover -s tools/tests`。
 9. **不在提交、文档或书中写模型标识。**
@@ -36,6 +36,7 @@
 ./tbook build [html|pdf|epub|slides|viz|films|site|all] [--book <slug>] [--lang zh]
 ./tbook serve                       # 本地预览 _site/
 ./tbook viz|slides|film new …       # 新建可视化、演示文稿、视频（list 列出）
+./tbook fig new|build|list|shots …  # 静态图：新建脚本、生成 SVG、列出、四种画面的预览图
 theme/film/film.sh <dir> <step>     # 视频流水线：setup、timeline、shot、serve、clip、poster、all
 ./tbook theme                       # 由 theme/tokens.json 重新生成配色文件
 ./tbook template status|update      # 模板版本
@@ -49,6 +50,7 @@ theme/film/film.sh <dir> <step>     # 视频流水线：setup、timeline、shot�
 | `book-write` | 写章节：环境、Lean 引用、数学、引用、对齐 |
 | `theorem-formalize` | 书中需要的定理尚未在 trureturing 冻结 |
 | `trureturing-pin` | 升级/刷新所钉的 trureturing 提交，处理 bump PR |
+| `book-figure` | 做静态图：一张图一件事，脚本生成，随主题与印刷版变化，按语言出标签 |
 | `book-viz` | 做交互可视化：舞台优先，按实验卡在正文中引用 |
 | `book-film` | 按 trureturing-film 方案做视频 |
 | `book-slides` | 按 chrono-company-slides 方案做演示文稿 |

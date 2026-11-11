@@ -504,6 +504,23 @@ figure.tr-media video { height: auto; aspect-ratio: 16 / 9; }
   margin-top: 0.7em; font-size: 0.9em; line-height: 1.65; color: var(--tr-dim);
 }
 .tr-media-caption p { margin: 0.3em 0; }
+
+/* Static figures (tbook.figure): the drawing is inlined, its role classes take the page tokens (tr-figure.css).
+   The block between the two markers is also what ./tbook fig shots previews with. */
+/* tr-figure:start */
+figure.tr-figure { margin: 1.8em 0; padding: 0; text-align: center; }
+.tr-fig-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 10px 16px; margin: 0 auto; }
+.tr-fig-row > svg.tr-fig { display: block; flex: 0 1 auto; width: 100%; height: auto; overflow: visible; }
+.tr-fig-row.tr-fig-wrap > svg.tr-fig-part { width: auto; min-width: 0; max-width: 100%; flex-shrink: 1; flex-grow: 0; }
+@media (min-width: 700px) { .tr-fig-row.tr-fig-wrap { flex-wrap: nowrap; } }
+svg.tr-fig { font-family: var(--tr-font-body); }
+:root:not(:lang(zh), :lang(ja), :lang(ko)) svg.tr-fig { font-family: var(--tr-font-body-latin, var(--tr-font-body)); }
+svg.tr-fig .tr-fig-mono { font-family: var(--tr-font-data); }
+svg.tr-fig text { font-variant-numeric: tabular-nums; }
+figure.tr-figure > figcaption { max-width: 46em; margin: 0.7em auto 0; text-align: center; }
+figure.tr-figure > figcaption strong { color: var(--tr-ink); }
+.tr-fig-missing { color: var(--tr-warn); font-family: var(--tr-font-data); }
+/* tr-figure:end */
 .tr-media-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.6em; }
 .tr-media-links a, .tr-media-links a:link, .tr-media-links a:visited {
   font-family: var(--tr-font-display); font-weight: 500; font-size: 0.78em; letter-spacing: 0.1em; text-transform: uppercase;

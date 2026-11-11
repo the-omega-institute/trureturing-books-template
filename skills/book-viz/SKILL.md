@@ -9,7 +9,7 @@ description: 为书做交互可视化时使用：先定这张图要让读者看�
 
 **用**：书中某个想法需要读者亲手推一下才看得见（拖动、逐步、扫参数）；修改、排查或重做已有可视化；在章节里引用可视化。
 
-**不用**：静态插图（放 `books/<slug>/assets/`，章节里写图片）；视频（`book-film`）；演示文稿（`book-slides`）。
+**不用**：静态图（`book-figure`：脚本生成，`::: {.figure src=…}` 引用）；视频（`book-film`）；演示文稿（`book-slides`）。
 
 **权威**：`templates/viz/`（起始模板，本身是一个能运行的舞台优先页面）与 `templates/viz/README.md`（登记表与页面契约）、`theme/viz/{theme.css,shell.js,kit.js}`（共享外观与运行时）、`tools/node/viz-testkit.mjs`（质量门）、`tools/tbook/viz.py`（校验与嵌入）。
 

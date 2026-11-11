@@ -111,7 +111,9 @@ Second repeated carry `double_one`
 General repeated carry `double_succ`
 : $q + 2e_{i+2} \to q + e_i + e_{i+3}$, for every $i$.
 
-![The four carry rules: in each row the digits before the rewrite are on the left, the digits after it on the right](../assets/carry-rules.svg)
+::: {.figure src="carry-rules"}
+**The four carry rules.** In each row the digits before the rewrite are on the left, the digits after it on the right; the cyan row has charge $+1$, the magenta row charge $-1$.
+:::
 
 In the figure, each row is headed by the rule's name and the identity behind it, and each box by its position. Digits run from the highest position down, and positions not drawn are unchanged. The middle two rows are the two lowest repeated carries; the $+1$ and $-1$ on the right are the signs they get in the signed count of Chapter 1, called their charges below (see [@thm-charge-unique]). The other two rules have charge $0$.
 

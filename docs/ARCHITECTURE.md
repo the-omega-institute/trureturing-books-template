@@ -23,6 +23,7 @@ books/<slug>/
   book.toml               书的元数据、语言版本、输出开关
   <lang>/SUMMARY.md       每个语言版本一个目录，mdBook SUMMARY 格式
   <lang>/*.md             章节；各版本文件名相同
+  figures/<name>.py       静态图脚本（tbook.figkit）；figures/<name>.<lang>.svg 是它生成并提交的图
   assets/                 各语言共享的图片等（章节中写 ../assets/x.svg）
   viz/<id>/               交互可视化（trureturing-visualize 方案）
   viz/visualizations.json 本书可视化注册表
@@ -41,10 +42,10 @@ theme/
                           导出 PDF 时换成 styles/backdrop.jpg 一张图（整页半透明渐变在 PDF 阅读器里每页要合成约两秒），
                           由 tools/node/slides-backdrop.mjs 按 backdrop.css 与 tokens.css 渲染，指纹记在 backdrop.json
   film/                   视频共享引擎与流水线脚本
-templates/                新书、新可视化、新 deck、新视频的起始模板
+templates/                新书、新静态图、新可视化、新 deck、新视频的起始模板
 tools/tbook/              Python 包（构建、校验、发布）
 tools/filters/            Pandoc Lua 过滤器
-tools/node/               Node 脚本（KaTeX 渲染、可视化校验/测试/缩略图、幻灯片构建）
+tools/node/               Node 脚本（KaTeX 渲染、可视化校验/测试/缩略图、静态图预览、幻灯片构建）
 skills/                   内置 agent skills（.claude/skills → ../skills）
 .github/workflows/        CI、Pages、Release、模板同步、Lean 深度验证
 ```
@@ -87,7 +88,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 | 开放 | `conjecture` `problem` | **禁止** | 是 | `OPEN`（红） |
 | 非形式 | `example` `remark` | 可选；给出则必须解析 | 是 | — |
 | 证明 | `proof` | 可选 | 否 | ∎ |
-| 媒体 | `viz` `film` `slides` | 可选 | 否 | — |
+| 媒体 | `viz` `film` `slides` `figure` | 可选 | 否 | — |
 
 - `#id`：形式结论、定义、开放条目必须有 id；id 以字母开头，可含字母、数字、`-`、`_`、`:`。
 - `title="…"`：可选，单行行内 Markdown，可含行内数学；属性值里反斜杠与花括号原样保留（`title="$\mathbb{N}$ 上的 $\{-1,0,1\}$"`）。值内的双引号写 `\"`；`\\` 读作一个反斜杠，所以 TeX 的 `\\` 要写成 `\\\\`。标题中可以写 `[@id]`（见 §3.3）。
@@ -134,8 +135,16 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 
 ::: {.slides src="overview"}
 :::
+
+::: {.figure src="phase-square"}
+**一句标题。** 图注（必须有）：只说图里看得见的东西。
+:::
 ```
 
+- 静态图（`tbook.figure`，`skills/book-figure`）：`src` 是图名，对应脚本 `books/<slug>/figures/<name>.py`。脚本定义 `SIZE`、`ALT`（每种语言一条给看不见图的读者的描述）与 `draw(fig)`，用 `tbook.figkit` 画，只写颜色角色（`figkit.ROLES` 把角色对到 `theme/tokens.json` 两套配色里同名的令牌，`ALIASES` 是语义名）。`./tbook fig build` 对每个语言版本运行脚本，写出规范 SVG `figures/<name>.<lang>.svg`（提交入库）：形状用角色类 `ts-<角色>`（描边）、`tf-<角色>`（填充），样式表里是浅色配色，`prefers-color-scheme: dark` 时为深色配色（文件单独打开或在 GitHub 上预览时用）。各端都不直接显示这个文件：
+  - mdBook：`figure.inline_html()` 去掉样式表与固定尺寸，把图内联进 `<figure class="tr-media tr-figure">`；`tr/tr-figure.css`（`figure.mdbook_css()`，构建时生成）让角色类取页面的 `--tr-*` 令牌，所以图随主题切换、随浏览器打印变成浅色。内联的 SVG 中没有空行（空行会结束 Markdown 的 HTML 块）。脚本写 `WRAP = True` 时各栏（`fig.row()` / `fig.panel()`，规范文件里是嵌套的 `<svg class="tr-fig-panel">`）各成一个 `<svg>`，放在弹性盒里：宽度不小于 700 像素时并排，否则叠放。图注是块后的 Markdown，写在 `<figcaption class="tr-media-caption">` 中。
+  - Pandoc（PDF/EPUB）：`figure.materialize()` 把一套配色写进样式表，经 `RenderContext.book_texts`（书目录下的相对路径 → 内容）由 `pandoc.stage()` 写到 `_book/figures/`：`<name>.<lang>.svg`（浅色，加不透明底，EPUB 用）、`.print.svg`（浅色）、`.screen.svg`（深色）。块输出为 `::: {.tr-media .tr-figure}`，其中的图片带 `tr-fig=1` 与按自然宽度算出的 `width`（760 单位对应版心宽度）；`tr-book.lua` 在 Typst 输出中把它换成 `image("<…不带扩展名>" + tr-fig-ext, …)`，`theme/typst/book.typ` 的 `tr-fig-ext` 按变体取 `.screen.svg` 或 `.print.svg`，`tr-media(kind: "figure")` 不画面板，只排图与图注。
+  - 画图库强制的标准（`figkit.FigureError`）：字号 ≥ 12、线宽 ≥ 1、文字不出画布（按估计的字宽）、角色名已知、宽度 ≤ 760；坐标保留两位小数，输出可复现。
 - HTML：可视化以 iframe 嵌入（`height` 160–2400，默认 560），附“全屏打开”；视频以 `<video controls preload="metadata" playsinline>` 播放站内的 `films/<id>/<outputs.narrated_720p>`（海报为提交的 `poster.jpg`），附 `film.json` 的 `outputs` 所列视频的下载（默认只有 720p 旁白版；列出时另有 1080p、纯配乐）；站点没有该视频时，`site.mark_films` 给 `<figure>` 加 `tr-film-unbuilt`，样式改为显示海报与“视频未构建”，并把隐藏的播放器改为 `preload="none"`，浏览器就不去请求不存在的文件（视频构建后复原为 `metadata`）；幻灯片为链接卡片（在线演示、PDF）。
 - PDF / EPUB：静态缩略图或海报 + 图注 + 在线地址（由 `site.toml` 的 `base_url` 拼出；没有 `base_url` 时视频只有海报）。
 - 书内媒体的源文件：
@@ -159,7 +168,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 4. 交叉引用 `[@id]`（正文与环境标题中）指向本版本存在的编号环境。
 5. 多语言对齐：各版本章节文件与顺序相同；每章环境序列（种类、id、Lean 引用）与媒体序列逐条相同；SUMMARY 结构（前言/编号/附录章节、嵌套、草稿条目）一致，使同一章在各语言中编号相同。
 6. Lean：每个被引用的 GID 都在锁文件中；形式结论引用的必须是 `theorem`；在锁定提交上重新读取冻结状态片，名称、种类、模块、`statement_id` 与锁文件一致（防止锁文件过期或被手改）；所钉提交可从 `site.toml` 的 trureturing 分支到达（本地 checkout 用 `git merge-base --is-ancestor`，否则用 GitHub compare API；无法判定时 GitHub Actions 中为错误，本地或 `--offline` 下为警告）；锁文件的 `branch` 与该分支相同，且该分支是分支名而不是 SHA 或 `refs/…`（错误）；未被引用的锁条目（警告；`--book` 时也计入其他书的引用）。
-7. 媒体：`tbook.viz/film/slides.check(book)` 与 `check_ref(book, src)`。
+7. 媒体：`tbook.viz/film/slides/figure.check(book)` 与 `check_ref(book, src)`。静态图：脚本不能运行、提交的 `figures/<name>.<lang>.svg` 与脚本现在画出的不一致或缺失（错误，`./tbook fig build`）；没有脚本的 `figures/*.svg`（警告）；`.figure` 块没有图注，或图注、图片说明（`![…](x.svg)`）只是编号（`figure.caption_problem`，错误）；`assets/` 下没有被任何语言的章节链接、文件名也不出现在本书幻灯片、视频、可视化源文件中的文件（`check.check_unused_assets`，警告）；各语言版本同一章的图片（`![…](…)`）张数不同（`check.check_image_parity`，警告；图片可以是各语言自己的文件，所以只比张数，`.figure` 块则逐条比对）。
 8. 主题：`theme/generated/*` 与 `tokens.json` 同步（`./tbook theme --check`）；幻灯片的打印背景图 `theme/slides/styles/backdrop.jpg` 与 `backdrop.css`、`tokens.css` 同步（`./tbook theme --check` 与 `slides-check` 核对指纹）。
 9. 缓存：`.cache/` 下的文件不得提交入库，`.cache` 本身（例如符号链接）也不得提交（错误；缓存只在本地可信；`git ls-files` 查询字面路径 `.cache`，不解析符号链接）。
 
@@ -307,6 +316,8 @@ mdBook 的 `<lang>/print.html` 不改写 iframe 的 `src` 与 video 的 `poster`
 | `lean` | 名称键解码、GID、冻结状态来源、`resolve()`、`Lock` 与永久链接 |
 | `render` | `RenderContext`、`env_view()`、`chapter_markdown()`（mdbook / pandoc 两种 target）；环境标题中的 `[@id]`（`env_title()`）；`rewrite_links()`（图片与文件链接，`check` 也用它找缺失文件）；Lean 声明未被锁文件解析时显示 `UNVERIFIED`、不给链接；`verified_envs()` 是所有 `LEAN ✓ n` 计数的唯一口径 |
 | `ledger` | 生成“形式化验证账本”章节 |
+| `figkit` | 静态图的画图库：`Figure`（`Canvas` 的方法：线、箭头、面、文字、标记，`axes()` 坐标系，`sphere()` 球面正交投影，`row()`/`panel()` 分栏），角色与语义名（`ROLES`、`ALIASES`），标准的下限（`MIN_FONT`、`MIN_STROKE`、`MAX_WIDTH`） |
+| `figure` | 静态图：`names()`、`render()`、`build(book, only, check=)`、`style_sheet()`、`materialize()`、`inline_html()`、`mdbook_css()`、`caption_problem()`、`shots()`，以及媒体接口 |
 | `check` / `pin` / `theme` / `newbook` / `build` / `cli` | 命令 |
 
 组件（各自实现，签名固定）：
@@ -320,7 +331,7 @@ def build_epub(site, book, edition, model, lock, out_path: Path, *, stage_dir=No
 # tbook/cover.py
 def render_cover(site, book, edition, out_path: Path, *, fmt: str = "png", variant: str = "screen",
                  model=None, lock=None, meta=None, width_px: int = 1600) -> Path
-# tbook/viz.py, tbook/film.py, tbook/slides.py
+# tbook/viz.py, tbook/film.py, tbook/slides.py, tbook/figure.py（figure 只有 check_ref、check、items、cited_gids、render_embed、cli）
 def check_ref(book, src: str) -> str | None          # 错误信息或 None
 def check(book) -> list[Issue]
 def items(book) -> list[dict]                         # 落地页用的条目
@@ -341,7 +352,7 @@ def run() -> int
 def generate(out_dir) -> Path
 ```
 
-媒体块的输出：mdbook 目标以块级 `<figure class="tr-media tr-viz|tr-film">`（slides 为链接卡片 `.tr-slides`）开头；pandoc 目标输出 Markdown，包在 `::: {.tr-media .tr-viz|.tr-film|.tr-slides}` 中得到 PDF/EPUB 的媒体面板，图片路径指向 `_book/…` 并加入 `ctx.book_files`。
+媒体块的输出：mdbook 目标以块级 `<figure class="tr-media tr-viz|tr-film|tr-figure">`（slides 为链接卡片 `.tr-slides`）开头；pandoc 目标输出 Markdown，包在 `::: {.tr-media .tr-viz|.tr-film|.tr-slides|.tr-figure}` 中得到 PDF/EPUB 的媒体面板，图片路径指向 `_book/…` 并加入 `ctx.book_files`（静态图为该输出生成的文件写入 `ctx.book_texts`）。
 
 `render.pandoc_env()` 输出的富属性 fenced div（Lua 过滤器 `tools/filters/tr-env.lua` 按输出格式渲染）：
 

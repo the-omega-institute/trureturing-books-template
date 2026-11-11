@@ -144,7 +144,9 @@ Since $0 \le p(v_1) + p(v_2) < 2$ and $1 < \varphi < 2$, the number inside the f
 
 By [@thm-beatty-deficit], $B(v_1, v_2) = c(v_1, v_2)$, so this is also a criterion for the deficit itself: it is $1$ when the two phases add up to less than $1/\varphi$, $-1$ when they add up to at least $\varphi$, and $0$ otherwise. trureturing also states this combination directly for the carry count (`carrySignedCount_phase_classifier`). Plotting the two phases as a point of the unit square turns the criterion into a picture:
 
-![The phase square, cut by two diagonal lines into the regions where the deficit is +1, 0 and −1](../assets/phase-square.svg)
+::: {.figure src="phase-square"}
+**The phase square.** Two diagonal lines cut it into three regions: the deficit is $+1$ in the cyan triangle, $-1$ in the magenta triangle and $0$ in the band between them.
+:::
 
 The horizontal axis is $p(v_1)$ and the vertical axis $p(v_2)$. The line $p_1 + p_2 = 1/\varphi$ joins the two $1/\varphi$ marks on the axes; in the triangle below it the deficit is $+1$. The line $p_1 + p_2 = \varphi$ joins $(1/\varphi, 1)$ and $(1, 1/\varphi)$; in the small triangle above it, the line included, the deficit is $-1$. In the band between the two lines, the lower line included, the deficit is $0$. The 64 dots are the phase pairs $(p(v_1), p(v_2))$ for $0 \le v_1, v_2 \le 7$, plotted from computed values; they match the table of [@ex-small-deficits]: 10 dots lie in the lower triangle and 6 in the upper one.
 
