@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "b2197588b6cde0e8a42719c515dce71dcacde9fc00234df856ba77ee54686737",
+      "sha256": "3f738cce580cb42d8473633f57a1f90a157b1a9705235577d8fbd2e7507786a1",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -580,7 +580,7 @@
       "mode": "100644"
     },
     "tools/node/viz-server.mjs": {
-      "sha256": "412604b9094e6b1346b49322d4153662041520b97f38f2d53236b54ddef051f4",
+      "sha256": "cc33a49dd9303471741253870406c7bd6b9a2d82b421c0c96f16ae4b05a9d158",
       "mode": "100644"
     },
     "tools/node/viz-shots.mjs": {
@@ -800,7 +800,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pin_sources.py": {
-      "sha256": "6a8ffaa675de8e9cf59943013adff471f46dfadc9455bfa946c7ed3744a2b093",
+      "sha256": "cd3fbb91e3b95add8cd17d4185d24feb674cb36699054184302a4bc87e07f88c",
       "mode": "100644"
     },
     "tools/tests/test_serve.py": {

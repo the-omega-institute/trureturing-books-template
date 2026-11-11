@@ -16,6 +16,42 @@ from test_viz import fake_book
 
 
 class PinSources(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "node is required for the preview server")
+    def test_preview_lock_asset_returns_404_until_lock_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake_book(root / "books", "x")
+            lock = dataclasses.asdict(fake_lock())
+            script = """
+                import fs from 'node:fs';
+                import path from 'node:path';
+                import {startServer} from './tools/node/viz-server.mjs';
+                const {server, origin} = await startServer();
+                const url = `${origin}/site/x/viz/assets/trureturing.json`;
+                try {
+                    const missing = await fetch(url);
+                    const absent = {status: missing.status, ok: missing.ok, body: await missing.text()};
+                    fs.writeFileSync(path.join(process.env.TBOOK_ROOT, 'trureturing.lock.json'), process.argv[1]);
+                    const restored = await fetch(url);
+                    console.log(JSON.stringify({absent, restored: {
+                        status: restored.status, ok: restored.ok,
+                        type: restored.headers.get('content-type'), data: await restored.json()
+                    }}));
+                } finally {
+                    server.closeAllConnections();
+                    await new Promise(resolve => server.close(resolve));
+                }
+            """
+            r = subprocess.run(["node", "--input-type=module", "-e", script, json.dumps(lock)],
+                               cwd=paths.ROOT, env={**os.environ, "TBOOK_ROOT": str(root)},
+                               capture_output=True, text=True, timeout=15)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            data = json.loads(r.stdout)
+            self.assertEqual(data["absent"], {"status": 404, "ok": False,
+                                              "body": "404 /site/x/viz/assets/trureturing.json\n"})
+            self.assertEqual(data["restored"], {"status": 200, "ok": True,
+                                                "type": "application/json; charset=utf-8", "data": lock})
+
     def test_viz_publication_and_preview_read_changed_lock(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
