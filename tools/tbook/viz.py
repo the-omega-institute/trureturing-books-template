@@ -69,6 +69,7 @@ import re
 import shutil
 import subprocess
 import sys
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -1065,6 +1066,11 @@ def build(site, book, out_dir: Path) -> None:
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
     publish_assets(out_dir)
+    # Generated publication input, also served by viz-server for local previews. Pages
+    # keep their book-specific topology in source and join it to the current lock here.
+    if lock:
+        (out_dir / "assets" / "trureturing.json").write_text(
+            json.dumps(asdict(lock), ensure_ascii=False) + "\n", encoding="utf-8")
     for v in live_entries(book):
         dst = out_dir / v["id"]
         shutil.copytree(book.viz_dir / v["id"], dst, ignore=_ignore)

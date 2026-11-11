@@ -934,6 +934,28 @@ class RenderTests(unittest.TestCase):
                                     lock=lock if lock is not None else make_lock(), target=target,
                                     env_href=render.mdbook_env_href(m) if target == "mdbook" else None)
 
+    def test_current_labels_follow_only_lock_changes(self):
+        with CoreRepo() as repo:
+            source = (f"[{{commit}}](trureturing:) [{{source}}](lean:{GID_3V}) "
+                      f"[{{statement_id}}](lean:{GID_3V})")
+            for target in ("mdbook", "pandoc"):
+                ctx = self.ctx(repo, target=target)
+                doc = ctx.model.chapters[1]
+                first = render.transform_line(source, doc, ctx)
+                self.assertIn(COMMIT, first)
+                self.assertIn(f"{MOD_3V}.lean:12", first)
+                ctx.lock.commit = OLD_COMMIT
+                ctx.lock.declarations[GID_3V]["line"] = 93
+                ctx.lock.declarations[GID_3V]["statement_id"] = "sha256:123456789abcdef"
+                second = render.transform_line(source, doc, ctx)
+                self.assertNotIn(COMMIT, second)
+                self.assertIn(f"{MOD_3V}.lean:93", second)
+                self.assertIn("#L93", second)
+                self.assertIn("`sha256:12345678`", second)
+                self.assertNotIn("{source}", second)
+                literal = f"`[{{source}}](lean:{GID_3V})`"
+                self.assertEqual(render.transform_line(literal, doc, ctx), literal)
+
     def test_refs_links_and_assets(self):
         with CoreRepo() as repo:
             ctx = self.ctx(repo)

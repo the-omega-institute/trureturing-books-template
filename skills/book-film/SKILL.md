@@ -33,7 +33,7 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 
 1. 写 `script.json`：每个场景 `id`、`name`、`lead`/`tail`、`lines: [[英文旁白, 中文字幕], …]`，可选 `music`、`cues`；发音修正写在 `say`。
 2. 写 `scenes.js`：每个场景 `SCENES.<id> = S => { … }`，用 `at(S, k, dur)` / `Q(S, k, '短语')` 与旁白对齐，用 `panel`、`chip`、`stamp`、`leanList`、`closingCard` 等绘制（见 README 的 scenes.js 一节）。
-3. 填 `film.json`：`title`/`title_zh`、`summary`/`summary_zh`、`subject_commit`（等于锁文件所钉提交）、`lean`（片中引用的 GID）、`outputs`（构建产出的文件：默认只有 `narrated_720p`——720p 旁白版，播放器播放它——与 `cover`；确实需要时再列出 `narrated`（1080p 旁白版）、`music_only`（1080p 纯配乐）、`music_only_720p`，列出 1080p 视频时 `resolution` 改为 `1920x1080@30`）。新 GID 后运行 `./tbook pin --refresh`（它收集视频引用的 GID）。
+3. 填 `film.json`：`title`/`title_zh`、`summary`/`summary_zh`、`publication_basis: "pinned"`（当前出版依据从锁文件解析；真实制作历史才另记 `subject_commit`）、`lean`（片中引用的 GID）、`outputs`（构建产出的文件：默认只有 `narrated_720p`——720p 旁白版，播放器播放它——与 `cover`；确实需要时再列出 `narrated`（1080p 旁白版）、`music_only`（1080p 纯配乐）、`music_only_720p`，列出 1080p 视频时 `resolution` 改为 `1920x1080@30`）。新 GID 后运行 `./tbook pin --refresh`（它收集视频引用的 GID）。
 4. 本地迭代（不需要 TTS）：
 
    ```bash
@@ -70,7 +70,7 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 
 | 现象 | 处理 |
 | --- | --- |
-| `check` 警告 `subject_commit` 与所钉提交不同 | 视频依据的提交过期；复核片中陈述后更新 `subject_commit`，构建会重新渲染 |
+| `check` 警告 `subject_commit` 与所钉提交不同 | 复核片中陈述；若它记录真实制作历史则保留原值。当前出版用 `publication_basis: "pinned"`，构建自动随锁文件重新渲染 |
 | `check` 警告 `release_tag` / `published_tag` 不再使用 | 旧的逐片 Release 字段；删除即可，视频随站点构建 |
 | `check` 报 `outputs.narrated_720p is required` 或 `outputs.<键> is not an output` | `outputs` 必须列出 `narrated_720p` 与 `cover`，可选键只有 `narrated`、`music_only`、`music_only_720p`；文件名可取 `./tbook film new` 生成的默认名 |
 | 需要 1080p 或纯配乐版本 | 在 `outputs` 中列出 `narrated`、`music_only` 或 `music_only_720p`（1080p 时 `resolution` 改为 `1920x1080@30`）；视频重新渲染，站点只托管、链接所列文件。每分钟视频默认约 7 MB，列出全部输出时约 84 MB，注意 Pages 站点 1 GB 的上限 |

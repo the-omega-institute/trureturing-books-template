@@ -54,3 +54,5 @@ description: 升级或刷新本书库所钉的 trureturing 提交时使用（./t
 - 为让 PR 通过而修改 `site.toml` 的 `[trureturing].branch`，或把它写成 SHA、修订表达式、形如 `git describe` 输出的名字、别的仓库的分支或任何不存在的分支。
 - 为让检查通过而删除 `lean` 属性或把定理改成注释。
 - 在未复核陈述变化的情况下合并 bump PR。
+
+当前版本来自 `trureturing.lock.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。

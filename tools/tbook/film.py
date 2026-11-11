@@ -31,7 +31,8 @@ Source layout (``books/<slug>/films/``)::
       "title": "…", "title_zh": "…",              English and Chinese titles
       "summary": "…", "summary_zh": "…",          optional one-paragraph blurbs (landing page, films page)
       "subject": "https://github.com/the-omega-institute/trureturing",
-      "subject_commit": "<sha>",                  trureturing commit the film was made against (= the lock commit)
+      "publication_basis": "pinned",             current publication follows the lock
+      "subject_commit": "<sha>",                  optional historical production provenance (kept literally)
       "released": "YYYY-MM-DD",
       "duration": "m:ss",                         the narrated cut (the build warns when the render differs)
       "resolution": "1280x720@30",                the published video: 1280x720, or 1920x1080 when outputs
@@ -542,11 +543,16 @@ def validate_meta(meta: dict, film_dir: Path, book: config.Book, lock: lean.Lock
     if subject is not None and (not isinstance(subject, str) or not subject.startswith("https://")):
         err("film.json: subject must be an https:// URL of the trureturing repository")
     commit = meta.get("subject_commit")
-    if not isinstance(commit, str) or not COMMIT_RE.match(commit):
+    basis = meta.get("publication_basis")
+    if basis is not None and basis != "pinned":
+        err('film.json: publication_basis must be "pinned"')
+    if commit is None and basis == "pinned":
+        pass  # Current publication basis; no claim about a historical production commit.
+    elif not isinstance(commit, str) or not COMMIT_RE.match(commit):
         err("film.json: subject_commit must be the trureturing commit (7–40 lowercase hex) the film was made against")
     elif lock and not lock.commit.startswith(commit):
         warn(f"film.json: subject_commit {commit[:12]} is not the pinned commit {lock.commit[:12]}; re-check the "
-             "narration against the pinned commit and set subject_commit")
+             "narration against the pinned commit; preserve subject_commit if it records historical provenance")
     released = meta.get("released")
     if not isinstance(released, str) or not DATE_RE.match(released):
         err("film.json: released must be a date YYYY-MM-DD")
@@ -949,6 +955,7 @@ def engine_data(film: Film) -> dict:
             "fps": fps,
             "subtitles": list(meta.get("subtitles") or ["zh", "en"]),
             "subject_commit": meta.get("subject_commit", ""),
+            "publication_commit": lock.commit if lock else "",
         },
         "book": {
             "slug": book.slug,
@@ -1248,6 +1255,7 @@ def published_registry(site: config.Site, book: config.Book, lock: lean.Lock | N
             "summary": film.summary("en"), "summary_zh": film.summary("zh"),
             "duration": film.meta.get("duration", ""), "released": film.meta.get("released", ""),
             "subject_commit": film.meta.get("subject_commit", ""),
+            "publication_commit": lock.commit if lock else "",
             "poster": f"{film.id}/{POSTER}" if film.poster.is_file() else "",
             "built": film.id in built,
             "videos": {k: f"{film.id}/{v}" for k, v in film.videos().items()} if film.id in built else {},
@@ -1587,7 +1595,6 @@ def scaffold(book: config.Book, film_id: str, title_zh: str, title_en: str, *, r
         "SLUG": book.slug,
         "TITLE_ZH": title_zh.strip(),
         "TITLE_EN": title_en.strip(),
-        "COMMIT": lock.commit if lock else "0000000",
         "REPO": f"https://github.com/{lock.repo}" if lock else "https://github.com/the-omega-institute/trureturing",
         "RELEASED": released or datetime.now(timezone.utc).date().isoformat(),
         "BOOK_CODE": book.code,

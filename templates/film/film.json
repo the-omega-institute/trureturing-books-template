@@ -3,7 +3,7 @@
   "title": "@@TITLE_EN@@",
   "title_zh": "@@TITLE_ZH@@",
   "subject": "@@REPO@@",
-  "subject_commit": "@@COMMIT@@",
+  "publication_basis": "pinned",
   "released": "@@RELEASED@@",
   "duration": "0:30",
   "resolution": "1280x720@30",

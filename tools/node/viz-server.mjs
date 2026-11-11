@@ -72,6 +72,7 @@ export function route(pathname) {
   if (tail === '' || tail === 'index.html') return { hub: slug };
   if (rest[0] === 'assets') {
     const name = rest.slice(1).join('/');
+    if (name === 'trureturing.json') return { body: JSON.stringify(readLock()), type: TYPES['.json'] };
     if (name === 'tokens.css') return { file: TOKENS_CSS };
     if (name === 'favicon.svg') return { body: favicon(), type: TYPES['.svg'] };
     if (RUNTIME_FILES.includes(name) || name.startsWith('vendor/')) {

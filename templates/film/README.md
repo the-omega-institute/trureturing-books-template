@@ -34,7 +34,7 @@ This directory is the starting point of `./tbook film new`. Every film follows t
   "summary": "Zeckendorf digits, golden carries and the deficit of beta …",
   "summary_zh": "Zeckendorf 数字、黄金进位与 β 的亏量……",
   "subject": "https://github.com/the-omega-institute/trureturing",
-  "subject_commit": "8a24ea4e79de962725aab9d9b49cc605fcc211d8",
+  "publication_basis": "pinned",
   "released": "2026-11-08",
   "duration": "0:50",
   "resolution": "1280x720@30",
@@ -54,7 +54,8 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 | `id` | 等于目录名 `<NNN>-<name>` · equals the directory name |
 | `title`, `title_zh` | 英文、中文标题，各一行 · English and Chinese titles, one line each |
 | `summary`, `summary_zh` | 可选，一段简介（落地页与视频页） · optional one-paragraph blurbs |
-| `subject_commit` | 制作时依据的 trureturing 提交，应等于 `trureturing.lock.json` 所钉提交；不等时 `./tbook check` 警告 · the trureturing commit the film was made against; should equal the pinned commit (a warning otherwise) |
+| `publication_basis` | 新视频填 `"pinned"`：当前出版依据、精确链接与构建数据由锁文件解析；钉版后仍须复核旁白 · current publication follows the lock; review narration after re-pinning |
+| `subject_commit` | 可选，真实制作历史的 7–40 位提交；原样保留，不能为消除警告改成当前版本。旧视频仅有此字段仍受支持 · optional literal historical production commit; preserve it when re-pinning; legacy manifests remain supported |
 | `released`, `duration` | `YYYY-MM-DD`，`m:ss`：旁白版的实际时长（`tts` 步骤与构建在不一致时提示） · the narrated length; the `tts` step and the build warn when it differs |
 | `resolution` | 发布的视频尺寸与帧率：默认 `1280x720@<fps>`，`outputs` 列出 1080p 视频时为 `1920x1080@<fps>`（引擎总按 1920×1080 绘制，720p 由构建缩放） · the size of the published video: `1280x720@<fps>`, or `1920x1080@<fps>` when `outputs` lists a 1080p video (the engine always draws 1920×1080; the build scales to 720p) |
 | `narration`, `subtitles` | 旁白语言/引擎/声音；字幕只支持 `zh`、`en` · subtitles are `zh` and/or `en` |

@@ -5,7 +5,7 @@
   "summary": "Zeckendorf digits, golden carries and the deficit of β: the β of a sum differs from the sum of the βs by exactly −1, 0 or 1, as two Lean theorems of chapter 1 state.",
   "summary_zh": "Zeckendorf 数字、黄金进位与 β 的亏量：和的 β 与 β 之和恰好相差 −1、0 或 1，正如第一章的两条 Lean 定理所述。",
   "subject": "https://github.com/the-omega-institute/trureturing",
-  "subject_commit": "8a24ea4e79de962725aab9d9b49cc605fcc211d8",
+  "publication_basis": "pinned",
   "released": "2026-11-08",
   "duration": "0:50",
   "resolution": "1280x720@30",

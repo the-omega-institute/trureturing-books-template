@@ -283,6 +283,8 @@ def rewrite_links(line: str, doc: ChapterDoc, ctx: RenderContext, role: str = md
         url = raw[1:-1] if angle else raw
         if not url:  # kept as written: a definition's "<>" may not become an empty (no) destination
             return raw
+        if url == "trureturing:":
+            return ctx.lock.tree_url if ctx.lock else None
         if url.startswith("lean:"):
             return lean_view(url[5:], ctx.lock)["url"] or None
         plain = _quote(_DEST_UNSAFE_RE, url) if angle else raw
@@ -319,6 +321,18 @@ def rewrite_links(line: str, doc: ChapterDoc, ctx: RenderContext, role: str = md
 
     def repl(m: re.Match) -> str:
         text = inline(m.group("text"))  # an image inside a link
+        raw = mdscan.unangle(m.group("url"))
+        # Reserved labels reuse the same locked declaration as the destination. They are
+        # inline links, so GID collection, frozen-ledger checks and all export targets agree.
+        if not m.group("bang") and ctx.lock:
+            if raw == "trureturing:" and text == "{commit}":
+                text = f"`{ctx.lock.commit}`"
+            elif raw.startswith("lean:") and text in ("{source}", "{statement_id}"):
+                res = ctx.lock.get(raw[5:])
+                if res:
+                    value = (f"{res.module}.lean:{res.line}" if text == "{source}"
+                             else res.statement_id[:15])
+                    text = f"`{value}`"
         empty(m.group("url"), m.group(0))
         new = new_url(m.group("url"))
         if new is None:

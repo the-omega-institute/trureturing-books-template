@@ -110,7 +110,7 @@ class ExampleFilmTest(unittest.TestCase):
         self.assertIsNotNone(f)
         self.assertEqual(sorted(f.lean), sorted([GID3, GIDI]))
         lock = lean.Lock.load()
-        self.assertTrue(lock.commit.startswith(f.meta["subject_commit"]))
+        self.assertEqual(f.meta["publication_basis"], "pinned")
         for gid in f.lean:
             self.assertEqual(lock.get(gid).kind, "theorem")
 
@@ -1110,7 +1110,8 @@ class ScaffoldTest(unittest.TestCase):
         meta = json.loads(created[0].read_text(encoding="utf-8"))
         self.assertFalse(set(meta) & set(film.LEGACY_KEYS))
         self.assertEqual(meta["title_zh"], "进位规则")
-        self.assertEqual(meta["subject_commit"], lean.Lock.load().commit)
+        self.assertEqual(meta["publication_basis"], "pinned")
+        self.assertNotIn("subject_commit", meta)
         # the default: the 720p narrated video and the cover
         self.assertEqual(meta["outputs"], {"narrated_720p": "film-fixture_002_720p_narrated.mp4",
                                            "cover": "film-fixture_002_cover.jpg"})
