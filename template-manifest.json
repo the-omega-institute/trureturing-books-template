@@ -672,7 +672,7 @@
       "mode": "100644"
     },
     "tools/tbook/mdscan.py": {
-      "sha256": "dab9536dc3f7796d2f059aef163c5466656d0df23dec7978d502916775e54499",
+      "sha256": "2ae94ba339dcdf1c1d495ea26b0f66eccc46e2e0fd0ea46626f26cf218a58324",
       "mode": "100644"
     },
     "tools/tbook/model.py": {
@@ -732,7 +732,7 @@
       "mode": "100644"
     },
     "tools/tests/test_blocks.py": {
-      "sha256": "f5dfa61acdb6f281cc4845d80793891d00c74a5c8bcc274fcd97df8dcc189546",
+      "sha256": "d92cc69a5d3e8ee1bc24b59cac9de10f75bf2c4e712ef2ddc23d2300d8e9d488",
       "mode": "100644"
     },
     "tools/tests/test_buildcache.py": {

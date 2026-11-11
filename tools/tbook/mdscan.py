@@ -264,6 +264,9 @@ _TILDE = ("'~' starts a definition for Pandoc (PDF/EPUB) but not for mdBook (HTM
 _EMPTY_DEF = ("this definition's ':' line holds nothing and a blank line follows it: mdBook (HTML) ends the "
               "definition there, while Pandoc (PDF/EPUB) reads the indented lines after the blank line as its "
               "body. The tools follow Pandoc; write the first line of the definition on the ':' line")
+_LIST_CUT = ("a list starts right after a line of a paragraph: mdBook (HTML) starts the list here, while Pandoc "
+             "(PDF/EPUB) needs a blank line before a list at the top level and runs its items into the paragraph "
+             "as text ('… - item …'); put a blank line before the list")
 _FORMULA_CUT = ("the '{dollar}' at column {col} is not closed before the fenced code block on line {fence}: the "
                 "HTML edition shows the code block, while Pandoc (PDF/EPUB) pairs this '{dollar}' with the one on "
                 "line {close} and reads everything between, the fence included, as a formula; write '\\$' for a "
@@ -466,6 +469,8 @@ def scan_blocks(lines: list[str]) -> BlockScan:
             empty = not after.strip(" ")
             if m and not (leaf == "p" and inner and not table
                           and (empty or (m.group(1) is not None and int(m.group(1)) != 1))):
+                if leaf == "p" and inner and not table and para >= 0 and depth == 0:
+                    notes.append((i, _LIST_CUT))  # in a list item Pandoc starts a sublist as mdBook does
                 del stack[keep:]
                 gap = len(after) - len(after.lstrip(" "))
                 stack.append(ind + m.end() + (1 if empty or gap > 4 else gap))

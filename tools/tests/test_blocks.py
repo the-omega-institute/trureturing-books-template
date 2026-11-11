@@ -485,6 +485,35 @@ class FindingsTest(unittest.TestCase):
         mdscan.parse_blocks(FENCE_CUT_BY_ITEM.replace("  ```\n\n见", "   ```\n\n见"), issues)
         self.assertEqual(issues, [], "a closing fence indented like the opening one")
 
+    def test_list_right_after_a_paragraph_is_reported(self):
+        """mdBook (CommonMark) lets a list interrupt a paragraph; Pandoc's Markdown needs a blank line
+        before a top-level list and runs the items into the paragraph ("… - 甲 …") in the PDF/EPUB."""
+        cases = {
+            "bullet": ("段落：\n- 甲\n- 乙\n", [2]),
+            "ordered from one": ("段落：\n1. 一\n2. 二\n", [2]),
+            "after a display formula": ("$$\na\n$$\n- 甲\n", [4]),
+            "ordered from three (no list for either)": ("段落：\n3. 三\n", []),
+            "blank line before": ("段落：\n\n- 甲\n", []),
+            "after a heading": ("# 标题\n- 甲\n", []),
+            "after a div fence": ("::: {.remark}\n- 甲\n:::\n", []),
+            "sublist in an item": ("1. 项\n   - 子\n", []),
+            "sublist after an item's second line": ("- a\n  续\n  - b\n", []),
+            "minus inside a display formula": ("段落\n\n$$\na\n- b\n$$\n", []),
+            "empty item": ("段落\n-\n", []),
+        }
+        for name, (md, lines) in cases.items():
+            with self.subTest(name):
+                issues: list[mdscan.ScanIssue] = []
+                mdscan.parse_blocks(md, issues)
+                found = [i for i in issues if "a list starts right after a line of a paragraph" in i.message]
+                self.assertEqual([i.line for i in found], lines)
+                self.assertEqual({i.severity for i in found} or {"warning"}, {"warning"})
+        with Repo() as repo:
+            write(repo.edition.dir / "ch01.md", "# 一\n\n段落：\n- 甲\n")
+            out = checked(model.load_edition(repo.edition))
+        self.assertTrue(any(o.startswith("WARNING") and "ch01.md:4:" in o and "blank line before the list" in o
+                            for o in out), out)
+
     def test_colon_line_after_code_is_no_definition(self):
         """":" after indented code (or a list item, a block quote) is a paragraph, so the 4-space line after
         it is code, as both renderers read it: no math, no link rewriting in it."""
@@ -811,6 +840,8 @@ class RenderersAgreeTest(unittest.TestCase):
                 with self.subTest(name):
                     issues = []
                     mdscan.parse_blocks(md, issues)
+                    if name == "list after paragraph":  # its tokens agree, its list does not (FindingsTest)
+                        issues = [i for i in issues if i.message != mdscan._LIST_CUT]
                     self.assertEqual(issues, [])
 
     @unittest.skipUnless(have_pinned_pandoc(), f"Pandoc {PINNED_PANDOC} needed (requirements.txt)")
