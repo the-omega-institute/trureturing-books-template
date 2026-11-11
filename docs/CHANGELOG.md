@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 变更
+
+- `./tbook check` 新增一种“mdBook 与 Pandoc 读法不同”的警告：顶层段落的下一行直接开始列表（`- 甲` 或 `1. 一`）。HTML 版（mdBook）把它显示为列表，PDF/EPUB（Pandoc）却把各项并进上一段，成了“…… - 甲 ……”；在列表前空一行即可。列表项里紧跟的子列表、跨行公式里以 `-` 开头的行不报。来源：《量子计算的几何直觉》有 20 处这样的列表在 PDF 里并进了段落（#30）。
+
 ## [0.5.0] - 2026-11-12
 
 ### 新增
