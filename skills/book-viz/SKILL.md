@@ -129,7 +129,8 @@ await stageFirstChecks(T, '<book>', '<id>');     // 所有舞台优先页面都�
 
 - `stageFirstChecks` 检查：舞台占比、每张卡能点且有说明、标签不重叠、抽屉、如实标注（每条 Lean 链接都是锁文件里的定理并指向所钉提交的文件与行；登记表列出的定理与页面引用的一致；绿色框恰好是引用 Lean 定理的框；抽屉用两种语言写明“不是证明”）、英文无残留中文、书内第一屏、被引用的图不滚动、静态图、手机无横向滚动、封面非空白、减少动效。
 - 页面自己的检查：每个控件一条；页面声称的每条性质一条，**用测试里另写的独立算法核对**（另一种表示、暴力枚举、数值积分），不调用页面自己的函数。页面通过只读探针 `window.<NAME>_DEBUG` 暴露状态。
-- 读状态前调用 `settle(page)`：无头浏览器每秒只渲染几帧，不要靠等待碰运气。
+- 读状态前调用 `settle(page)`：无头浏览器每秒只渲染几帧，不要靠等待碰运气。它先把进行中的过渡（`kit.tween`、相机的 `st.view`）走完，再重绘：点完一张卡 `settle` 一下就能读到终态，不要为过渡等一个固定的毫秒数。过渡只在动画帧上前进，机器一忙，结束它的那一帧可能比标称时长晚得多。
+- 交付前加上 `VIZ_SLOW_FRAMES=350` 再跑一遍测试（`VIZ_SLOW_FRAMES=350 node books/<book>/viz/tests/<id>.test.mjs`）：它把动画帧拉开到 CI 忙时的间隔，靠固定等待碰巧通过的检查在这里就会失败。
 - 用随机抽样做独立核对时，容差要对得上抽样的精度。落在尖点上的极值（多面体的面、绝对值之和）靠均匀抽样收敛很慢：先抽样，再在最好的点附近逐步收窄搜索。
 - 每提交一次输入（`fill` 加回车、点一次步进键或一张卡）也先 `settle(page)`，再去动下一个控件：页面在下一帧按状态重写全部输入框，上一次提交排定的那一帧若落在“第二个框已填、回车未按”之间，刚填的值被覆盖，第二次提交不会发生。本地机器快，几乎不触发；CI 上表现为同一条断言偶发失败、重跑又通过。
 
@@ -150,7 +151,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 
 | 用途 | 调用 |
 | --- | --- |
-| 重绘 | `const paint = kit.painter(draw, [要监听尺寸的元素])`；`paint()` 请求一帧，`kit.flush()` 立即重绘（测试用） |
+| 重绘 | `const paint = kit.painter(draw, [要监听尺寸的元素])`；`paint()` 请求一帧，`kit.flush()` 走完进行中的过渡并立即重绘（测试用） |
 | 三维舞台（二维画布上） | `const st = kit.stage3(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `st.begin()` … `st.sphere()`、`st.arc(u, v)`、`st.arrow(a, b)`、`st.path(pts)`、`st.poly(pts)`、`st.dot(p)`、`st.circle(c, n, r)`、`st.tag(key, p, html, cls)` … `st.end()`；`st.pick(ev)` 取指针下的球面点，`st.view('iso' \| 'front' \| 'top')` |
 | 二维舞台与小图 | `const g = kit.plot(canvas, { x, y, pad, equal, logY })`；`g.axes()`、`g.line()`、`g.area()`、`g.rect()`、`g.poly()`、`g.dot()`、`g.vline()`、`g.hline()`、`g.text()`、`g.legend()`；`g.invX/invY` 把指针换回数据坐标 |
 | 同一页既有二维又有三维场景 | 共用一块画布和一个 `kit.stage3`：二维场景里先 `st.begin(); st.end();` 再 `kit.plot(canvas, …)`；`onPick` 在二维场景返回 `true` 接管拖动（否则拖动会悄悄转动相机），并随场景切换舞台的 `still` 类 |
@@ -173,7 +174,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | 一进页面就自动播放，或在视野外播完 | 读者错过了演示 | `kit.autoplay`；整页打开停在关键帧 |
 | 章末一台大实验室，正文没有图 | 读到那句话时图不在旁边 | 在那句话旁按卡引用 |
 | 为“看起来丰富”加第三张小图、第四个场景 | 每多一样东西，主角就淡一分 | 删到每样东西都回答一个问题 |
-| 用 `sleep` 等渲染的测试 | 无头环境帧率低，时过时不过 | `settle(page)` |
+| 用 `sleep` 等渲染或等过渡的测试 | 无头环境帧率低，时过时不过 | `settle(page)`；用 `VIZ_SLOW_FRAMES=350` 复查 |
 
 ## 嵌入 trureturing-visualize 的现成页面
 
@@ -193,6 +194,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | 标题里的 φ、u 变成了 Φ、U | 标题按大写排版；变量不写进标题 |
 | `Cannot access '…' before initialization`，页面一片空白 | `kit.clock` 的 `format` 在构造时被调用，里面引用了尚未赋值的时钟变量 |
 | 书里的图内部出现滚动条 | 被引用的图（带 `preset`）不应滚动；检查是否有固定高度的元素撑破了舞台 |
+| 测试本地通过，CI 上偶尔有几条失败 | 多半是为过渡或播放等了固定时间；用 `VIZ_SLOW_FRAMES=350` 在本地复现，改成 `settle(page)` 或等状态本身 |
 
 ## 完成标准
 

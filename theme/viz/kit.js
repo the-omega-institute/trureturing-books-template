@@ -5,7 +5,7 @@
 
      kit.v3                       vector algebra on [x, y, z]: add sub scale dot cross len unit lerp rot slerp sph
      kit.painter(draw, [els])     coalesced redraw: paint() asks for one frame; repaints on resize, fonts and language
-     kit.flush()                  draw every painter now (browser suites use it instead of waiting for a frame)
+     kit.flush()                  finish running transitions and draw every painter now (browser suites use it instead of waiting)
      kit.tween(ms, step, done)    eased 0 → 1 animation (one jump under prefers-reduced-motion); returns { cancel }
      kit.stage3(el, opts)         a 3D scene on a 2D canvas: orbit camera (drag, wheel, pinch), depth-cued lines, sphere,
                                   arcs, arrows, polygons, DOM labels, picking on the unit sphere
@@ -73,21 +73,27 @@
     if (window.ResizeObserver && watch) { const ro = new ResizeObserver(paint); [].concat(watch).forEach((el) => el && ro.observe(el)); }
     return paint;
   }
-  /** Draw every painter now. Browser suites call it (testkit `settle`) instead of waiting for the next frame. */
-  function flush() { painters.forEach((p) => p.now()); }
+  /** Bring the page to rest now: finish every transition in progress, then draw every painter. Browser suites call it
+      (testkit `settle`) instead of waiting: a transition only advances on animation frames, and a busy machine may
+      deliver the frame that ends it long after its nominal duration. */
+  const tweens = new Set();
+  function flush() { [...tweens].forEach((finish) => finish()); painters.forEach((p) => p.now()); }
   /** step(e) with e eased from 0 to 1 over ms; done() at the end. Under reduced motion: step(1) at once. */
   function tween(ms, step, done) {
     let live = true;
     if (TRV.reduceMotion || ms <= 0) { step(1); if (done) done(); return { cancel() {} }; }
     const t0 = performance.now();
+    const finish = () => { if (!live) return; live = false; tweens.delete(finish); step(1); if (done) done(); };
     const tick = (now) => {
       if (!live) return;
       const u = clamp((now - t0) / ms, 0, 1);
+      if (u >= 1) { finish(); return; }
       step(TRV.smooth(u));
-      if (u < 1) requestAnimationFrame(tick); else if (done) done();
+      requestAnimationFrame(tick);
     };
+    tweens.add(finish);
     requestAnimationFrame(tick);
-    return { cancel() { live = false; } };
+    return { cancel() { live = false; tweens.delete(finish); } };
   }
 
   /* ---------- 3D stage on a 2D canvas ----------

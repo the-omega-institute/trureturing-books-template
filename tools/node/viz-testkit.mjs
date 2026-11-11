@@ -81,6 +81,18 @@ export const labelOverlaps = (page, selector = '.stage .tag', share = 0.5) => pa
  * Open a browser session. Options: viewport, locale, reducedMotion ('reduce' | 'no-preference').
  * Returns { page, context, browser, origin, errors, check, goto, url, newPage, finish }.
  */
+/** VIZ_SLOW_FRAMES=<ms> delivers animation frames that far apart, as a busy CI runner does. A suite that waits a fixed
+    time for a transition passes on a fast machine and fails there; run it once this way before trusting it. */
+async function slowFrames(context) {
+  const ms = Number(process.env.VIZ_SLOW_FRAMES) || 0;
+  if (!ms) return;
+  await context.addInitScript((gap) => {
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb) => setTimeout(() => raf(cb), gap);
+    window.cancelAnimationFrame = (id) => clearTimeout(id);
+  }, ms);
+}
+
 export async function session(opts = {}) {
   let origin = process.env.VIZ_ORIGIN, server = null;
   if (!origin) ({ server, origin } = await startServer(0));
@@ -91,6 +103,7 @@ export async function session(opts = {}) {
     reducedMotion: opts.reducedMotion || 'no-preference', deviceScaleFactor: opts.deviceScaleFactor || 1
   });
   await routeLocalFonts(context, origin);
+  await slowFrames(context);
   const results = [], errors = [];
   const watch = (page) => {
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
@@ -119,6 +132,7 @@ export async function session(opts = {}) {
       reducedMotion: o.reducedMotion || 'no-preference', deviceScaleFactor: 1
     });
     await routeLocalFonts(ctx, origin);
+    await slowFrames(ctx);
     const p = watch(await ctx.newPage());
     await p.goto(url(slug, id, query), { waitUntil: 'load' });
     await p.evaluate(() => document.fonts && document.fonts.ready);

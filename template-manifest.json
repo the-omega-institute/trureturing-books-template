@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "1831c2f99fae8309dbca505dea30733cbb56af67358b0ed21bb447fc5cc320f5",
+      "sha256": "098d624fa0d7d4b57fa69ad10ff9aecfed11f488192fa758c278e840a0b13a32",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "79164937891cb68c94e2482d44cd97994bfe4998d997a279c5e9cf1c96ccefcf",
+      "sha256": "c30ec2db718d0372371a2874dfdf228a39a0e9b3a1a89c232e56ddd868ac366c",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -464,7 +464,7 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "63ecfcd926e4157421e8228bd37bd5c2d78c70b7d61bf102aae7f1d7c7aa8171",
+      "sha256": "c21ca28538d7595cbfad3fedcd816c421a3d83ddd92c8b46808c3f9b2458f966",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
@@ -544,7 +544,7 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "afab64ea51e1adfd83b71e068997d766143e1bd2512b62cb6372667fc9e69239",
+      "sha256": "c41067335a87fc0ce2f62e9a9615e49432cb9a780f3347061d445a5e8e899207",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
