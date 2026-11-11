@@ -406,6 +406,8 @@
   show math.equation: set text(font: ("New Computer Modern Math",), fallback: true)
   // TeX keeps the dot of i and j under an accent (\hat{a_i}); Typst would remove it, in subscripts too.
   set math.accent(dotless: false)
+  // TeX (and KaTeX) set 1em between the columns of a matrix; Typst's default is half of that.
+  set math.mat(column-gap: 1em)
   show math.equation.where(block: true): set block(above: 0.9em, below: 0.9em)
   show math.equation.where(block: true): it => layout(size => fit-width(it, size.width))
   show link: set text(fill: link-colour)

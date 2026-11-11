@@ -235,8 +235,38 @@ class PdfMathTest(unittest.TestCase):
         self.assertIn('class("normal", backslash)', codes[3])
         self.assertIn("arrow.r.long", codes[4])
         self.assertIn("arrow.r.long.bar", codes[4])
+        self.assertIn("square.stroked", typst_code([r"U_\square"])[0])
+        self.assertNotIn("tiny", typst_code([r"U_\square"])[0])
         self.widths({str(k): tex for k, tex in enumerate(
             [r"(a \gg i)\,\&\,1", r"G \succeq 0 \preceq H", r"E_a \backslash E_b", r"a \longmapsto c"])})
+
+    def test_operators_without_an_operand_are_ordinary_symbols(self):
+        # TeX sets a binary operator as an ordinary symbol when an operand is missing on either side.
+        w = self.widths({
+            "ket": r"|+\rangle", "ket-ref": r"\lvert{+}\rangle", "script": r"\rho_{|+}", "script-ref": r"\rho_{|{+}}",
+            "prefix": r"= \star I", "none": "= I", "star": r"\star", "binary": r"x \star y", "operands": "x y",
+            "slot": r"\langle \cdot, \cdot \rangle", "slot-ref": r"\langle {\cdot}, {\cdot} \rangle",
+            "minus": "a = - b", "minus-ref": "a = {-} b", "sum": "a - b", "sum-none": "a b", "sign": "-",
+        })
+        self.assertAlmostEqual(w["ket"], w["ket-ref"], delta=0.01)
+        self.assertAlmostEqual(w["script"], w["script-ref"], delta=0.01)
+        self.assertAlmostEqual(w["prefix"] - w["none"], w["star"], delta=0.01)             # = ⋆I, not = ⋆ I
+        self.assertAlmostEqual(w["binary"] - w["operands"], w["star"] + 8 * MU, delta=0.01)
+        self.assertAlmostEqual(w["slot"], w["slot-ref"], delta=0.01)
+        self.assertAlmostEqual(w["minus"], w["minus-ref"], delta=0.01)
+        self.assertAlmostEqual(w["sum"] - w["sum-none"], w["sign"] + 8 * MU, delta=0.01)   # a − b stays binary
+
+    def test_dots_and_aligned_columns_are_spaced(self):
+        w = self.widths({"dots": r"P \cdots P", "none": "P P", "glyph": r"\cdots", "sum": r"a + \cdots + b",
+                         "sum-ref": r"a + {\cdots} + b"})
+        self.assertAlmostEqual(w["dots"] - w["none"], w["glyph"] + 6 * MU, delta=0.01)     # a thin space each side
+        self.assertAlmostEqual(w["sum"], w["sum-ref"], delta=0.01)                         # none next to an operator
+        two, one = typst_code([r"\begin{aligned} a &= b, & c &= d, \\ aaa &= bbb, & ccc &= ddd. \end{aligned}",
+                               r"\begin{aligned} a &= b \\ c &= d \end{aligned}"], display=True)
+        self.assertEqual(two.count("#box(width: 1em)/**/&"), 2)                            # between the column pairs
+        self.assertNotIn("#box(width: 1em)", one)
+        self.widths({"two": r"\begin{aligned} a &= b, & c &= d, \\ aaa &= bbb, & ccc &= ddd. \end{aligned}"},
+                    display=True)
 
     def test_matrices_outside_left_right(self):
         environments = ["smallmatrix", "matrix", "vmatrix", "Vmatrix"]
@@ -245,9 +275,11 @@ class PdfMathTest(unittest.TestCase):
                      r"\bigl(\begin{smallmatrix} 1 & -1 \\ -1 & 1 \end{smallmatrix}\bigr)"]
         codes = typst_code(formulas)
         for code in codes:
-            self.assertIn("mat(delim: ", code)
+            self.assertIn("mat(", code)
+            self.assertIn("delim: ", code)
             self.assertNotIn("\\\n", code)        # rows inside mat(…), not line breaks of the formula
-        self.assertIn("script(mat(delim: #none", codes[0])
+        self.assertIn("script(mat(", codes[0])
+        self.assertIn("delim: #none", codes[0])
         self.assertIn("mat(delim: #none", codes[1])
         self.assertIn("mat(delim: bar.v,", codes[2])
         self.assertIn("mat(delim: bar.v.double,", codes[3])
@@ -255,6 +287,9 @@ class PdfMathTest(unittest.TestCase):
         w = self.widths({"small": formulas[0], "matrix": formulas[1], "bars": formulas[2], "double": formulas[3]})
         self.assertLess(w["small"], 0.85 * w["matrix"])
         self.assertGreater(w["double"], w["bars"])
+        w = self.widths({"row": r"\begin{pmatrix} a & b \end{pmatrix}", "cell": r"\begin{pmatrix} a \end{pmatrix}",
+                         "b": "b"})
+        self.assertAlmostEqual(w["row"] - w["cell"] - w["b"], 1.0, delta=0.15)             # 1em between columns, not 0.5em
 
     def test_text_keeps_escaped_characters(self):
         codes = typst_code([r"\text{a \& b}", r"\text{100\% sure}", r"\texttt{left \^{} right}", r"\text{a\;b}"])
@@ -281,6 +316,66 @@ class PdfMathTest(unittest.TestCase):
             '"sym", "math", "std", "none")\n'
             '#metadata(dictionary(theme).keys().filter(name => name in taken))\n')
         self.assertEqual(values, [[]], "theme/typst/book.typ defines names that Typst's math uses")
+
+    def test_nothing_internal_reaches_the_page(self):
+        # Facts the writer loses travel through it as private-use characters and coded widths. Whatever the
+        # construct around them, none may be left in the result, and the result must compile.
+        formulas = [
+            r"\boxed{\frac{a}{b}}", r"\boxed{a \;=\; b}", r"\boxed{A \cap B}", r"\boxed{\lvert x\rvert}",
+            r"a \phantom{\frac{a}{b}} b", r"\begin{aligned} a &= b \\ \phantom{a} &\;\le c \end{aligned}",
+            r"a \not\preceq b \not\succeq c", r"a \not\Longrightarrow b", r"a \not\implies b \;\|\; c",
+            r"x^\frac{1}{2} + 2^\tfrac{n}{2} + \sqrt\frac{a}{b} + \sqrt[3]\frac{a}{b}",
+            r"\operatorname{arg\;max}_x f(x) + \operatorname*{lim\;sup}_x a + \operatorname{a\&b}",
+            r"\int f(x) \mathop{}\!\mathrm{d}x", r"f\mathopen{}\left(x\right)\mathclose{}", r"a \mathrel{} b",
+            r"\underset{x}{}", r"\frac{a}{} + \frac{}{b} + \binom{n}{}",
+            r"f * \text{g} + a * \quad b + (f * \, g)(x) + \text{width} * \text{height}", r"a / \text{b}",
+            r"\begin{matrix} a \\ b \end{matrix} + \bigl(\begin{smallmatrix} a \\ b \end{smallmatrix}\bigr)",
+            r"\begin{vmatrix} a \\ b \end{vmatrix} + \left(\begin{array}{c} a \\ b \end{array}\right)",
+            r"\left\{ \begin{array}{l} x = 1 \\ y = 22 \end{array} \right.",
+            r"\left\{\begin{aligned} x &= 1 \\ y &= 2\end{aligned}\right.",
+            r"\underset{n}{A}^2 + \overset{\leftrightarrow}{T}_{ij}", r"\sum\nolimits_k a + \limits x",
+        ]
+        for display in (False, True):
+            codes = typst_code(formulas, display)
+            for tex, code in zip(formulas, codes):
+                with self.subTest(formula=tex, display=display):
+                    self.assertTrue(code.startswith("$"), code)
+                    self.assertNotRegex(code, "[-]")
+                    self.assertNotRegex(code, r"#h\([3-6]\d\d\dem\)")
+                    self.assertNotIn("overline(", code)
+            self.widths({str(k): tex for k, tex in enumerate(formulas)}, display)
+
+    def test_review_regressions(self):
+        codes = dict(zip("abcdefghij", typst_code([
+            r"x^\frac{1}{2}", r"\begin{matrix} a \\ b \end{matrix}", r"\operatorname{arg\;max}_x",
+            r"P(A \| B) \cdot \frac{P(B)}{P(A)} = P(B \| A)", r"B : \operatorname{Space}(d)",
+            r"\underset{n}{A}^2", r"x>0 \iff -x<0", r"P^\perp \;+\; Q", r"\sum_i \; -a_i",
+            r"\left\{ \begin{array}{l} x = 1 \\ y = 22 \end{array} \right.",
+        ])))
+        self.assertIn("x^(frac(1 , 2))", codes["a"])                  # the fraction is the exponent
+        self.assertIn("vec(delim: #none, a, b)", codes["b"])          # one column: no parentheses
+        self.assertRegex(codes["c"], r'op\("arg.max"\)')            # the name as written, one space
+        self.assertNotIn("lr(", codes["d"])                           # two unrelated bars are not a pair
+        self.assertIn('op("Space")', codes["e"])                      # a typeset colon is not "delim:"
+        self.assertIn("scripts(limits(A)_n)^2", codes["f"])
+        self.assertIn('class("unary", -) x', codes["g"])              # a sign after \iff
+        self.assertNotIn("unary", codes["h"])                         # binary after a scripted operand
+        self.assertIn('class("unary", -) a_i', codes["i"])            # unary after a scripted operator
+        self.assertIn("lr(brace.l vec(delim: #none, align: #left, x = 1, y = 22))", codes["j"])
+        w = self.widths({"idiom": r"\int f(x) \mathop{}\!\mathrm{d}x", "thin": r"\int f(x)\,\mathrm{d}x",
+                         "bars": r"P(A \| B) \frac{P(B)}{P(A)}", "no-bars": r"P(A B) \frac{P(B)}{P(A)}"},
+                        typst={"bar": "$bar.v.double$"})
+        self.assertAlmostEqual(w["idiom"], w["thin"], delta=0.01)     # the differential keeps its thin space
+        self.assertAlmostEqual(w["bars"] - w["no-bars"], w["bar"], delta=0.02)
+
+    def test_malformed_tex_is_left_to_the_writer(self):
+        # The filter must not repair what the author did not write: the writer prints the source, as before.
+        for tex in (r"\frac{a}{b", r"\frac{a}", r"x \text{abc", r"x^{\frac{a}}", r"\frac1\sqrt{2} \;+\; 1"):
+            with self.subTest(formula=tex):
+                code = typst_code([tex])[0]
+                self.assertNotIn("#box", code)
+                self.assertNotIn("frac(", code)
+        self.assertIn("frac(pi , 2)", typst_code([r"\frac\pi{2}"])[0])   # valid: a command without arguments
 
     def test_an_unconvertible_formula_is_left_as_written(self):
         code, fine = typst_code([r"\undefinedcommand{x} \;=\; \lvert y\rvert", r"a \;=\; b"])

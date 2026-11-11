@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "a3f12eeaa13af879fd2fbb13ef92ec7e5f6a13ee51e16dba53af68dca8c60ee1",
+      "sha256": "1fa19a97edbdb3095ca54ff8b1fc75db9c69aa986abe4fa0d8f8c8f9ba44e4a2",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -436,7 +436,7 @@
       "mode": "100644"
     },
     "theme/typst/book.typ": {
-      "sha256": "dcfb1954f8c1c3b8cf7f2f0b3fd6b10ba2b5967a8cbf954b9aaef767b07f8ba5",
+      "sha256": "665cfb6f802f2ccf16bda0fa9351c9cdff2f7d30b9eeb6bb94532ed2e1d42ffa",
       "mode": "100644"
     },
     "theme/typst/cover.typ": {
@@ -488,7 +488,7 @@
       "mode": "100644"
     },
     "tools/filters/typst-compat.lua": {
-      "sha256": "78824c60469ffd900130a59fd7f6474793594e38e7f987e18de79730c6fd9790",
+      "sha256": "77cb0ed2fef83146e206962f96cf5ca9c406fc103e13d491d8d1a31a36befdc4",
       "mode": "100644"
     },
     "tools/migrations/README.md": {
@@ -732,7 +732,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {
-      "sha256": "6476a40795691cf0253af1a81f4a34285db6f4a6d1a287c65ca97bcfe2a67fcf",
+      "sha256": "5c7651acccbb922bbe9340a6b6ccc928a44ec792fc7571262cb5b4e113cff8e4",
       "mode": "100644"
     },
     "tools/tests/test_serve.py": {

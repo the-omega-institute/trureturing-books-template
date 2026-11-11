@@ -2,6 +2,19 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- PDF 数学排版（`tools/filters/typst-compat.lua`，承接 0.3.1）：合并前的独立审查（三个视角各自构造反例，每条由另一方复现）确认了 14 类问题，其中 3 类会让 PDF 编译失败；它们都不出现在据以实测的那本书里，现已全部修复并各有回归用例。
+  - 括号不配对或缺参数的 TeX（`\frac{a}{b`、`\frac1\sqrt{2}`）不再被“修”成能转换的东西：公式原样交给 Pandoc，像以前一样印出源码。
+  - `\boxed{…}`、`\phantom{…}` 内部的公式被改写却没有还原（印出标记字符，或被推到页外）；现在与外层公式同样处理，`\phantom` 的占位宽度也按公式而不是按文字计算。
+  - 注释分隔符紧跟在 `*` 之后会结束一个并未开始的注释（`f * \text{g}` 使 PDF 编译失败）；空的 `\mathop{}`、`\mathrel{}`、`\overset{x}{}`、`\frac{a}{}` 生成没有内容的调用（`\mathop{}\!\mathrm{d}x` 这一常见写法因此编译失败，现在保留它该有的细空格）。
+  - `x^\frac{1}{2}`、`\sqrt\frac{a}{b}`：不带花括号作参数的分式散开；单列的 `matrix`、`array`、`smallmatrix`、`vmatrix` 被加上圆括号；`\operatorname{arg\;max}` 的名字被当作公式改写；`\not` 后面跟被改写的符号时否定的是标记字符。
+  - 同一公式里两处互不相干的 `\|`（`P(A \| B) \cdot \frac{…}{…} = P(B \| A)`）被配成一对并拉伸到两者之间内容的高度。`\|` 现在与 TeX 一样是普通符号，只有 `\left\|…\right\|` 与 `\norm{…}` 随内容伸长。
+  - 单侧定界 `\left\{…\right.` 包住 `aligned` 时关系符前的间距丢失；`\underset{n}{A}^2` 的指数被排到正上方；`\iff -x`、`\sum_i \; -a_i` 的负号被当作二元运算符；冒号后面的算符名（`B : \operatorname{Space}(d)`）仍按文字排。
+  同时补完了对书中全部 TeX 构造逐类排查的余项：缺操作数的运算符按普通符号排（`= \star I`、`\langle\cdot,\cdot\rangle`、`|+\rangle`、`\rho_{|+}`），`\cdots`、`\ldots` 两侧补上细空格，多列 `aligned` 的列对之间留 1em，矩阵列距由 0.5em 改为与 TeX 一致的 1em（主题），`array` 的列对齐（全 `l` 或全 `r`）得以保留，`\square` 不再印成极小的方块。TeX 扫描部分与词法分析一样改用写明的 ASCII 字符类，不受 ctype 区域设置影响。作为最后一道防线，结果里若仍有内部标记或编码宽度，就改用作者原文的转换结果。`tools/tests/test_pdf_math.py` 增至 19 个用例。
+
 ## [0.3.1] - 2026-11-11
 
 ### 新增
