@@ -60,11 +60,11 @@
 // Frame accent per status (same mapping as theme/mdbook/tr-book.css): green only for
 // Lean-verified results; labels stay cyan so green marks the verification itself.
 #let status-colour(status) = (
-  lean: pal.ok, definition: pal.cyan, open: pal.warn, informal: pal.dim,
+  "written-proof": pal.violet, lean: pal.ok, definition: pal.cyan, open: pal.warn, informal: pal.dim,
   proof: pal.dim, media: pal.cyan,
 ).at(status, default: pal.cyan)
 #let label-colour(status) = (
-  lean: pal.cyan, definition: pal.cyan, open: pal.warn, informal: pal.dim, proof: pal.dim,
+  "written-proof": pal.violet, lean: pal.cyan, definition: pal.cyan, open: pal.warn, informal: pal.dim, proof: pal.dim,
 ).at(status, default: pal.cyan)
 
 #let margins = if is-print {
@@ -146,7 +146,7 @@
     }
   }
   let badge-box = if badge != "" {
-    tr-badge(badge, c, url: badge-url)
+    tr-badge(badge, c, url: if status == "lean" { badge-url } else { "" })
   } else { none }
   let fill = if light { none } else { panel-fill }
   let edge = if light { none } else { 0.5pt + pal.panel-edge }

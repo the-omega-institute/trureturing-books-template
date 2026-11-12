@@ -18,6 +18,8 @@ remark = "注"
 proof = "证明"
 
 [badge]
+written_proof = "书面证明"
+written_proof_title = "源文有书面证明；没有陈述同一结论的 Lean 内核验证声明"
 lean = "LEAN ✓"
 open = "OPEN"
 lean_title = "已在 trureturing 中由 Lean 内核验证并冻结"
@@ -57,8 +59,10 @@ verified_count = "条定理均经 Lean 内核验证"
 generated_note = "本页由构建自动生成，请勿手改。"
 
 [ledger]
+written_title = "书面证明"
+written_intro = "以下结果有 DOI 来源和书内证明，并已登记形式化请求；未经 Lean 内核验证，不计入 LEAN ✓ 数量。"
 title = "形式化验证账本"
-intro = "本书每一条定理、引理、命题与推论都对应 trureturing 中一条已被 Lean 内核验证并冻结的声明。下表列出对应关系；链接固定到所钉的提交，内容不会随上游变化而漂移。"
+intro = "Lean 验证结果对应 trureturing 中已由内核验证并冻结的声明；书面证明与开放条目在下方单列。下表列出 Lean 对应关系；链接固定到所钉的提交，内容不会随上游变化而漂移。"
 col_item = "条目"
 col_title = "标题"
 col_decl = "Lean 声明"
@@ -206,7 +210,7 @@ pinned = "所钉提交"
 
 [site]
 skip = "跳到正文"
-lede = "书中每一条定理都引用 trureturing 中一条已由 Lean 内核验证并冻结的声明：文字负责解释，Lean 负责成立。"
+lede = "本书库区分 Lean 内核验证、书面证明与开放问题；只有 LEAN ✓ 表示陈述同一结果的冻结声明。"
 nav_site = "站点信息"
 lang_group = "界面语言"
 source = "源码"

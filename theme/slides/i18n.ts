@@ -8,6 +8,8 @@ import tr from 'virtual:trureturing'
 
 const LOCAL: Record<string, Record<string, string>> = {
   zh: {
+    'badge.written_proof': '书面证明',
+    'badge.written_proof_title': '源文有书面证明；没有陈述同一结论的 Lean 内核验证声明',
     'slides.badge_unverified': 'UNVERIFIED',
     'slides.badge_unverified_title': '该声明不在 trureturing.lock.json 中：未经 Lean 内核验证',
     'slides.badge_argued': 'ARGUED',
@@ -24,6 +26,8 @@ const LOCAL: Record<string, Record<string, string>> = {
     'slides.pdf': '下载 PDF',
   },
   en: {
+    'badge.written_proof': 'WRITTEN PROOF',
+    'badge.written_proof_title': 'Written proof in the source; no matching kernel-verified Lean declaration',
     'slides.badge_unverified': 'UNVERIFIED',
     'slides.badge_unverified_title': 'Not in trureturing.lock.json: not kernel-verified in Lean',
     'slides.badge_argued': 'ARGUED',

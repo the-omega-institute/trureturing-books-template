@@ -374,3 +374,8 @@ nav#toc a, nav[epub|type~="toc"] a { color: inherit; }
 nav#toc > h1::after { display: none; }
 
 .tr-dangling { text-decoration: none; }
+
+/* Written argument: the same violet semantic as Slidev ARGUED. */
+section.tr-status-written-proof { border-left-color: var(--tr-violet); }
+.tr-status-written-proof .tr-env-label { color: var(--tr-violet); }
+.tr-badge-written-proof { color: var(--tr-violet) !important; background: color-mix(in srgb, var(--tr-violet) 9%, transparent); }

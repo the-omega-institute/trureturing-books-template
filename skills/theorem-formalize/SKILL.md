@@ -26,6 +26,10 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 2. 找到 → 记下 GID（`<模块路径>.<声明名>`），确认 `Golden/Frozen/state/<模块路径>.lean.json` 里有它且 `kind` 为 `theorem`，回到本仓库写作即可。
 3. 找到但陈述不同 → 判断书中陈述能否作为它的忠实特例或推论；能，就在 trureturing 里补一条小定理（仍走下面的流程），不要在书里“近似地”引用。
 
+源文已有证明且能引用 DOI、只是尚无匹配 Lean 验证时，先按 `skills/book-write` 保留显式书面证明状态。
+按 `docs/FORMALIZATION-REQUESTS.md` 搜索并复用已有 issue，用英文正文或评论登记本书用途，标题也用英文，没有匹配项才新建；这不自动授权上游 Lean 工作；需要形式化且已获授权时才继续。冻结了陈述同一结果的声明后，
+在所有语言同步删掉 status、proof、doi、source 与 request 属性、添加 `lean` 并复核原书面论证。
+
 ### 1. 在 trureturing 中形式化
 
 在 trureturing 仓库按它的 `skills/codex-formalize/SKILL.md` 工作：写 D5 Lean 与 Blueprint Scribe，`lake build`、无 `sorry`、只用标准公理，经它的 CI 与评审合入 `dev`，并完成冻结（状态片写入 `Golden/Frozen/state/`）。
@@ -49,4 +53,5 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 - 在本仓库写 `.lean` 文件，或把 Lean 片段当作“证明”贴进书里。
 - 引用未冻结的声明、私有声明，或 `D5/*_Frontier/` 中的开放边界。
 - 手改 `trureturing.lock.json`。
-- 在 trureturing 合入前就把结论写成定理；在此之前它只能是 `conjecture`。
+- 在 trureturing 合入并冻结前声称 Lean 验证。源文已有证明时可保留 theorem/lemma/proposition/corollary，显式用 `status="written-proof" proof="<proof-id>" doi="<裸 DOI>" source="<原文定位>" request="<issue URL>"` 且不带 `lean`，每版关联非空书面证明；真正开放才用 conjecture/problem。紫色书面证明不带验证链接、不计入 Lean 数量。
+- 编造 GID、改变数学，或用特例/变体冒充同一结果。最近的声明只作明确的比较来源，不填入该结果的 `lean`。

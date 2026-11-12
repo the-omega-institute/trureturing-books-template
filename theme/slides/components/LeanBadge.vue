@@ -6,6 +6,7 @@
     kind="definition"  always the neutral LEAN DEF (a definition is not a claim to verify)
     status="open"      red OPEN: an open problem, no Lean proof
     status="argued"    violet ARGUED: argued, but not kernel-verified
+    status="written-proof" violet WRITTEN PROOF: a source proof, no matching Lean declaration; no gid
   ./tbook check and tools/node/slides-check.mjs reject unlocked GIDs, and non-theorem GIDs unless
   kind="definition", so UNVERIFIED should never ship.
 -->
@@ -14,10 +15,11 @@ import { computed } from 'vue'
 import { leanInfo, leanState } from '../lean'
 import { t } from '../i18n'
 
-const props = defineProps<{ gid?: string, status?: 'open' | 'argued', kind?: string }>()
+const props = defineProps<{ gid?: string, status?: 'open' | 'argued' | 'written-proof', kind?: string }>()
 const info = computed(() => leanInfo(props.gid))
 const state = computed(() => leanState(info.value, props.status, props.kind))
 const label = computed(() => ({
+  'written-proof': t('badge.written_proof'),
   lean: t('badge.lean'),
   defined: t('slides.badge_defined'),
   open: t('badge.open'),
@@ -25,6 +27,7 @@ const label = computed(() => ({
   unverified: t('slides.badge_unverified'),
 })[state.value])
 const title = computed(() => ({
+  'written-proof': t('badge.written_proof_title'),
   lean: `${t('badge.lean_title')} · ${info.value.name}`,
   defined: `${t('slides.badge_defined_title')} · ${info.value.name}`,
   open: t('badge.open_title'),

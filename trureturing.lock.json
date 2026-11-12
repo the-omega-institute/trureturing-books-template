@@ -309,6 +309,14 @@
       "line": 30,
       "signature": "theorem golden_lucas_succ_eq_fib_add_fib (n : ℕ) : goldenLucas (n + 1) = (Nat.fib n : ℤ) + (Nat.fib (n + 2) : ℤ)"
     },
+    "D5/S1/Words/Complexity/MorseHedlund.eventuallyPeriodic_of_factor_complexity_le": {
+      "module": "D5/S1/Words/Complexity/MorseHedlund",
+      "name": "D5.S1.Words.Complexity.eventuallyPeriodic_of_factor_complexity_le",
+      "kind": "theorem",
+      "statement_id": "sha256:4b42e9895328d98a8965519c571cd6d99e5ac8c298cdb776f1fe6cf29293c9d8",
+      "line": 136,
+      "signature": "theorem eventuallyPeriodic_of_factor_complexity_le (x : Nat -> A) (n : Nat) (hcomplexity : (wordFactorSet x n).card <= n) : EventuallyPeriodicWord x"
+    },
     "D5/S1/Words/Expansions/BasePhiNegativeBridge.betaContraction_mem_window": {
       "module": "D5/S1/Words/Expansions/BasePhiNegativeBridge",
       "name": "D5.S1.Words.Expansions.BasePhiNegativeBridge.betaContraction_mem_window",

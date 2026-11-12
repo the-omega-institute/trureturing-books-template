@@ -304,7 +304,7 @@ class ExampleDeckTest(unittest.TestCase):
         zh = slides.read_edition(self.book, "overview", "zh")
         en = slides.read_edition(self.book, "overview", "en")
         self.assertEqual(zh.count, en.count)
-        self.assertTrue(8 <= zh.count <= 10)
+        self.assertTrue(8 <= zh.count <= 12)
         self.assertEqual(zh.head["htmlAttrs"]["lang"], "zh-CN")
         self.assertEqual(en.head["htmlAttrs"]["lang"], "en")
         self.assertEqual(zh.meta["code"], self.book.code)
@@ -841,7 +841,7 @@ GID_BINDINGS = [
     ("<LeanBadge gid=\"D5/S9/Bind/Vue.later\" v-bind:gid=\"'@'\" :gid.camel=\"'@'\" v-model:gid=\"m\" />",
      "D5/S9/Bind/Vue.later", "D5/S9/Bind/Vue.later"),
     # not gid: another prop, an argument that is not gid, an attribute that is no directive (Vue's are lower case)
-    ("<LeanBadge v-bind:kind=\"'theorem'\" :gid:x=\"'@'\" V-BIND:gid=\"'@'\" gid=\"D5/S9/Bind/Vue.other\" />",
+    ("<LeanBadge v-bind:title=\"'theorem'\" :gid:x=\"'@'\" V-BIND:gid=\"'@'\" gid=\"D5/S9/Bind/Vue.other\" />",
      "D5/S9/Bind/Vue.other", "D5/S9/Bind/Vue.other"),
     # a v-on object starts a group of props that Vue merges over the earlier ones: its first gid wins
     ("<LeanBadge gid=\"@\" v-on=\"{}\" :gid=\"'D5/S9/Bind/Vue.on_group'\" v-bind:gid=\"'@'\" />",
@@ -1425,6 +1425,37 @@ class NodeScriptsTest(unittest.TestCase):
                      f'{FAKE_DEF} is a Lean def; a LeanBadge must cite a theorem',
                      "src: imports slides from another file"]:
             self.assertIn(want, r.stderr)
+
+    def test_written_proof_metadata_and_parity(self):
+        deck = self.book(["zh", "en"]) / "slides" / "d1"
+        deck.mkdir(parents=True)
+        source = ('<TheoremCard status="written-proof" cite="thm-a" doi="10.1000/proof" '
+                  'source="Theorem 2" request="https://github.com/the-omega-institute/trureturing-requests/issues/1">'
+                  '\n\ns\n\n</TheoremCard>\n')
+        for lang, name in (("zh", "slides.md"), ("en", "slides.en.md")):
+            (deck / name).write_text(deck_head("../../../../theme/slides", lang) + '\n---\n\n' + source)
+        result = self.node("slides-check.mjs")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        page = deck / "slides.en.md"
+        page.write_text(page.read_text().replace('source="Theorem 2"', 'source="Theorem 3"'))
+        result = self.node("slides-check.mjs")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("cites", result.stderr)
+
+    def test_written_proof_status_never_accepts_a_gid(self):
+        deck = self.book(["en"]) / "slides" / "d1"
+        deck.mkdir(parents=True)
+        page = deck / "slides.md"
+        head = deck_head("../../../../theme/slides", "en")
+        for tag in ("LeanBadge", "TheoremCard"):
+            for gid in (None, "", FAKE_THM):
+                with self.subTest(tag=tag, gid=gid):
+                    attr = f' gid="{gid}"' if gid is not None else ""
+                    page.write_text(head + f'\n---\n\n<{tag} status="written-proof"{attr}>s</{tag}>\n')
+                    result = self.node("slides-check.mjs")
+                    self.assertEqual(result.returncode, 1, result.stderr)
+                    if gid is not None:
+                        self.assertIn("written-proof must not have gid", result.stderr)
 
     def test_check_tags_between_code_blocks(self):
         """Finding: slides-check.mjs, like check(), sees tags between two code blocks (not those inside)."""

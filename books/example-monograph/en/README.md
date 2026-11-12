@@ -4,11 +4,11 @@ This book starts from a concrete arithmetic phenomenon. Every natural number is,
 
 The example leads to two more general questions: how to refute a claim conclusively, and what a readout can and cannot tell us. The book's answer to the first is a finite certificate that can be checked mechanically; its answer to the second is an order on readouts that ties together recovery, memory and entropy.
 
-One rule holds throughout: every theorem, lemma, proposition and corollary corresponds to a declaration in [trureturing](https://github.com/the-omega-institute/trureturing) that the Lean kernel has verified and that is frozen[^frozen]. The Lean code lives in trureturing, and the book cites it by GID (module path plus declaration name): the book explains, Lean decides. Each statement in the book agrees with the Lean statement it cites and claims nothing that statement does not. A result without a Lean proof is never called a theorem: an unresolved one is written as a conjecture or an open problem, and one that has a paper proof but no Lean proof yet is written as a remark that says so.
+The book gives priority to matching declarations in [trureturing](https://github.com/the-omega-institute/trureturing) that are kernel-verified in Lean and frozen[^frozen]; its statements claim no more than those declarations. Only when no matching frozen Lean verification exists may a result be marked WRITTEN PROOF. It must have an associated proof, a DOI and source location, and a formalization request registered in [trureturing-requests](https://github.com/the-omega-institute/trureturing-requests). The example here is [@rem-areas-not-frequencies]. Genuinely unresolved results are conjectures or open problems. The Lean code lives in trureturing; this book cites it by GID (module path plus declaration name).
 
 The book is also the sample monograph of the trureturing books template: theorem environments and cross-references, footnotes, tables, figures, definition lists, and interactive visualizations, films and slides all appear in it.
 
-[^frozen]: Freezing is a step in trureturing's workflow: only after a module has been verified by the Lean kernel (no `sorry`, no axioms of the repository's own) does the workflow write a state file for it under `Golden/Frozen/state/`, recording a digest of the module's statements and the name and kind of each declaration in it. The book's theorems, lemmas, propositions and corollaries cite only declarations that a state file at the pinned commit lists with kind theorem.
+[^frozen]: Freezing is a step in trureturing's workflow: only after a module has been verified by the Lean kernel (no `sorry`, no axioms of the repository's own) does the workflow write a state file for it under `Golden/Frozen/state/`, recording a digest of the module's statements and the name and kind of each declaration in it. The book's theorems, lemmas, propositions and corollaries marked `LEAN ✓` cite only declarations that a state file at the pinned commit lists with kind theorem.
 
 ## What each chapter does {#sec-preface-map}
 
@@ -29,7 +29,7 @@ The book is also the sample monograph of the trureturing books template: theorem
 
 Chapter 1 is where everything starts. Appendix A can be read first or consulted when needed. The refutation half of Chapter 2 does not depend on Chapter 1, while its second half uses the golden phases of Chapter 1; Chapter 3 continues from [@thm-target-recovery] in Chapter 2; Chapter 4 uses the deficit of Chapter 1 and the Zeckendorf representations of Appendix A.
 
-Within a chapter all numbered items share one counter, so labels look like "Theorem 1.3": the chapter number, then the item's position among the chapter's numbered items; items in the appendix are numbered A.1, A.2, and so on. Proof blocks only explain the idea; the Lean kernel checks the full proof. Every table of numbers in the book was computed by a program, and the text says that it is a computation, not a proof.
+Within a chapter all numbered items share one counter, so labels look like "Theorem 1.3": the chapter number, then the item's position among the chapter's numbered items; items in the appendix are numbered A.1, A.2, and so on. Proof blocks for Lean results explain the idea; written-proof blocks give the cited argument and are checked by authors and reviewers. Every table of numbers in the book was computed by a program, and the text says that it is a computation, not a proof.
 
 ## Badges and colors {#sec-preface-badges}
 
@@ -38,10 +38,11 @@ Colors have a fixed meaning in this book.
 | Mark | Color | Meaning |
 | --- | --- | --- |
 | `LEAN ✓` | green | Theorems, lemmas, propositions and corollaries: every declaration cited is kernel-verified in Lean and frozen at the pinned commit. The badge links to the source of the first declaration |
+| `WRITTEN PROOF` | purple | No matching frozen Lean verification; an associated proof, DOI, source location and formalization request are supplied, with author and reviewer responsibility |
 | `OPEN` | red | Conjectures and open problems: there is no Lean proof, the book never treats them as proved, and it says in which trureturing file the question is recorded |
 | current position | amber | Only "where you are now": the chapter being read in the sidebar, the current language in the language switch, the keyboard focus |
 
-Green is reserved for results verified in Lean, amber marks only the current position, and red marks open problems. The badges are generated by the build from the lock file, not written by hand: if the lock file cannot confirm that a cited declaration is a frozen Lean theorem, the build shows a red `UNVERIFIED` badge, `./tbook check` reports an error, and the book cannot be published.
+Green is reserved for results verified in Lean, amber marks only the current position, red marks open problems, and purple marks written proofs. The badges are generated by the build from the lock file, not written by hand: if the lock file cannot confirm that a cited declaration is a frozen Lean theorem, the build shows a red `UNVERIFIED` badge, `./tbook check` reports an error, and the book cannot be published.
 
 An item that cites Lean ends with the names of the declarations it cites, linked to the source files at the pinned commit. Definitions cite Lean `def`s too, but carry no badge, since a definition has no claim to verify. The text can also link a declaration directly: [@thm-deficit-three-valued], for instance, is [`deficit_three_valued`](lean:D5/S1/Deficit/DeficitThreeValued.deficit_three_valued).
 
@@ -49,9 +50,9 @@ An item that cites Lean ends with the names of the declarations it cites, linked
 
 The end of [Chapter 1](ch01-golden-deficit.md) has an interactive visualization: pick $v_1$ and $v_2$, step through the carries after their Zeckendorf representations are added, and see how $c(v_1, v_2)$ is distributed on the deficit map. The same section has a film of about fifty seconds that animates the carries and the three values of the deficit, with English narration and bilingual Chinese and English subtitles.
 
-The end of [Chapter 2](ch02-refutation-observation.md) links a ten-slide deck that surveys the main results of Chapters 1 and 2 and one open problem; you can present it online or download it as a PDF.
+The end of [Chapter 2](ch02-refutation-observation.md) links a slide deck that surveys the main results of Chapters 1 and 2 and one open problem; you can present it online or download it as a PDF.
 
-The visualization and the film are built from this book's repository and published with the website. The numbers on screen are computations on the page, meant to help understanding, not proofs; whether a result holds is decided by Lean. The PDF and EPUB editions cannot play or interact: they show a thumbnail or poster for the visualization and the film, and give the online address of all three.
+The visualization and the film are built from this book's repository and published with the website. The numbers on screen are computations on the page, meant to help understanding, not proofs; green results rely on Lean verification, and purple results on the cited written proof. The PDF and EPUB editions cannot play or interact: they show a thumbnail or poster for the visualization and the film, and give the online address of all three.
 
 ## A companion primer {#sec-preface-primer}
 
@@ -59,4 +60,4 @@ This library also holds a short introduction, *Fibonacci and Lucas: A Verified P
 
 ## The verification ledger {#sec-preface-ledger}
 
-The "Verification ledger" at the end of the book is generated by the build. It opens with the pinned trureturing commit and then lists every theorem, lemma, proposition and corollary of the book: each Lean declaration links to its source at that commit, and the state column links to the frozen state file. Last come all the open problems and conjectures. On every check, `./tbook check` rereads the state files at the pinned commit and confirms, item by item, the name, kind and statement digest of each declaration.
+The "Verification ledger" at the end of the book is generated by the build. It opens with the pinned trureturing commit and then lists its Lean-verified theorems, lemmas, propositions and corollaries: each Lean declaration links to its source at that commit, and the state column links to the frozen state file. Written proofs have a separate list with their DOI, source location, associated proof and request link. Last come all the open problems and conjectures. On every check, `./tbook check` rereads the state files at the pinned commit and confirms, item by item, the name, kind and statement digest of each declaration.

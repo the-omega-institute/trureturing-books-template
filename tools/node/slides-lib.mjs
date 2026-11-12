@@ -1313,6 +1313,8 @@ export function citations(content) {
     let group = false; // a v-on object began a new group of props since: its first gid source wins
     for (const a of m[2].matchAll(ATTR_RE)) {
       const name = a[1];
+      const policyProp = /^(?:(?::|v-bind:|v-model:))?(status|kind|cite|doi|source|request)(?:\..*)?$/.exec(name);
+      if (policyProp && (name !== policyProp[1] || Object.hasOwn(attrs, name))) problems.push(`<${m[1]} ${name}=…>: verification metadata must use one literal attribute per prop`);
       attrs[name] = a[2] ?? a[3] ?? a[4] ?? true;
       if (SPREAD_RE.test(name)) {
         problems.push(`<${m[1]} ${name}=…>: an object bound with v-bind can set gid, which cannot be checked; bind each `

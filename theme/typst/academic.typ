@@ -95,8 +95,8 @@
       if badge != "" {
         h(0.7em)
         let mark = box(text(size: 7pt,
-          fill: if status == "lean" { tr-paper.ok } else if status == "open" { tr-paper.warn } else { secondary }, badge))
-        if badge-url != "" { link(badge-url, mark) } else { mark }
+          fill: if status == "lean" { tr-paper.ok } else if status == "open" { tr-paper.warn } else if status == "written-proof" { tr-paper.violet } else { secondary }, badge))
+        if status == "lean" and badge-url != "" { link(badge-url, mark) } else { mark }
       }
     })
     {
