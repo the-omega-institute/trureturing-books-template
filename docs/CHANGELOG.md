@@ -40,7 +40,6 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - 当前 trureturing pin 以锁文件为唯一来源：正文复用 `lean:` 解析器的 `{source}` / `{statement_id}` 标签和 `[{commit}](trureturing:)`，幻灯片增加复用 `pinned` 的 `<PinnedCommit />`，可视化构建与本地预览提供生成的 `assets/trureturing.json`。视频新增 `publication_basis: "pinned"`；可选的 `subject_commit` 保留真实制作历史。旧格式继续受支持。
 - 幂等迁移只移除已明确标记为锁引用的 HTML 锚点的版本回退链接。正文审计表、动态地图与历史记录的选择性迁移见 `docs/UPGRADING.md`，不会自动抹去历史。来源：下游更新 pin 时，当前版本曾复制到正文、八部视频、幻灯片与声明地图，造成同步冲突和行号/摘要漂移。
@@ -60,7 +59,6 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - 完整出版工具链容器：在固定版本与摘要的官方 Playwright 镜像上预装 Python、Node、mdBook、Pandoc、Typst、EPUB 校验器、中英文字体及视频与语音工具。上游 `Toolchain image` 工作流实际验证断网 PDF/EPUB/语音/浏览器及完整示例构建后发布 GHCR 镜像；组合动作自动核对依赖指纹并复用预装环境，采用容器的作业不再逐次运行 apt。容器为可选接入，默认 CI 与 Pages 继续使用现有的 Ubuntu 工具安装与缓存流程。使用与升级方式见 `docs/CONTAINERS.md`。来源：trureturing-books 的 CI 与 Pages 在 Ubuntu 软件源 DNS 解析失败时连续无法安装字体和浏览器依赖。
 
@@ -95,7 +93,6 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - `until(page, fn)`（`tools/node/viz-testkit.mjs`）：等页面自己报告某件事发生了，成立返回 `true`，超时返回 `false`，可以直接作为一条检查的结果。用于靠动画帧自己前进的东西，首先是播放：`settle(page)` 走完过渡，但不替时钟往前走。
 
@@ -126,7 +123,6 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - 可视化：每张实验卡都可以在章节里单独引用，`::: {.viz src="<id>" preset="<卡>" height="500"}`。HTML 中它是开在那张卡上、不带内部滚动的一张图（舞台、一句说明、◀ ▶、时间轴），“全屏打开”进入同一状态的完整实验室；PDF/EPUB 中它是那张卡的带标签静态图 `viz/<id>/fig-<卡>.<语言>.jpg`，取代通用封面。`./tbook check` 核对被引用的卡存在、各语言版本引用同一张卡、静态图齐全；`node tools/node/viz-thumbs.mjs` 在生成封面的同时为被引用的卡生成静态图，并删除不再被引用的。运行时新增 `TRV.preset`、`TRV.figure`、`TRV.shot`、`TRV.still`。
 - 可视化运行时 `theme/viz/kit.js`（`TRV.kit`，可选）：二维画布上的三维舞台（轨道相机、深度淡化、球面拾取、DOM 标签）、二维舞台与小图、时间轴、实验卡与导览条、进入视野才播放、过渡、互斥按钮组、滑块绑定、快捷键与数字格式。`theme/viz/theme.css` 新增舞台优先的实验室版式 `.app.lab`、实验卡 `.presets.cards`、条带小图 `.strip`、导览条 `.tour`、舞台图例 `.hud-bl` 与关键读数 `dl.ro .key`，以及书内引用图与静态图两种模式的样式。
@@ -185,7 +181,6 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - 示例书扩充为四章加一个附录：收缩面与相位判据（附图与小数值表）、有限证书与反驳（Detlefs、反例搜索、Farkas）、细化与目标风险、遗忘与熵、黄金词与回归得分、$\lambda_-$ 的几乎可加性、齐肯多夫表示与进位（附图）；33 条定理类结论都引用所钉提交上已冻结的 Lean 声明，另有 2 个开放问题与 1 个猜想；Detlefs 刻画补上漏掉的剩余类后得到的修正刻画写成注记（两个方向都有纸面证明，尚无 Lean 证明），不算开放问题。定理 2.1 改为只陈述 Lean 证明的内容（该取整公式并非对所有 $n \ge 1$ 成立），见证值移到证明中。
 - 新增第二本示例书 `books/example-primer/`《斐波那契与卢卡斯：一本可验证的入门小书》：两章、11 条定理与一个开放问题，没有媒体，演示一本书最少需要什么。两本示例书都以 `example-` 开头，书库用 `hide = ["example-*"]` 一并隐藏。
@@ -251,7 +246,6 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - 多本书、多语言（默认中文、英文）的书库结构：`books/<slug>/<lang>/`，`./tbook check` 校验各语言版本逐条对齐。
 - 定理验证：形式结论必须引用 trureturing 中在所钉提交上已冻结（`Golden/Frozen/state`）的 Lean `theorem`；`trureturing.lock.json` 由 `./tbook pin` 生成并在 CI 中复核；`lean-verify` 工作流做公理闭包深度验证。
