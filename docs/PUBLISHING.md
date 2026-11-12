@@ -34,7 +34,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 
 | 工作流 | 触发 | 作用 |
 | --- | --- | --- |
-| `ci.yml` | PR、推送到 main、手动、被调用 | `check` 作业：`./tbook check`、`./tbook theme --check`、全部单元测试、可视化登记校验与幻灯片检查（模板仓库另跑 `./tbook template manifest --check`，并在删去示例书的工作树中、以及用 `site.toml` 的 `[books] hide = ["example-*"]` 隐藏示例书的工作树中重跑检查与单元测试：下游书库可以隐藏或删除示例书，甚至暂时没有书，CI 照样通过）；`build` 作业：HTML、屏幕 PDF、印刷 PDF、EPUB 分 4 个作业并行，产物按 `books-html-html`、`books-dist-pdf-screen`、`books-dist-pdf-print`、`books-dist-epub` 分别上传；`viz` 作业：可视化浏览器回归测试，分 8 片并行（`node tools/node/viz-test.mjs --shard i/8`；每个页面的测试约一分钟，页面多了串行跑会让后面的每次运行排上大半个小时）；`media` 作业：幻灯片构建与 PDF；`films` 作业：视频分 4 片严格构建（`TBOOK_FILMS=require`；默认分支推送与 tag 的被调用运行由 Pages / 发版工作流构建视频）。`build`、`media`、`films` 经构建缓存（§5）恢复未变的单元，从不保存；调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
+| `ci.yml` | PR、推送到 main、手动、被调用、每周（只跑 `viz-slow`） | `check` 作业：`./tbook check`、`./tbook theme --check`、全部单元测试、可视化登记校验与幻灯片检查（模板仓库另跑 `./tbook template manifest --check`，并在删去示例书的工作树中、以及用 `site.toml` 的 `[books] hide = ["example-*"]` 隐藏示例书的工作树中重跑检查与单元测试：下游书库可以隐藏或删除示例书，甚至暂时没有书，CI 照样通过）；`build` 作业：HTML、屏幕 PDF、印刷 PDF、EPUB 分 4 个作业并行，产物按 `books-html-html`、`books-dist-pdf-screen`、`books-dist-pdf-print`、`books-dist-epub` 分别上传；`viz` 作业：可视化浏览器回归测试，分 8 片并行（`node tools/node/viz-test.mjs --shard i/8`；每个页面的测试约一分钟，页面多了串行跑会让后面的每次运行排上大半个小时）；`viz-slow` 作业：同样的测试以慢帧（`--slow`，即 `VIZ_SLOW_FRAMES=1000`）分 8 片再跑一遍，只在手动运行（输入 `slow_frames`，默认勾选）与每周三的定时运行中出现，定时运行只跑它，PR 与推送不跑；`media` 作业：幻灯片构建与 PDF；`films` 作业：视频分 4 片严格构建（`TBOOK_FILMS=require`；默认分支推送与 tag 的被调用运行由 Pages / 发版工作流构建视频）。`build`、`media`、`films` 经构建缓存（§5）恢复未变的单元，从不保存；调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
 | `pages.yml` | 推送到 `main`、手动 | `./tbook check` 后构建全部（含视频，`TBOOK_FILMS=require`）并部署 GitHub Pages；Pages 尚未启用时只构建、不部署，并在作业摘要中提示。唯一保存构建缓存的工作流（§5），同一时间只运行一个 |
 | `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
@@ -55,6 +55,8 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 - Settings → General → Releases → 启用 **immutable releases**（建议）：已发布的 Release 的附件与 tag 不能再改，从 Release 恢复的构建缓存因此不会被事后替换（`docs/VERIFICATION.md` §2）。工作流先建草稿、上传全部附件再发布，与之兼容。
 
 容器运行方式见 [容器工具链](CONTAINERS.md)：上游提供预装全部工具、浏览器、字体与语音模型的镜像，避免每次作业依赖 Ubuntu 软件源。
+
+**慢帧复查（`viz-slow`）。** 无头浏览器在忙碌的 runner 上可能一秒才给一帧；测试若为过渡或播放等了固定时间，在快机器上通过、在那里偶发失败。`node tools/node/viz-test.mjs [<book>] --slow` 把动画帧拉开到一秒一帧再跑全部（或一本书的）测试，下游 36 个页面分 4 片约需 20 分钟，故不放进 PR 的 CI。何时跑：新写或改了某个页面的测试，交付前在本地对那个测试跑一次（`VIZ_SLOW_FRAMES=1000 node books/<book>/viz/tests/<id>.test.mjs`）；改了共享运行时（`theme/viz/kit.js`、`shell.js`）或测试工具（`tools/node/viz-testkit.mjs`）、升级模板之后，以及 CI 上出现时过时不过的可视化失败时，在 Actions 中手动运行 CI（`slow_frames` 勾选）；其余由每周的定时运行兜底，失败时看作业日志里的 `FAIL` 行，按 `skills/book-viz` 改成 `settle(page)` / `until(page, …)`。`viz-validate` 对测试里的 `waitForTimeout(…)` 报警告，提前指出这类写法。
 
 开发分支在 PR 上运行完整 CI，不再同时因分支 push 重复跑一轮；尚未开 PR 时可手动运行。PR 与 main 上被新提交取代的 CI 会取消，Pages 仍串行保存缓存并部署。默认分支名称若不是 main，需同步调整 `ci.yml` / `pages.yml` 的 push 分支过滤。
 

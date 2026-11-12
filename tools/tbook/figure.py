@@ -5,6 +5,7 @@ A figure is a script that draws on a :class:`tbook.figkit.Figure` (skills/book-f
 
     SIZE = (560, 300)                                  # natural size in CSS pixels
     ALT = {"zh": "……", "en": "…"}                      # what a reader who cannot see it is told
+    MARKUP = 2                                         # optional: marks nest inside sub- and superscripts
     def draw(fig): ...                                 # fig.t("中文", "English") picks the label
 
 ``./tbook fig build`` runs every script once per edition and writes the canonical SVG next to it
@@ -29,6 +30,7 @@ import functools
 import html
 import importlib.util
 import json
+import math
 import posixpath
 import re
 import string
@@ -176,7 +178,8 @@ def render(book, name: str, lang: str) -> str:
     if not str(alt).strip():
         raise FigureError(f"{where}: ALT has no text for {lang!r} (what a reader who cannot see the figure is told)")
     try:
-        fig = figkit.Figure(name, lang, size[0], size[1], alt=str(alt), wrap=bool(getattr(mod, "WRAP", False)))
+        fig = figkit.Figure(name, lang, size[0], size[1], alt=str(alt), wrap=bool(getattr(mod, "WRAP", False)),
+                            markup=getattr(mod, "MARKUP", 1))
         draw(fig)
         return fig.svg()
     except figkit.FigureError as exc:
@@ -313,6 +316,88 @@ def check(book) -> list[Issue]:
         if stem not in known or lang not in langs:
             issues.append(Issue("warning", p, 0, "no figure script draws this file (figures are generated: "
                                                  f"{FIG_DIR}/<name>.py → <name>.<lang>.svg); delete it or add its script"))
+    issues.extend(phone_issues(book, [n for n in known if NAME_RE.match(n)]))
+    return issues
+
+
+# --------------------------------------------------------------------------- labels on a phone
+
+PHONE_WIDTH = 358  # the text column of a 390 px phone screen (16 px margins): a wider figure is shown this wide
+PHONE_MIN_FONT = 10.0  # the smallest label a reader can still read there, in CSS pixels
+PHONE_SEVERITIES = ("warning", "error")
+_FONT_SIZE_RE = re.compile(r'font-size="([0-9.]+)"')
+_PANEL_WIDTH_RE = re.compile(r'<svg class="tr-fig-panel" x="[^"]*" y="[^"]*" width="([0-9.]+)"')
+
+
+def phone_label(svg: str) -> tuple[float, float, float] | None:
+    """(smallest label on a phone, its size at the natural size, the width that is scaled) of the
+    canonical figure ``svg``, or None when it has no text. A figure is shown at ``min(1, 358 / width)``
+    of its natural size; one made of panels (``WRAP = True``) stacks them on a phone, so its widest
+    panel decides. Sub- and superscripts (``font-size="72%"``) follow their label and are not counted."""
+    sizes = [float(v) for v in _FONT_SIZE_RE.findall(svg)]
+    if not sizes:
+        return None
+    root = _ROOT_RE.match(svg)
+    width = natural_size(svg)[0]
+    if root and 'data-wrap="1"' in root.group():
+        panels = [float(v) for v in _PANEL_WIDTH_RE.findall(svg)]
+        width = max(panels) if panels else width
+    smallest = min(sizes)
+    return smallest * min(1.0, PHONE_WIDTH / width), smallest, width
+
+
+def phone_severity() -> str:
+    """How ``[figures] phone_labels`` of site.toml reports a label too small on a phone: "warning"
+    (default) or "error"."""
+    value = config.load_site().raw.get("figures", {}).get("phone_labels", "warning")
+    if value not in PHONE_SEVERITIES:
+        raise config.ConfigError(f'site.toml: [figures] phone_labels must be "warning" or "error"; got {value!r}')
+    return value
+
+
+def phone_reading(book, name: str) -> tuple[float, str, float, float] | None:
+    """(smallest label on a phone, edition, natural size, scaled width) of figure ``name`` over its
+    drawn editions (the smallest one), or None when nothing is drawn or it has no text."""
+    best = None
+    for ed in book.editions:
+        p = out_path(book, name, ed.lang)
+        if not p.is_file():
+            continue
+        try:
+            got = phone_label(p.read_text(encoding="utf-8"))
+        except FigureError:
+            continue
+        if got and (best is None or got[0] < best[0]):
+            best = (got[0], ed.lang, got[1], got[2])
+    return best
+
+
+def phone_problem(book, name: str) -> str | None:
+    """Why figure ``name``'s smallest label cannot be read on a phone, with the three ways out; or None."""
+    got = phone_reading(book, name)
+    if got is None or got[0] >= PHONE_MIN_FONT - 1e-9:
+        return None
+    value, lang, size, width = got
+    narrow = PHONE_WIDTH * size / PHONE_MIN_FONT
+    bigger = PHONE_MIN_FONT * width / PHONE_WIDTH
+    return (f"figure {name}: its smallest label ({figkit.num(size)} px, {lang}) is {value:.1f} px on a phone, below "
+            f"{figkit.num(PHONE_MIN_FONT)} px (a {figkit.num(width)} px wide drawing is shown {PHONE_WIDTH} px wide). "
+            f"Make it narrower (width at most {math.floor(narrow)}), split it into panels that stack on a phone "
+            f"(WRAP = True, each at most {math.floor(narrow)} wide), or enlarge its labels to at least "
+            f"{math.ceil(bigger * 10) / 10:g} px")
+
+
+def phone_issues(book, only: list[str] | None = None) -> list[Issue]:
+    """:func:`phone_problem` of ``book``'s figures, at the severity site.toml asks for (:func:`phone_severity`)."""
+    try:
+        severity = phone_severity()
+    except config.ConfigError as exc:
+        return [Issue("error", paths.SITE_TOML, 0, str(exc))]
+    issues = []
+    for name in only if only is not None else names(book):
+        problem = phone_problem(book, name)
+        if problem:
+            issues.append(Issue(severity, script_path(book, name), 0, problem))
     return issues
 
 
@@ -474,9 +559,19 @@ def cli(args) -> int:
                          views=args.view or None, sheet=not args.no_sheet)
         books = config.load_books(args.book or None)
         if cmd == "list":
+            rows = []
             for book in books:
                 for name in names(book):
-                    print(f"{book.slug}/{name}")
+                    got = phone_reading(book, name)
+                    phone = ("not drawn" if not any(out_path(book, name, ed.lang).is_file() for ed in book.editions)
+                             else "no labels" if got is None
+                             else f"{got[0]:.1f} px" + ("  < " + figkit.num(PHONE_MIN_FONT) if got[0] < PHONE_MIN_FONT - 1e-9 else ""))
+                    rows.append((f"{book.slug}/{name}", phone))
+            if rows:
+                pad = max(len(r[0]) for r in rows)
+                print(f"{'figure':<{pad}}  smallest label on a phone")
+                for fig_name, phone in rows:
+                    print(f"{fig_name:<{pad}}  {phone}")
             return 0
         if cmd == "build":
             rc = 0
@@ -492,10 +587,13 @@ def cli(args) -> int:
                     print(f"fig: {msg}", file=sys.stderr)
                 for p in changed:
                     print(("stale " if args.check else "wrote ") + paths.rel(p))
+                small = phone_issues(book, only)
+                for issue in small:
+                    print(f"fig: {issue.severity}: {issue.message}", file=sys.stderr)
                 n = len(only) if only is not None else len(names(book))
                 print(f"fig build: {book.slug}: {n} figure(s), {len(changed)} file(s) "
                       + ("stale" if args.check else "written") + f", {len(errors)} error(s)")
-                if errors or (args.check and changed):
+                if errors or (args.check and changed) or any(i.severity == "error" for i in small):
                     rc = 1
             return rc
     except (figkit.FigureError, config.ConfigError) as exc:

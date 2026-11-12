@@ -430,6 +430,21 @@
   }
 
   /* ---------- controls ---------- */
+  /** After a click with the pointer (mouse, pen, touch: detail > 0) on a card, a chip or a tour button, hand the focus to
+      the stage (.stage, focusable by script only: tabindex −1), so that Space plays and pauses the clock at once instead
+      of pressing that button again. A press from the keyboard (Enter or Space on a focused button: detail 0) keeps the
+      focus where the reader put it, so a reader who tabs through the controls is answered by the button. */
+  function release(ev) {
+    if (!ev || !(ev.detail > 0)) return;
+    const from = document.activeElement;
+    if (!from || from === document.body || !from.closest || !from.closest('button')) return;
+    const st = document.querySelector('.stage');
+    if (st && st !== from) {
+      if (!st.hasAttribute('tabindex')) st.setAttribute('tabindex', '-1');
+      st.focus({ preventScroll: true });
+    }
+    if (document.activeElement === from) from.blur();
+  }
   /** An exclusive group of buttons carrying data-<key>; onPick(value, button). Returns { value, set(value, quiet) }. */
   function chips(el, key, onPick) {
     const prop = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
@@ -439,7 +454,7 @@
       value: pressed ? pressed.dataset[prop] : null,
       set(v, quiet) { api.value = v == null ? null : String(v); btns().forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[prop] === api.value))); if (!quiet && onPick) onPick(api.value); }
     };
-    el.addEventListener('click', (ev) => { const b = ev.target.closest(`[data-${key}]`); if (b && el.contains(b) && !b.disabled) { ev.stopPropagation(); api.set(b.dataset[prop]); } });
+    el.addEventListener('click', (ev) => { const b = ev.target.closest(`[data-${key}]`); if (b && el.contains(b) && !b.disabled) { ev.stopPropagation(); api.set(b.dataset[prop]); release(ev); } });
     return api;
   }
   /** Experiment cards: buttons carrying data-preset inside el. opts: notes { id: [zh, en] }, noteEl, idle [zh, en],
@@ -466,11 +481,11 @@
     api.step = (k) => { const list = ids(), i = list.indexOf(api.current); api.pick(list[((i < 0 ? (k > 0 ? -1 : 0) : i) + k + list.length) % list.length]); };
     /** The card a chapter cites (?preset=<id>) when the page has it, else `fallback`: the card to open with. */
     api.initial = (fallback) => (TRV.preset && ids().includes(TRV.preset) ? TRV.preset : fallback);
-    el.addEventListener('click', (ev) => { const b = ev.target.closest('[data-preset]'); if (b && el.contains(b)) api.pick(b.dataset.preset); });
+    el.addEventListener('click', (ev) => { const b = ev.target.closest('[data-preset]'); if (b && el.contains(b)) { api.pick(b.dataset.preset); release(ev); } });
     if (tour) {
       const p = tour.querySelector('[data-tour="prev"]'), n = tour.querySelector('[data-tour="next"]');
-      if (p) p.addEventListener('click', () => api.step(-1));
-      if (n) n.addEventListener('click', () => api.step(1));
+      if (p) p.addEventListener('click', (ev) => { api.step(-1); release(ev); });
+      if (n) n.addEventListener('click', (ev) => { api.step(1); release(ev); });
     }
     TRV.onLang(note);
     return api;
@@ -500,7 +515,9 @@
     api.show();
     return api;
   }
-  /** Keyboard shortcuts { key: handler }. Ignored while typing in a control, with a modifier, or under an open drawer. */
+  /** Keyboard shortcuts { key: handler }. Ignored while typing in a control, with a modifier, or under an open drawer;
+      Space and Enter on a focused button belong to that button (a pointer click on a card or chip moves the focus to
+      the stage first: see release). */
   function keys(map) {
     document.addEventListener('keydown', (ev) => {
       if (ev.defaultPrevented || ev.metaKey || ev.ctrlKey || ev.altKey) return;

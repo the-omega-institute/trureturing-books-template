@@ -106,11 +106,19 @@ $$
 （trureturing 中的 `goldenWindowTrueCount_eq_floor`，由 [@prop-golden-word-zeckendorf] 经 Beatty 序列得到）。记 $\{x\}$ 为小数部分，相位 $x_i = \{(i+1)/\varphi\}$；因为 $1/\varphi = \varphi - 1$，它就是 [@thm-golden-phase] 中的 $p(i)$。对 $1 \le m \le n$，上面的个数等于 $\lfloor m/\varphi \rfloor$，在 $x_i \ge 1 - \{m/\varphi\}$ 时再加 $1$。这 $n$ 个分点 $1 - \{m/\varphi\}$ 互不相同（$1/\varphi$ 是无理数），把 $[0, 1)$ 分成 $n + 1$ 段。长度为 $n$ 的因子由这些个数逐个相减得出，只依赖 $x_i$ 落在哪一段，所以至多有 $n + 1$ 个。反过来，相位 $x_i$ 在 $[0, 1)$ 中稠密，每一段都有相位落入，而落在不同段的相位给出不同的因子，所以至少有 $n + 1$ 个。完整证明由 Lean 内核检查。
 :::
 
+::: {.figure src="factor-skeleton"}
+**证明的骨架。** 虚线框是出发点，中性的方框是证明的步骤（灰色等宽字是 trureturing 中做这一步的引理），两支分别给出上界与下界，汇入绿色的 [@thm-factor-complexity]。
+:::
+
 [^sturm]: M. Morse, G. A. Hedlund, Symbolic dynamics, *Amer. J. Math.* 60 (1938), 815–866；Sturm 词见二人的 Symbolic dynamics II. Sturmian trajectories, *Amer. J. Math.* 62 (1940), 1–42。这是文献结果，未在本书形式化：所引的 Lean 声明只计算黄金词的因子个数，不含这条周期性定理。反方向是初等的：最终周期的词只有有界多个不同的因子，而 $n + 1$ 无界，所以黄金词不是最终周期的。
 
 ## 回归 {#sec-returns}
 
 在 [@thm-factor-complexity] 的证明中，黄金词由相位 $x_i$ 控制，而 $x_{i+1}$ 是把 $x_i$ 在周长为 $1$ 的圆周上转过 $1/\varphi$。因为 $\varphi = 1 + 1/\varphi$，转过 $1/\varphi$ 与转过 $\varphi$ 是同一个旋转。相位回到同一段时，同一个因子重新出现；因子多快重现，取决于这个旋转多快回到起点附近。
+
+::: {.figure src="golden-rotation"}
+**黄金词是黄金旋转的编码。** 相位圆画成球的赤道，每一步绕竖直轴转过 $1/\varphi$（从 $x_0$ 到 $x_1$ 的箭头）。取 $n = 1$，分点 $1 - \{1/\varphi\} = 1/\varphi^2$ 把圆分成两段：相位落在青色的一段时 $g(i) = \mathtt{a}$，落在品红的一段时 $g(i) = \mathtt{b}$；图上 $x_0, \dots, x_7$ 依次读出 $\mathtt{abaababa}$。
+:::
 
 有限的循环窗口转满一圈就精确复原（trureturing 称之为 revival，见 `CyclicWindowRevival` 模块）。黄金旋转永远不会精确复原：转 $q$ 步之后，离起点的距离是 $q\varphi$ 到最近整数的距离 $\norm{q\varphi}$，它对每个 $q \ge 1$ 都不是 $0$。沿 Fibonacci 时刻看，[`fibonacci_golden_residual`](lean:D5/S1/Scale/FibonacciErrorRatio.fibonacci_golden_residual) 给出精确的余差
 
@@ -154,6 +162,10 @@ $$
 | 10 | 55 | 89 | 0.008131 | 0.447184 | −0.000030 |
 | 11 | 89 | 144 | 0.005025 | 0.447225 | +0.000011 |
 | 12 | 144 | 233 | 0.003106 | 0.447209 | −0.000004 |
+
+::: {.figure src="revival-log"}
+**等待与误差此消彼长。** 纵轴取对数：青色的等待时间 $F_n$ 与品红的误差 $\varphi^{-n}$ 是斜率相反的两条直线，中间的一串点是两者之积，即得分，在绿色虚线 $1/\sqrt5$ 两侧交替并逼近这条线（[@thm-revival-score]）。
+:::
 
 ::: {.problem #prob-revival-spectrum title="完整的回归谱"}
 [@thm-revival-score] 只处理 Fibonacci 时刻这一个子序列。trureturing 中有两处说明还有什么没有解决：

@@ -394,6 +394,122 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(model.status_of("figure"), "media")
 
 
+HAND_DRAWN = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect width="200" height="100" fill="#0a0e14"/>'
+              '<text x="10" y="50" fill="#00e5ff" font-size="8">label</text></svg>\n')
+STYLED = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><style>.a{fill:#000}'
+          '@media (prefers-color-scheme:dark){.a{fill:#fff}}</style><text class="a" x="10" y="50">label</text></svg>\n')
+WIDE = '''\
+SIZE = (716, 120)
+ALT = {"zh": "一行字。", "en": "A line of text."}
+
+
+def draw(fig):
+    fig.text(20, 60, fig.t("小字", "small"), size=12)
+'''
+WIDE_PANELS = '''\
+SIZE = (716, 120)
+WRAP = True
+ALT = {"zh": "两栏字。", "en": "Two panels of text."}
+
+
+def draw(fig):
+    for p in fig.row([350, 350], 120):
+        p.text(20, 60, fig.t("小字", "small"), size=12)
+'''
+
+
+def media_chapter(*blocks: str) -> str:
+    return "# One\n\n" + "\n\n".join(blocks) + "\n"
+
+
+class StandardTests(unittest.TestCase):
+    """The checks that keep pictures to the standard: hand-drawn SVG images, one image for every language,
+    labels a phone can show, and media blocks stacked without prose."""
+
+    def issues(self, book: config.Book) -> list[model.Issue]:
+        out: list[model.Issue] = []
+        models = model.load_book_models(book)
+        for m in models.values():
+            check.check_media_runs(m, out)
+        check.check_drawn_images(book, models, out)
+        return out
+
+    def test_hand_drawn_svg_in_assets(self):
+        self.assertTrue(check.svg_is_hand_drawn(HAND_DRAWN))
+        self.assertFalse(check.svg_is_hand_drawn(STYLED), "it follows the reader's colour scheme")
+        with Repo() as repo:
+            book = demo(repo)
+            figure.build(book)
+            self.assertFalse(check.svg_is_hand_drawn(figure.out_path(book, "line", "en").read_text(encoding="utf-8")),
+                             "a generated figure paints by role classes")
+            self.assertFalse(check.svg_is_hand_drawn('<svg><animate attributeName="x" fill="freeze"/></svg>'))
+            write(repo.root / "books/demo/assets/drawn.svg", HAND_DRAWN)
+            write(repo.root / "books/demo/assets/photo.png", "x")
+            write(repo.root / "books/demo/assets/styled.zh.svg", STYLED)
+            chapter(repo, "zh", "# One\n\n![一张手绘图](../assets/drawn.svg)\n\n![照片](../assets/photo.png)\n\n"
+                                "![随主题的图](../assets/styled.zh.svg)\n")
+            chapter(repo, "en", "# One\n\n![A drawing](../assets/drawn.svg)\n\n![A photograph](../assets/photo.png)\n")
+            found = [i for i in self.issues(book) if "hand-drawn" in i.message]
+            self.assertEqual([(i.path.parent.name, i.line) for i in found], [("zh", 3), ("en", 3)])
+            self.assertIn("::: {.figure", found[0].message)
+            self.assertTrue(all(i.severity == "warning" for i in found))
+
+    def test_an_svg_with_text_shared_by_two_editions(self):
+        with Repo() as repo:
+            book = demo(repo)
+            write(repo.root / "books/demo/assets/shared.svg", STYLED)
+            write(repo.root / "books/demo/assets/plain.svg", '<svg viewBox="0 0 10 10"><circle class="tf-cyan" r="4"/></svg>\n')
+            write(repo.root / "books/demo/assets/own.zh.svg", STYLED)
+            write(repo.root / "books/demo/assets/own.en.svg", STYLED)
+            chapter(repo, "zh", "# One\n\n![带字的图](../assets/shared.svg)\n\n![无字的图](../assets/plain.svg)\n\n"
+                                "![各自的图](../assets/own.zh.svg)\n")
+            chapter(repo, "en", "# One\n\n![With text](../assets/shared.svg)\n\n![No text](../assets/plain.svg)\n\n"
+                                "![Its own](../assets/own.en.svg)\n")
+            found = self.issues(book)
+            self.assertEqual([(i.severity, i.path.parent.name, i.line, i.message.split(" has text")[0]) for i in found],
+                             [("warning", "en", 3, "books/demo/assets/shared.svg")])
+            self.assertIn("every language its own labels", found[0].message)
+
+    def test_media_blocks_in_a_row(self):
+        fig = '::: {.figure src="line"}\nA line.\n:::'
+        with Repo() as repo:
+            book = demo(repo)
+            figure.build(book)
+            chapter(repo, "zh", media_chapter(fig, fig, "<!-- note -->", fig, fig, "Some prose.", fig, fig))
+            chapter(repo, "en", media_chapter(fig, fig, "Prose between.", fig, fig, "More prose.", fig))
+            found = self.issues(book)
+            self.assertEqual([(i.path.parent.name, i.line) for i in found], [("zh", 13)],
+                             "the third block of a run of four; a comment is no prose, two in a row are fine")
+            self.assertIn("4 media blocks in a row (figure → figure → figure → figure, from line 3)", found[0].message)
+            self.assertIn("line 13, line 17", found[0].message)
+
+    def test_labels_on_a_phone(self):
+        with Repo() as repo:
+            book = demo(repo, {"wide": WIDE, "panels": WIDE_PANELS, "line": SCRIPT})
+            figure.build(book)
+            wide = figure.phone_label(figure.out_path(book, "wide", "en").read_text(encoding="utf-8"))
+            self.assertEqual((round(wide[0], 2), wide[1], wide[2]), (6.0, 12.0, 716.0), "12 px at 716 wide is 6 px at 358")
+            panels = figure.phone_label(figure.out_path(book, "panels", "en").read_text(encoding="utf-8"))
+            self.assertEqual((round(panels[0], 2), panels[2]), (12.0, 350.0), "panels stack: the widest panel decides")
+            found = figure.check(book)
+            self.assertEqual([(i.severity, i.path.name) for i in found], [("warning", "wide.py")])
+            msg = found[0].message
+            for part in ("6.0 px on a phone", "below 10 px", "width at most 429", "WRAP = True", "at least 20 px"):
+                self.assertIn(part, msg)
+            write(repo.root / "site.toml", (repo.root / "site.toml").read_text(encoding="utf-8") + '\n[figures]\nphone_labels = "error"\n')
+            config.load_site.cache_clear()
+            self.assertEqual([i.severity for i in figure.check(book)], ["error"])
+            code, out, err = repo.run_cli("fig", "build")
+            self.assertEqual(code, 1, "an error by site.toml fails the build")
+            self.assertIn("fig: error: figure wide:", err)
+            code, out, _err = repo.run_cli("fig", "list")
+            self.assertEqual(code, 0)
+            self.assertEqual(out.splitlines()[1:], ["demo/line    14.0 px", "demo/panels  12.0 px", "demo/wide    6.0 px  < 10"])
+            write(repo.root / "site.toml", (repo.root / "site.toml").read_text(encoding="utf-8").replace('"error"', '"loud"'))
+            config.load_site.cache_clear()
+            self.assertEqual([(i.severity, i.path.name) for i in figure.check(book)], [("error", "site.toml")])
+
+
 class CliTests(unittest.TestCase):
     def test_new_build_list(self):
         with Repo() as repo:
@@ -415,7 +531,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertIn("2 file(s) written", out)
             self.assertEqual(repo.run_cli("fig", "build", "--check")[0], 0)
-            self.assertEqual(repo.run_cli("fig", "list")[1], "demo/ch01-shadow\n")
+            self.assertEqual(repo.run_cli("fig", "list")[1].splitlines()[1:], ["demo/ch01-shadow  10.4 px"])
             svg = (repo.root / "books/demo/figures/ch01-shadow.en.svg").read_text(encoding="utf-8")
             self.assertTrue(re.search(r">shadow cos θ<", svg), "the starter draws its English labels")
 

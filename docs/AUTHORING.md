@@ -164,7 +164,7 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 :::
 ```
 
-静态图用 `::: {.figure src="<图名>"}` 引用，图名对应脚本 `books/<slug>/figures/<图名>.py`：一张图只讲一件事，放在讲到它的那句话旁，各语言版本位置与 `src` 相同，只翻译图注。图由脚本生成（`./tbook fig new|build|shots`），每种语言一版标签；HTML 中随深浅主题变化，PDF 的屏幕版与印刷版各用自己的配色。图注必须有，且不能只是编号。标准、画图库的用法与看图的方法见 `skills/book-figure`。照片、截图等不能由脚本画的图片仍写 `![图注](../assets/x.png)`，图注同样不能只是编号。
+静态图用 `::: {.figure src="<图名>"}` 引用，图名对应脚本 `books/<slug>/figures/<图名>.py`：一张图只讲一件事，放在讲到它的那句话旁，各语言版本位置与 `src` 相同，只翻译图注。图由脚本生成（`./tbook fig new|build|shots`），每种语言一版标签；HTML 中随深浅主题变化，PDF 的屏幕版与印刷版各用自己的配色。图注必须有，且不能只是编号。标准、画图库的用法与看图的方法见 `skills/book-figure`。图片语法 `![图注](../assets/x.png)` 只用于照片、截图这类不能由脚本画的图片，图注同样不能只是编号；用图片语法引用 `assets/` 里写死颜色的 SVG（没有角色类、没有 `prefers-color-scheme`），或让两种语言共用一个带字的 SVG，`./tbook check` 都给出警告。图在手机上（正文栏宽 358 px，按 `min(1, 358 / 宽度)` 缩小，分栏图按最宽一栏）最小的标签不得小于 10 px，低于时 `./tbook fig build` 与 `./tbook check` 警告，`site.toml` 的 `[figures]` `phone_labels = "error"` 可升为错误。媒体块（`.figure`、`.viz`、`.film`、`.slides`）放在各自对应的那句话之后，彼此之间要有正文：三块以上只隔着空行连排时，`./tbook check` 从第三块起警告。
 
 外部资源：`src="trureturing-visualize:<id>"`、`src="trureturing-film:film-001-v1"`。HTML 中为交互嵌入或播放器；PDF/EPUB 中为缩略图/海报加在线地址。媒体块在各语言版本中也必须一一对应。
 
@@ -212,5 +212,9 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 | `not listed in SUMMARY.md` | 加入 SUMMARY 或删除文件 |
 | `figure … has no caption` / `has a placeholder caption` | 给 `.figure` 块或图片写一句说明这张图的图注；“图 13”这样的编号不算图注 |
 | `… is stale: its script draws something else` / `has not been generated` | `./tbook fig build --book <slug>`，提交生成的 `figures/*.svg` |
+| `figure …: its smallest label (…) is … px on a phone, below 10 px`（警告，`site.toml` 可升为错误） | 做窄、分栏（`WRAP = True`）或加大最小字号，提示里给了具体数值（见 `skills/book-figure`） |
+| `… is a hand-drawn SVG with its colours written in`（警告） | 改写成图脚本 `figures/<name>.py`，用 `::: {.figure}` 引用；图片语法只留给照片一类 |
+| `… has text and is shown by the zh, en editions alike`（警告） | 每种语言一版标签：改成图脚本，或各语言各用一个文件 |
+| `N media blocks in a row … with no text between them`（警告） | 把每一块挪到它对应的那句话之后，块与块之间有正文 |
 | `no figure books/<slug>/figures/<name>.py` | `.figure` 的 `src` 没有对应脚本：核对图名，或 `./tbook fig new <slug> <name>` |
 | `no chapter, deck, film or visualization of this book uses this file`（警告） | `assets/` 里的遗留文件：删除，或在章节里引用 |

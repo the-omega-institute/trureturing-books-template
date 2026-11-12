@@ -10,6 +10,9 @@
 #          more with the example books hidden (site.toml [books].hide = ["example-*"])
 #   build  HTML (mdBook), PDF (screen + print), EPUB → workflow artifacts
 #   viz    visualization browser tests, in eight parallel shards
+#   viz-slow  the same suites with animation frames a second apart (node tools/node/viz-test.mjs --slow), as a
+#          busy runner delivers them: only when started by hand (workflow_dispatch, input slow_frames) and weekly
+#          (schedule); the weekly run does nothing else, and pull requests never wait for it
 #   media  slide decks (Slidev + Chromium)
 #   films  strict film builds, in four parallel shards
 #
@@ -28,14 +31,22 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      slow_frames:
+        description: Also run the visualization browser tests with slow frames (viz-slow, about 20 minutes)
+        type: boolean
+        default: true
   workflow_call:
+  schedule:
+    - cron: '29 3 * * 3' # Wednesdays 03:29 UTC: viz-slow only
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # a scheduled run has a group of its own, so that a push to main does not cancel it
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'schedule' && '-schedule' || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch') }}
 
 env:
@@ -45,6 +56,9 @@ env:
 jobs:
   check:
     name: Check
+    # The weekly run of this workflow is for viz-slow alone; build, viz, media and films need check and are
+    # skipped with it. (In a called workflow github.workflow_ref names the caller: a caller's schedule runs it all.)
+    if: github.event_name != 'schedule' || !contains(github.workflow_ref, '/.github/workflows/ci.yml@')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -264,6 +278,36 @@ jobs:
       - name: Visualization browser tests
         if: hashFiles('tools/node/viz-test.mjs') != ''
         run: node tools/node/viz-test.mjs --shard ${{ matrix.shard }}/8
+
+  viz-slow:
+    name: Visualization browser tests, slow frames (${{ matrix.shard }}/8)
+    # The same suites with an animation frame a second (VIZ_SLOW_FRAMES=1000): a suite that waits a fixed time
+    # for a transition or for playback passes on a fast runner and fails here (docs/PUBLISHING.md §4). Weekly and
+    # by hand only: a calling workflow (workflow_call) passes no input slow_frames, and its own schedule is not
+    # this workflow's (github.workflow_ref names the caller there), so it never runs viz-slow.
+    if: >-
+      (github.event_name == 'schedule' && contains(github.workflow_ref, '/.github/workflows/ci.yml@')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.slow_frames == true)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+        with:
+          browsers: 'true'
+          fonts: 'false'
+          mdbook: 'false'
+
+      - name: Visualization browser tests (slow frames)
+        if: hashFiles('tools/node/viz-test.mjs') != ''
+        run: node tools/node/viz-test.mjs --slow --shard ${{ matrix.shard }}/8
 
   media:
     name: Slides

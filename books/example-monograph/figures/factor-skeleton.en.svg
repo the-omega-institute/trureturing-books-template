@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="tr-fig" data-tr-fig="factor-skeleton" data-lang="en" viewBox="0 0 358 380" width="358" height="380" font-family="'Noto Sans SC', 'Noto Sans CJK SC', 'Source Sans 3', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif" role="img" aria-label="A proof skeleton. At the top a dashed box, &#x27;the golden word g&#x27;. First box: the number of a&#x27;s in a window equals ⌊(i+m+1)/φ⌋ − ⌊(i+1)/φ⌋, by goldenWindowTrueCount_eq_floor. Second box: that number depends only on which of the n+1 segments cut by n points the phase x_i falls in. Two branches follow: left, &#x27;at most n+1: one segment, one factor&#x27;; right, &#x27;at least n+1: the phases are dense, every segment is hit&#x27;. Both meet in the green LEAN ✓ box at the bottom, &#x27;exactly n+1 factors&#x27;, which is golden_factor_complexity.">
+<title>A proof skeleton. At the top a dashed box, &#x27;the golden word g&#x27;. First box: the number of a&#x27;s in a window equals ⌊(i+m+1)/φ⌋ − ⌊(i+1)/φ⌋, by goldenWindowTrueCount_eq_floor. Second box: that number depends only on which of the n+1 segments cut by n points the phase x_i falls in. Two branches follow: left, &#x27;at most n+1: one segment, one factor&#x27;; right, &#x27;at least n+1: the phases are dense, every segment is hit&#x27;. Both meet in the green LEAN ✓ box at the bottom, &#x27;exactly n+1 factors&#x27;, which is golden_factor_complexity.</title>
+<style>.ts-ink{stroke:#0b1622}.tf-ink{fill:#0b1622}.ts-dim{stroke:#45607a}.tf-dim{fill:#45607a}.ts-faint{stroke:#9db3c4}.tf-faint{fill:#9db3c4}.ts-edge{stroke:#b9d0dd}.tf-edge{fill:#b9d0dd}.ts-hot{stroke:#5f9bb5}.tf-hot{fill:#5f9bb5}.ts-bg{stroke:#ffffff}.tf-bg{fill:#ffffff}.ts-panel{stroke:#eef5f9}.tf-panel{fill:#eef5f9}.ts-sheet{stroke:#f7fbfd}.tf-sheet{fill:#f7fbfd}.ts-cyan{stroke:#007c8a}.tf-cyan{fill:#007c8a}.ts-magenta{stroke:#b0128f}.tf-magenta{fill:#b0128f}.ts-amber{stroke:#946200}.tf-amber{fill:#946200}.ts-violet{stroke:#5a45c8}.tf-violet{fill:#5a45c8}.ts-ok{stroke:#087a4c}.tf-ok{fill:#087a4c}.ts-warn{stroke:#c21f3a}.tf-warn{fill:#c21f3a}.ts-blue{stroke:#1d5fd0}.tf-blue{fill:#1d5fd0}.ts-orange{stroke:#b85410}.tf-orange{fill:#b85410}.ts-sigma{stroke:#28405a}.tf-sigma{fill:#28405a}@media (prefers-color-scheme:dark){.ts-ink{stroke:#d4efff}.tf-ink{fill:#d4efff}.ts-dim{stroke:#6f8ea5}.tf-dim{fill:#6f8ea5}.ts-faint{stroke:#34506a}.tf-faint{fill:#34506a}.ts-edge{stroke:#143049}.tf-edge{fill:#143049}.ts-hot{stroke:#1f5d7c}.tf-hot{fill:#1f5d7c}.ts-bg{stroke:#03060c}.tf-bg{fill:#03060c}.ts-panel{stroke:#07101b}.tf-panel{fill:#07101b}.ts-sheet{stroke:#050c16}.tf-sheet{fill:#050c16}.ts-cyan{stroke:#19f0ff}.tf-cyan{fill:#19f0ff}.ts-magenta{stroke:#ff2fd0}.tf-magenta{fill:#ff2fd0}.ts-amber{stroke:#ffc83d}.tf-amber{fill:#ffc83d}.ts-violet{stroke:#9d8cff}.tf-violet{fill:#9d8cff}.ts-ok{stroke:#46ffb2}.tf-ok{fill:#46ffb2}.ts-warn{stroke:#ff5064}.tf-warn{fill:#ff5064}.ts-blue{stroke:#2a7bff}.tf-blue{fill:#2a7bff}.ts-orange{stroke:#ff8a3c}.tf-orange{fill:#ff8a3c}.ts-sigma{stroke:#cfe3ff}.tf-sigma{fill:#cfe3ff}}</style>
+<rect x="106.2" y="6" width="145.6" height="32.9" rx="14" class="ts-dim" stroke-width="1.2" stroke-dasharray="4 3" fill="none"/>
+<text class="tf-dim" x="179" y="27.49" font-size="14" text-anchor="middle">the golden word <tspan font-style="italic">g</tspan></text>
+<rect x="48" y="58" width="262" height="69.35" rx="6" class="ts-edge tf-panel" stroke-width="1.3"/>
+<text class="tf-ink" x="179" y="79.49" font-size="14" text-anchor="middle">a&#x27;s in a window =</text>
+<text class="tf-ink" x="179" y="98.39" font-size="14" text-anchor="middle">⌊(<tspan font-style="italic">i</tspan>+<tspan font-style="italic">m</tspan>+1)/φ⌋ − ⌊(<tspan font-style="italic">i</tspan>+1)/φ⌋</text>
+<text class="tf-dim tr-fig-mono" x="179" y="116.25" font-size="13" font-family="'JetBrains Mono', 'DejaVu Sans Mono', ui-monospace, Menlo, Consolas, monospace" text-anchor="middle">goldenWindowTrueCount_eq_floor</text>
+<rect x="37.04" y="151.35" width="283.92" height="51.8" rx="6" class="ts-edge tf-panel" stroke-width="1.3"/>
+<text class="tf-ink" x="179" y="172.84" font-size="14" text-anchor="middle">the counts depend only on which of <tspan font-style="italic">n</tspan>+1</text>
+<text class="tf-ink" x="179" y="191.74" font-size="14" text-anchor="middle">segments holds <tspan font-style="italic">x</tspan><tspan dy="0.28em" font-size="72%" font-style="italic">i</tspan><tspan dy="-0.2em">​</tspan></text>
+<rect x="5" y="237.15" width="170" height="51.8" rx="6" class="ts-edge tf-panel" stroke-width="1.3"/>
+<text class="tf-ink" x="90" y="258.64" font-size="14" text-anchor="middle">at most <tspan font-style="italic">n</tspan>+1: one</text>
+<text class="tf-ink" x="90" y="277.54" font-size="14" text-anchor="middle">segment, one factor</text>
+<rect x="183" y="237.15" width="170" height="70.7" rx="6" class="ts-edge tf-panel" stroke-width="1.3"/>
+<text class="tf-ink" x="268" y="258.64" font-size="14" text-anchor="middle">at least <tspan font-style="italic">n</tspan>+1: the</text>
+<text class="tf-ink" x="268" y="277.54" font-size="14" text-anchor="middle">phases are dense,</text>
+<text class="tf-ink" x="268" y="296.44" font-size="14" text-anchor="middle">every segment is hit</text>
+<rect x="69.26" y="341.85" width="219.48" height="32.9" rx="6" class="ts-ok tf-ok" stroke-width="1.6" fill-opacity="0.1"/>
+<rect x="83.26" y="347.8" width="57.2" height="21" class="ts-ok tf-ok" stroke-width="1.2" fill-opacity="0.12"/>
+<text class="tf-ok tr-fig-mono" x="90.26" y="363.8" font-size="12" font-family="'JetBrains Mono', 'DejaVu Sans Mono', ui-monospace, Menlo, Consolas, monospace" font-weight="600">LEAN ✓</text>
+<text class="tf-ok" x="148.46" y="363.34" font-size="14">exactly <tspan font-style="italic">n</tspan>+1 factors</text>
+<line x1="179" y1="38.9" x2="179" y2="52.05" class="ts-dim" stroke-width="1.4" fill="none"/>
+<path d="M179 58 L176.06 51 L181.94 51Z" class="tf-dim"/>
+<line x1="179" y1="127.35" x2="179" y2="145.4" class="ts-dim" stroke-width="1.4" fill="none"/>
+<path d="M179 151.35 L176.06 144.35 L181.94 144.35Z" class="tf-dim"/>
+<line x1="90" y1="203.15" x2="90" y2="231.2" class="ts-dim" stroke-width="1.4" fill="none"/>
+<path d="M90 237.15 L87.06 230.15 L92.94 230.15Z" class="tf-dim"/>
+<line x1="268" y1="203.15" x2="268" y2="231.2" class="ts-dim" stroke-width="1.4" fill="none"/>
+<path d="M268 237.15 L265.06 230.15 L270.94 230.15Z" class="tf-dim"/>
+<line x1="90" y1="288.95" x2="90" y2="335.9" class="ts-ink" stroke-width="1.4" fill="none"/>
+<path d="M90 341.85 L87.06 334.85 L92.94 334.85Z" class="tf-ink"/>
+<line x1="268" y1="307.85" x2="268" y2="335.9" class="ts-ink" stroke-width="1.4" fill="none"/>
+<path d="M268 341.85 L265.06 334.85 L270.94 334.85Z" class="tf-ink"/>
+</svg>

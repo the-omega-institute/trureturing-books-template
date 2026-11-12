@@ -12,11 +12,12 @@ must give every chapter the same number.
 from __future__ import annotations
 
 import importlib
+import re
 import subprocess
 from pathlib import Path
 
 from . import config, lean, mdscan, paths, render
-from .model import (DEFINITION, FORMAL, MEDIA, NUMBERED, OPEN, PROOF, EditionModel, Issue, load_book_models,
+from .model import (DEFINITION, FORMAL, MEDIA, NUMBERED, OPEN, PROOF, EditionModel, Issue, load_book_models, kind_of,
                     media_cited_gids)
 from .summary import Chapter, Summary, chapter_prefix
 
@@ -181,6 +182,98 @@ def check_image_parity(book: config.Book, models: dict[str, EditionModel], issue
             if m is not None and n != m:
                 _warn(issues, doc.path, 0, f"the {lang} edition shows {n} image(s) in this chapter, the "
                                            f"{book.languages[0]} edition {m}: editions show the same pictures at the same places")
+
+
+# A colour written into an SVG: a fill / stroke / stop-color / color attribute or style declaration whose value is
+# a hex, rgb()/hsl() or named colour (not none, currentColor, inherit, transparent or a url(#…) paint server).
+_SVG_COLOR_RE = re.compile(r"""(?:\b(?:fill|stroke|stop-color|flood-color|lighting-color|color)\s*(?:=\s*["']|:)\s*)"""
+                           r"""(?!none\b|freeze\b|remove\b|currentcolor\b|inherit\b|transparent\b|url\(|var\()(?:#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|[a-z]{3,}\b)""",
+                           re.I)
+_SVG_ROLE_RE = re.compile(r"""class\s*=\s*["'][^"']*\bt[sf]-[a-z]""")
+
+
+def svg_is_hand_drawn(svg: str) -> bool:
+    """True when ``svg`` writes its colours in: it neither paints by role classes (``ts-…``/``tf-…``,
+    as the figure scripts do) nor follows the reader's colour scheme (``prefers-color-scheme``)."""
+    return bool(_SVG_COLOR_RE.search(svg)) and not _SVG_ROLE_RE.search(svg) and "prefers-color-scheme" not in svg
+
+
+def _image_file(doc, url: str) -> Path | None:
+    """The local file an image destination of chapter ``doc`` names, or None (remote, missing)."""
+    if not url or "://" in url or url.startswith(("/", "data:")):
+        return None
+    from urllib.parse import unquote
+
+    p = (doc.path.parent / unquote(url)).resolve()
+    return p if p.is_file() else None
+
+
+def check_drawn_images(book: config.Book, models: dict[str, EditionModel], issues: list[Issue]) -> None:
+    """Images that should have been figures (warnings). An SVG in ``assets/`` shown with image syntax
+    that writes its colours in keeps them in the light theme, in print and in the EPUB: draw it with a
+    figure script (``figures/<name>.py``, cited with ``::: {.figure}``). Image syntax is for pictures
+    no script can draw (photographs, scans); bitmaps are not reported. An SVG with text that two
+    editions show as the same file gives every reader the labels of one language."""
+    assets = (book.dir / "assets").resolve()
+    users: dict[Path, list[tuple[str, Path, int]]] = {}
+    for lang, model in models.items():
+        for doc in model.chapters:
+            for lineno, _text, url in _images(doc):
+                p = _image_file(doc, url)
+                if p is not None and p.suffix.lower() == ".svg":
+                    users.setdefault(p, []).append((lang, doc.path, lineno))
+    for p, uses in users.items():
+        try:
+            svg = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if p.is_relative_to(assets) and svg_is_hand_drawn(svg):
+            for _lang, path, lineno in uses:
+                _warn(issues, path, lineno,
+                      f"{paths.rel(p)} is a hand-drawn SVG with its colours written in (no role classes, no "
+                      "prefers-color-scheme): it keeps those colours in both themes, in print and in the EPUB. Draw it "
+                      "with a figure script figures/<name>.py and cite it with ::: {.figure src=\"<name>\"} "
+                      "(image syntax is for pictures no script can draw, such as photographs)")
+        langs = list(dict.fromkeys(lang for lang, _path, _line in uses))
+        if len(langs) > 1 and re.search(r"<text\b", svg):
+            later = [u for u in uses if u[0] != langs[0]]
+            _lang, path, lineno = later[0]
+            _warn(issues, path, lineno,
+                  f"{paths.rel(p)} has text and is shown by the {', '.join(langs)} editions alike: give every "
+                  "language its own labels (a figure script draws one version per language; or one image file "
+                  "per edition)")
+
+
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+MEDIA_RUN = 3  # this many media blocks in a row with no prose between them are reported
+
+
+def check_media_runs(model: EditionModel, issues: list[Issue]) -> None:
+    """Three or more media blocks (figure, viz, film, slides) with nothing but blank lines between
+    them (a warning, from the third block on): a reader meets a stack of pictures and cannot tell
+    which sentence each one belongs to. Cite each next to the sentence it shows."""
+    for doc in model.chapters:
+        for nodes in [doc.blocks] + [n.children for n in mdscan.walk(doc.blocks) if isinstance(n, mdscan.Div)]:
+            run: list[tuple[str, int]] = []
+
+            def flush() -> None:
+                if len(run) >= MEDIA_RUN:
+                    later = ", ".join(f"line {line}" for _kind, line in run[MEDIA_RUN - 1:])
+                    _warn(issues, doc.path, run[MEDIA_RUN - 1][1],
+                          f"{len(run)} media blocks in a row ({' → '.join(k for k, _l in run)}, from line {run[0][1]}) "
+                          f"with no text between them ({later}): cite each next to the sentence it shows, with "
+                          "prose between them")
+                run.clear()
+
+            for node in nodes:
+                if isinstance(node, mdscan.Div) and kind_of(node) in MEDIA:
+                    run.append((kind_of(node), node.start))
+                elif isinstance(node, mdscan.Comment) or (isinstance(node, mdscan.Text) and not _COMMENT_RE.sub(
+                        "", "\n".join(node.lines)).strip()):  # blank lines and HTML comments show nothing
+                    continue
+                else:
+                    flush()
+            flush()
 
 
 def check_unused_figures(book: config.Book, models: dict[str, EditionModel], issues: list[Issue]) -> None:
@@ -485,10 +578,12 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
             check_links(model, site, issues)
             check_footnotes(model, issues)
             check_captions(model, issues)
+            check_media_runs(model, issues)
             if model.summary is not None and not model.chapters:
                 _warn(issues, model.edition.summary, 0, "edition has no chapters yet")
         check_parity(book, models, issues)
         check_image_parity(book, models, issues)
+        check_drawn_images(book, models, issues)
         check_unused_figures(book, models, issues)
         check_unused_assets(book, models, site, issues)
         for kind in MEDIA:

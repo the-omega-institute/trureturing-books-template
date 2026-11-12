@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "6feca141b49b1c8f298bda83b8113a05e074ef1c55741a6151b811cde80ba813",
+      "sha256": "9b198cb9749757a5552d0f354bd5a0b439336620ee1ca651e39e8081dc7d1783",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -64,15 +64,15 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "b3c87f3eff672d4c5f618bd1618eee7cc1cf627dd152fe67a893d3af4d1c40c3",
+      "sha256": "47803fe19f4854bac0ce8bd55fa6dbaa88f94e0859cac809f953e4b6f5b2939a",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "7948ea1d438f8d3b8063aa74ccd2e21f1a3b3812593495b0c1c38af26946662d",
+      "sha256": "27de39da5bfea22767d2d8f49f9b7c676fea6af0642cc09e282ee2a49c50d36b",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "2a893ba6ddf31bf42cb45a3f9b412c0f11ba01673f96685d7f1ad0c2ea9ce539",
+      "sha256": "5fa0f2021ca80aece809f88f372ba93ff4e349c7eac1253917ad07c934a9147c",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -80,7 +80,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "02398998c1c9e2defb27d0112dc1d60570290476950f07a55babb464f77c8895",
+      "sha256": "955850aa95a6f891f72c0922880df14369c103b829e61bfc6bda5fa6a3907b0c",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
-      "sha256": "4b098b56d8dd0073974b296abd1b6f49835271aecba12f1e732eb99384d9ba6c",
+      "sha256": "add46569e2f4032353cb6b1fe3f957d81ccf659fdccc89dc9e5725d30c0eed4c",
       "mode": "100644"
     },
     "skills/book-film/SKILL.md": {
@@ -128,7 +128,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "ceb019a04daf0ee9648052ebd4aaa5c28e9526b5cf9793e560b382b656d54255",
+      "sha256": "e54ac12c1759176c421c7e4558d3d703ab2b85f183ebc77c2297a90ea5588940",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -184,11 +184,11 @@
       "mode": "100644"
     },
     "templates/figure/README.md": {
-      "sha256": "8fe0ea1b449bb96e01b1ec5993b9539dc45612054bfb23ca8faa1db0ff685928",
+      "sha256": "2e5fab7e365571cd7095da529ac4c3704a1b43231ea3e5a6ebd196c1881b8c14",
       "mode": "100644"
     },
     "templates/figure/figure.py": {
-      "sha256": "55fa4c29ed916421eae3ed259894452d4aedeb8a57942f1cf52272676d4d6f2d",
+      "sha256": "8bf11953cf1f2c7132a8e3b6cc12f00668eb1b340776708544ceee6bf724bf35",
       "mode": "100644"
     },
     "templates/film/README.md": {
@@ -216,7 +216,7 @@
       "mode": "100644"
     },
     "templates/viz/README.md": {
-      "sha256": "6395879467feea0f6ab9eb55a8391b2788034ddcbc21cc9446d4ddc962e20c91",
+      "sha256": "0e54297727974c76b5ee1fd51f5380114d59bfe4b82fe4d4cdf34dde2b18af84",
       "mode": "100644"
     },
     "templates/viz/index.html": {
@@ -488,7 +488,7 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "c21ca28538d7595cbfad3fedcd816c421a3d83ddd92c8b46808c3f9b2458f966",
+      "sha256": "8c9dec85b32ab053f9a3570c60b5c67944cba6f7cd6f082f21b6d54feb7ae2d7",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
@@ -496,7 +496,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "addfcfdb504e821371aa0ec84fc1a715b3f5a8c9146e5ab4e275b75fd400111a",
+      "sha256": "e7caf55c9cf044cbcaadc48062b91b1cb205f859ff14600d2b9a5e36e66ec54c",
       "mode": "100644"
     },
     "tools/ci/films.py": {
@@ -580,7 +580,7 @@
       "mode": "100644"
     },
     "tools/node/viz-common.mjs": {
-      "sha256": "c5aa5f37c76278d706b99b8a186eff35ad4acad47c88f0b56e3658ae43a598e6",
+      "sha256": "17226418cc20d257c62b2bc2e7f869ae0f20432c33d2360a57e09e6a5a5df565",
       "mode": "100644"
     },
     "tools/node/viz-new.mjs": {
@@ -596,11 +596,11 @@
       "mode": "100644"
     },
     "tools/node/viz-test.mjs": {
-      "sha256": "02fd73454e37bd88a5fec3e958a57a8d93e28df7accfa2e96569019454f97d9c",
+      "sha256": "f288fc05038d34f24a1e564292e35bbb7cd39b8cf2c6a624c7885a04078746b5",
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "4d7cbf0e72ade580211805f9b470b1c4f4b88c4c476ecbe3bd72361c30b48caa",
+      "sha256": "de17543c242704d399047a95d4d517e304e454e006409a6d3ec7ff7508558328",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
@@ -608,7 +608,7 @@
       "mode": "100644"
     },
     "tools/node/viz-validate.mjs": {
-      "sha256": "7e0b7e858f9dafaa812f87faaf983fe67850a67b3b57cce0ce6d21b05a6d64c9",
+      "sha256": "667973a22d7814b9d8a45c90882694abfa4e59ab36a62bffd65d498b326ccab4",
       "mode": "100644"
     },
     "tools/tbook/__init__.py": {
@@ -628,7 +628,7 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "0d60153ff9be7db7f0b89422c9e06d94e9ffec3fe5fa80d38aaec69fe910fc77",
+      "sha256": "f1e34e8bb9b5920d3593cdc7264e6000c9540339225a098c237066d76ef47b7e",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
@@ -648,11 +648,11 @@
       "mode": "100644"
     },
     "tools/tbook/figkit.py": {
-      "sha256": "e007bd73d14bded6ec0eb0536f2ba5ceb541696daea04867232cb49ee2cfbed7",
+      "sha256": "719293f5e79235146b488f5e4e382447c325ba3cbfe3ef40c3fceb18294bb8f1",
       "mode": "100644"
     },
     "tools/tbook/figure.py": {
-      "sha256": "1845740a51878ceb5c0c118ef7406f14b75dc54118be4e77765340bb85b5208b",
+      "sha256": "6c509a41c52f38b2ec4d2a852de53398738323d78d1b12880df3fee475552daa",
       "mode": "100644"
     },
     "tools/tbook/film.py": {
@@ -732,7 +732,7 @@
       "mode": "100644"
     },
     "tools/tbook/viz.py": {
-      "sha256": "00b176c772b2f29edd520ea1f32507946ad2361d8d6471c84d50dc9418d42352",
+      "sha256": "9ec538e0aa49a5f498c0376d80e3d8d95395193251bf16ab0b64905459b3326f",
       "mode": "100644"
     },
     "tools/tests/example_support.py": {
@@ -751,6 +751,10 @@
       "sha256": "58de30672c1ff4741b3f96a432808794f2c6e35c874eb1efefe3a321882ba689",
       "mode": "100644"
     },
+    "tools/tests/test_ci_viz_slow.py": {
+      "sha256": "c14b4508a9699cb02934aad59055182a40a9b38a6b7c9247541ee980dfd4b26b",
+      "mode": "100644"
+    },
     "tools/tests/test_container.py": {
       "sha256": "e761b362d37fff48c75c34599d05a1b16330d430a9b2175baad912453a184b84",
       "mode": "100644"
@@ -759,8 +763,12 @@
       "sha256": "05c22ce1b4d33fd21b2eaf32b70d3a139a58a7f99d5b98850948f13ff5ef134d",
       "mode": "100644"
     },
+    "tools/tests/test_figkit_shapes.py": {
+      "sha256": "b7e2573d718a93dba81ddb4a61fb9d7777e4d416ae76c8257970d79867dd7ecc",
+      "mode": "100644"
+    },
     "tools/tests/test_figure.py": {
-      "sha256": "081df906f57449b8d3fdf54d39b1dc32736fb88c65edc9adb480ab598de1bea3",
+      "sha256": "99d3bb729e074ec88e6e2c59882cd95bb081f8c83e4a1aa7b60814b57ca8ef3d",
       "mode": "100644"
     },
     "tools/tests/test_film.py": {
@@ -832,11 +840,11 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "97ed448f512f9f8bfa8786e5511217bb59953174f4f3eec0b08b85b9a44c092c",
+      "sha256": "1931a6a6b0a57f7c026af9bbd49d2560e9fe5ee6585b401b54868113de41b2fc",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "9fbf830f9c7fd035e23037d2a4348aafa39885bb58a187a98ddfec3350768def",
+      "sha256": "0f8603a9a019bd4b0d9af6662eafd3f33bcbc47697dd9f7146351c7bd456affc",
       "mode": "100644"
     }
   }

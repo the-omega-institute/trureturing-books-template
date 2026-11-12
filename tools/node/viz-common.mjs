@@ -10,6 +10,7 @@
 // Pages reference the runtime as ../assets/… and the hub as ../ (relative links only).
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { bookDirs, hiddenBy, hiddenError, hidePatterns } from './slides-lib.mjs';
 
@@ -132,32 +133,32 @@ export function resolveHref(href, lock) {
 }
 
 /* ---------- chapter citations: `::: {.viz src="<id>" preset="<card>" height="<px>"}` ---------- */
-const VIZ_BLOCK = /^:::+\s*\{([^}]*\.viz\b[^}]*)\}/gm;
-const vizAttr = (text, name) => { const m = new RegExp(`\\b${name}="([^"]*)"`).exec(text); return m ? m[1] : null; };
 /** Frame height of an embed when a chapter gives none or an unusable one, and the accepted range (tools/tbook/viz.py). */
 export const EMBED_HEIGHT = 560, EMBED_HEIGHTS = [160, 2400];
-/** Every embed of `vizId` in the chapters of `book`, from every language directory (one with a SUMMARY.md):
-    [{ lang, preset, height }] in file order; preset is null for the whole lab, height is the frame height in pixels. */
+// The chapters are read by the book tools themselves (tbook.viz.citations over tbook.model.load_edition), so the cards
+// that the quality gate opens and that viz-thumbs.mjs captures (and keeps) are the ones the published book cites: the
+// same editions, SUMMARY selection, Markdown grammar, kind and attributes. The interpreter is chosen as ./tbook does.
+const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const CITATIONS_PY = 'import json, sys\nfrom tbook import config, viz\n'
+  + 'json.dump(viz.citations(config.load_book(sys.argv[1]), sys.argv[2]), sys.stdout)\n';
+function tbookPython() {
+  if (process.env.TBOOK_PYTHON) return process.env.TBOOK_PYTHON;
+  const venv = path.join(CODE_ROOT, '.venv', 'bin', 'python');
+  return fs.existsSync(venv) ? venv : 'python3';
+}
+/** Every embed of `vizId` in the published chapters of `book`, as `./tbook build` reads them (tbook.viz.citations):
+    [{ lang, preset, height }] by edition (book.toml order), SUMMARY.md chapter and position; preset is null for the
+    whole lab, height is the frame height in pixels. Throws when the book tools cannot run or cannot read the book. */
 export function vizCitations(book, vizId) {
-  const out = [];
-  const langs = fs.readdirSync(book.dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && fs.existsSync(path.join(book.dir, d.name, 'SUMMARY.md'))).map((d) => d.name).sort();
-  for (const lang of langs) {
-    const walk = (dir) => {
-      for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-        const f = path.join(dir, e.name);
-        if (e.isDirectory()) walk(f);
-        else if (e.name.endsWith('.md')) for (const m of fs.readFileSync(f, 'utf8').matchAll(VIZ_BLOCK)) {
-          if (vizAttr(m[1], 'src') !== vizId) continue;
-          const preset = vizAttr(m[1], 'preset'), h = Number(String(vizAttr(m[1], 'height') ?? EMBED_HEIGHT).trim().replace(/px$/, ''));
-          out.push({ lang, preset: preset && /^[A-Za-z0-9][\w-]*$/.test(preset) ? preset : null,
-            height: Number.isInteger(h) && h >= EMBED_HEIGHTS[0] && h <= EMBED_HEIGHTS[1] ? h : EMBED_HEIGHT });
-        }
-      }
-    };
-    walk(path.join(book.dir, lang));
-  }
-  return out;
+  const py = tbookPython();
+  const pythonPath = [path.join(CODE_ROOT, 'tools'), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter);
+  const r = spawnSync(py, ['-c', CITATIONS_PY, book.dir, vizId], {
+    cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26, env: { ...process.env, PYTHONPATH: pythonPath, TBOOK_ROOT: ROOT }
+  });
+  const why = r.error ? r.error.message : r.status !== 0 ? (r.stderr || `exit ${r.status ?? r.signal}`).trim() : '';
+  const fail = (detail) => new Error(`cannot read the citations of viz "${vizId}" in ${rel(book.dir)} with ${py} (tbook.viz.citations): ${detail}`);
+  if (why) throw fail(why);
+  try { return JSON.parse(r.stdout); } catch (e) { throw fail(`unreadable output (${e.message})`); }
 }
 /** The cards of `vizId` that the chapters of `book` cite: [{ preset, lang }], one per card and language. */
 export function citedCards(book, vizId) {

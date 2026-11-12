@@ -75,7 +75,7 @@ from pathlib import Path
 from typing import Any
 
 from . import config, lean, paths
-from .model import Issue
+from .model import Issue, load_edition
 
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -594,7 +594,33 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
         for f in sorted(tdir.glob("*.test.mjs")):
             if f.name[: -len(".test.mjs")] not in seen:
                 warn(f, 0, f"tests/{f.name} belongs to no registered visualization")
+        for f in sorted(tdir.glob("*.test.mjs")):
+            for line in fixed_waits(f.read_text(encoding="utf-8")):
+                warn(f, line, fixed_wait_message(line))
     return issues
+
+
+_FIXED_WAIT = re.compile(r"\bwaitForTimeout\s*\(")
+
+
+def fixed_waits(text: str) -> list[int]:
+    """Line numbers of the ``waitForTimeout(`` calls of a browser suite, outside comment lines (one entry per call).
+
+    A suite waits for what the page reports (``settle`` for a transition, ``until`` for playback), never for a fixed
+    time (skills/book-viz); tools/node/viz-validate.mjs applies the same rule."""
+    lines = []
+    for k, line in enumerate(text.split("\n"), 1):
+        t = line.strip()
+        if t.startswith(("//", "*", "/*")):
+            continue
+        lines.extend(k for _ in _FIXED_WAIT.finditer(line))
+    return lines
+
+
+def fixed_wait_message(line: int) -> str:
+    return (f"waitForTimeout(…) at line {line} waits a fixed time, which passes on a fast machine and fails on a busy "
+            "runner; wait for what the page reports instead: settle(page) after a click or a transition, "
+            "until(page, () => …) for playback (skills/book-viz)")
 
 
 PAGE_NEEDLES = (
@@ -737,17 +763,53 @@ def items(book) -> list[dict]:
 # --------------------------------------------------------------------------- embeds
 
 
-def _height(env, ctx) -> int:
-    raw = env.attrs.get("height", str(DEFAULT_HEIGHT)).strip().removesuffix("px")
+def _frame_height(attrs) -> tuple[int | None, str]:
+    """The frame height in pixels that ``height=`` of an embed gives (None when unusable), and the value as read."""
+    raw = attrs.get("height", str(DEFAULT_HEIGHT)).strip().removesuffix("px")
     try:
         h = int(raw)
     except ValueError:
         h = 0
-    if not HEIGHT_RANGE[0] <= h <= HEIGHT_RANGE[1]:
+    return (h if HEIGHT_RANGE[0] <= h <= HEIGHT_RANGE[1] else None), raw
+
+
+def _height(env, ctx) -> int:
+    h, raw = _frame_height(env.attrs)
+    if h is None:
         ctx.issues.append(f"viz {env.attrs.get('src')}: height must be a number of pixels between "
                           f"{HEIGHT_RANGE[0]} and {HEIGHT_RANGE[1]}, got {raw!r}; using {DEFAULT_HEIGHT}")
         return DEFAULT_HEIGHT
     return h
+
+
+def citations(book, viz_id: str) -> list[dict]:
+    """Every embed of the local visualization ``viz_id`` in the published chapters of ``book``, as the builds read
+    them: the editions of book.toml in order, the chapters their SUMMARY.md lists (drafts and unlisted files are not
+    published), and in each the ``viz`` blocks of :func:`tbook.model.load_edition` (not in code or HTML comments).
+    ``[{"lang", "preset", "height"}]`` in that order: preset is the cited card (None for the whole lab, or a name that
+    is no card name, which the build shows as the whole lab), height the frame height in pixels (:func:`_height`).
+
+    tools/node/viz-common.mjs ``vizCitations`` returns this list to the browser quality gate and to viz-thumbs.mjs,
+    which removes the stills no chapter cites: an edition with a directory whose chapters cannot be selected
+    (SUMMARY.md missing or unreadable, a listed chapter missing) raises :class:`VizError` rather than reading as
+    citing nothing. An edition without a directory has no text, so it cites nothing (``./tbook check`` reports it)."""
+    out: list[dict] = []
+    for edition in book.editions:
+        if not edition.dir.is_dir():
+            continue
+        model = load_edition(edition)
+        broken = [i.format() for i in model.issues if i.severity == "error" and i.path == edition.summary]
+        if broken:
+            raise VizError(f"cannot read the chapters of {edition.key}: " + "; ".join(broken))
+        for doc in model.chapters:
+            for env in doc.media:
+                if env.kind != "viz" or (env.attrs.get("src") or "").strip() != viz_id:
+                    continue
+                preset = (env.attrs.get("preset") or "").strip()
+                height = _frame_height(env.attrs)[0]
+                out.append({"lang": edition.lang, "preset": preset if PRESET_RE.match(preset) else None,
+                            "height": DEFAULT_HEIGHT if height is None else height})
+    return out
 
 
 def published_url(site, book, viz_id: str) -> str:

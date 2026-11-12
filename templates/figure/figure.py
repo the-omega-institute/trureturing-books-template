@@ -8,7 +8,8 @@ stroke and fill names a role. Run `./tbook fig build` after each change and look
 
 import math
 
-# natural size in CSS pixels: the largest the figure is ever shown (≤ 760 wide; text ≥ 12, lines ≥ 1)
+# natural size in CSS pixels: the largest the figure is ever shown (≤ 760 wide; text ≥ 12, lines ≥ 1).
+# A phone shows it 358 px wide, so the smallest label × min(1, 358 / width) should stay ≥ 10 (here 14 × 358 / 480).
 SIZE = (480, 290)
 
 # what a reader who cannot see the figure is told; one entry per edition
@@ -37,4 +38,4 @@ def draw(fig):
     fig.text(ox + r + 8, oy + 5, "*a*", size=16)
     fig.text(bx + 8, by - 4, "*b*", size=16, color="now")
     fig.text((ox + bx) / 2, oy + 26, t("影子 cos θ", "shadow cos θ"), color="line", anchor="middle")
-    fig.text(bx + 12, (by + oy) / 2, t("垂线", "perpendicular"), size=13, color="dim", middle=True)
+    fig.text(bx + 12, (by + oy) / 2, t("垂线", "perpendicular"), size=14, color="dim", middle=True)

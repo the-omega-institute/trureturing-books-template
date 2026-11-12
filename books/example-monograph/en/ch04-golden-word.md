@@ -106,11 +106,19 @@ $$
 (`goldenWindowTrueCount_eq_floor` in trureturing, derived from [@prop-golden-word-zeckendorf] through the Beatty sequence). Write $\{x\}$ for the fractional part and $x_i = \{(i+1)/\varphi\}$ for the phase; since $1/\varphi = \varphi - 1$, this is the $p(i)$ of [@thm-golden-phase]. For $1 \le m \le n$, the count above is $\lfloor m/\varphi \rfloor$, plus $1$ when $x_i \ge 1 - \{m/\varphi\}$. These $n$ cut points $1 - \{m/\varphi\}$ are distinct (because $1/\varphi$ is irrational) and divide $[0, 1)$ into $n + 1$ pieces. The factor of length $n$ is recovered from the counts by taking successive differences, so it depends only on the piece that contains $x_i$; hence there are at most $n + 1$ factors. Conversely, the phases $x_i$ are dense in $[0, 1)$, so every piece contains one, and phases in different pieces give different factors; hence there are at least $n + 1$. The full proof is checked by the Lean kernel.
 :::
 
+::: {.figure src="factor-skeleton"}
+**The skeleton of the proof.** The dashed box is the starting point, the neutral boxes are the steps of the proof (in grey monospace, the trureturing lemma that does the step), and the two branches give the upper and the lower bound, meeting in the green [@thm-factor-complexity].
+:::
+
 [^sturm]: M. Morse, G. A. Hedlund, Symbolic dynamics, *Amer. J. Math.* 60 (1938), 815–866; for Sturmian words see their Symbolic dynamics II. Sturmian trajectories, *Amer. J. Math.* 62 (1940), 1–42. This is a result from the literature, not formalized in this book: the cited Lean declaration only counts the factors of the golden word and does not contain this periodicity theorem. The other direction is elementary: an eventually periodic word has only boundedly many distinct factors, while $n + 1$ is unbounded, so the golden word is not eventually periodic.
 
 ## Returns {#sec-returns}
 
 In the proof of [@thm-factor-complexity], the golden word is governed by the phase $x_i$, and $x_{i+1}$ is $x_i$ turned by $1/\varphi$ around a circle of circumference $1$. Since $\varphi = 1 + 1/\varphi$, turning by $1/\varphi$ and turning by $\varphi$ are the same rotation. When the phase comes back into the same piece, the same factor reappears; how soon factors recur depends on how soon this rotation comes back close to where it started.
+
+::: {.figure src="golden-rotation"}
+**The golden word codes the golden rotation.** The phase circle is drawn as the equator of a ball, and each step turns it about the vertical axis by $1/\varphi$ (the arrow from $x_0$ to $x_1$). With $n = 1$ the cut point $1 - \{1/\varphi\} = 1/\varphi^2$ splits the circle in two: a phase in the cyan piece gives $g(i) = \mathtt{a}$, a phase in the magenta piece $g(i) = \mathtt{b}$; the dots $x_0, \dots, x_7$ read $\mathtt{abaababa}$ in turn.
+:::
 
 A finite cyclic window is restored exactly after one full loop (trureturing calls this a revival; see the `CyclicWindowRevival` module). The golden rotation is never restored exactly: after $q$ steps its distance from the start is the distance $\norm{q\varphi}$ from $q\varphi$ to the nearest integer, which is not $0$ for any $q \ge 1$. Along Fibonacci times, [`fibonacci_golden_residual`](lean:D5/S1/Scale/FibonacciErrorRatio.fibonacci_golden_residual) gives the exact residual
 
@@ -154,6 +162,10 @@ The table gives the values for $n = 1, \dots, 12$; $1/\sqrt5 \approx 0.4472136$.
 | 10 | 55 | 89 | 0.008131 | 0.447184 | −0.000030 |
 | 11 | 89 | 144 | 0.005025 | 0.447225 | +0.000011 |
 | 12 | 144 | 233 | 0.003106 | 0.447209 | −0.000004 |
+
+::: {.figure src="revival-log"}
+**Waiting and error trade off.** On a logarithmic vertical axis the cyan waiting time $F_n$ and the magenta error $\varphi^{-n}$ are straight lines of opposite slope; the row of dots between them is their product, the score, alternating about the green dashed line at $1/\sqrt5$ and closing in on it ([@thm-revival-score]).
+:::
 
 ::: {.problem #prob-revival-spectrum title="The full revival spectrum"}
 [@thm-revival-score] covers only the subsequence of Fibonacci times. Two places in trureturing say what remains unresolved:

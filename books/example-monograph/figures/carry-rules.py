@@ -5,7 +5,7 @@ Rule names are Lean identifiers and stay as they are in both editions. The two l
 the only rules with a charge: +1 in cyan (a positive difference), −1 in magenta (a negative one).
 """
 
-SIZE = (440, 356)
+SIZE = (420, 356)
 ALT = {
     "zh": "四行，每行一条进位规则：adjacent 把相邻的 1、1 改写成高一位的 1（电荷 0）；double_zero 把最低位的 2 改写成高一位的 1（电荷 +1）；"
           "double_one 把次低位的 2 改写成两侧各一个 1（电荷 −1）；double_succ 把一般位置的 2 改写成低两位与高一位各一个 1（电荷 0）。",

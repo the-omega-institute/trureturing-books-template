@@ -35,3 +35,8 @@ order = ["example-monograph", "example-primer"]
 # template's example books without deleting them, so that merging template changes with git never conflicts
 # over them.
 hide = []
+
+[figures]
+# 静态图在手机上（正文栏宽 358 px）最小的标签不到 10 px 时："warning"（默认）或 "error"（check 与 fig build 失败）。
+# A static figure whose smallest label is under 10 px on a phone (a 358 px text column): "warning" (default) or "error".
+# phone_labels = "warning"

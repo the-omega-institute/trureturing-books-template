@@ -103,6 +103,27 @@ let longest = 0; for (let a = 0; a <= 987; a++) for (let b = a; b <= 987; b += 1
 check('no sampled pair below 988 needs more than 50 carries', longest === 50, String(longest));
 check('a card that plays starts its rail from the beginning when clicked', st.playing || st.t < st.max, JSON.stringify([st.playing, st.t]));
 
+/* ---------- the keyboard after a click: Space runs the clock; a card reached with Tab still answers Space ---------- */
+const focused = () => D(() => { const a = document.activeElement; return { preset: a.dataset.preset || null, scene: a.dataset.scene || null, stage: a.id === 'stage', ring: a.matches(':focus-visible') && getComputedStyle(a).outlineStyle !== 'none' }; });
+await pick('long'); st = await state();
+await page.keyboard.press(' '); let st2 = await state();
+check('right after LONGEST is clicked, Space pauses its carries instead of pressing the card again', st.playing && !st2.playing && st2.preset === 'long' && st2.t >= st.t, JSON.stringify([[st.playing, st.t], [st2.playing, st2.t, st2.preset]]));
+await page.keyboard.press(' '); st = await state();
+check('and Space again plays on from there', st.playing && st.preset === 'long' && st.t >= st2.t, JSON.stringify([st.playing, st.t]));
+let f = await focused();
+check('a pointer click on a card hands the focus to the stage, which draws no focus ring even after keys', f.stage && !f.ring, JSON.stringify(f));
+await scene('map'); st = await state();
+await page.keyboard.press(' '); st2 = await state();
+check('right after a scene chip is clicked, Space plays or pauses the clock, and the scene stays', st2.playing !== st.playing && st2.scene === 'map' && (await focused()).stage, JSON.stringify([st.playing, st2.playing, st2.scene]));
+if (st2.playing) await page.keyboard.press(' ');
+await page.focus('[data-preset="plus"]'); await page.keyboard.press('Tab'); f = await focused();
+check('Tab moves from one card to the next', f.preset === 'minus', JSON.stringify(f));
+await page.keyboard.press(' '); await settle(page, 60); st = await state(); f = await focused();
+check('a card reached with Tab is pressed by Space and keeps the focus', st.preset === 'minus' && st.v1 === 2 && f.preset === 'minus', JSON.stringify([st.preset, f]));
+await page.keyboard.press('Tab'); await page.keyboard.press('Enter'); await settle(page, 60); st = await state(); f = await focused();
+check('the next card is pressed by Enter and keeps the focus', st.preset === 'cancel' && st.v1 === 6 && f.preset === 'cancel', JSON.stringify([st.preset, f]));
+await D(() => document.activeElement.blur());
+
 /* ---------- many pairs: digits, β, the carry run, the signed count, the Beatty form ---------- */
 const pairs = [[0, 0], [0, 5], [1, 1], [2, 2], [6, 6], [17, 17], [88, 88], [609, 609], [986, 986], [987, 987], [987, 0], [500, 377]];
 let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed; };

@@ -62,6 +62,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 | `[trureturing] repo`、`branch` | 形式化仓库；`./tbook pin` 跟随、`./tbook check` 核对的分支（默认 `dev`） |
 | `[books] order` | 书库首页的顺序；未列出的书按目录名排在后面 |
 | `[books] hide` | 隐藏的书：glob 模式的列表，默认 `[]`（不隐藏）；书库用 `["example-*"]` 隐藏模板附带的示例书 |
+| `[figures] phone_labels` | 静态图在手机上的最小标签不到 10 px 时的级别：`"warning"`（默认）或 `"error"`（`./tbook check` 与 `./tbook fig build` 失败）；其他值报错（§4 第 7 项） |
 
 `[books] hide` 的每一项是非空字符串，按 Python 的 `fnmatch.fnmatchcase` 与书的目录名（slug）匹配：`*`、`?`、`[seq]`、`[!seq]`，区分大小写；类型不对时 `site.toml` 报错。被隐藏的书仍留在 `books/` 中，但所有命令与产物都当它不存在，这样从模板创建的书库不必删除示例书，以后用 git 合并模板改动时就不会因示例书冲突（`docs/UPGRADING.md` §6）：
 
@@ -168,7 +169,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 4. 交叉引用 `[@id]`（正文与环境标题中）指向本版本存在的编号环境。
 5. 多语言对齐：各版本章节文件与顺序相同；每章环境序列（种类、id、Lean 引用）与媒体序列逐条相同；SUMMARY 结构（前言/编号/附录章节、嵌套、草稿条目）一致，使同一章在各语言中编号相同。
 6. Lean：每个被引用的 GID 都在锁文件中；形式结论引用的必须是 `theorem`；在锁定提交上重新读取冻结状态片，名称、种类、模块、`statement_id` 与锁文件一致（防止锁文件过期或被手改）；所钉提交可从 `site.toml` 的 trureturing 分支到达（本地 checkout 用 `git merge-base --is-ancestor`，否则用 GitHub compare API；无法判定时 GitHub Actions 中为错误，本地或 `--offline` 下为警告）；锁文件的 `branch` 与该分支相同，且该分支是分支名而不是 SHA 或 `refs/…`（错误）；未被引用的锁条目（警告；`--book` 时也计入其他书的引用）。
-7. 媒体：`tbook.viz/film/slides/figure.check(book)` 与 `check_ref(book, src)`。静态图：脚本不能运行、提交的 `figures/<name>.<lang>.svg` 与脚本现在画出的不一致或缺失（错误，`./tbook fig build`）；没有脚本的 `figures/*.svg`、没有任何章节引用的图（`check.check_unused_figures`）（警告）；`.figure` 块没有图注，或图注、图片说明（`![…](x.svg)`）只是编号（`figure.caption_problem`，错误）；`assets/` 下没有被任何语言的章节链接、文件名也不出现在本书幻灯片、视频、可视化源文件中的文件（`check.check_unused_assets`，警告）；各语言版本同一章的图片（`![…](…)`）张数不同（`check.check_image_parity`，警告；图片可以是各语言自己的文件，所以只比张数，`.figure` 块则逐条比对）。
+7. 媒体：`tbook.viz/film/slides/figure.check(book)` 与 `check_ref(book, src)`。静态图：脚本不能运行、提交的 `figures/<name>.<lang>.svg` 与脚本现在画出的不一致或缺失（错误，`./tbook fig build`）；没有脚本的 `figures/*.svg`、没有任何章节引用的图（`check.check_unused_figures`）（警告）；`.figure` 块没有图注，或图注、图片说明（`![…](x.svg)`）只是编号（`figure.caption_problem`，错误）；`assets/` 下没有被任何语言的章节链接、文件名也不出现在本书幻灯片、视频、可视化源文件中的文件（`check.check_unused_assets`，警告）；各语言版本同一章的图片（`![…](…)`）张数不同（`check.check_image_parity`，警告；图片可以是各语言自己的文件，所以只比张数，`.figure` 块则逐条比对）；用图片语法引用、位于 `assets/`、写死颜色（有 `fill`/`stroke`/`stop-color`/`color` 的色值，却既没有 `ts-`/`tf-` 角色类也没有 `prefers-color-scheme`）的 SVG，以及被两种以上语言的章节共用、含 `<text>` 的 SVG（`check.check_drawn_images`，警告；位图不报）；图在手机上的最小标签：取提交的各语言 SVG 中最小的数值 `font-size`（上下标的 `72%` 随所在标签，不另计），乘以 `min(1, 358 / 宽度)`（`WRAP = True` 的分栏图取最宽一栏），低于 10 px（`figure.phone_problem`，默认警告，`[figures] phone_labels` 可升为错误；`./tbook fig build` 同样报出，`./tbook fig list` 列出该值）；三块以上 `.figure`/`.viz`/`.film`/`.slides` 在同一层只隔着空行或 HTML 注释连排（`check.check_media_runs`，警告，报在第三块）。
 8. 主题：`theme/generated/*` 与 `tokens.json` 同步（`./tbook theme --check`）；幻灯片的打印背景图 `theme/slides/styles/backdrop.jpg` 与 `backdrop.css`、`tokens.css` 同步（`./tbook theme --check` 与 `slides-check` 核对指纹）。
 9. 缓存：`.cache/` 下的文件不得提交入库，`.cache` 本身（例如符号链接）也不得提交（错误；缓存只在本地可信；`git ls-files` 查询字面路径 `.cache`，不解析符号链接）。
 
