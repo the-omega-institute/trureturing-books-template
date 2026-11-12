@@ -144,6 +144,7 @@ await page.evaluate(() => SC.park());
 const parked = await page.evaluate(() => ({ parked: SC.parked(), gl: !!SC.el.querySelector('canvas.solid-gl'), still: getComputedStyle(document.getElementById('cv')).visibility }));
 const still = await grab();
 await page.evaluate(() => PAINT.now());
+await settle(page);
 const again = await grab();
 const md = (a, b) => a.reduce((s, x, i) => s + Math.abs(x - b[i]), 0) / a.length;
 out('parking gives the WebGL context back and leaves the frame on the 2D canvas', parked.parked && !parked.gl && parked.still === 'visible' && md(before, still) < 2, `${JSON.stringify(parked)}, mean |Δ| ${md(before, still).toFixed(2)}`);

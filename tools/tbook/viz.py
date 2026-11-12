@@ -240,12 +240,15 @@ def _attr(tag: str, name: str) -> str | None:
 
 
 def pinned_refs(page_html: str) -> list[tuple[str, str]]:
-    """``("gid", GID)`` / ``("path", repo path)`` for every ``<a data-lean-gid>`` / ``<a data-trureturing-path>``."""
+    """``("gid", GID)`` / ``("frozen", GID)`` / ``("path", repo path)`` for every ``<a data-lean-gid>`` / ``<a data-frozen-gid>`` / ``<a data-trureturing-path>``."""
     out = []
     for m in _A_TAG_RE.finditer(page_html):
         gid = _attr(m.group(0), "data-lean-gid")
         if gid is not None:
             out.append(("gid", gid))
+        frozen = _attr(m.group(0), "data-frozen-gid")
+        if frozen is not None:
+            out.append(("frozen", frozen))
         p = _attr(m.group(0), "data-trureturing-path")
         if p is not None:
             out.append(("path", p))
@@ -264,7 +267,7 @@ def lean_url(lock: lean.Lock | None, gid: str) -> str:
 
 
 def pin_links(page_html: str, lock: lean.Lock | None) -> str:
-    """Point ``<a data-lean-gid>`` / ``<a data-trureturing-path>`` hrefs at the pinned commit.
+    """Point ``<a data-lean-gid>`` / ``<a data-frozen-gid>`` / ``<a data-trureturing-path>`` hrefs at the pinned commit.
 
     Mirrors ``pinLinks`` in tools/node/viz-common.mjs (the local preview server applies the same rewrite).
     """
@@ -273,7 +276,8 @@ def pin_links(page_html: str, lock: lean.Lock | None) -> str:
 
     def repl(m: re.Match) -> str:
         tag = m.group(0)
-        gid, p = _attr(tag, "data-lean-gid"), _attr(tag, "data-trureturing-path")
+        gid = _attr(tag, "data-lean-gid") or _attr(tag, "data-frozen-gid")
+        p = _attr(tag, "data-trureturing-path")
         url = lean_url(lock, gid) if gid is not None else trureturing_url(lock, p) if p is not None else ""
         if not url:
             return tag
@@ -321,7 +325,7 @@ def cited_gids(book) -> list[tuple[Path, int, str]]:
         page = book.viz_dir / vid / "index.html"
         if ID_RE.match(vid) and page.exists():
             for kind, value in pinned_refs(page.read_text(encoding="utf-8")):
-                if kind == "gid":
+                if kind in {"gid", "frozen"}:
                     out.append((page, 0, value))
     return out
 
@@ -711,17 +715,18 @@ def check_page(book, vid: str, page: Path, ids: set[str], *, lock=None, ledger=N
         issues.append(Issue("warning", script if where == "main.js" else page, line, okmark_message(where, line)))
     for kind, value in pinned_refs(text):
         line = text.count("\n", 0, text.find(value)) + 1 if value else 0
-        if kind == "gid":
+        if kind in {"gid", "frozen"}:
+            attr = "data-lean-gid" if kind == "gid" else "data-frozen-gid"
             try:
                 lean.parse_gid(value)
             except lean.LeanError:
-                err(line, f'data-lean-gid="{value}" is not a declaration GID')
+                err(line, f'{attr}="{value}" is not a declaration GID')
                 continue
             res = lock.get(value) if lock is not None else None
             if lock is not None and res is None:
-                err(line, f'data-lean-gid="{value}" is not in trureturing.lock.json; cite it in a chapter and run ./tbook pin --refresh'
+                err(line, f'{attr}="{value}" is not in trureturing.lock.json; cite it in a chapter and run ./tbook pin --refresh'
                     + config.unhide_hint(book.slug))
-            elif res is not None and res.kind not in lean.FORMAL_KINDS:
+            elif kind == "gid" and res is not None and res.kind not in lean.FORMAL_KINDS:
                 err(line, f'data-lean-gid="{value}" names a Lean {res.kind}, not a theorem; data-lean-gid cites verified '
                           'theorems (LEAN ✓); link a definition with data-trureturing-path="<module>.lean"')
         else:

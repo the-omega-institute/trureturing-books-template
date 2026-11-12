@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "241ca7a7c1d11105540f935446c3d98771f00ddfe8a80c8dcbcfdf763e85192c",
+      "sha256": "8d5e9ed67f1f141018eac7e8536e12f059447d4744281773d69acb53da60af39",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -132,7 +132,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "d633cb681b810404beddec77192aa2ba6805647f8ffdee1f61acde0529e4e77f",
+      "sha256": "e52b735c4b1b6e299684bce3151bd7b3083990dcec83065ae535c79918da5f0a",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -224,7 +224,7 @@
       "mode": "100644"
     },
     "templates/viz/README.md": {
-      "sha256": "33146888ba5c09a00dbe162c67a23b4e0969a2667a20769807acdf77ff4605de",
+      "sha256": "f87b7d4fec988c88f3aeb52a71b15072d9ab08e55ce914855d79badd9be3fd04",
       "mode": "100644"
     },
     "templates/viz/index.html": {
@@ -508,19 +508,19 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "a6854827f7db0337cb0f90c3da2750125fecae213da70cf4651c04a0eae5e428",
+      "sha256": "46773dd90771f377e531f8332b5fe902b803f1c2c73b87d37c25d2d6074106d0",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
-      "sha256": "07e1b0e1ee381d2d38e233cd9851f2bd229fef4940c8a1f25431a8526b9f6613",
+      "sha256": "eb1438bf51f275a145de66dafd2255253484732a640cfb509651cace76202b2f",
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
-      "sha256": "ceae4a0392c063c87dc9e84a9c99115d5e2059aa0334015c0ce19f32dd678ea0",
+      "sha256": "a057ca8a5d99816687c4d0cf89a0750cce22c5a373901ba37193b885f80d7c55",
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "3e6cf067c2275c54fcfd3a451cebeb4de5fa427a9432c60a55c0a9674c45e834",
+      "sha256": "2d7b45209ffce8c9e735c8b0e7e4c07f95a8e47b795b0743c6dc93c9f861176a",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -576,7 +576,7 @@
       "mode": "100644"
     },
     "tools/filters/typst-compat.lua": {
-      "sha256": "5a236b1bb7d028afb78d09cd37677f31b4b75414efd538404e2d290d07fba0ed",
+      "sha256": "5ae739b663190c1d20ca877e85acb1975d677412e93ff4ecb0e41c2ac4b0a4dd",
       "mode": "100644"
     },
     "tools/install-tectonic.sh": {
@@ -628,7 +628,7 @@
       "mode": "100644"
     },
     "tools/node/viz-common.mjs": {
-      "sha256": "d0c954eb47db7b85c3e0101ac446e69add2ac3803810f3a98631178a4f02ab3c",
+      "sha256": "3a3011b40f2fd395c6ab671052ce588f1b609d1e91f09001729090e53427566e",
       "mode": "100644"
     },
     "tools/node/viz-new.mjs": {
@@ -640,7 +640,7 @@
       "mode": "100644"
     },
     "tools/node/viz-shots.mjs": {
-      "sha256": "e7149b57b9420c37420964a09e765eefe7e055ee78e1a28b1dde444b93ba4331",
+      "sha256": "40d66001e0728c15e55f31535c404ed35ce50b904f3ea1d805072da3c90a9dc1",
       "mode": "100644"
     },
     "tools/node/viz-test.mjs": {
@@ -648,7 +648,7 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "aafb1c033dc477547219b9da8b92f1ea340c6c4c7f50400d0bd5130b28b45875",
+      "sha256": "cbb5042d95d6c3947b68132c281950f15c99676b2cac64ce5089f33c8a4beaaf",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
@@ -656,7 +656,7 @@
       "mode": "100644"
     },
     "tools/node/viz-validate.mjs": {
-      "sha256": "664c5857534d8779d7914be8c3905e363bad9d627c3200560f36d726a4107b6d",
+      "sha256": "454f801374b34fa260e6f890839bc173c5e491a432736c268404da70733a9450",
       "mode": "100644"
     },
     "tools/tbook/__init__.py": {
@@ -788,7 +788,7 @@
       "mode": "100644"
     },
     "tools/tbook/viz.py": {
-      "sha256": "90d192d9de5af6914f63c593bfe267c85b99409b25441eaa8e33011432811c34",
+      "sha256": "96a5bfbce71dc4a4f91b09c87b98dda26b8d4affeeb938a879362459e3764237",
       "mode": "100644"
     },
     "tools/tests/example_support.py": {
@@ -800,7 +800,7 @@
       "mode": "100644"
     },
     "tools/tests/solid_harness.mjs": {
-      "sha256": "f666564e85d637b63f2226bba7592ab0e3672d790bc769bc687a8cecf6b04f5d",
+      "sha256": "eb359a9fe5915a4605d1eb0919b0678087bcc97148b4d4513abd0428dc1a0e6d",
       "mode": "100644"
     },
     "tools/tests/test_academic.py": {
@@ -892,7 +892,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {
-      "sha256": "fcbd918aadb95f6f4dabf3f7613aa5dc4ff2dad05e343251dd1cb81f9a761fa0",
+      "sha256": "adf0fcd8e74c4815240ad79d5e98e9342a6c3c78aa0a28923f8945a3bcd689fc",
       "mode": "100644"
     },
     "tools/tests/test_pin_sources.py": {
@@ -928,11 +928,19 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "d31110880e6c7ae3059f561ce5f7161944720151a4225109e61492fef1377bc8",
+      "sha256": "9f8235a3954cbb12efc84cf8502be295cacf4279e7e8031f1d1a24c88dee6731",
+      "mode": "100644"
+    },
+    "tools/tests/test_viz_runtime.py": {
+      "sha256": "9cd1b9f9307418393468d27d43d9e0c5b2f67289ad86f59f501142e44d68d350",
       "mode": "100644"
     },
     "tools/tests/test_viz_solid.py": {
       "sha256": "f5b68e8cdd2e341e64635837e38b8083abfc6e8fc62dce99003e876bb9d427da",
+      "mode": "100644"
+    },
+    "tools/tests/viz_runtime_harness.mjs": {
+      "sha256": "5993686c6ed5c0b7f155fc1a6792c41c885a9b80c9bd7484c583fa501520d2ce",
       "mode": "100644"
     }
   }

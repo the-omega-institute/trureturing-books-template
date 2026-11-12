@@ -223,10 +223,11 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
       const js = path.join(dir, 'main.js');
       for (const o of okmarksOutsideLean(html, fs.existsSync(js) ? fs.readFileSync(js, 'utf8') : '')) warn(o.where === 'main.js' ? js : page, OKMARK_MESSAGE(o.where, o.line));
       for (const r of pinnedRefs(html)) {
-        if (r.kind === 'gid') {
-          if (!parseGid(r.value)) err(page, `data-lean-gid="${r.value}" is not a declaration GID`);
-          else if (lock && !(lock.declarations || {})[r.value]) err(page, `data-lean-gid="${r.value}" is not in trureturing.lock.json; cite it in a chapter and run ./tbook pin --refresh${unhideHint(book.slug)}`);
-          else if (lock && !FORMAL_KINDS.includes(lock.declarations[r.value].kind)) err(page, `data-lean-gid="${r.value}" names a Lean ${lock.declarations[r.value].kind}, not a theorem; data-lean-gid cites verified theorems (LEAN ✓); link a definition with data-trureturing-path="<module>.lean"`);
+        if (r.kind === 'gid' || r.kind === 'frozen') {
+          const attr = r.kind === 'gid' ? 'data-lean-gid' : 'data-frozen-gid';
+          if (!parseGid(r.value)) err(page, `${attr}="${r.value}" is not a declaration GID`);
+          else if (lock && !(lock.declarations || {})[r.value]) err(page, `${attr}="${r.value}" is not in trureturing.lock.json; cite it in a chapter and run ./tbook pin --refresh${unhideHint(book.slug)}`);
+          else if (r.kind === 'gid' && lock && !FORMAL_KINDS.includes(lock.declarations[r.value].kind)) err(page, `data-lean-gid="${r.value}" names a Lean ${lock.declarations[r.value].kind}, not a theorem; data-lean-gid cites verified theorems (LEAN ✓); link a definition with data-trureturing-path="<module>.lean"`);
         } else if (!r.value || r.value.includes('..') || r.value.startsWith('/')) err(page, `data-trureturing-path="${r.value}" must be a repository-relative path`);
       }
     }

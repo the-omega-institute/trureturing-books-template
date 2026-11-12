@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Review screenshots of a book-local visualization, for looking at the page the way a reader will see it:
 //   node tools/node/viz-shots.mjs <book> <id> [more ids] [--out DIR] [--lang zh|en|both] [--views desk,embed,phone,thumb]
-//                                             [--do "<js>"] [--wait MS] [--name SUFFIX]
+//                                             [--do "<js>"] [--wait MS] [--name SUFFIX] [--width PX] [--height PX] [--preset CARD]
 // Writes PNG files to DIR (default build/viz-shots/<book>/):
 //   <id>-desk-<lang>.png    1440×900   the full page
 //   <id>-embed-<lang>.png   740×620    ?embed=1, the first screen of the iframe inside a chapter
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, resolveBook, readRegistry, chromiumOptions, loadChromium, rel } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
-import { routeLocalFonts } from './viz-testkit.mjs';
+import { routeLocalFonts, settle } from './viz-testkit.mjs';
 
 const VIEWS = {
   desk: { width: 1440, height: 900, query: '' },
@@ -24,20 +24,26 @@ const VIEWS = {
   thumb: { width: 1280, height: 720, query: 'thumb=1', once: true }
 };
 const args = process.argv.slice(2);
-const opt = { out: null, lang: 'both', views: Object.keys(VIEWS), do: null, wait: 700, name: '' };
+const opt = { out: null, lang: 'both', views: Object.keys(VIEWS), do: null, wait: 700, name: '', width: null, height: null, preset: null };
 const rest = [];
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === '--out') opt.out = args[++k];
   else if (a === '--lang') opt.lang = args[++k];
   else if (a === '--views') opt.views = String(args[++k] || '').split(',').filter(Boolean);
+  else if (a === '--width' || a === '--height') opt[a.slice(2)] = Number(args[++k]);
+  else if (a === '--preset') opt.preset = args[++k];
   else if (a === '--do') opt.do = args[++k];
   else if (a === '--wait') opt.wait = Number(args[++k]) || 0;
   else if (a === '--name') opt.name = args[++k] || '';
-  else if (a === '-h' || a === '--help') { console.log('usage: node tools/node/viz-shots.mjs <book> <id> [ids…] [--out DIR] [--lang zh|en|both] [--views desk,embed,phone,thumb] [--do "<js>"] [--wait MS] [--name SUFFIX]'); process.exit(0); }
+  else if (a === '-h' || a === '--help') { console.log('usage: node tools/node/viz-shots.mjs <book> <id> [ids…] [--out DIR] [--lang zh|en|both] [--views desk,embed,phone,thumb] [--do "<js>"] [--wait MS] [--name SUFFIX] [--width PX] [--height PX] [--preset CARD]'); process.exit(0); }
   else rest.push(a);
 }
 if (!rest.length) { console.error('usage: node tools/node/viz-shots.mjs <book> <id> [ids…]   (see the header of this file)'); process.exit(2); }
+for (const key of ['width', 'height']) if (opt[key] !== null && (!Number.isInteger(opt[key]) || opt[key] <= 0)) {
+  console.error(`--${key} must be a positive integer`); process.exit(2);
+}
+if (opt.preset !== null && !/^[A-Za-z0-9][\w-]*$/.test(opt.preset || '')) { console.error('--preset must name an experiment card'); process.exit(2); }
 let book;
 try { book = resolveBook(rest[0]); } catch (e) { console.error(e.message); process.exit(2); }
 const known = (readRegistry(book).visualizations || []).map((v) => v.id);
@@ -54,7 +60,7 @@ const browser = await chromium.launch(chromiumOptions());
 let failures = 0;
 try {
   for (const id of ids) for (const view of opt.views) {
-    const V = VIEWS[view];
+    const V = { ...VIEWS[view], width: opt.width || VIEWS[view].width, height: opt.height || VIEWS[view].height };
     for (const lang of V.once ? ['zh'] : langs) {
       const context = await browser.newContext({ viewport: { width: V.width, height: V.height }, deviceScaleFactor: 1, locale: lang === 'zh' ? 'zh-CN' : 'en-US', reducedMotion: view === 'thumb' ? 'reduce' : 'no-preference' });
       await routeLocalFonts(context, origin);
@@ -62,9 +68,10 @@ try {
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-      await page.goto(vizUrl(origin, book.slug, id, `?${[V.query, `lang=${lang}`].filter(Boolean).join('&')}`), { waitUntil: 'load' });
+      await page.goto(vizUrl(origin, book.slug, id, `?${[V.query, `lang=${lang}`, opt.preset ? `preset=${encodeURIComponent(opt.preset)}` : ''].filter(Boolean).join('&')}`), { waitUntil: 'load' });
       await page.evaluate(() => document.fonts && document.fonts.ready);
-      await page.waitForTimeout(500);
+      await settle(page);
+      if (opt.preset && !(await page.locator(`[data-preset="${opt.preset}"]`).count())) throw new Error(`no experiment card "${opt.preset}"`);
       if (view === 'thumb') {
         await page.evaluate(() => {
           if (!document.querySelector('[data-thumb]')) { const s = document.querySelector('.stage'); if (s) s.setAttribute('data-thumb', ''); }
@@ -74,8 +81,8 @@ try {
       } else if (opt.do) {
         try { await page.evaluate(opt.do); } catch (e) { errors.push(`--do: ${e.message}`); }
       }
-      await page.waitForTimeout(opt.wait);
-      const file = path.join(outDir, `${id}-${view}${V.once ? '' : `-${lang}`}${opt.name ? `-${opt.name}` : ''}.png`);
+      await settle(page, opt.wait);
+      const file = path.join(outDir, `${id}-${view}${V.once ? '' : `-${lang}`}${opt.preset ? `-${opt.preset}` : ''}${opt.width ? `-w${V.width}` : ''}${opt.height ? `-h${V.height}` : ''}${opt.name ? `-${opt.name}` : ''}.png`);
       await page.screenshot({ path: file, fullPage: !!V.fullPage });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       const notes = [];

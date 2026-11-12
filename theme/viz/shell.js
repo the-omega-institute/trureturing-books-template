@@ -75,6 +75,27 @@
     document.querySelectorAll('[data-lang-set]').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.langSet)));
   });
 
+  // Reserve the actual HUD height on narrow stages. Canvas and tag coordinates share the remaining box.
+  document.addEventListener('DOMContentLoaded', () => {
+    const update = (stage) => {
+      const flow = getComputedStyle(stage).getPropertyValue('--hud-flow').trim() === '1';
+      const r = stage.getBoundingClientRect();
+      const huds = [...stage.children].filter((e) => e.matches('.hud-tl, .hud-tr') && e.getClientRects().length);
+      const top = flow && huds.length ? Math.ceil(Math.max(...huds.map((e) => e.getBoundingClientRect().bottom)) - r.top - stage.clientTop + 8) : 0;
+      const value = `${top}px`;
+      if (stage.style.getPropertyValue('--stage-top') === value) return;
+      stage.style.setProperty('--stage-top', value);
+      stage.toggleAttribute('data-hud-flow', top > 0);
+      window.dispatchEvent(new Event('resize'));
+    };
+    document.querySelectorAll('.stage').forEach((stage) => {
+      const ro = new ResizeObserver(() => update(stage));
+      ro.observe(stage);
+      stage.querySelectorAll('.hud-tl, .hud-tr').forEach((e) => ro.observe(e));
+      update(stage);
+    });
+  });
+
   /* ---------- colours: read from the --tr-* design tokens (tokens.css), never duplicated here ---------- */
   function css(name) {
     try { return getComputedStyle(root).getPropertyValue(name).trim(); } catch (e) { return ''; }

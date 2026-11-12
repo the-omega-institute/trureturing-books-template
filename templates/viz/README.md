@@ -25,9 +25,19 @@ The finished example is `books/example-monograph/viz/golden-carry/`: the same la
 
 ## 实体舞台 · Lit solids
 
-对象本身是面或体、画成受光的实体确实更清楚时（带、环面、多面体、可行域、球里有东西的布洛赫球），在舞台上调用 `TRV.kit.solid(stage, { canvas, onChange: paint, … })`；它不是统一风格，曲线、格点、矩阵、记号串照旧。页面不多加载任何脚本：`kit.js` 在第一次调用时才取造型核心 `assets/solid-core.js` 与它导入的、`assets/vendor/` 里钉版的 three.js，所以页面契约不变（两者都是运行时自己的文件，`vendor/` 不做语法检查）。用法、取舍与测试（`stageFirstChecks(…, { solid: true })`）见 `skills/book-viz/SKILL.md` 的“具象”一节；成品示例是 `books/example-monograph/viz/phase-torus/`。
+对象本身是面或体、画成受光的实体确实更清楚时（带、环面、多面体、可行域、球里有东西的布洛赫球），在舞台上调用 `TRV.kit.solid(stage, { canvas, onChange: paint, … })`；它不是统一风格，曲线、格点、矩阵、记号串照旧。页面不多加载任何脚本：`kit.js` 在第一次调用时才取造型核心 `assets/solid-core.js` 与它导入的、`assets/vendor/` 里钉版的 three.js，所以页面契约不变（两者都是运行时自己的文件，`vendor/` 不做语法检查）。用法、取舍与测试（`stageFirstChecks(…, { solid: true })`）见 `skills/book-viz/SKILL.md` 的“具象”一节；成品示例见[上游模板的 phase-torus 源码](https://github.com/the-omega-institute/trureturing-books-template/tree/main/books/example-monograph/viz/phase-torus)（示例书不随模板升级下发）。
 
-When the object itself is a surface or a body and a lit solid makes it clearer, call `TRV.kit.solid(stage, { canvas, onChange: paint, … })` on the stage; it is one more option, not a house style. The page loads no extra script: `kit.js` fetches the modelling core `assets/solid-core.js`, and with it the pinned three.js from `assets/vendor/`, on the first call, so the page contract is unchanged. See the section on solids in `skills/book-viz/SKILL.md`; the finished example is `books/example-monograph/viz/phase-torus/`.
+When the object itself is a surface or a body and a lit solid makes it clearer, call `TRV.kit.solid(stage, { canvas, onChange: paint, … })` on the stage; it is one more option, not a house style. The page loads no extra script: `kit.js` fetches the modelling core `assets/solid-core.js`, and with it the pinned three.js from `assets/vendor/`, on the first call, so the page contract is unchanged. See the section on solids in `skills/book-viz/SKILL.md`; the finished example is [phase-torus in the upstream template](https://github.com/the-omega-institute/trureturing-books-template/tree/main/books/example-monograph/viz/phase-torus), whose book content is not distributed by template updates.
+
+混合页面每帧用 `sc.active(是否实体卡)` 切换实体与原二维画布，二维叠加层用 `sc.overlay()`，不再自行交还上下文或清理实体标签。`surface` / `poly` / `tube` 支持 `pick: false` 与 `occlude`，半透明对象默认不挡标记；`surface` 的 `alpha(u,v)`、`tube` 的 `alpha(t)` 可逐顶点渐隐。`sc.circle(c, normal, r, s)` 画大圆或纬线，后半圈默认变淡。首帧准备与上下文恢复用 `await settle(page)` 等待；质量门用 `{ solid: { preset: 'torus' } }` 指定实体卡，默认尝试两个转动方向，书内静止检查暂停共享时钟，无需播完整条时间轴。
+
+For a mixed page, call `sc.active(isSolidCard)` each frame to switch between the solid and the original 2D canvas; use `sc.overlay()` for an independent 2D layer. Transparent surfaces, polyhedra and tubes leave marks visible by default; `pick: false` lets picking rays pass, and `occlude` overrides hiding. Surface `alpha(u,v)` and tube `alpha(t)` support vertex opacity, and `sc.circle(c, normal, r, s)` draws spherical circles with a dim rear half. Await `settle(page)` for first-frame preparation and context restoration. Select a solid card with `{ solid: { preset: 'torus' } }`; the gate tries both turn directions and pauses shared clocks for its resting check.
+
+## 绘图、标签与窄屏
+
+`st.path` 与实体 `line` 的虚线沿投影弧长连续；二维箭头用 `g.arrow([x0,y0], [x1,y1], {color, width, headSize, head})`，箭头头部按屏幕像素计。图例墨色用 `.sw.ik`；标签衬底用 `.tag.backed`，`.tag.num.c-cy` 等组合保留指定颜色。共享主题保持数学、标题与卡代号的源码大小写，质量门检查希腊小写字母被 CSS 大写的问题。760 px 以内 `.hud-tl`、`.hud-tr` 各占一行，绘图区自动让出它们的实际高度。
+
+Dashes follow projected arc length regardless of sampling density. `g.arrow(a,b,styles)` gives 2D plots a screen-sized arrowhead. Use `.sw.ik` for ink, `.tag.backed` for a label background, and `.tag.num.c-cy` to keep a numeric label's colour. Source case is preserved; the gate catches CSS that uppercases Greek variables. Narrow stages stack the two HUD blocks and reserve their measured height above the drawing.
 
 ## 注册表 · Registry (`books/<book>/viz/visualizations.json`)
 
@@ -76,6 +86,8 @@ When the object itself is a surface or a body and a lit solid makes it clearer, 
   <div class="lean"><span class="ok">LEAN ✓</span><span><span class="zh">陈述，与 Lean 一致。已冻结：</span><span class="en">The statement, as in Lean. Frozen: </span><a class="leanref" data-lean-gid="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" href="https://github.com/the-omega-institute/trureturing/blob/dev/D5/S1/Deficit/DeficitThreeValued.lean" target="_blank" rel="noopener"><code>deficit_three_valued</code></a></span></div>
   ```
 
+  已冻结但未由正文定理环境引用的声明，用中性 `<div class="lean frozen">`，标签 `FROZEN`，链接 `<a data-frozen-gid="<GID>" href="#">`；`pin --refresh` 收集它，两个校验器核对锁文件，构建与预览固定到声明行；不加入绿色 `lean` 清单。A frozen declaration outside the book's theorem environments uses a neutral `.lean.frozen` box with `FROZEN` and a `data-frozen-gid` link, checked and pinned without a green theorem badge.
+
   只有 Lean 已验证的定理用绿色 `LEAN ✓`；页面计算用 `.lean.num`（NUM）；示意模型与诠释 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。
 - 颜色只来自令牌：CSS 用 `var(--cyan)` 等（映射到 `--tr-*`），脚本用 `TRV.palette` / `TRV.rgb`。琥珀色只给“现在/当前选择”。
 - 运行模式（`shell.js` 按网址设置，页面不必自己解析）：
@@ -111,6 +123,7 @@ With `preset` the chapter shows one card as a figure that does not scroll inside
 
 ```bash
 node tools/node/viz-server.mjs                 # local preview at http://127.0.0.1:8766/site/<book>/viz/
+node tools/node/viz-shots.mjs <book> <id> --views embed --width 430 --height 620 --preset torus  # 指定视口和卡；文件名带宽高
 node tools/node/viz-shots.mjs <book> <id>      # review screenshots (desktop, in-book frame, phone, cover) → build/viz-shots/
 node tools/node/viz-validate.mjs [book]        # registry + page contract + links + JS syntax
 node tools/node/viz-test.mjs [book] [--shard i/n] [--slow]   # browser suites books/*/viz/tests/*.test.mjs (--slow: a frame a second)

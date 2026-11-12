@@ -50,6 +50,8 @@ export async function settle(page, ms = 0) {
     if (!kit) return;
     if (kit.ready) await kit.ready();          // three.js for kit.solid, fetched on its first call
     if (kit.flush) kit.flush();
+    if (kit.ready) await kit.ready();          // first frame may start asynchronous shader compilation
+    if (kit.flush) kit.flush();
   });
 }
 
@@ -166,6 +168,12 @@ export const inkShare = (page, selector) => page.evaluate((sel) => {
   return total ? drawn / total : 0;
 }, selector);
 
+/** Mathematical letters whose source spelling a page's CSS would change. */
+export const caseChanges = (page) => page.$$eval('.tag, .tag *, .sec h2, .strip h2, .preset .code, .chip, .tour b', (els) => els.filter((el) => {
+  if (!el.getClientRects().length || getComputedStyle(el).textTransform !== 'uppercase') return false;
+  return [...el.textContent].some((c) => /\p{Script=Greek}/u.test(c) && c !== c.toUpperCase());
+}).map((el) => el.textContent.trim()));
+
 /** Visible stage labels whose boxes overlap by more than `share` of the smaller box: [[textA, textB], …]. */
 export const labelOverlaps = (page, selector = '.stage .tag', share = 0.5) => page.evaluate(([sel, tol]) => {
   const boxes = [...document.querySelectorAll(sel)].filter((el) => !el.hidden && el.offsetParent !== null && el.textContent.trim())
@@ -281,7 +289,7 @@ export const solidPixels = (page) => page.evaluate(async () => {
  * { solid: { … } }). `page` is open on the visualization.
  *   lit solid   the stage's WebGL canvas is drawn on over ≥ minShare (0.12) of its pixels, opaquely, and their
  *               luminance spreads (σ ≥ minSpread, 0.04): a shaded body, not a flat silhouette or a wireframe
- *   turning     after the camera turns (drag across the stage, or opts.turn(page)) the distribution of light and
+ *   turning     after the camera turns (drag across the stage, or opts.turn(page); by default both yaw and pitch) the distribution of light and
  *               shade changes (histogram distance ≥ 0.05)
  *   hidden mark a mark (bead or ring) that a solid hides cannot be picked, a visible one can (skipped when the frame
  *               has no hidden mark, or no visible one)
@@ -290,6 +298,7 @@ export const solidPixels = (page) => page.evaluate(async () => {
  */
 export async function solidChecks(T, slug, id, page, opts = {}) {
   const o = { minShare: 0.12, minSpread: 0.04, rest: true, ...opts };
+  if (o.preset) await page.locator(`[data-preset="${o.preset}"]`).click();
   const { check } = T;
   await settle(page);
   const a = await solidPixels(page);
@@ -297,16 +306,24 @@ export async function solidChecks(T, slug, id, page, opts = {}) {
   if (!a) return;
   check(`solid: an opaque body covers ≥ ${Math.round(o.minShare * 100)}% of the stage`, a.share >= o.minShare, `${(a.share * 100).toFixed(1)}%`);
   check('solid: light and shade spread across the body', a.spread >= o.minSpread, `σ = ${a.spread.toFixed(3)}`);
-  if (o.turn) await o.turn(page);
-  else {
-    const b = await page.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
-    const y = b[1] + b[3] * 0.08;
-    await page.mouse.move(b[0] + b[2] * 0.06, y); await page.mouse.down();
-    for (let k = 1; k <= 6; k++) await page.mouse.move(b[0] + b[2] * (0.06 + 0.05 * k), y);
-    await page.mouse.up();
+  const initial = await page.evaluate(() => ({ ...window.TRV.solids[0].cam }));
+  const distances = [];
+  for (const axis of o.turn ? ['custom'] : ['yaw', 'pitch']) {
+    await page.evaluate((cam) => { Object.assign(TRV.solids[0].cam, cam); TRV.kit.flush(); }, initial);
+    if (o.turn) await o.turn(page);
+    else {
+      const b = await page.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+      const x = b[0] + b[2] * 0.08, y = b[1] + b[3] * 0.65;
+      await page.mouse.move(x, y); await page.mouse.down();
+      for (let k = 1; k <= 6; k++) await page.mouse.move(x + (axis === 'yaw' ? b[2] * 0.05 * k : 0), y - (axis === 'pitch' ? b[3] * 0.05 * k : 0));
+      await page.mouse.up();
+    }
+    await settle(page);
+    const c = await solidPixels(page);
+    distances.push(c.hist.reduce((sum, h, k) => sum + Math.abs(h - a.hist[k]), 0) / 2);
   }
-  const c = await solidPixels(page);
-  const dist = c.hist.reduce((s, h, k) => s + Math.abs(h - a.hist[k]), 0) / 2;
+  const dist = Math.max(...distances);
+  await page.evaluate((cam) => { Object.assign(TRV.solids[0].cam, cam); TRV.kit.flush(); }, initial);
   check('solid: turning the camera changes light and shade', dist >= 0.05, `histogram distance ${dist.toFixed(3)}`);
   const pick = await page.evaluate(() => {
     const sc = window.TRV.solids[0], ms = sc.marks(), hid = ms.find((m) => m.hidden), vis = ms.find((m) => !m.hidden);
@@ -316,10 +333,11 @@ export async function solidChecks(T, slug, id, page, opts = {}) {
   if (pick.hidden != null) check('solid: a mark behind the solid cannot be picked', pick.hidden === -1);
   if (pick.visible != null) check('solid: a visible mark can be picked', pick.visible === 0);
   if (o.rest) {
-    const em = await T.open(slug, id, '?embed=1&lang=zh', { viewport: { width: 740, height: 620 } });
+    const em = await T.open(slug, id, `?embed=1&lang=zh${o.preset ? `&preset=${encodeURIComponent(o.preset)}` : ''}`, { viewport: { width: 740, height: 620 } });
     await settle(em);
-    // a card that plays when it scrolls into view keeps the context until it stops: allow for slow frames
-    const parked = await until(em, () => window.TRV.solids && window.TRV.solids[0] && window.TRV.solids[0].parked(), null, 120000);
+    // Pause the shared clocks explicitly: resting tests must not depend on the duration of a card's story.
+    await em.evaluate(() => { TRV.kit.pause(); TRV.kit.flush(); });
+    const parked = await until(em, () => window.TRV.solids && window.TRV.solids[0] && window.TRV.solids[0].parked(), null, 30000);
     const shown = await em.evaluate(() => { const sc = window.TRV.solids[0], st = sc.el.querySelector('canvas:not(.solid-gl)'); return { gl: !!sc.el.querySelector('canvas.solid-gl'), still: !!st && st.style.visibility === 'visible' }; });
     check('solid: inside a book the WebGL context is given back after a rest, the frame stays as a picture', parked && !shown.gl && shown.still, JSON.stringify(shown));
     const box = await em.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left + 8, r.top + r.height - 8]; });
@@ -334,7 +352,7 @@ export async function solidChecks(T, slug, id, page, opts = {}) {
  * Honest labels (skills/book-viz, "如实标注"), checked on the page as served. `page` is open on the visualization.
  *   every Lean link names a theorem of trureturing.lock.json and points at its pinned commit, file and line;
  *   the registry entry lists exactly the theorems the page cites;
- *   green boxes (.lean without .num / .model / .argued / .open) are exactly the boxes that cite a Lean theorem;
+ *   green boxes (.lean without .num / .model / .argued / .open / .frozen) are exactly the boxes that cite a Lean theorem;
  *   the theory drawer says in both languages that the page is not a proof.
  */
 export async function evidenceChecks(T, slug, id, page) {
@@ -343,10 +361,13 @@ export async function evidenceChecks(T, slug, id, page) {
   const links = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => [a.dataset.leanGid, a.href]));
   const bad = links.find(([gid, href]) => { const d = lock && (lock.declarations || {})[gid]; return !d || !FORMAL_KINDS.includes(d.kind) || href !== leanUrl(lock, gid); });
   check('evidence: every Lean link names a frozen theorem and points at its pinned commit, file and line', !bad, bad ? bad.join(' → ') : '');
+  const frozen = await page.$$eval('a[data-frozen-gid]', (as) => as.map((a) => [a.dataset.frozenGid, a.href, !!a.closest('.lean.frozen')]));
+  const wrongFrozen = frozen.find(([gid, href, neutral]) => !neutral || !lock?.declarations?.[gid] || href !== leanUrl(lock, gid));
+  check('evidence: frozen declaration links are pinned and use neutral boxes', !wrongFrozen, wrongFrozen ? wrongFrozen.join(' → ') : '');
   const cited = [...new Set(links.map(([g]) => g))].sort(), listed = (entry.lean || []).map((l) => l.gid).sort();
   const diff = [...cited.filter((g) => !listed.includes(g)).map((g) => `page only: ${g}`), ...listed.filter((g) => !cited.includes(g)).map((g) => `registry only: ${g}`)];
   check('evidence: the registry lists exactly the theorems the page cites', diff.length === 0, diff.slice(0, 3).join(' | '));
-  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open)(\s|$)/.test(b.className), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
+  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open|frozen)(\s|$)/.test(b.className), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
   const wrong = boxes.find((b) => b.green !== b.link);
   check('evidence: green boxes are exactly the boxes that cite a Lean theorem', !wrong, wrong ? `${wrong.green ? 'green without a Lean link' : 'Lean link in a box of another colour'}: ${wrong.text}` : '');
   const drawer = await page.$eval('#drawer', (d) => d.textContent).catch(() => null);
@@ -538,7 +559,7 @@ export async function spaceAfterCard(T, page, wait = 120) {
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
  *       rail (true; a page without footer.rail is not checked), keys (true; false for a page that does not bind
  *       Space to its clock), still (true; false skips the still-frame warning), settle (ms to wait after a click), solid (false; true or the options of solidChecks for a
- *       page that draws a lit solid with kit.solid).
+ *       page that draws a lit solid with kit.solid; preset selects its solid card).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
   const o = { stage: '.stage', cover: '[data-thumb] canvas', solid: false, still: true, minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
@@ -553,6 +574,8 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
         return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1, still: b.dataset.still == null ? null : b.dataset.still };
       }, c);
       check(`${tag}: card ${c} applies and explains itself`, state.pressed === 'true' && state.note !== 0, JSON.stringify(state));
+      const changedCase = await caseChanges(page);
+      check(`${tag}: card ${c} preserves Greek variable case`, changedCase.length === 0, changedCase.join(' | '));
       if (played) { const r = await playRecord(page, key); if (r && r.started) played.push({ card: c, still: state.still }); }
     }
   };
@@ -560,6 +583,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   // desktop
   const page = await T.goto(slug, id, '?lang=zh');
   await page.evaluate(() => document.fonts && document.fonts.ready); await settle(page, 400);
+  if (o.solid) await solidChecks(T, slug, id, page, o.solid === true ? {} : o.solid);
   const share = await viewportShare(page, o.stage);
   check(`desktop: the stage holds ≥ ${Math.round(o.minShare * 100)}% of the viewport`, share >= o.minShare, `${(share * 100).toFixed(1)}%`);
   check('desktop: no sideways scrolling', (await overflowX(page)) <= 0);
@@ -576,6 +600,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
         'chapter cites and the cover then show the frame its caption describes');
     }
   }
+  check('labels: CSS preserves lowercase Greek letters', (await caseChanges(page)).length === 0);
   if (o.labels) { const bad = await labelOverlaps(page, `${o.stage} .tag`); check('desktop: stage labels do not sit on top of each other', bad.length === 0, JSON.stringify(bad.slice(0, 4))); }
   if (await page.$('#infoBtn')) {
     await page.click('#infoBtn');
@@ -586,7 +611,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
     check('desktop: Escape closes the drawer', await page.evaluate(() => document.getElementById('drawer').hidden));
   }
   if (o.evidence) await evidenceChecks(T, slug, id, page);
-  if (o.solid) await solidChecks(T, slug, id, page, o.solid === true ? {} : o.solid);
+
   if (o.cards && o.keys) await spaceAfterCard(T, page, o.settle);
 
   // English
@@ -601,7 +626,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   await page.click('[data-lang-set="zh"]');
 
   // embed: the first screen of the iframe inside a chapter
-  const embed = await T.open(slug, id, '?embed=1&lang=zh', { viewport: { width: 740, height: 620 } });
+  const embed = await T.open(slug, id, `?embed=1&lang=zh${o.preset ? `&preset=${encodeURIComponent(o.preset)}` : ''}`, { viewport: { width: 740, height: 620 } });
   await settle(embed, 400);
   const e = await embed.evaluate((sel) => {
     const st = document.querySelector(sel).getBoundingClientRect(), head = document.querySelector('header.top'), tour = document.querySelector('.tour');
