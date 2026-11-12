@@ -807,6 +807,51 @@ class MetadataTest(unittest.TestCase):
         self.assertIn('href="text/ch003.xhtml" media-type="application/xhtml+xml" />', new)
 
 
+@unittest.skipUnless(have_typst(), "typst not available")
+class CompileTypstTest(unittest.TestCase):
+    def test_consecutive_compilations_keep_inputs_formats_and_failure_details(self):
+        with tempfile.TemporaryDirectory(prefix="tbook typst worker ") as tmp:
+            root = Path(tmp)
+            main = root / "main.typ"
+            main.write_text('#set page(width: 80pt, height: 80pt)\n'
+                            '#link(sys.inputs.at("url"))[A document]\n', encoding="utf-8")
+            for i, fmt in enumerate(("svg", "pdf", "png", "svg")):
+                url = f"https://example.org/document/{i}"
+                out = root / "output files" / f"document-{i}.{fmt}"
+                self.assertEqual(tp.compile_typst(main, out, root=root, fmt=fmt, ppi=72,
+                    sys_inputs={"url": url}, timestamp=1767312000), out)
+                data = out.read_bytes()
+                if fmt == "svg":
+                    self.assertIn(url.encode(), data)
+                elif fmt == "pdf":
+                    self.assertTrue(data.startswith(b"%PDF-"))
+                else:
+                    self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
+            main.write_text('#undefined-compiler-variable()', encoding="utf-8")
+            with self.assertRaises(tp.PandocError) as caught:
+                tp.compile_typst(main, root / "bad.pdf", root=root)
+            self.assertIn("typst failed for", str(caught.exception))
+            self.assertIn("unknown variable: undefined-compiler-variable", str(caught.exception))
+            main.write_text("The next compilation succeeds.", encoding="utf-8")
+            out = tp.compile_typst(main, root / "recovered.pdf", root=root)
+            self.assertTrue(out.read_bytes().startswith(b"%PDF-"))
+
+    def test_real_font_warnings_keep_the_verbose_summary(self):
+        with tempfile.TemporaryDirectory(prefix="tbook-typst-warnings-") as tmp:
+            root = Path(tmp)
+            main = root / "main.typ"
+            main.write_text('#set text(font: "tbook-missing-test-font")\nText', encoding="utf-8")
+            for verbose in ("", "1"):
+                stderr = io.StringIO()
+                with patch.dict(os.environ, {"TBOOK_VERBOSE": verbose}), contextlib.redirect_stderr(stderr):
+                    tp.compile_typst(main, root / "out.pdf", root=root)
+                if verbose:
+                    self.assertEqual(stderr.getvalue(), "  typst: fonts not installed, using fallbacks: "
+                                     "tbook-missing-test-font\n")
+                else:
+                    self.assertEqual(stderr.getvalue(), "")
+
+
 @unittest.skipUnless(have_pandoc() and have_typst(), "pandoc or typst not available")
 class BuildTest(unittest.TestCase):
     """End-to-end builds of the synthetic book (PDF variants, EPUB, covers)."""

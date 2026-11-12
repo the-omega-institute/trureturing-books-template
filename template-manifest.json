@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "d489e084c7fe5bd99ad0b582ab07cb4c97477f74630a55da8fbeca20b1aa4365",
+      "sha256": "9f046f28b3c0ac8624ee12f04d1686f297fd2b8be6215eb45a7ddacad805de40",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -700,7 +700,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "ffe5bb9742c1b33a2cee990348d13e574eae390bb8a3bbee0675fca067d07f9f",
+      "sha256": "0c2cff6cfbc440b1d1d9cfbf66eb4210a6dcbcddc4b455911930f949c9ec419b",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -737,6 +737,10 @@
     },
     "tools/tbook/theme.py": {
       "sha256": "4bd17977aa18892bbe4fcabff3baf20cddc2895d7a00da9e569654293599930e",
+      "mode": "100644"
+    },
+    "tools/tbook/typst_worker.py": {
+      "sha256": "ff74fd208a44debec6692838f0ec376885ee808dae20bd5cd037f26ff36e749f",
       "mode": "100644"
     },
     "tools/tbook/viz.py": {
@@ -816,7 +820,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "61f957cbc633ed934b13c5766f62716a9a968a4f224b8e11871da47e4e5dcc5a",
+      "sha256": "cfdd872e46b668d05908494df6bcba409aca1346d073bf4fe3c3e0bfd6e6a097",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {

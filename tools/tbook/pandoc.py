@@ -1619,9 +1619,7 @@ _TYPST_FONT_WARNING = re.compile(r"unknown font family: (.+)")
 
 def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", ppi: float | None = None,
                   sys_inputs: dict[str, str] | None = None, timestamp: int | None = None) -> Path:
-    """Compile with the typst Python module; font fallbacks are reported in one line."""
-    import typst  # type: ignore
-
+    """Compile in a fresh process so each document releases its Typst memory on exit."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     kwargs = dict(output=str(out_path), root=str(root), font_paths=[str(d) for d in font_dirs()],
                   format=fmt, sys_inputs=sys_inputs or {})
@@ -1630,12 +1628,22 @@ def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", p
     if timestamp:
         kwargs["timestamp"] = timestamp
     try:
-        _, warnings = typst.compile_with_warnings(str(main), **kwargs)
-    except (typst.TypstError, RuntimeError, OSError) as exc:
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("typst_worker.py"))],
+            input=json.dumps({"main": str(main), "kwargs": kwargs}),
+            capture_output=True, encoding="utf-8",
+        )
+    except OSError as exc:
         raise PandocError(f"typst failed for {paths.rel(main)}:\n{exc}") from exc
+    if result.returncode:
+        detail = result.stderr.strip() or f"compiler worker exited with status {result.returncode}"
+        raise PandocError(f"typst failed for {paths.rel(main)}:\n{detail}")
+    try:
+        warnings = json.loads(result.stdout)
+    except ValueError as exc:
+        raise PandocError(f"typst failed for {paths.rel(main)}:\ninvalid compiler worker response") from exc
     missing: set[str] = set()
-    for w in warnings or []:
-        msg = getattr(w, "message", str(w))
+    for msg in warnings:
         m = _TYPST_FONT_WARNING.search(msg)
         if m:
             missing.add(m.group(1))
