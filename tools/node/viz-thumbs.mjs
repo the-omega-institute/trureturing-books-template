@@ -19,34 +19,13 @@
 // Adapted from trureturing-visualize/scripts/thumbs.mjs (Apache-2.0, the-omega-institute).
 import path from 'node:path';
 import fs from 'node:fs';
-import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel } from './viz-common.mjs';
+import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel, citedCards } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
 import { routeLocalFonts, STILL, stillQuery, prepareStill } from './viz-testkit.mjs';
 
 export const WIDTH = 1280, HEIGHT = 720;
-/** Stills are captured at 800×450 CSS pixels, twice over: labels sized for a reader stay legible on a printed page.
-    openStill() of viz-testkit.mjs opens a card the same way, so a suite checks the frame that is photographed here. */
-export { STILL };
-const VIZ_BLOCK = /^:::+\s*\{([^}]*\.viz\b[^}]*)\}/gm;
-const attr = (text, name) => { const m = new RegExp(`\\b${name}="([^"]*)"`).exec(text); return m ? m[1] : null; };
-/** The cards of `vizId` that the chapters of `book` cite: [{ preset, lang }], from every language directory. */
-export function citedCards(book, vizId) {
-  const out = new Map();
-  for (const lang of fs.readdirSync(book.dir, { withFileTypes: true }).filter((d) => d.isDirectory() && fs.existsSync(path.join(book.dir, d.name, 'SUMMARY.md'))).map((d) => d.name)) {
-    const walk = (dir) => {
-      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const f = path.join(dir, e.name);
-        if (e.isDirectory()) walk(f);
-        else if (e.name.endsWith('.md')) for (const m of fs.readFileSync(f, 'utf8').matchAll(VIZ_BLOCK)) {
-          const preset = attr(m[1], 'preset');
-          if (attr(m[1], 'src') === vizId && preset && /^[A-Za-z0-9][\w-]*$/.test(preset)) out.set(`${preset}.${lang}`, { preset, lang });
-        }
-      }
-    };
-    walk(path.join(book.dir, lang));
-  }
-  return [...out.values()];
-}
+/** Stills use the same capture setup as openStill() of viz-testkit.mjs. */
+export { STILL, citedCards };
 const args = process.argv.slice(2);
 let books = listBooks(), ids = [];
 if (args.length) {

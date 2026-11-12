@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -588,6 +589,183 @@ class CitedCards(unittest.TestCase):
         self.assertEqual(check._env_signature(model("demo")), [("ch.md", [("viz", "golden-carry", ("demo",))])])
         self.assertEqual(check._env_signature(model(None)), [("ch.md", [("viz", "golden-carry", ())])])
         self.assertNotEqual(check._env_signature(model("demo")), check._env_signature(model("second-card")))
+
+
+# The chapters of a book as the builds read them (tbook.model.load_edition), with embeds of golden-carry in every
+# accepted attribute form, embeds no build shows, and Markdown no SUMMARY.md publishes.
+CITING_ZH = r"""# 一
+
+正文。
+
+::: {.viz src='golden-carry' preset='single' height='480px'}
+单引号。
+:::
+
+正文。
+
+::: {.viz src=golden-carry preset=bare height=620}
+不加引号。
+:::
+
+正文。
+
+::: {.viz src="golden-carry" title="$\{0,1\}^n$" preset="braces" height="450"}
+引号里的花括号。
+:::
+
+```markdown
+::: {.viz src="golden-carry" preset="code-only"}
+:::
+```
+
+<!--
+::: {.viz src="golden-carry" preset="comment-only"}
+:::
+-->
+
+    ::: {.viz src="golden-carry" preset="indented-only"}
+    :::
+
+- 列表项
+
+  ::: {.viz src="golden-carry" preset="list-only"}
+  :::
+
+正文 `::: {.viz src="golden-carry" preset="inline-only"}`。
+
+::: {.figure .viz src="golden-carry" preset="figure-first"}
+:::
+
+::: {.viz-like src="golden-carry" preset="lookalike"}
+:::
+
+::: {.viz src="other-viz" preset="other"}
+:::
+
+::: {.viz src="trureturing-visualize:golden-carry" preset="external"}
+:::
+
+::: {.callout .viz src=" golden-carry " preset=" spaced " height="0x200"}
+:::
+
+::: {.remark #rem-a}
+::: {.viz src="golden-carry" preset="a b" height="5e2"}
+:::
+:::
+
+::: {.viz src="golden-carry" height="100"}
+:::
+"""
+
+
+def citing_book(root: Path):
+    """A book (book.toml editions zh, en) whose published chapters cite golden-carry; see CITING_ZH."""
+    book = fake_book(root)
+    files = {
+        "zh/SUMMARY.md": "# 目录\n\n- [前言](z-first.md)\n- [一](ch01.md)\n- [草稿]()\n",
+        "zh/z-first.md": '# 前言\n\n::: {.viz src="golden-carry" preset="first" height="300"}\n:::\n',
+        "zh/ch01.md": CITING_ZH,
+        "zh/unlisted.md": '# 未列出\n\n::: {.viz src="golden-carry" preset="unlisted"}\n:::\n',
+        "zh/drafts/later.md": '# 草稿\n\n::: {.viz src="golden-carry" preset="draft"}\n:::\n',
+        "en/SUMMARY.md": "# Contents\n\n- [Preface](z-first.md)\n- [One](ch01.md)\n",
+        "en/z-first.md": '# Preface\n\n::: {.viz src="golden-carry" preset="first"}\n:::\n',
+        "en/ch01.md": '# One\n\n::: {.viz src="golden-carry" preset="single" height="500"}\n:::\n',
+        # a language directory that book.toml does not list as an edition is not published
+        "fr/SUMMARY.md": "# Sommaire\n\n- [Un](ch01.md)\n",
+        "fr/ch01.md": '# Un\n\n::: {.viz src="golden-carry" preset="french"}\n:::\n',
+    }
+    for name, text in files.items():
+        (book.dir / name).parent.mkdir(parents=True, exist_ok=True)
+        (book.dir / name).write_text(text, encoding="utf-8")
+    return book
+
+
+# editions in book.toml order, chapters in SUMMARY.md order, embeds in document order
+CITED = [
+    {"lang": "zh", "preset": "first", "height": 300},
+    {"lang": "zh", "preset": "single", "height": 480},
+    {"lang": "zh", "preset": "bare", "height": 620},
+    {"lang": "zh", "preset": "braces", "height": 450},
+    {"lang": "zh", "preset": "spaced", "height": 560},  # src and preset as the build strips them; 0x200 is no number
+    {"lang": "zh", "preset": None, "height": 560},  # "a b" is no card name; 5e2 is no number of pixels
+    {"lang": "zh", "preset": None, "height": 560},  # the whole lab; 100 is outside 160–2400
+    {"lang": "en", "preset": "first", "height": 560},
+    {"lang": "en", "preset": "single", "height": 500},
+]
+
+
+class Citations(unittest.TestCase):
+    """viz.citations, and vizCitations / citedCards of tools/node/viz-common.mjs that return it to the browser quality
+    gate (stageFirstChecks) and to viz-thumbs.mjs: the embeds of the published chapters, read as the builds read them."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tbook-viz-"))
+        self.book = citing_book(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def node(self, viz_id: str = "golden-carry", **env: str) -> subprocess.CompletedProcess:
+        script = ("import { vizCitations, citedCards, resolveBook } from './tools/node/viz-common.mjs';"
+                  "const [dir, id] = process.argv.slice(1), book = resolveBook(dir);"
+                  "process.stdout.write(JSON.stringify({ citations: vizCitations(book, id), cards: citedCards(book, id) }));")
+        return subprocess.run([NODE, "--input-type=module", "-e", script, str(self.book.dir), viz_id],
+                              capture_output=True, text=True, cwd=paths.ROOT, timeout=120,
+                              env={**os.environ, "TBOOK_PYTHON": sys.executable, **env})
+
+    def test_the_published_embeds(self):
+        book = config.load_book(self.book.dir)
+        self.assertEqual(viz.citations(book, "golden-carry"), CITED)
+        self.assertEqual(viz.citations(book, "other-viz"), [{"lang": "zh", "preset": "other", "height": 560}])
+        self.assertEqual(viz.citations(book, "no-such-viz"), [])
+
+    def test_the_builds_read_the_same_blocks(self):
+        """Every embed of the edition model is a citation or is not a viz of golden-carry; nothing else is."""
+        book = config.load_book(self.book.dir)
+        media = [(e.kind, e.attrs.get("src").strip(), e.attrs.get("preset").strip())
+                 for ch in load_edition(book.edition("zh")).chapters for e in ch.media]
+        self.assertEqual([p for k, s, p in media if k == "viz" and s == "golden-carry"],
+                         ["first", "single", "bare", "braces", "spaced", "a b", ""])
+        self.assertIn(("figure", "golden-carry", "figure-first"), media)  # the first kind class names the kind
+
+    def test_an_edition_whose_chapters_cannot_be_selected_is_an_error(self):
+        (self.book.dir / "en" / "SUMMARY.md").unlink()
+        with self.assertRaisesRegex(viz.VizError, "cannot read the chapters of tbook-viz-fixture/en: .*SUMMARY.md is missing"):
+            viz.citations(config.load_book(self.book.dir), "golden-carry")
+        (self.book.dir / "en" / "SUMMARY.md").write_text("# Contents\n\n- [Gone](gone.md)\n", encoding="utf-8")
+        with self.assertRaisesRegex(viz.VizError, "chapter file not found: gone.md"):
+            viz.citations(config.load_book(self.book.dir), "golden-carry")
+        (self.book.dir / "en" / "SUMMARY.md").write_text("# Contents\n\n- [x\n", encoding="utf-8")
+        with self.assertRaisesRegex(viz.VizError, r"SUMMARY.md:3: list items must be links"):
+            viz.citations(config.load_book(self.book.dir), "golden-carry")
+
+    def test_an_edition_without_a_directory_has_no_text_to_cite(self):
+        shutil.rmtree(self.book.dir / "en")  # e.g. a book of visualizations only, as the quality-gate fixtures are
+        self.assertEqual(viz.citations(config.load_book(self.book.dir), "golden-carry"),
+                         [c for c in CITED if c["lang"] == "zh"])
+
+    @unittest.skipUnless(NODE, "node not available")
+    def test_node_returns_the_published_embeds(self):
+        r = self.node()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)
+        self.assertEqual(got["citations"], CITED)
+        self.assertEqual(got["cards"], [{"preset": p, "lang": lang} for lang, p in (
+            ("zh", "first"), ("zh", "single"), ("zh", "bare"), ("zh", "braces"), ("zh", "spaced"), ("en", "first"),
+            ("en", "single"))])
+
+    @unittest.skipUnless(NODE, "node not available")
+    def test_node_fails_rather_than_cite_nothing(self):
+        r = self.node(TBOOK_PYTHON=str(self.tmp / "no-python"))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(r.stdout, "")
+        self.assertIn('cannot read the citations of viz "golden-carry"', r.stderr)
+        self.assertIn("ENOENT", r.stderr)
+        (self.book.dir / "zh" / "SUMMARY.md").unlink()
+        r = self.node()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(r.stdout, "")
+        self.assertIn("SUMMARY.md is missing", r.stderr)
 
 
 class Links(unittest.TestCase):
@@ -1178,6 +1356,158 @@ process.exit(0);
             d = json.loads(c["detail"])
             self.assertEqual(d["home"][1], d["end"][1], "the readout must be what gave the broken clock away")
         self.assertTrue(all(c["ok"] for c in self.checks("rail-deaf", "inside the frame and named")))
+
+
+@unittest.skipUnless(NODE, "node not available")
+class StageViewGate(unittest.TestCase):
+    """The "layout" and "title" parts of stageFirstChecks (stageView in tools/node/viz-testkit.mjs), run in Chromium
+    on private copies of the starter page. Some copies add scene buttons with long labels; others put back, in the
+    page's own style.css, one piece of the shared layout that let the strip be drawn over the stage, left the lab
+    without a way to scroll, put the title under the buttons, cut the title, or painted the buttons under the
+    canvas. The gate must accept the shared layout and refuse each of those. Skipped like RailGate."""
+
+    SLUG = "stage-view-fixture"
+    HUD = '      <div class="hud-tl"><span class="big" id="hudBig"></span><span class="sub" id="hudSub"></span></div>\n'
+    BUTTONS = (
+        '      <div class="hud-tr chips" role="group" aria-label="场景" data-aria-en="Scene">'
+        + "".join(f'<button class="chip" aria-pressed="{str(i == 0).lower()}"><span class="zh">{zh}</span>'
+                  f'<span class="en">{en}</span></button>'
+                  for i, (zh, en) in enumerate([("影子与高度", "Shadow and height"), ("两个平方", "Both squares"),
+                                                ("单位圆", "Unit circle"), ("整圈", "Full turn")]))
+        + "</div>\n"
+    )
+    # the shared layout of 0.5.2, which these copies put back one piece at a time
+    OLD_HUD = (".stage:has(> .hud-tl, > .hud-tr) { display: block; padding: 0; }\n"
+               ".stage > .hud-tl, .stage.hud-stack > .hud-tl { position: absolute; top: 14px; left: 20px; max-width: calc(100% - 40px); }\n"
+               ".stage > .hud-tr { position: absolute; top: 12px; right: 18px; max-width: 60%; }\n")
+    OLD_ROWS = (".app.lab { grid-template-rows: auto minmax(0, 1fr) auto; }\n"
+                ".lab .center { min-height: 0; grid-template-rows: minmax(0, 1fr) auto; }\n"
+                ".lab .center > .stage:has(> .hud-tl, > .hud-tr) { padding-bottom: 0; }\n")
+    NO_SCROLL = "body:has(> .app.lab) { overflow: hidden; }\n"
+    RUNNER = """
+import fs from 'node:fs';
+const [kit, out, slug, ...ids] = process.argv.slice(2);
+const { session, stageFirstChecks } = await import(kit);
+const T = await session();
+const view = {};
+const ours = /: the (stage, the tour bar and the strip keep their own regions|title, the scene buttons and the legend are whole)|the scene button can be pressed/;
+for (const id of ids) {
+  const from = T.results.length;
+  await stageFirstChecks(T, slug, id, { labels: false, evidence: false, rail: false });
+  view[id] = T.results.slice(from).filter((r) => ours.test(r.name));
+}
+await T.browser.close();
+fs.writeFileSync(out, JSON.stringify(view));
+process.exit(0);
+"""
+
+    @classmethod
+    def variants(cls) -> dict:
+        """id → (change to index.html, rules appended to style.css)."""
+        buttons = lambda html: cls.swap(html, cls.HUD, cls.HUD + cls.BUTTONS)
+        same = lambda html: html
+        return {
+            "view-plain": (same, ""),
+            "view-scenes": (buttons, ""),
+            "view-old-hud": (buttons, cls.OLD_HUD),
+            "view-old-rows": (same, cls.OLD_ROWS + cls.NO_SCROLL),
+            "view-no-scroll": (same, cls.NO_SCROLL),
+            "view-cut": (buttons, ".stage > .hud-tl .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n"),
+            "view-buried": (buttons, ".stage > .hud-tr { z-index: -1; }\n"),
+        }
+
+    @staticmethod
+    def swap(text: str, old: str, new: str) -> str:
+        if text.count(old) != 1:
+            raise AssertionError(f"templates/viz/index.html no longer has exactly one {old!r}")
+        return text.replace(old, new)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="tbook-view-"))
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        root = cls.tmp / "root"
+        (root / "books").mkdir(parents=True)
+        try:
+            (root / "theme").symlink_to(paths.THEME, target_is_directory=True)
+            if (paths.ROOT / "node_modules").is_dir():
+                (root / "node_modules").symlink_to(paths.ROOT / "node_modules", target_is_directory=True)
+        except OSError as exc:
+            raise unittest.SkipTest(f"cannot link the theme into a private root: {exc}")
+        book = fake_book(root / "books", cls.SLUG)
+        for vid, (page, rules) in cls.variants().items():
+            viz.scaffold(book, vid, vid.upper().replace("-", "//"), "版式", "Layout", added="2026-11-12")
+            index, style = book.viz_dir / vid / "index.html", book.viz_dir / vid / "style.css"
+            index.write_text(page(index.read_text(encoding="utf-8")), encoding="utf-8")
+            style.write_text(style.read_text(encoding="utf-8") + rules, encoding="utf-8")
+        runner, out = cls.tmp / "view-gate.mjs", cls.tmp / "view-gate.json"
+        runner.write_text(cls.RUNNER, encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k != "VIZ_ORIGIN"}
+        env["TBOOK_ROOT"] = str(root)
+        kit = (paths.TOOLS / "node" / "viz-testkit.mjs").as_uri()
+        r = subprocess.run([NODE, str(runner), kit, str(out), cls.SLUG, *cls.variants()], capture_output=True,
+                           text=True, cwd=paths.ROOT, env=env, timeout=1500)
+        if not out.is_file():
+            tail = (r.stdout + r.stderr)[-3000:]
+            if re.search(r"Playwright is not installed|Executable doesn't exist|browserType\.launch", tail):
+                raise unittest.SkipTest("Playwright Chromium is not available")
+            raise AssertionError(f"the stage view gate did not run (exit {r.returncode}):\n{tail}")
+        cls.view = json.loads(out.read_text(encoding="utf-8"))
+
+    def results(self, vid: str, prefix: str = "", part: str = "") -> list[dict]:
+        found = [c for c in self.view[vid] if c["name"].startswith(prefix) and part in c["name"]]
+        self.assertTrue(found, f"{vid}: no check {prefix}…{part}…")
+        return found
+
+    def failed(self, vid: str, prefix: str = "", part: str = "") -> list[dict]:
+        return [c for c in self.results(vid, prefix, part) if not c["ok"]]
+
+    LAYOUT, TITLE = "keep their own regions", "are whole and clear of each other"
+
+    def test_the_shared_layout_passes_in_every_state(self):
+        for vid in ("view-plain", "view-scenes"):
+            self.assertEqual([f"{c['name']} — {c['detail']}" for c in self.view[vid] if not c["ok"]], [], vid)
+            for prefix in ("desktop", "English", "short screen (zh, 1440 ×", "short screen (en, 1081 ×", "embed",
+                           "frame (zh, 320 × 620)", "frame (en, 334 × 620)", "cited figure (zh,", "cited figure (en,",
+                           "still for PDF/EPUB", "phone"):
+                self.results(vid, prefix)
+        # both sides of the height the lab needs on a short screen, read off the page
+        names = [c["name"] for c in self.results("view-scenes", "short screen (en, 1081 ×", self.LAYOUT)]
+        need = int(re.search(r"needs (\d+)\)", names[0]).group(1))
+        self.assertTrue(any(f"× {need - 1}," in n for n in names) and any(f"× {need + 1}," in n for n in names), names)
+        self.assertGreater(need, 500, "the fixture no longer needs more height than a 500px screen gives it")
+        self.assertEqual(len({c["name"].split(":")[0] for c in self.results("view-scenes", "English, scene ")}), 4)
+
+    def test_a_strip_drawn_over_the_stage_fails(self):
+        bad = self.failed("view-old-rows", "short screen", self.LAYOUT)
+        self.assertTrue(bad)
+        self.assertTrue(any("the stage" in c["detail"] and "overlaps div.strip" in c["detail"] for c in bad), bad)
+        self.assertTrue(any("painted over by" in c["detail"] for c in bad), bad)
+        self.assertFalse(self.failed("view-old-rows", "desktop", self.LAYOUT), "a tall screen has room for both")
+
+    def test_a_lab_that_cannot_scroll_fails_even_when_nothing_overlaps(self):
+        bad = self.failed("view-no-scroll", "short screen", self.LAYOUT)
+        self.assertTrue(bad)
+        self.assertTrue(all("cannot be scrolled into view" in c["detail"] and "overlaps" not in c["detail"] for c in bad), bad)
+        self.assertTrue(any("#rail (bottom" in c["detail"] for c in bad), bad)
+        self.assertFalse(self.failed("view-no-scroll", "frame", self.LAYOUT), "a chapter's frame scrolls on its own")
+
+    def test_a_title_under_the_scene_buttons_fails(self):
+        bad = self.failed("view-old-hud", part=self.TITLE)
+        self.assertTrue(any("runs under button" in c["detail"] for c in bad), bad)
+        for prefix in ("frame (zh, 334", "frame (en, 334", "cited figure (en,"):
+            self.assertTrue(self.failed("view-old-hud", prefix, self.TITLE), prefix)
+        self.assertFalse(self.failed("view-old-hud", part=self.LAYOUT))
+
+    def test_a_cut_title_fails(self):
+        bad = self.failed("view-cut", part=self.TITLE)
+        self.assertTrue(bad and any("is cut off by #hudSub" in c["detail"] for c in bad), bad)
+        self.assertTrue(self.failed("view-cut", "frame (en, 334", self.TITLE))
+
+    def test_buttons_painted_under_the_canvas_fail(self):
+        bad = self.failed("view-buried", "desktop", self.TITLE)
+        self.assertTrue(bad and all("is covered by #cv" in c["detail"] for c in bad), bad)
+        self.assertTrue(self.failed("view-buried", "English, scene", "the scene button can be pressed"))
 
 
 class KeysGate(unittest.TestCase):

@@ -10,6 +10,7 @@
 // Pages reference the runtime as ../assets/… and the hub as ../ (relative links only).
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { bookDirs, hiddenBy, hiddenError, hidePatterns } from './slides-lib.mjs';
 
@@ -129,6 +130,39 @@ export function pinLinks(html, lock) {
 export function resolveHref(href, lock) {
   if (typeof href === 'string' && href.startsWith('{trureturing}/')) return trureturingUrl(lock, href.slice('{trureturing}/'.length));
   return href;
+}
+
+/* ---------- chapter citations: `::: {.viz src="<id>" preset="<card>" height="<px>"}` ---------- */
+// The chapters are read by the book tools themselves (tbook.viz.citations over tbook.model.load_edition), so the cards
+// that the quality gate opens and that viz-thumbs.mjs captures (and keeps) are the ones the published book cites: the
+// same editions, SUMMARY selection, Markdown grammar, kind and attributes. The interpreter is chosen as ./tbook does.
+const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const CITATIONS_PY = 'import json, sys\nfrom tbook import config, viz\n'
+  + 'json.dump(viz.citations(config.load_book(sys.argv[1]), sys.argv[2]), sys.stdout)\n';
+function tbookPython() {
+  if (process.env.TBOOK_PYTHON) return process.env.TBOOK_PYTHON;
+  const venv = path.join(CODE_ROOT, '.venv', 'bin', 'python');
+  return fs.existsSync(venv) ? venv : 'python3';
+}
+/** Every embed of `vizId` in the published chapters of `book`, as `./tbook build` reads them (tbook.viz.citations):
+    [{ lang, preset, height }] by edition (book.toml order), SUMMARY.md chapter and position; preset is null for the
+    whole lab, height is the frame height in pixels. Throws when the book tools cannot run or cannot read the book. */
+export function vizCitations(book, vizId) {
+  const py = tbookPython();
+  const pythonPath = [path.join(CODE_ROOT, 'tools'), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter);
+  const r = spawnSync(py, ['-c', CITATIONS_PY, book.dir, vizId], {
+    cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26, env: { ...process.env, PYTHONPATH: pythonPath, TBOOK_ROOT: ROOT }
+  });
+  const why = r.error ? r.error.message : r.status !== 0 ? (r.stderr || `exit ${r.status ?? r.signal}`).trim() : '';
+  const fail = (detail) => new Error(`cannot read the citations of viz "${vizId}" in ${rel(book.dir)} with ${py} (tbook.viz.citations): ${detail}`);
+  if (why) throw fail(why);
+  try { return JSON.parse(r.stdout); } catch (e) { throw fail(`unreadable output (${e.message})`); }
+}
+/** The cards of `vizId` that the chapters of `book` cite: [{ preset, lang }], one per card and language. */
+export function citedCards(book, vizId) {
+  const out = new Map();
+  for (const { preset, lang } of vizCitations(book, vizId)) if (preset) out.set(`${preset}.${lang}`, { preset, lang });
+  return [...out.values()];
 }
 
 /** theme/viz/favicon.svg with its @@colour@@ placeholders filled from the screen palette. */

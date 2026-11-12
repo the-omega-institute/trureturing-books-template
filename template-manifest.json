@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "52f6a6bae25d41ed09ef01cb80668e5522bb8d75436c21c985c3b8f6912f15ce",
+      "sha256": "a9ecd5e83a640d8955418b954eb98d1d7fa65aaab07a01b78eeb6965851d84ec",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -136,7 +136,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "8679933ff43f507b75ebbd848208399daf7ec9877e00f3202d5fb843274e16a2",
+      "sha256": "ad62c4f685d83b30f5ca0b73da4f2f17686c201fcf5121d094a95fb981692507",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -524,7 +524,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "c4f57b41f277c6aeb33d07209b24d77e3de2644fc32bec6eaf1eeeea8504f42b",
+      "sha256": "e492c8487c3eed8b48284f32211103ed8918837b531895d1da555a9c058bf789",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -632,7 +632,7 @@
       "mode": "100644"
     },
     "tools/node/viz-common.mjs": {
-      "sha256": "d0c954eb47db7b85c3e0101ac446e69add2ac3803810f3a98631178a4f02ab3c",
+      "sha256": "b2de99bf910407e07bad0a86f3dd9b22fe34f6f3ea503da68fb343235fbdd4b1",
       "mode": "100644"
     },
     "tools/node/viz-new.mjs": {
@@ -652,11 +652,11 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "c02ada770b9d27980ea5860f74002db5368687104793a6314cf0fad40cbbb090",
+      "sha256": "ec750b5d970f43517bb44f823dc2b247a44e2c40510ef00cb7803076255198bb",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
-      "sha256": "e31a3529f9fde7718f7e7350f3f10793d8623054dcf523703643b3f3f21ff642",
+      "sha256": "a459548c158e33c0e4493e49282ca17311f481c689694bda9dc9ecc08ec97811",
       "mode": "100644"
     },
     "tools/node/viz-validate.mjs": {
@@ -800,7 +800,7 @@
       "mode": "100644"
     },
     "tools/tbook/viz.py": {
-      "sha256": "18e0ad1f8af737f03deca86652d70e054c878f95db0d04d2f0522e35effd59ae",
+      "sha256": "278d4aef14e4ce67faa304f42fd12180b0262076d49eed86cb9d161813fa3920",
       "mode": "100644"
     },
     "tools/tests/example_support.py": {
@@ -944,7 +944,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "d31110880e6c7ae3059f561ce5f7161944720151a4225109e61492fef1377bc8",
+      "sha256": "a68ef19101a6c6a71ea65758ce7a185a68f4ed35eec3fd40e424155bf9599a81",
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {

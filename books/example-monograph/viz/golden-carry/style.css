@@ -1,5 +1,8 @@
 /* GOLDEN//CARRY: the shared lab layout (../assets/theme.css) plus the two number fields of the pair. */
 #cv { cursor: default; }
+/* Inputs, the final carry and the window formula need room even in a short full lab. Cited figures fit their frame. */
+.lab .center > #stage { min-height: 390px; }
+:root[data-embed][data-figure] .lab .center > #stage { min-height: 0; }
 .num-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
 .num-field label { font-size: 12.5px; color: var(--ink); }
 .num-field input[type=range] { grid-column: 1 / -1; }

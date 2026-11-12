@@ -122,6 +122,17 @@
     }
     ctx.fillStyle = color; ctx.fillText(str, x, y); ctx.globalAlpha = 1;
   }
+  /** Wrap at words (Chinese at characters), keeping every symbol at the requested readable size. */
+  function lines(ctx, str, width, size, font) {
+    ctx.font = `${size}px ${face(font)}`;
+    const out = []; let row = '';
+    for (const part of str.match(/\p{Script=Han}|[^\S\n]+|[^\p{Script=Han}\s]+/gu) || []) {
+      if (row && ctx.measureText(row + part).width > width) { out.push(row.trim()); row = ''; }
+      row += part;
+    }
+    if (row.trim()) out.push(row.trim());
+    return out;
+  }
   const blend = (a, b, t) => `rgb(${TRV.rgb[a].map((x, k) => Math.round(255 * (x * (1 - t) + TRV.rgb[b][k] * t))).join(',')})`;
   const cellColor = (c) => (c > 0 ? P.cyan : c < 0 ? P.magenta : c === 0 ? blend('stage', 'lineHot', 0.45) : P.warn);
 
@@ -141,13 +152,14 @@
   /* ---------- scene: the carries ---------- */
   function drawGauge(ctx, m, D, k, f, words) {
     const next = k < D.passes.length ? D.passes[k].sign : 0, off = D.c.a - D.partial[k] - f * next;   // β(current string) − β(normal form)
-    const wide = words && m.w >= 600, cx = wide ? m.x + m.w * 0.76 : m.x + m.w / 2, unit = Math.min(44, m.w * (wide ? 0.085 : 0.16)), y = m.y + m.h * 0.56;
+    const wide = words && m.w >= 600, cx = wide ? m.x + m.w * 0.76 : m.x + m.w / 2, unit = Math.min(44, m.w * (wide ? 0.085 : 0.16)), y = m.y + m.h - 23;
     if (wide) {
       const tx = m.x + 4, eq = tx + 132;
       text(ctx, 'β(v₁) + β(v₂)', tx, m.y + m.h * 0.3, P.dim, { size: 12 }); text(ctx, `= ${fmtZphi({ a: D.b1.a + D.b2.a, b: D.b1.b + D.b2.b })}`, eq, m.y + m.h * 0.3, P.ink, { size: 12.5 });
       text(ctx, 'β(v₁ + v₂)', tx, m.y + m.h * 0.72, P.dim, { size: 12 }); text(ctx, `= ${fmtZphi(D.b3)}`, eq, m.y + m.h * 0.72, P.ink, { size: 12.5 });
     }
-    if (words) text(ctx, L('当前数字串的 β − 规范形的 β', 'β of the current string − β of the normal form'), cx, m.y + 7, P.dim, { align: 'center', size: 10.5, face: 'body' });
+    if (words) lines(ctx, L('当前数字串的 β − 规范形的 β', 'β of the current string − β of the normal form'), wide ? m.w * 0.46 : m.w, 10.5, 'body')
+      .forEach((s, i) => text(ctx, s, cx, m.y + 6 + i * 13, P.dim, { align: 'center', size: 10.5, face: 'body' }));
     ctx.strokeStyle = P.lineHot; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx - 2.4 * unit, y); ctx.lineTo(cx + 2.4 * unit, y); ctx.stroke();
     for (let u = -2; u <= 2; u++) {
       ctx.strokeStyle = u ? P.lineHot : P.ink; ctx.lineWidth = u ? 1 : 1.6; ctx.beginPath(); ctx.moveTo(cx + u * unit, y - (u ? 5 : 8)); ctx.lineTo(cx + u * unit, y + (u ? 5 : 8)); ctx.stroke();
@@ -162,7 +174,7 @@
     const D = fresh(), n = D.width, KK = D.passes.length, k = Math.min(KK, Math.floor(t + 1e-9)), f = k < KK ? clamp(t - k, 0, 1) : 0, e = TRV.smooth(f);
     const gaugeH = clamp(bx.h * 0.2, 52, 72), availH = bx.h - gaugeH - 8, wide = words && bx.w >= 600, labW = 34, sideW = wide ? 184 : 48, headH = 20, gapH = 6;
     let rowH = Math.min(54, (availH - headH - gapH - 8) / (KK + 3)), cap = KK + 1, first = 0;
-    if (rowH < 20) { rowH = 20; cap = Math.max(2, Math.floor((availH - headH - gapH) / rowH) - 2); first = clamp(t + 2 - cap, 0, KK + 1 - cap); }
+    if (rowH < 20) { rowH = 20; cap = Math.max(1, Math.floor((availH - headH - gapH) / rowH) - 2); first = clamp(t + 2 - cap, 0, KK + 1 - cap); }
     const by = bx.y + Math.max(0, (availH - headH - gapH - (cap + 2) * rowH) / 2), top = by + gaugeH + 8;   // gauge and rows, centred in the box
     drawGauge(ctx, { x: bx.x, y: by, w: bx.w, h: gaugeH }, D, k, e, words);
     const cell = Math.min(rowH, (bx.w - labW - sideW) / n, 54), gridW = n * cell, x0 = bx.x + labW + Math.max(0, (bx.w - labW - sideW - gridW) / 2);
@@ -278,7 +290,13 @@
 
   /* ---------- scene: the window on the contraction face ---------- */
   function drawWindow(ctx, bx, m) {
-    const D = fresh(), xa = -0.62, xb = 0.86, sx = bx.x + 44, sw = bx.w - 56, sy = bx.y + 30, cy = bx.y + bx.h - 22, lane = cy - 92, sh = lane - 30 - sy, top = Math.max(21, m);
+    const D = fresh(), xa = -0.62, xb = 0.86, sx = bx.x + 32, sw = bx.w - 40, sy = bx.y + 22, cy = bx.y + bx.h - 18, top = Math.max(21, m);
+    const b = (u) => (u < 0 ? `(${fix(u, 3)})` : fix(u, 3)), formula = [
+      'c = β′(v₁) + β′(v₂) − β′(v₁ + v₂)',
+      `= ${b(BC[S.v1])} + ${b(BC[S.v2])} − ${b(BC[S.v1 + S.v2])} = ${fmtSigned(D.c.a)}`
+    ];
+    const size = sw > 520 ? 12 : 10.5, formulaLines = formula.flatMap((s) => lines(ctx, s, bx.w, size));
+    const lane = cy - 60 - formulaLines.length * 15, sh = lane - 24 - sy;
     const X = (u) => sx + (u - xa) / (xb - xa) * sw, Yv = (v) => sy + sh - v / top * sh;
     ctx.fillStyle = TRV.alpha(P.lineHot, 0.16); ctx.fillRect(X(LO), sy - 6, X(HI) - X(LO), lane - sy + 22);
     for (const u of [LO, HI]) { ctx.strokeStyle = P.ink; ctx.globalAlpha = 0.75; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(u), sy - 6); ctx.lineTo(X(u), lane + 16); ctx.stroke(); ctx.globalAlpha = 1; }
@@ -298,8 +316,8 @@
       text(ctx, lab, X(u), lane + (up ? -1 : 1) * (clash ? 26 : 14), P.amber, { align: 'center', size: 11, halo: true });
     });
     // c = β′(v₁) + β′(v₂) − β′(v₁ + v₂): three numbers of the window leave room for the integers −1, 0, 1 only
-    const cw = Math.min(sw, 560), c0 = sx + sw / 2, U = (u) => c0 + u / 2.2 * (cw / 2), b = (u) => (u < 0 ? `(${fix(u, 3)})` : fix(u, 3));
-    text(ctx, `c = β′(v₁) + β′(v₂) − β′(v₁ + v₂) = ${b(BC[S.v1])} + ${b(BC[S.v2])} − ${b(BC[S.v1 + S.v2])} = ${fmtSigned(D.c.a)}`, c0, cy - 42, P.ink, { align: 'center', size: sw > 520 ? 12 : 10.5 });
+    const cw = Math.min(sw, 560), c0 = sx + sw / 2, U = (u) => c0 + u / 2.2 * (cw / 2);
+    formulaLines.forEach((s, i) => text(ctx, s, bx.x + bx.w / 2, lane + 30 + i * 15, P.ink, { align: 'center', size }));
     ctx.fillStyle = TRV.alpha(P.lineHot, 0.3); ctx.fillRect(U(PHI - 3), cy - 7, U(PHI) - U(PHI - 3), 14);
     ctx.strokeStyle = P.lineHot; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(U(-2.2), cy); ctx.lineTo(U(2.2), cy); ctx.stroke();
     text(ctx, 'φ − 3 ≈ −1.382', U(PHI - 3), cy - 17, P.dim, { align: 'center', size: 10.5 }); text(ctx, 'φ ≈ 1.618', U(PHI), cy - 17, P.dim, { align: 'center', size: 10.5 });
@@ -323,6 +341,7 @@
       return;
     }
     const st = $('stage').getBoundingClientRect(), below = (el) => (el ? el.getBoundingClientRect().bottom - st.top : 0);
+    TRV.hudFit();
     const top = Math.max(46, below($('hudBig').parentElement), below($('sceneChips'))) + 10, bottom = Math.max(18, $('legend').offsetHeight + 20);
     const bx = { x: 18, y: top, w: W - 36, h: Math.max(80, H - top - bottom) };
     if (S.scene === 'carry') drawCarry(ctx, bx, clock.t, true);
@@ -402,7 +421,7 @@
         + (s < HI ? L('小于 1/φ ≈ 0.618，所以 c = +1。', 'below 1/φ ≈ 0.618, so c = +1.') : s >= PHI ? L('不小于 φ ≈ 1.618，所以 c = −1。', 'at least φ ≈ 1.618, so c = −1.') : L('在 1/φ 与 φ 之间，所以 c = 0。', 'between 1/φ and φ, so c = 0.'));
     } else {
       const m = count(), inside = BLO[m] >= LO - 1e-12 && BHI[m] <= HI + 1e-12;
-      big = L(`收缩面的窗口 · v ≤ ${m}`, `Window on the contraction face · v ≤ ${m}`);
+      big = L(`收缩窗口 · v ≤ ${m}`, `Contraction window · v ≤ ${m}`);
       hud = L(`${m + 1} 个读数都在 [−0.382, 0.618] 之内 ${inside ? '✓' : '✗'} · 最小 ${fix(BLO[m], 3)}，最大 ${fix(BHI[m], 3)}`, `all ${m + 1} readings lie in [−0.382, 0.618] ${inside ? '✓' : '✗'} · least ${fix(BLO[m], 3)}, greatest ${fix(BHI[m], 3)}`);
       note = L('三个读数都在长度为 1 的窗口里，所以 c 只能落在 −1.382 与 1.618 之间；它又是整数。', 'All three readings lie in a window of length 1, so c can only fall between −1.382 and 1.618; and it is an integer.');
     }
@@ -527,6 +546,19 @@
     window: ['在收缩面上把 φ 换成 ψ = 1 − φ 再读同一串数字，得到 β′(v)。每个读数都落在 [−1/φ², 1/φ] 这个长度为 1 的窗口里，所以 c = β′(v₁) + β′(v₂) − β′(v₁ + v₂) 只能在 −1.382 与 1.618 之间：其中的整数只有 −1、0、1。', 'On the contraction face the same digits are read with ψ = 1 − φ in place of φ, which gives β′(v). Every reading lies in the window [−1/φ², 1/φ] of length 1, so c = β′(v₁) + β′(v₂) − β′(v₁ + v₂) can only fall between −1.382 and 1.618: the integers in there are −1, 0 and 1.'],
     sweep: ['v 从 0 走到 233，每个 β′(v) 画成一个点：它们左右折返，却没有一个离开窗口。', 'Let v run from 0 to 233 and draw each β′(v) as a point: they swing left and right, and not one leaves the window.']
   };
+  // A cited figure keeps one sentence next to ◀ ▶; the full lab retains the detailed explanations above.
+  const FIGURE_NOTES = {
+    plus: ['R₀ 保持数值不变，让 β 少 1。', 'R₀ preserves the value and lowers β by 1.'],
+    minus: ['R₁ 保持数值不变，让 β 多 1。', 'R₁ preserves the value and raises β by 1.'],
+    cancel: ['R₀ 与 R₁ 的计数抵消，c(6, 6) = 0。', 'R₀ and R₁ cancel: c(6, 6) = 0.'],
+    long: ['50 次进位中只有第一步的 R₁ 计数，c = −1。', 'Only the first of 50 carries counts: R₁ gives c = −1.'],
+    map: ['每格是一对数，亏量只有 −1、0、1 三色。', 'Each cell is a pair; its deficit has just three colours: −1, 0, 1.'],
+    zoom: ['格子增至 976144 个，亏量仍只有三色。', 'Even with 976144 cells, the deficit has just three colours.'],
+    phase: ['两条斜线把相位正方形分成三种亏量。', 'Two lines divide the phase square into three deficits.'],
+    fill: ['点铺满正方形，比例贴近两块三角形的面积。', 'Points fill the square; their shares approach the triangle areas.'],
+    window: ['三个读数都在长度为 1 的窗口里，整数亏量只能是 −1、0、1。', 'Three readings in a window of length 1 leave only the integer deficits −1, 0, 1.'],
+    sweep: ['读数左右折返，没有一个离开窗口。', 'Readings swing left and right; none leaves the window.']
+  };
   let booting = true;
   function applyPreset(id) {
     const p = PRESETS[id];
@@ -539,7 +571,7 @@
     clock.set(p.from || 0);
     if (booting) kit.autoplay(clock, $('stage')); else clock.play();
   }
-  const cards = kit.cards($('presets'), { presets: PRESETS, notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
+  const cards = kit.cards($('presets'), { presets: PRESETS, notes: TRV.figure ? FIGURE_NOTES : NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
     idle: ['自由探索：换一对数、换场景、拖时间轴。随时可以再选一张卡。', 'Free play: change the pair, switch scenes, scrub the rail. Pick a card again at any time.'] });
 
   TRV.drawer({ drawer: $('drawer'), open: $('infoBtn'), close: $('drawerClose') });

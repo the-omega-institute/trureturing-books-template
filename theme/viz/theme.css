@@ -315,15 +315,18 @@ footer.rail { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; ga
    <div class="app lab">  header.top · aside.deck | main.center | aside.side · footer.rail
    The stage is the page: it takes the middle column and most of the height; an optional .strip of small plots sits
    under it; experiment cards and controls are on the left, readouts and evidence on the right, the clock along the
-   bottom. Narrow screens and the book's iframe (?embed=1) put the stage first and the columns below it. */
-body:has(> .app.lab) { overflow: hidden; }
+   bottom. Narrow screens and the book's iframe (?embed=1) put the stage first and the columns below it.
+   Every row of the middle column is at least as tall as what it holds (the stage keeps its minimum height), and so
+   is the middle row of the lab: on a screen shorter than that the page scrolls
+   instead of drawing the strip over the stage or cutting off the rail. The two side columns scroll on their own. */
+body:has(> .app.lab) { overflow-x: hidden; overflow-y: auto; }
 .app.lab {
   height: 100%; display: grid; gap: 10px; padding-block: 10px; padding-inline: var(--gutter);
   grid-template-columns: minmax(240px, 290px) minmax(0, 1fr) minmax(270px, 330px);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(auto, 1fr) auto;
 }
 .app.lab > header.top, .app.lab > footer.rail { grid-column: 1 / -1; }
-.lab .center { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 10px; min-height: 0; min-width: 0; }
+.lab .center { display: grid; grid-template-rows: minmax(min-content, 1fr) auto; gap: 10px; min-width: 0; }
 .lab .center > .stage { min-height: 220px; }
 .strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; height: 176px; min-height: 0; }
 .strip .panel { display: flex; flex-direction: column; min-height: 0; }
@@ -364,7 +367,7 @@ dl.ro .ok dd, .okmark { color: var(--ok); }
   html:has(.app.lab), body:has(> .app.lab) { height: auto; }
   .app.lab { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .app.lab > header.top { order: 0; }
-  .lab .center { order: 1; grid-template-rows: minmax(300px, 58vh) auto auto; }
+  .lab .center { order: 1; grid-template-rows: minmax(min-content, max(300px, 58vh)) auto auto; }
   .app.lab > footer.rail { order: 2; grid-template-columns: minmax(0, 1fr); }
   .lab .side { order: 3; overflow: visible; }
   .lab .deck { order: 4; overflow: visible; }
@@ -372,7 +375,6 @@ dl.ro .ok dd, .okmark { color: var(--ok); }
   .lab .strip { grid-auto-flow: row; height: auto; }
   .lab .strip canvas { height: 170px; flex: none; }
   .lab .keys { text-align: left; }
-  .lab .hud-tr { max-width: calc(100% - 24px); }
 }
 @media (max-width: 520px) {
   .presets.cards { grid-template-columns: minmax(0, 1fr); }
@@ -389,7 +391,7 @@ dl.ro .ok dd, .okmark { color: var(--ok); }
    then readouts and controls in two columns, follow below */
 :root[data-embed]:has(.app.lab), :root[data-embed] body:has(> .app.lab) { height: auto; overflow: auto; }
 :root[data-embed] .app.lab { height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; padding-block: 8px; }
-:root[data-embed] .lab .center { grid-column: 1 / -1; order: 1; grid-template-rows: clamp(280px, calc(100vh - 150px), 520px) auto auto; }
+:root[data-embed] .lab .center { grid-column: 1 / -1; order: 1; grid-template-rows: minmax(min-content, clamp(280px, calc(100vh - 150px), 520px)) auto auto; }
 :root[data-embed] .app.lab > footer.rail { order: 2; }
 :root[data-embed] .lab .side { order: 3; overflow: visible; }
 :root[data-embed] .lab .deck { order: 4; overflow: visible; }
