@@ -161,7 +161,8 @@ Body text.
 #set page(width: 360pt, height: 480pt, margin: 30pt, header: none, footer: none)
 #set par(first-line-indent: (amount: 10pt, all: false))
 #let mark(name) = context metadata((name: name,
-  x: here().position().x.pt(), y: here().position().y.pt(), same_width: measure([Same]).width.pt()))
+  x: here().position().x.pt(), y: here().position().y.pt(), same_width: measure([Same]).width.pt(),
+  prefix_width: measure([Label before]).width.pt()))
 #block(width: 180pt)[
   Same#mark("indent-first") beginning.
 
@@ -179,6 +180,7 @@ Body text.
 #let reused = [$#mark("reused-start") "InterpretationContextTextReaderAdmissionBackgroundEvaluationGoalRuleConceptMeaning" #mark("reused-end")$<tr-inline-reused>]
 #block(width: 180pt)[#reused]
 #block(width: 80pt)[#reused]
+#block(width: 180pt)[Label before#mark("wide-prefix") $#mark("wide-start")#box(width: 150pt)[x]#mark("wide-end")$<tr-inline-wide>.]
 ''', encoding="utf-8")
         for cjk in (False, True):
             with self.subTest(cjk=cjk):
@@ -202,4 +204,7 @@ Body text.
                 self.assertEqual(len(reused), 2)
                 self.assertAlmostEqual(reused[0]["x"], 210, places=2)
                 self.assertAlmostEqual(reused[1]["x"], 110, places=2)
+                self.assertAlmostEqual(marks["wide-prefix"]["x"], 30 + marks["wide-prefix"]["prefix_width"], places=2)
+                self.assertGreater(marks["wide-start"]["y"], marks["wide-prefix"]["y"])
+                self.assertAlmostEqual(marks["wide-end"]["x"] - marks["wide-start"]["x"], 150, places=2)
                 self.assertGreater(marks["short-end"]["x"] - marks["short-start"]["x"], 15)

@@ -254,10 +254,13 @@
     let width-label = label("tr-academic-inline-measure-" + str(equation.label))
     let entry = query(width-label).find(item => item.value.loc == loc)
     let width = if entry == none { none } else { entry.value.width }
-    if width != none and measure(equation).width > width { linebreak(justify: false) }
+    // A long expression leaves too little prose to justify the preceding line gracefully.
+    if entry != none and measure(equation).width > 0.75 * entry.value.available { linebreak(justify: false) }
     box(width: if width == none { auto } else { width }, layout(size => {
       let target = calc.min(measure(equation).width, size.width)
-      [#metadata((loc: loc, width: target))#width-label]
+      // Later passes lay out the box at its fitted width; retain the initial container measure.
+      let available = if entry == none { size.width } else { calc.max(size.width, entry.value.available) }
+      [#metadata((loc: loc, width: target, available: available))#width-label]
       fit-width(equation, target)
     }))
   } }
