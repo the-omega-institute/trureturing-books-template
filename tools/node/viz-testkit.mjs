@@ -4,6 +4,7 @@
 //   const T = await session();                       // server + browser + page (zh-CN, 1440×900)
 //   await T.goto('example-monograph', 'golden-carry', '?lang=zh');
 //   T.check('c(1, 1) = 1', value === 1, `got ${value}`);
+//   T.warn('…', detail);                             // reported, counted, never fails the suite
 //   await stageFirstChecks(T, 'my-book', 'my-viz');  // the quality gates every stage-first page must pass (see below)
 //   await T.finish();                                // prints the tally and exits non-zero on any failure
 //
@@ -44,7 +45,14 @@ export const overflowX = (page) => page.evaluate(() => document.documentElement.
     few frames per second, so a suite should settle the page rather than hope that a frame has passed. */
 export async function settle(page, ms = 0) {
   if (ms) await page.waitForTimeout(ms);
-  await page.evaluate(() => { if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush(); });
+  await page.evaluate(async () => {
+    const kit = window.TRV && window.TRV.kit;
+    if (!kit) return;
+    if (kit.ready) await kit.ready();          // three.js for kit.solid, fetched on its first call
+    if (kit.flush) kit.flush();
+    if (kit.ready) await kit.ready();          // first frame may start asynchronous shader compilation
+    if (kit.flush) kit.flush();
+  });
 }
 
 /** Wait until `fn`, evaluated in the page with `arg`, returns something truthy: resolves true as soon as it does and
@@ -53,6 +61,90 @@ export async function settle(page, ms = 0) {
     runner delivers frames late, so "press Space, wait 700 ms, read t" fails there although the page is right.
       check('Space plays', await until(page, () => window.MY_DEBUG.state.t > 0)); */
 export const until = (page, fn, arg, timeout = 30000) => page.waitForFunction(fn, arg, { timeout }).then(() => true, () => false);
+
+/** The clock of the page as the rail shows it: playing is the ▶ / ❚❚ button's aria-pressed (kit.clock writes it on
+    play() and pause()), t the slider's value. The default reader of playsAfter; null on a page without a rail. */
+export const railClock = () => {
+  const b = document.querySelector('footer.rail #play'), r = document.querySelector('footer.rail .clock input[type=range]');
+  return b && r ? { playing: b.getAttribute('aria-pressed') === 'true', t: parseFloat(r.value) } : null;
+};
+
+let playWatches = 0;
+/** Arm a watcher in the page before an action: it samples read() (evaluated in the page, returning { playing, t }) on
+    every animation frame and after every change of the DOM (kit.clock rewrites its readout on every tick), and records
+    whether the clock was seen starting (from rest, or again from an earlier time) and then seen past the time it
+    started from (played). Returns the
+    key of the record (window.__trvPlays[key]). */
+async function armPlayWatch(page, read) {
+  const key = ++playWatches;
+  await page.evaluate(`(() => {
+    const read = (${read.toString()}), key = ${key};
+    const all = window.__trvPlays = window.__trvPlays || {}, rec = all[key] = { started: false, played: false, from: null };
+    let prev = null;   // the state before the action: a clock already playing counts only once it starts again
+    const sample = () => {
+      let s = null; try { s = read(); } catch (e) { return; }
+      if (!s) return;
+      if (!rec.started && prev && s.playing && (!prev.playing || s.t < prev.t)) { rec.started = true; rec.from = s.t; }
+      else if (rec.started && s.t !== rec.from && (s.playing || s.t > rec.from)) rec.played = true;
+      prev = { playing: !!s.playing, t: s.t };
+    };
+    const mo = new MutationObserver(sample);
+    mo.observe(document.documentElement, { subtree: true, attributes: true, childList: true, characterData: true });
+    const tick = () => { if (rec.done) return; sample(); requestAnimationFrame(tick); };
+    rec.stop = () => { rec.done = true; mo.disconnect(); };
+    sample(); requestAnimationFrame(tick);
+  })()`);
+  return key;
+}
+const playRecord = (page, key) => page.evaluate((k) => { const r = (window.__trvPlays || {})[k]; if (r && r.stop) r.stop(); return r ? { started: r.started, played: r.played } : null; }, key);
+
+/** Whether the clock plays after an action, without a race: the watcher is in the page before action() runs (a click,
+    a key), so a playback that is over within a frame or two still counts. read() is evaluated in the page and returns
+    { playing, t } (default railClock: the rail's ▶ button and slider); "it played" means it was seen playing and then
+    seen past the time it started from. Resolves true as soon as that is recorded, false after opts.timeout (30000 ms).
+    Use it for every check of a playback shorter than a second or two (a card that sweeps a short stretch of the rail):
+    "click, settle, then until(playing && t > 0)" can start looking after the sweep has ended.
+      check('card fill plays', await playsAfter(page, () => page.click('[data-preset="fill"]'), () => window.GC_DEBUG.state)); */
+export async function playsAfter(page, action, read = railClock, opts = {}) {
+  const key = await armPlayWatch(page, read);
+  await action();
+  const ok = await until(page, (k) => !!(window.__trvPlays[k] && window.__trvPlays[k].played), key, opts.timeout == null ? 30000 : opts.timeout);
+  await playRecord(page, key);
+  return ok;
+}
+
+/** The labelled still that tools/node/viz-thumbs.mjs captures of a cited card: the size, scale and query it uses. */
+export const STILL = { width: 800, height: 450, scale: 2 };
+export const stillQuery = (preset, lang) => `?shot=1&lang=${lang}&preset=${preset}`;
+/** Bring a page opened on stillQuery() to the frame viz-thumbs.mjs photographs: fonts loaded, the [data-thumb] region
+    (else the stage) filling the viewport, canvases resized and drawn. Returns { has, on }: whether the page has the
+    card and opened on it. */
+export async function prepareStill(page, preset) {
+  await page.evaluate(() => document.fonts && document.fonts.ready);
+  await page.waitForTimeout(500);
+  const state = await page.evaluate((card) => {
+    if (!document.querySelector('[data-thumb]')) { const s = document.querySelector('.stage'); if (s) s.setAttribute('data-thumb', ''); }
+    window.dispatchEvent(new Event('resize'));
+    if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush();
+    const b = document.querySelector(`[data-preset="${card}"]`);
+    return { has: !!b, on: !!b && b.getAttribute('aria-pressed') === 'true' };
+  }, preset);
+  await page.waitForTimeout(700);
+  await settle(page);
+  return state;
+}
+/** Open the still of card `preset` in language `lang` exactly as viz-thumbs.mjs captures it (800 × 450, reduced motion,
+    ?shot=1&lang=…&preset=…) and return the page, so a suite can check that the frame the figure shows carries the
+    numbers its caption names:
+      const still = await openStill(T, 'example-monograph', 'golden-carry', 'cancel', 'zh');
+      check('the still of CANCEL shows the third pass, c = 0', (await still.evaluate(() => window.GC_DEBUG.state)).pass === 3);
+    Close it with still.context().close(). */
+export async function openStill(T, slug, id, preset, lang = 'zh') {
+  const page = await T.open(slug, id, stillQuery(preset, lang), { viewport: { width: STILL.width, height: STILL.height }, locale: lang === 'zh' ? 'zh-CN' : lang, reducedMotion: 'reduce' });
+  const state = await prepareStill(page, preset);
+  T.check(`still ${preset} (${lang}): the page opens on the card`, state.has && state.on, JSON.stringify(state));
+  return page;
+}
 
 /** The fraction of the viewport covered by the visible part of an element (0 when it is absent or off-screen). */
 export const viewportShare = (page, selector) => page.evaluate((sel) => {
@@ -65,7 +157,12 @@ export const viewportShare = (page, selector) => page.evaluate((sel) => {
 /** The fraction of a 2D canvas that is drawn on (sampled pixels with non-zero alpha): 0 for a blank canvas. */
 export const inkShare = (page, selector) => page.evaluate((sel) => {
   const cv = document.querySelector(sel); if (!cv || !cv.width || !cv.height) return 0;
-  const data = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  let c2 = cv.getContext('2d');
+  if (!c2) {   // a WebGL canvas (kit.solid draws with preserveDrawingBuffer): read it through a 2D copy
+    const cp = document.createElement('canvas'); cp.width = cv.width; cp.height = cv.height;
+    c2 = cp.getContext('2d'); c2.drawImage(cv, 0, 0);
+  }
+  const data = c2.getImageData(0, 0, cv.width, cv.height).data;
   let drawn = 0, total = 0;
   for (let i = 3; i < data.length; i += 4 * 5) { total++; if (data[i] > 8) drawn++; }
   return total ? drawn / total : 0;
@@ -83,6 +180,21 @@ export const labelOverlaps = (page, selector = '.stage .tag', share = 0.5) => pa
   }
   return bad;
 }, [selector, share]);
+
+/** Lowercase Greek letters the page sets in capitals: [text, …] of rendered text nodes that hold a lowercase Greek
+    letter inside an element whose computed text-transform is uppercase (δ shown as Δ, φ as Φ). The theme sets labels,
+    headings, card codes and chips in capitals, and shell.js (TRV.keepCase) keeps Greek letters and one-letter
+    variables as written; a leftover means that guard was bypassed (a page's own style or script). */
+export const capitalGreek = (page) => page.evaluate(() => {
+  const lower = /(?=\p{Script=Greek})\p{Ll}/u, out = [];
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let t = w.nextNode(); t; t = w.nextNode()) {
+    const el = t.parentElement;
+    if (!el || !lower.test(t.nodeValue) || !el.getClientRects().length) continue;
+    if (getComputedStyle(el).textTransform === 'uppercase') out.push(t.nodeValue.trim().slice(0, 40));
+  }
+  return [...new Set(out)];
+});
 
 /**
  * What a reader can see of the stage and of the middle column around it, on the page as it is laid out now (see
@@ -236,6 +348,9 @@ export async function session(opts = {}) {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail && !ok ? '  — ' + detail : ''}`);
     return !!ok;
   };
+  /** Something to fix that does not fail the suite (a quality gate introduced after pages were written). */
+  const warnings = [];
+  const warn = (name, detail = '') => { warnings.push({ name, detail }); console.log(`WARN  ${name}${detail ? '  — ' + detail : ''}`); };
   const url = (slug, id, query = '') => vizUrl(origin, slug, id, query);
   const goto = async (slug, id, query = '', p = page) => { await p.goto(url(slug, id, query), { waitUntil: 'load' }); return p; };
   const newPage = async () => watch(await context.newPage());
@@ -256,31 +371,121 @@ export async function session(opts = {}) {
     await browser.close();
     if (server) server.close();
     const failed = results.filter((r) => !r.ok).length;
-    console.log(`\n${results.length - failed}/${results.length} passed`);
+    console.log(`\n${results.length - failed}/${results.length} passed${warnings.length ? `, ${warnings.length} warning${warnings.length > 1 ? 's' : ''}` : ''}`);
     process.exit(failed || !results.length ? 1 : 0);
   }
-  return { page, context, browser, origin, errors, results, check, goto, url, newPage, open, finish };
+  return { page, context, browser, origin, errors, results, warnings, check, warn, goto, url, newPage, open, finish };
+}
+
+/** Pixel statistics of the WebGL canvas of the first kit.solid stage on the page: the share of drawn (opaque) pixels,
+    the spread of their luminance, and a 16-bin luminance histogram (for comparing two views). */
+export const solidPixels = (page) => page.evaluate(async () => {
+  const sc = window.TRV && window.TRV.solids && window.TRV.solids[0];
+  if (!sc) return null;
+  await sc.ready; window.TRV.kit.flush();
+  const cv = sc.el.querySelector('canvas.solid-gl');
+  if (!cv) return { share: 0, spread: 0, hist: [] };
+  const cp = document.createElement('canvas'); cp.width = cv.width; cp.height = cv.height;
+  const c = cp.getContext('2d'); c.drawImage(cv, 0, 0);
+  const d = c.getImageData(0, 0, cp.width, cp.height).data, hist = new Array(16).fill(0);
+  let n = 0, all = 0, s1 = 0, s2 = 0;
+  for (let i = 0; i < d.length; i += 4 * 3) {
+    all++;
+    if (d[i + 3] < 250) continue;
+    const y = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+    n++; s1 += y; s2 += y * y; hist[Math.min(15, Math.floor(y * 16))]++;
+  }
+  const mean = n ? s1 / n : 0;
+  return { share: all ? n / all : 0, spread: n ? Math.sqrt(Math.max(0, s2 / n - mean * mean)) : 0, hist: hist.map((h) => (n ? h / n : 0)) };
+});
+
+/**
+ * The checks of a page that draws a lit solid with kit.solid (stageFirstChecks runs them with { solid: true } or
+ * { solid: { … } }). `page` is open on the visualization.
+ *   lit solid   the stage's WebGL canvas is drawn on over ≥ minShare (0.12) of its pixels, opaquely, and their
+ *               luminance spreads (σ ≥ minSpread, 0.04): a shaded body, not a flat silhouette or a wireframe
+ *   turning     after the camera turns (drag across the stage, or opts.turn(page)) the distribution of light and
+ *               shade changes (histogram distance ≥ 0.05)
+ *   hidden mark a mark (bead or ring) that a solid hides cannot be picked, a visible one can (skipped when the frame
+ *               has no hidden mark, or no visible one)
+ *   resting     inside a book the WebGL context is given back after a rest, the frame stays on the 2D canvas, and a
+ *               touch takes it back (skipped with { rest: false })
+ */
+export async function solidChecks(T, slug, id, page, opts = {}) {
+  const o = { minShare: 0.12, minSpread: 0.04, rest: true, ...opts };
+  if (o.preset) await page.locator(`[data-preset="${o.preset}"]`).click();
+  const { check } = T;
+  await settle(page);
+  const a = await solidPixels(page);
+  check('solid: the stage draws a solid (kit.solid)', !!a, 'no kit.solid stage on the page');
+  if (!a) return;
+  check(`solid: an opaque body covers ≥ ${Math.round(o.minShare * 100)}% of the stage`, a.share >= o.minShare, `${(a.share * 100).toFixed(1)}%`);
+  check('solid: light and shade spread across the body', a.spread >= o.minSpread, `σ = ${a.spread.toFixed(3)}`);
+  const initial = await page.evaluate(() => ({ ...window.TRV.solids[0].cam }));
+  const distances = [];
+  for (const axis of o.turn ? ['custom'] : ['yaw', 'pitch']) {
+    await page.evaluate((cam) => { Object.assign(TRV.solids[0].cam, cam); TRV.kit.flush(); }, initial);
+    if (o.turn) await o.turn(page);
+    else {
+      const b = await page.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+      const x = b[0] + b[2] * 0.08, y = b[1] + b[3] * 0.65;
+      await page.mouse.move(x, y); await page.mouse.down();
+      for (let k = 1; k <= 6; k++) await page.mouse.move(x + (axis === 'yaw' ? b[2] * 0.05 * k : 0), y - (axis === 'pitch' ? b[3] * 0.05 * k : 0));
+      await page.mouse.up();
+    }
+    await settle(page);
+    const c = await solidPixels(page);
+    distances.push(c.hist.reduce((sum, h, k) => sum + Math.abs(h - a.hist[k]), 0) / 2);
+  }
+  const dist = Math.max(...distances);
+  await page.evaluate((cam) => { Object.assign(TRV.solids[0].cam, cam); TRV.kit.flush(); }, initial);
+  check('solid: turning the camera changes light and shade', dist >= 0.05, `histogram distance ${dist.toFixed(3)}`);
+  const pick = await page.evaluate(() => {
+    const sc = window.TRV.solids[0], ms = sc.marks(), hid = ms.find((m) => m.hidden), vis = ms.find((m) => !m.hidden);
+    const at = (m) => sc.nearest({ clientX: m.x, clientY: m.y }, [m.p], 6);
+    return { hidden: hid ? at(hid) : null, visible: vis ? at(vis) : null };
+  });
+  if (pick.hidden != null) check('solid: a mark behind the solid cannot be picked', pick.hidden === -1);
+  if (pick.visible != null) check('solid: a visible mark can be picked', pick.visible === 0);
+  if (o.rest) {
+    const em = await T.open(slug, id, `?embed=1&lang=zh${o.preset ? `&preset=${encodeURIComponent(o.preset)}` : ''}`, { viewport: { width: 740, height: 620 } });
+    await settle(em);
+    // Pause the shared clocks explicitly: resting tests must not depend on the duration of a card's story.
+    await em.evaluate(() => { TRV.kit.pause(); TRV.kit.flush(); });
+    const parked = await until(em, () => window.TRV.solids && window.TRV.solids[0] && window.TRV.solids[0].parked(), null, 30000);
+    const shown = await em.evaluate(() => { const sc = window.TRV.solids[0], st = sc.el.querySelector('canvas:not(.solid-gl)'); return { gl: !!sc.el.querySelector('canvas.solid-gl'), still: !!st && st.style.visibility === 'visible' }; });
+    check('solid: inside a book the WebGL context is given back after a rest, the frame stays as a picture', parked && !shown.gl && shown.still, JSON.stringify(shown));
+    const box = await em.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left + 8, r.top + r.height - 8]; });
+    await em.mouse.move(box[0], box[1]); await em.mouse.down(); await em.mouse.up();
+    await settle(em);
+    check('solid: a touch takes the context back', await em.evaluate(() => !window.TRV.solids[0].parked()));
+    await em.context().close();
+  }
 }
 
 /**
  * Honest labels (skills/book-viz, "如实标注"), checked on the page as served. `page` is open on the visualization.
  *   every Lean link names a theorem of trureturing.lock.json and points at its pinned commit, file and line;
- *   the registry entry lists exactly the theorems the page cites;
- *   green boxes (.lean without .num / .model / .argued / .open) are exactly the boxes that cite a Lean theorem;
+ *   the registry entry lists exactly the theorems the page cites outside .lean.frozen boxes;
+ *   green boxes (.lean without .num / .model / .argued / .open / .frozen) are exactly the boxes, other than the
+ *   neutral .lean.frozen ones, that cite a Lean theorem; every .lean.frozen box cites one (a theorem frozen in
+ *   trureturing that no theorem environment of the text cites: shown, not green, not in the registry's lean);
  *   the theory drawer says in both languages that the page is not a proof.
  */
 export async function evidenceChecks(T, slug, id, page) {
   const { check } = T, lock = readLock();
   const entry = (readRegistry(resolveBook(slug)).visualizations || []).find((v) => v.id === id) || {};
-  const links = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => [a.dataset.leanGid, a.href]));
+  const links = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => [a.dataset.leanGid, a.href, !!a.closest('.lean.frozen')]));
   const bad = links.find(([gid, href]) => { const d = lock && (lock.declarations || {})[gid]; return !d || !FORMAL_KINDS.includes(d.kind) || href !== leanUrl(lock, gid); });
-  check('evidence: every Lean link names a frozen theorem and points at its pinned commit, file and line', !bad, bad ? bad.join(' → ') : '');
-  const cited = [...new Set(links.map(([g]) => g))].sort(), listed = (entry.lean || []).map((l) => l.gid).sort();
+  check('evidence: every Lean link names a frozen theorem and points at its pinned commit, file and line', !bad, bad ? bad.slice(0, 2).join(' → ') : '');
+  // .lean.frozen boxes show theorems no theorem environment of the text cites: they are not the page's LEAN ✓ list
+  const cited = [...new Set(links.filter((l) => !l[2]).map(([g]) => g))].sort(), listed = (entry.lean || []).map((l) => l.gid).sort();
   const diff = [...cited.filter((g) => !listed.includes(g)).map((g) => `page only: ${g}`), ...listed.filter((g) => !cited.includes(g)).map((g) => `registry only: ${g}`)];
   check('evidence: the registry lists exactly the theorems the page cites', diff.length === 0, diff.slice(0, 3).join(' | '));
-  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open)(\s|$)/.test(b.className), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
-  const wrong = boxes.find((b) => b.green !== b.link);
-  check('evidence: green boxes are exactly the boxes that cite a Lean theorem', !wrong, wrong ? `${wrong.green ? 'green without a Lean link' : 'Lean link in a box of another colour'}: ${wrong.text}` : '');
+  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open|frozen)(\s|$)/.test(b.className), frozen: b.classList.contains('frozen'), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
+  const wrong = boxes.find((b) => (b.frozen ? !b.link : b.green !== b.link));
+  check('evidence: green boxes are exactly the boxes that cite a Lean theorem', !wrong,
+    wrong ? `${wrong.frozen ? 'FROZEN box without a Lean link' : wrong.green ? 'green without a Lean link' : 'Lean link in a box of another colour'}: ${wrong.text}` : '');
   const drawer = await page.$eval('#drawer', (d) => d.textContent).catch(() => null);
   if (drawer != null) check('evidence: the drawer says in both languages that the page is not a proof', /不是证明/.test(drawer) && /not a proof/.test(drawer));
 }
@@ -473,26 +678,35 @@ export async function spaceAfterCard(T, page, wait = 120) {
  *             through every card and scene, in both languages; every card a chapter cites, in its language and at its
  *             frame height, 334 and 740 wide and back, then every scene and the tour through every card (a page no
  *             chapter cites: its second card at 500 in both languages); the still; phone after every card
+ *   capitals  (desktop, both languages, every card; a warning, not a failure) no lowercase Greek letter is set in
+ *             capitals (capitalGreek): δ must not show as Δ
+ *   still     (desktop, a warning, not a failure) a card whose click starts the clock (seen by a watcher armed before
+ *             the click, so a sweep of a fifth of a second counts) declares its still frame: data-still on the card,
+ *             written by kit.cards({ presets }) from the `still` of the page's table of cards
  * and no page error, console error or failed request anywhere.
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
  *       rail (true; a page without footer.rail is not checked), keys (true; false for a page that does not bind
- *       Space to its clock), settle (ms to wait after a click).
+ *       Space to its clock), still (true; false skips the still-frame warning), settle (ms to wait after a click), solid (false; true or the options of solidChecks for a
+ *       page that draws a lit solid with kit.solid; preset selects its solid card).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
-  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', solid: false, still: true, minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
   const { check } = T;
   const locale = (lang) => (lang === 'zh' ? 'zh-CN' : 'en-US');
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
-  const runCards = async (page, tag) => {
+  const runCards = async (page, tag, played, caps) => {
     for (const c of await cardIds(page)) {
+      const key = played ? await armPlayWatch(page, railClock) : null;   // armed before the click: a short sweep counts
       await page.click(`[data-preset="${c}"]`); await settle(page, o.settle);
       const state = await page.evaluate((cid) => {
         const b = document.querySelector(`[data-preset="${cid}"]`), note = document.querySelector('#presetNote, .presets + .note');
-        return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1 };
+        return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1, still: b.dataset.still == null ? null : b.dataset.still };
       }, c);
       check(`${tag}: card ${c} applies and explains itself`, state.pressed === 'true' && state.note !== 0, JSON.stringify(state));
       await viewChecks(T, page, o, `${tag}: card ${c}`);
+      if (played) { const r = await playRecord(page, key); if (r && r.started) played.push({ card: c, still: state.still }); }
+      if (caps) for (const x of await capitalGreek(page)) caps.add(x);
     }
   };
   // the scene buttons on the stage, pressed in turn as a reader does
@@ -519,10 +733,16 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
       await viewChecks(T, page, o, `${tag}, ▶ card ${now}`, figure);
     }
   };
+  const capsWarning = (caps, where) => {
+    if (caps.size) T.warn(`capitals: lowercase Greek letters are set in capitals (${where})`,
+      `${[...caps].slice(0, 4).join(' | ')} — text-transform: uppercase turns δ into Δ; the theme keeps Greek letters and one-letter ` +
+      'variables as written (shell.js, TRV.keepCase): do not override .keepcase or set capitals on text the page writes outside the DOM');
+  };
 
   // desktop
   const page = await T.goto(slug, id, '?lang=zh');
   await page.evaluate(() => document.fonts && document.fonts.ready); await settle(page, 400);
+  if (o.solid) await solidChecks(T, slug, id, page, o.solid === true ? {} : o.solid);
   const share = await viewportShare(page, o.stage);
   check(`desktop: the stage holds ≥ ${Math.round(o.minShare * 100)}% of the viewport`, share >= o.minShare, `${(share * 100).toFixed(1)}%`);
   check('desktop: no sideways scrolling', (await overflowX(page)) <= 0);
@@ -530,7 +750,16 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   if (o.cards) {
     const n = (await cardIds(page)).length;
     check('desktop: at least four experiment cards', n >= 4, `${n}`);
-    await runCards(page, 'desktop');
+    const playing = [], caps = new Set(await capitalGreek(page));
+    await runCards(page, 'desktop', o.still ? playing : null, caps);
+    capsWarning(caps, 'zh, every card');
+    // a card that plays by itself declares the frame its still shows (kit.cards({ presets }) writes data-still)
+    for (const { card } of playing.filter((x) => x.still == null || x.still === '')) {
+      T.warn(`still: card ${card} plays by itself but declares no still frame`,
+        "give its entry in the page's table of cards a `still` (a clock time or 'end'), pass the table to kit.cards as " +
+        '`presets`, and put the clock there when TRV.still is set (or write data-still on the card); the figure a ' +
+        'chapter cites and the cover then show the frame its caption describes');
+    }
   }
   if (o.labels) { const bad = await labelOverlaps(page, `${o.stage} .tag`); check('desktop: stage labels do not sit on top of each other', bad.length === 0, JSON.stringify(bad.slice(0, 4))); }
   if (await page.$('#infoBtn')) {
@@ -547,12 +776,16 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   // English
   await page.click('[data-lang-set="en"]'); await settle(page, 150);
   await viewChecks(T, page, o, 'English');
+  const capsEn = new Set();
   if (o.cards) for (const c of await cardIds(page)) {
     await page.click(`[data-preset="${c}"]`); await settle(page, o.settle);
     const left = await cjkLeftovers(page); check(`English: no Chinese left with card ${c}`, left.length === 0, left.slice(0, 3).join(' | '));
     await viewChecks(T, page, o, `English: card ${c}`);
+    for (const x of await capitalGreek(page)) capsEn.add(x);
   }
   else { const left = await cjkLeftovers(page); check('English: no Chinese left on screen', left.length === 0, left.slice(0, 3).join(' | ')); }
+  for (const x of await capitalGreek(page)) capsEn.add(x);
+  capsWarning(capsEn, 'en');
   await runScenes(page, 'English');
   if (await page.$('#infoBtn')) {
     await page.click('#infoBtn'); const left = await cjkLeftovers(page);

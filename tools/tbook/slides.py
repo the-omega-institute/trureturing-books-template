@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from . import config, lean, paths
+from . import academic, config, lean, paths
 from .model import OPEN, Issue
 
 PRIMARY_FILE = "slides.md"  # the edition of the book's first language
@@ -58,6 +58,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
     "zh": {
         "present": "在线演示",
         "pdf": "下载 PDF",
+        "notes_pdf": "讲者笔记 PDF",
         "pages": "{n} 页",
         "static_note": "在线演示见",
         "keys": "在线演示：方向键或空格翻页，O 总览，F 全屏。",
@@ -68,6 +69,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
     "en": {
         "present": "Present online",
         "pdf": "Download PDF",
+        "notes_pdf": "Speaker notes PDF",
         "pages": "{n} slides",
         "static_note": "Slides online:",
         "keys": "Online: arrow keys or space to advance, O for the overview, F for full screen.",
@@ -156,6 +158,8 @@ def deck_names(book: config.Book) -> list[str]:
 def deck_langs(book: config.Book, deck: str) -> list[str]:
     """Languages with an edition file in the deck directory, the book's order first."""
     d = book.slides_dir / deck
+    if academic.is_academic(d):
+        return academic.settings(book, deck)["editions"]
     if not d.is_dir():
         return []
     found = {lang for lang in (lang_of_file(book, p.name) for p in d.iterdir() if p.is_file()) if lang}
@@ -1413,6 +1417,12 @@ class DeckEdition:
 
 
 def read_edition(book: config.Book, deck: str, lang: str) -> DeckEdition:
+    if academic.is_academic(book.slides_dir / deck):
+        data = academic.settings(book, deck)
+        source = academic.read_source(book, deck, lang, data)
+        title = data.get("title", {}).get(lang, deck)
+        return DeckEdition(lang, source.path, [Slide(i + 1, 1, {}, "") for i in range(source.count)],
+                           {"title": title, "deck": {"title": title, "version": book.version}})
     path = book.slides_dir / deck / edition_file(book, lang)
     all_slides = split_slides(path.read_text(encoding="utf-8"))
     head = all_slides[0].frontmatter if all_slides else {}
@@ -1430,6 +1440,12 @@ def cited_gids(book: config.Book) -> list[tuple[Path, int, str]]:
     """(file, line, GID) for every GID the book's decks cite — for ``./tbook pin`` and the lock check."""
     out = []
     for deck in deck_names(book):
+        if academic.is_academic(book.slides_dir / deck):
+            try:
+                out += academic.cited_gids(book, deck)
+            except ValueError:
+                pass  # check reports a malformed descriptor
+            continue
         for lang in deck_langs(book, deck):
             ed = read_edition(book, deck, lang)
             for s in ed.slides:
@@ -1453,6 +1469,15 @@ def check_ref(book: config.Book, src: str) -> str | None:
     d = book.slides_dir / src
     if not d.is_dir():
         return f"slides src={src!r}: books/{book.slug}/slides/{src}/ not found (create it: ./tbook slides new {book.slug} {src} \"<中文标题>\" \"<English title>\")"
+    if academic.is_academic(d):
+        try:
+            data = academic.settings(book, src)
+            for lang in data["editions"]:
+                if not (d / academic.edition_file(data, lang)).is_file():
+                    return f"academic deck {src}: missing {academic.edition_file(data, lang)}"
+        except ValueError as exc:
+            return str(exc)
+        return None
     primary = book.languages[0]
     if not (d / edition_file(book, primary)).is_file():
         return f"slides src={src!r}: books/{book.slug}/slides/{src}/{edition_file(book, primary)} not found"
@@ -1484,6 +1509,9 @@ def check(book: config.Book) -> list[Issue]:
 
     for deck in names:
         d = book.slides_dir / deck
+        if academic.is_academic(d):
+            issues += academic.check_deck(book, deck, lock)
+            continue
         err = lambda path, line, msg: issues.append(Issue("error", path, line, msg))  # noqa: E731
         if not DECK_RE.match(deck):
             err(d, 0, f"deck name {deck!r} must be kebab-case (a-z, 0-9, -)")
@@ -1630,6 +1658,7 @@ def items(book: config.Book) -> list[dict[str, Any]]:
         primary = eds[langs[0]]
         out.append({
             "kind": "slides",
+            "deck_kind": "academic" if academic.is_academic(book.slides_dir / deck) else "slidev",
             "id": deck,
             "languages": langs,
             "title": {lang: ed.deck_title for lang, ed in eds.items()},
@@ -1641,6 +1670,8 @@ def items(book: config.Book) -> list[dict[str, Any]]:
             "href": {lang: f"slides/{site_path(book, deck, lang)}" for lang in langs},
             "pdf": {lang: f"slides/{deck}/{pdf_name(book, deck, lang)}" for lang in langs},
             "pdf_name": {lang: pdf_name(book, deck, lang) for lang in langs},
+            "notes_pdf": {lang: f"slides/{deck}/{pdf_name(book, deck, lang)[:-4]}-notes.pdf" for lang in langs}
+                         if academic.is_academic(book.slides_dir / deck) else {},
             "url": {lang: public_url(site, book, deck, lang) for lang in langs},
             "index": "slides/index.html",
         })
@@ -1700,6 +1731,9 @@ def render_embed(env, ctx, inner: str, doc) -> str:
             f'<a href="{esc(pdf)}" download>{esc(t(lang, "pdf"))}</a></div>',
             "</aside>",
         ]
+        if academic.is_academic(book.slides_dir / src):
+            notes = pdf[:-4] + "-notes.pdf"
+            parts.insert(-1, f'<p><a href="{esc(notes)}" download>{esc(t(lang, "notes_pdf"))}</a></p>')
         return "\n".join(parts)
     # pandoc (PDF / EPUB): the title, the caption and the public URL (absolute; empty base_url → site path)
     url = public_url(ctx.site, book, src, deck_lang or lang)
@@ -1755,6 +1789,19 @@ def _build(site: config.Site, book: config.Book, out_dir: Path) -> None:
     out_dir = Path(out_dir)
     if out_dir.exists():  # a fresh build: no deck or PDF of an earlier one stays behind
         shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    slidev = [d for d in deck_names(book) if not academic.is_academic(book.slides_dir / d)]
+    if slidev:
+        _build_slidev(site, book, out_dir)
+    manifest = read_manifest(out_dir) or {"schema": MANIFEST_SCHEMA, "book": book.slug,
+                                       "base": base_path(site), "decks": {}}
+    for deck in deck_names(book):
+        if academic.is_academic(book.slides_dir / deck):
+            manifest["decks"][deck] = academic.build_deck(site, book, deck, out_dir)
+    (out_dir / MANIFEST).write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _build_slidev(site, book, out_dir):
     cmd = [_node(), str(paths.TOOLS / "node" / "slides-build.mjs"), "--book", book.slug,
            "--out", str(Path(out_dir).resolve()), "--base", base_path(site)]
     if os.environ.get("TBOOK_SLIDES_NO_PDF") == "1":
@@ -1796,6 +1843,10 @@ def _stale(book: config.Book, out_dir: Path, manifest: dict[str, Any] | None, ba
             if info.get("site_path") != want:
                 return (f"{deck} ({lang}) was built for {info.get('site_path')!r}, the site uses {want!r} "
                         f"({book.languages[0]} is the book's first language)")
+            if academic.is_academic(book.slides_dir / deck):
+                for key in ("pdf", "notes_pdf"):
+                    if not info.get(key) or not (out_dir / info[key]).is_file():
+                        return f"academic deck {deck} ({lang}) is missing its {key}"
         gone = sorted(set(built) - set(langs))
         if gone:
             return f"{deck} was built with {', '.join(gone)} as well, which is no longer an edition of it"
@@ -1839,6 +1890,8 @@ def publish(site: config.Site, book: config.Book, site_dir: Path, *, build_missi
             shutil.copytree(out / info["dir"], site_dir / info["site_path"], dirs_exist_ok=True)
             if info.get("pdf") and (out / info["pdf"]).is_file():
                 shutil.copy2(out / info["pdf"], site_dir / deck / pdf_name(book, deck, lang))
+            if info.get("notes_pdf") and (out / info["notes_pdf"]).is_file():
+                shutil.copy2(out / info["notes_pdf"], site_dir / deck / (pdf_name(book, deck, lang)[:-4] + "-notes.pdf"))
     published = items(book)
     for it in published:
         it["built_pdf"] = {lang: (site_dir / it["id"] / it["pdf_name"][lang]).is_file() for lang in it["languages"]}
@@ -1890,6 +1943,8 @@ def index_html(site: config.Site, book: config.Book, decks: list[dict[str, Any]]
             links = [f'<a href="{esc(site_path(book, d["id"], lang))}">{esc(t(lang, "present"))} ↗</a>']
             if d.get("built_pdf", {}).get(lang, True):
                 links.append(f'<a href="{esc(d["id"])}/{esc(d["pdf_name"][lang])}" download>{esc(t(lang, "pdf"))}</a>')
+            if lang in d.get("notes_pdf", {}):
+                links.append(f'<a href="{esc(d["id"])}/{esc(d["pdf_name"][lang][:-4])}-notes.pdf" download>{esc(t(lang, "notes_pdf"))}</a>')
             rows.append(f'<p class="links" lang="{esc(config.bcp47(lang))}"><span class="ln">'
                         f'{esc(config.s(lang, "meta.name") or lang)}</span><span class="lk">{"".join(links)}</span></p>')
         blurb = pair(lambda lang, d=d: d["blurb"].get(lang) or d["info"].get(lang) or "")
@@ -2023,9 +2078,13 @@ def _list(books: list[config.Book]) -> int:
 def cli(args) -> int:
     """``./tbook slides new <book> <deck> "<中文标题>" "<English title>"`` and ``./tbook slides list [<book>]``."""
     rest = [a for a in (getattr(args, "rest", None) or []) if a != "--"]
+    if args.action == "snapshots":
+        return academic.snapshots(config.load_books(rest or None))
     if args.action == "list":
         return _list(config.load_books(rest or None))
     if args.action == "new":
+        if "--academic" in rest:
+            return academic.scaffold(rest)
         if len(rest) not in (3, 4):
             print('usage: ./tbook slides new <book> <deck> "<中文标题>" "<English title>"', file=sys.stderr)
             return 2

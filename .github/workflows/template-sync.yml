@@ -1,6 +1,7 @@
 # Keep a books repository on the latest template release (managed by the template; never runs in the
 # template repository itself).
 #
+# Each installed layer uses its own matrix job and template-update/<layer>/<version> branch.
 # Weekly (or on demand) this runs `./tbook template update`, and when managed files changed, pushes the
 # branch template-update/<version> and opens or updates a pull request whose body is the update summary
 # (build/template-update.md). Conflicts (local edits to managed files that the template also changed) are
@@ -28,6 +29,10 @@ on:
         description: 'Template version (e.g. 0.3.0) or git ref; empty = latest release'
         required: false
         default: ''
+      layer:
+        description: 'upstream or an installed layer name; empty = all sources'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -37,9 +42,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sync:
-    name: Update managed files
+  discover:
     if: github.repository != 'the-omega-institute/trureturing-books-template'
+    runs-on: ubuntu-24.04
+    outputs:
+      layers: ${{ steps.layers.outputs.layers }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - id: layers
+        env:
+          PYTHONPATH: tools
+          SELECTED_LAYER: ${{ inputs.layer }}
+          TARGET_REF: ${{ inputs.to }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from tbook.paths import ROOT
+          from tbook.template import targets
+          rows = targets(ROOT)
+          selected = os.environ.get("SELECTED_LAYER", "")
+          if selected and selected not in [r["name"] for r in rows]:
+              raise SystemExit("Unknown layer: " + selected)
+          if os.environ.get("TARGET_REF") and not selected and len(rows) > 1:
+              raise SystemExit("Choose a layer when specifying a version/ref for multiple sources")
+          names = [r["name"] for r in rows if r["repo"] != os.environ["GITHUB_REPOSITORY"]
+                   and (not selected or r["name"] == selected)]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("layers=" + json.dumps(names) + "\n")
+          PYTHON
+
+  sync:
+    name: Update ${{ matrix.layer }} managed files
+    needs: discover
+    if: needs.discover.outputs.layers != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        layer: ${{ fromJSON(needs.discover.outputs.layers) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -49,6 +91,7 @@ jobs:
       GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
       HAS_BOT_TOKEN: ${{ secrets.BOT_TOKEN != '' }}
       BASE: ${{ github.ref_name }}
+      LAYER: ${{ matrix.layer }}
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -67,8 +110,15 @@ jobs:
           TO: ${{ inputs.to }}
         run: |
           set -euo pipefail
-          old="$(python3 -c 'import tomllib; print(tomllib.load(open("template.toml", "rb"))["template"]["version"])')"
-          args=()
+          config=template.toml
+          summary=build/template-update.md
+          if [ "$LAYER" != upstream ]; then
+            config="template.d/$LAYER.toml"
+            summary="build/template-update-$LAYER.md"
+          fi
+          export CONFIG="$config"
+          old="$(python3 -c 'import os, tomllib; print(tomllib.load(open(os.environ["CONFIG"], "rb"))["template"]["version"])')"
+          args=(--layer "$LAYER")
           if [ -n "${TO:-}" ]; then args+=(--to "$TO"); fi
           rc=0
           ./tbook template update "${args[@]}" 2> "$RUNNER_TEMP/update.err" || rc=$?
@@ -82,14 +132,14 @@ jobs:
             echo "::error title=Template sync::./tbook template update failed (exit $rc); see the log above"
             exit "$rc"
           fi
-          new="$(python3 -c 'import tomllib; print(tomllib.load(open("template.toml", "rb"))["template"]["version"])')"
+          new="$(python3 -c 'import os, tomllib; print(tomllib.load(open(os.environ["CONFIG"], "rb"))["template"]["version"])')"
           {
             echo "old=$old"
             echo "new=$new"
             echo "conflicts=$([ "$rc" -eq 3 ] && echo true || echo false)"
             if [ -n "$(git status --porcelain)" ]; then echo "changed=true"; else echo "changed=false"; fi
           } >> "$GITHUB_OUTPUT"
-          if [ -f build/template-update.md ]; then cat build/template-update.md >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -f "$summary" ]; then cat "$summary" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Push the branch and open or update the pull request
         if: steps.update.outputs.changed == 'true'
@@ -100,7 +150,14 @@ jobs:
         run: |
           set -euo pipefail
           branch="template-update/$NEW"
-          title="Template update $OLD → $NEW"
+          prefix=template-update/
+          summary=build/template-update.md
+          if [ "$LAYER" != upstream ]; then
+            prefix="template-update/$LAYER/"
+            summary="build/template-update-$LAYER.md"
+            branch="$prefix$NEW"
+          fi
+          title="Template update $LAYER $OLD → $NEW"
           if [ "$CONFLICTS" = "true" ]; then title="[conflicts] $title"; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -117,7 +174,7 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          git commit -q -m "Update template to $NEW" -m "Generated by ./tbook template update ($OLD → $NEW)."
+          git commit -q -m "Update template $LAYER to $NEW" -m "Generated by ./tbook template update ($OLD → $NEW)."
 
           # Never overwrite commits a person added to an existing update branch.
           if git rev-parse -q --verify "refs/remotes/origin/$branch" >/dev/null; then
@@ -138,7 +195,7 @@ jobs:
           fi
 
           body="$RUNNER_TEMP/pr-body.md"
-          cp build/template-update.md "$body"
+          cp "$summary" "$body"
           if [ "$HAS_BOT_TOKEN" != "true" ]; then
             cat >> "$body" <<'EOF'
 
@@ -160,7 +217,7 @@ jobs:
             echo "Opened pull request #$pr"
             # Point older, still open update pull requests at the new one (once, when it is created).
             gh pr list --state open --json number,headRefName \
-              --jq ".[] | select(.headRefName | startswith(\"template-update/\")) | select(.headRefName != \"$branch\") | .number" |
+              --jq ".[] | select(.headRefName | startswith(\"$prefix\")) | select(.headRefName != \"$branch\") | select(.headRefName | ltrimstr(\"$prefix\") | contains(\"/\") | not) | .number" |
               while read -r old_pr; do
                 gh pr comment "$old_pr" --body "Superseded by #$pr (template $NEW)." || true
               done

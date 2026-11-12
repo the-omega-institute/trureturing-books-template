@@ -95,7 +95,7 @@ end
 local function typst_content(inlines)
   if #inlines == 0 then return "none" end
   local out = pandoc.write(pandoc.Pandoc({ pandoc.Plain(compat.inlines(inlines)) }), "typst")
-  out = out:gsub("%s+$", "")
+  out = out:gsub("[ \t\r\n]+$", "")
   return "[" .. out .. "]"
 end
 

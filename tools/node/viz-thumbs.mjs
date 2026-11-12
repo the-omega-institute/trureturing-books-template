@@ -13,18 +13,19 @@
 // viewport and hides toasts and HUD text, so one cover serves both languages. A page may define window.TRV_THUMB()
 // (sync or async) to put itself into a representative cover state first. A still is the page opened as
 // <id>/?shot=1&lang=<lang>&preset=<card>: the same region with its title, labels and legend kept (TRV.still is set, so
-// the page shows the card's telling frame instead of playing). Chromium honours PW_CHROMIUM_PATH.
+// the page shows the card's telling frame instead of playing): a card that plays by itself declares that frame as
+// `still` in the page's table of cards (kit.cards({ presets }) writes it onto the card as data-still; see
+// templates/viz/README.md). Chromium honours PW_CHROMIUM_PATH.
 // Adapted from trureturing-visualize/scripts/thumbs.mjs (Apache-2.0, the-omega-institute).
 import path from 'node:path';
 import fs from 'node:fs';
 import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel, citedCards } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
-import { routeLocalFonts } from './viz-testkit.mjs';
+import { routeLocalFonts, STILL, stillQuery, prepareStill } from './viz-testkit.mjs';
 
 export const WIDTH = 1280, HEIGHT = 720;
-/** Stills are captured at 800×450 CSS pixels, twice over: labels sized for a reader stay legible on a printed page. */
-export const STILL = { width: 800, height: 450, scale: 2 };
-export { citedCards };   // the cards that chapters cite (tools/node/viz-common.mjs)
+/** Stills use the same capture setup as openStill() of viz-testkit.mjs. */
+export { STILL, citedCards };
 const args = process.argv.slice(2);
 let books = listBooks(), ids = [];
 if (args.length) {
@@ -81,17 +82,8 @@ try {
       const errs = [];
       pg.on('pageerror', (e) => errs.push(e.message));
       pg.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-      await pg.goto(vizUrl(origin, book.slug, v.id, `?shot=1&lang=${lang}&preset=${preset}`), { waitUntil: 'load' });
-      await pg.evaluate(() => document.fonts && document.fonts.ready);
-      await pg.waitForTimeout(500);
-      const state = await pg.evaluate((card) => {
-        if (!document.querySelector('[data-thumb]')) { const s = document.querySelector('.stage'); if (s) s.setAttribute('data-thumb', ''); }
-        window.dispatchEvent(new Event('resize'));
-        if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush();
-        const b = document.querySelector(`[data-preset="${card}"]`);
-        return { has: !!b, on: !!b && b.getAttribute('aria-pressed') === 'true' };
-      }, preset);
-      await pg.waitForTimeout(700);
+      await pg.goto(vizUrl(origin, book.slug, v.id, stillQuery(preset, lang)), { waitUntil: 'load' });
+      const state = await prepareStill(pg, preset);
       const file = path.join(dir, `fig-${preset}.${lang}.jpg`);
       if (!state.has) { console.error(`${book.slug}/${v.id}: no card data-preset="${preset}" (cited by a ${lang} chapter)`); failures++; await ctx.close(); continue; }
       if (!state.on) errs.push(`the page did not open on card "${preset}" (does it call cards.initial()?)`);

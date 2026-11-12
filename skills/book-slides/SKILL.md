@@ -67,3 +67,17 @@ npx slidev books/<book>/slides/<deck>/slides.md                  # 本地预览�
 `slides-check`、`./tbook check`、`./tbook build slides` 全部通过（PDF 页数与幻灯片页数一致）；各语言页数与版式对应；在站点上逐页看过；章节已嵌入。
 
 当前版本来自 `trureturing.lock.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。
+
+## 学术演示稿（Beamer）
+
+传统讨论班报告用 `./tbook slides new <book> <deck> "<title>" --academic --editions en` 创建，每个所选语言提供一个标题。命令生成 `deck.toml` 和 `slides.tex`，其他所选语言使用 `slides.<lang>.tex`。一份演示稿可以只覆盖书中语言版本的子集，各语言仅在该演示稿内逐帧对齐。现有 Slidev 构建方式继续可用。
+
+先读 `theme/beamer/README.md`，了解配置、TeX 字面量契约、固定引擎与自有主题接口。源码以 `\documentclass{beamer}` 和 `\input{tbook-deck}` 开始，依次组织标题页、提纲、节与小节，各帧写 `% Manuscript: ...` 注释并保留 `\note{...}`，可选技术内容放在 `\appendix` 之后。明确填写报告人、合作者及其真实机构信息；模板不提供默认机构标识。
+
+用 `\begin{bookresult}{<book-id>} ... \end{bookresult}` 引用结果：正文由报告人撰写，种类、编号、标题、GID 与状态来自书模型和锁文件。每个 GID 都解析为定理时才显示带链接的绿色 `Lean ✓`；定义用中性 `LEAN DEF`，开放问题用红色 `OPEN` 且不得带 GID，未解析引用显示不带链接的红色 `UNVERIFIED` 并使检查失败。不要重复抄写 GID 或覆盖徽章。用 `\PinnedCommit` 显示所钉提交，以 `\FormalVerification` 生成本演示稿的结果账本。
+
+用 `\BookViz{<viz>}{<card>}` 插入链接在线页面的纸面静态图。先用 `./tbook slides snapshots <book>` 生成并提交 `fig-<card>.<lang>.paper.png`；它使用现有 Chromium，可用 `PW_CHROMIUM_PATH` 指定。用 `\BookFigure{<figure>}` 按纸面配色插入规范图件，图件过期时运行 `./tbook fig build --book <book>`。不要把 SVG 副本放进演示目录。
+
+运行 `./tbook check`、工具单元测试与 `./tbook build slides --book <book>`。Tectonic 0.16.9 同时构建 `<deck>-<lang>.pdf` 和 `<deck>-<lang>-notes.pdf`。查看渲染后的标题页、提纲、定理、媒体与账本页，确认听众版隐藏备注，并比较两次无缓存构建是否逐字节相同。站点索引、章节卡片与书籍 Release 均链接两种 PDF。演示稿可把获得相应授权的自有主题放在 `theme_dir`；不得把 GPL 主题文件或机构图形纳入 Apache 模板。
+
+学术报告默认使用原创主题的实色条带、白字块标题与纸面浅色块正文。填写 `short_author`、`institution`、可选的 `coauthors` 与 `date`；原创标题页在合作者前显示“Joint work with …”。导航按钮默认隐藏，设 `navigation_symbols = true` 才显示。纸面可视化静态图为 3200 × 1800 像素，占满幻灯片正文宽度。验证账本按结果、GID、状态三列排版，每帧最多十二条结果，页底标出所钉源码。构建后按 4:3 实际查看标题、提纲、定理、开放问题、静态图与账本页。

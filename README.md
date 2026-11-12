@@ -14,6 +14,8 @@
 | PDF / EPUB | Pandoc → Typst；Pandoc EPUB 3 + MathML |
 | 视觉 | trureturing 赛博朋克风，配色唯一来源 `theme/tokens.json` |
 
+传统学术报告也可用 Beamer：`./tbook slides new <book> <deck> "<title>" --academic --editions en`。白底 4:3（可选 16:9）、定理与 Lean 链接由书和锁生成，输出听众 PDF 与演讲备注 PDF，可使用书库自有主题。见 [theme/beamer/README.md](theme/beamer/README.md)。Slidev 继续提供现有的在线演示。
+
 ## 承诺与检查
 
 书中的 `theorem / lemma / proposition / corollary` 必须写成：

@@ -93,7 +93,7 @@
     // inside a chapter the card plays once the reader has scrolled it into view; a click plays at once
     if (TRV.still || (booting && !TRV.embed)) { if (p.still != null) clock.set(p.still); } else if (p.play) { if (booting) kit.autoplay(clock, $('stage')); else clock.play(); }
   }
-  const cards = kit.cards($('presets'), { notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
+  const cards = kit.cards($('presets'), { presets: PRESETS, notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
     idle: ['自由探索：拖动圆上的点，或拖动时间轴。随时可以再选一张卡。', 'Free play: drag the point on the circle, or scrub the rail. Pick a card again at any time.'] });
 
   TRV.drawer({ drawer: $('drawer'), open: $('infoBtn'), close: $('drawerClose') });

@@ -23,6 +23,16 @@ The generated page runs as it is and passes its own test: a point on the unit ci
 
 The finished example is `books/example-monograph/viz/golden-carry/`: the same layout and kit, four scenes on one rail, ten experiment cards, four of them cited from chapter 1, and a suite that runs the quality gates and then checks every claim independently. The starter is its smallest form.
 
+## 实体舞台 · Lit solids
+
+对象本身是面或体、画成受光的实体确实更清楚时（带、环面、多面体、可行域、球里有东西的布洛赫球），在舞台上调用 `TRV.kit.solid(stage, { canvas, onChange: paint, … })`；它不是统一风格，曲线、格点、矩阵、记号串照旧。页面不多加载任何脚本：`kit.js` 在第一次调用时才取造型核心 `assets/solid-core.js` 与它导入的、`assets/vendor/` 里钉版的 three.js，所以页面契约不变（两者都是运行时自己的文件，`vendor/` 不做语法检查）。用法、取舍与测试（`stageFirstChecks(…, { solid: true })`）见 `skills/book-viz/SKILL.md` 的“具象”一节；成品示例见[上游模板的 phase-torus](https://github.com/the-omega-institute/trureturing-books-template/tree/main/books/example-monograph/viz/phase-torus)；`books/` 归书库所有，示例不随模板升级下发。
+
+When the object itself is a surface or a body and a lit solid makes it clearer, call `TRV.kit.solid(stage, { canvas, onChange: paint, … })` on the stage; it is one more option, not a house style. The page loads no extra script: `kit.js` fetches the modelling core `assets/solid-core.js`, and with it the pinned three.js from `assets/vendor/`, on the first call, so the page contract is unchanged. See the section on solids in `skills/book-viz/SKILL.md`; the finished example is [phase-torus in the upstream template](https://github.com/the-omega-institute/trureturing-books-template/tree/main/books/example-monograph/viz/phase-torus). Example books are not distributed by template updates.
+
+混合页面每帧用 `sc.active(是否实体卡)` 切换实体与原二维画布，二维叠加层用 `sc.overlay()`，不再自行交还上下文或清理实体标签。`surface` / `poly` / `tube` 支持 `pick: false` 与 `occlude`，半透明对象默认不挡标记；`surface` 的 `alpha(u,v)`、`tube` 的 `alpha(t)` 可逐顶点渐隐。`sc.circle(c, normal, r, s)` 画大圆或纬线，后半圈默认变淡。首帧准备与上下文恢复用 `await settle(page)` 等待；质量门用 `{ solid: { preset: 'torus' } }` 指定实体卡，默认尝试两个转动方向，书内静止检查暂停共享时钟，无需播完整条时间轴。
+
+For a mixed page, call `sc.active(isSolidCard)` each frame to switch between the solid and the original 2D canvas; use `sc.overlay()` for an independent 2D layer. Transparent surfaces, polyhedra and tubes leave marks visible by default; `pick: false` lets picking rays pass, and `occlude` overrides hiding. Surface `alpha(u,v)` and tube `alpha(t)` support vertex opacity, and `sc.circle(c, normal, r, s)` draws spherical circles with a dim rear half. Await `settle(page)` for first-frame preparation and context restoration. Select a solid card with `{ solid: { preset: 'torus' } }`; the gate tries both turn directions and pauses shared clocks for its resting check.
+
 ## 注册表 · Registry (`books/<book>/viz/visualizations.json`)
 
 ```json
@@ -61,6 +71,7 @@ The finished example is `books/example-monograph/viz/golden-carry/`: the same la
 
 - `<body data-viz-id="<id>">`；`<html data-title-en="…">` 与 `<title>`。
 - `<link rel="stylesheet" href="../assets/theme.css">`；`<head>` 内 `<script src="../assets/shell.js"></script>`（`window.TRV`），其后可加 `<script src="../assets/kit.js"></script>`（`TRV.kit`：舞台、小图、时间轴、实验卡等辅助，见 skill 的速查表）。
+- 页面自己的脚本是底部的 `main.js`；与视频共用造型时，可在它之前加载同目录的 `model.js`（经典脚本，见 `skills/book-viz` 的“具象”）。
 - `<a class="crumb" href="../">` 返回本书的可视化索引；语言切换 `data-lang-set="zh"` / `data-lang-set="en"`。
 - 所有可见文字成对：`<span class="zh">…</span><span class="en">…</span>`；脚本文字用 `TRV.L('中文', 'English')` 并在语言切换时重绘（`kit.painter` 已代办）；`aria-label` 写中文、`data-aria-en` 写英文。
 - Lean 定理引用写成 `<a data-lean-gid="<GID>" href="…">`（GID 须是锁文件中种类为 `theorem` 的声明）；定义等其他 trureturing 文件写成 `<a data-trureturing-path="<path>" href="…">`：构建与本地预览把 href 固定到所钉提交。依据框：
@@ -69,8 +80,18 @@ The finished example is `books/example-monograph/viz/golden-carry/`: the same la
   <div class="lean"><span class="ok">LEAN ✓</span><span><span class="zh">陈述，与 Lean 一致。已冻结：</span><span class="en">The statement, as in Lean. Frozen: </span><a class="leanref" data-lean-gid="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" href="https://github.com/the-omega-institute/trureturing/blob/dev/D5/S1/Deficit/DeficitThreeValued.lean" target="_blank" rel="noopener"><code>deficit_three_valued</code></a></span></div>
   ```
 
-  只有 Lean 已验证的定理用绿色 `LEAN ✓`；页面计算用 `.lean.num`（NUM）；示意模型与诠释 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。
-- 颜色只来自令牌：CSS 用 `var(--cyan)` 等（映射到 `--tr-*`），脚本用 `TRV.palette` / `TRV.rgb`。琥珀色只给“现在/当前选择”。
+  绿色 `LEAN ✓` 只给正文用 `lean=` 引用过的定理（列进登记表的 `lean`）。trureturing 中已冻结、但正文没有用定理环境引用的定理用中性的 `.lean.frozen`（FROZEN），链接同样写 `data-lean-gid`（必须是锁文件里的 `theorem`，`./tbook pin --refresh` 会解析它），不列进登记表的 `lean`：
+
+  ```html
+  <div class="lean frozen"><span class="ok">FROZEN</span><span><span class="zh">陈述，与 Lean 一致。trureturing 中已冻结，正文未以定理环境引用：</span><span class="en">The statement, as in Lean. Frozen in trureturing, not cited by a theorem environment of the text: </span><a data-lean-gid="<GID>" href="#" target="_blank" rel="noopener"><code>name</code></a></span></div>
+  ```
+
+  页面计算用 `.lean.num`（NUM）；示意模型与诠释 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。别的类名、没有链接的 FROZEN 框、正文已引用却放在 FROZEN 框里的定理，检查都会警告。
+
+  Green `LEAN ✓` is for the theorems the book's text cites with `lean=` (listed under `lean` in the registry). A theorem frozen in trureturing that no theorem environment of the text cites goes in a neutral `.lean.frozen` box (`FROZEN`), linked the same way with `data-lean-gid` (a theorem of the lock) and not listed under `lean`.
+- 颜色只来自令牌：CSS 用 `var(--cyan)` 等（映射到 `--tr-*`），脚本用 `TRV.palette` / `TRV.rgb`。琥珀色只给“现在/当前选择”。图例色块 `<i class="sw cy|mg|am|ok|vi|dm|wn|ik">`，`ik` 是正文墨色。
+- 大写排版（舞台标签、标题、卡片代号、按钮）只作用于词：希腊字母与单个字母的变量由 `shell.js`（`TRV.keepCase`）保留原样，不必逐个加 `raw`。Text set in capitals keeps its Greek letters and one-letter variables as written (`TRV.keepCase` in `shell.js`).
+- 舞台左上的标题块（`.hud-tl`）与右上的场景按钮（`.hud-tr`）相碰时（窄屏、书内窄框），运行时把标题块排到按钮下面；不要自己给 `.hud-tl` 写 `top`。
 - 运行模式（`shell.js` 按网址设置，页面不必自己解析）：
 
   | 网址 | 含义 | 页面看到的 |
@@ -81,6 +102,7 @@ The finished example is `books/example-monograph/viz/golden-carry/`: the same la
   | `?shot=1&preset=<卡>&lang=<语言>` | 被引用卡的带标签静态图，供 PDF/EPUB | `TRV.shot`、`TRV.still` |
 
   `TRV.still` 为真时不播放动画，直接显示那张卡的关键帧。
+- 停帧（still frame）：会自己播放的卡在页面的卡片表里声明 `still`（时间轴上的值，或 `'end'`），把表交给 `kit.cards(el, { presets: PRESETS, … })`，它把声明写到卡上的 `data-still`（也可直接写在 HTML 里）；`TRV.still` 为真时页面把时钟放到那里。A card that plays by itself declares the frame its still shows as `still` in the page's table of cards; `kit.cards({ presets })` writes it onto the card as `data-still`, and the page puts its clock there when `TRV.still` is set. `stageFirstChecks` warns about a card that plays without one; a suite opens the still with `openStill(T, book, id, card, lang)` and checks that the frame carries the numbers of its caption.
 - 手机宽度（390px）无横向滚动；尊重 `prefers-reduced-motion`。
 
 ## 嵌入书中 · Embedding in a chapter
@@ -104,6 +126,7 @@ With `preset` the chapter shows one card as a figure that does not scroll inside
 ```bash
 node tools/node/viz-server.mjs                 # local preview at http://127.0.0.1:8766/site/<book>/viz/
 node tools/node/viz-shots.mjs <book> <id>      # review screenshots (desktop, in-book frame, phone, cover) → build/viz-shots/
+node tools/node/viz-shots.mjs <book> <id> --views embed --width 390 --preset <card>   # a cited card in a 390px frame → <id>-embed-390-<lang>-<card>.png
 node tools/node/viz-validate.mjs [book]        # registry + page contract + links + JS syntax
 node tools/node/viz-test.mjs [book] [--shard i/n] [--slow]   # browser suites books/*/viz/tests/*.test.mjs (--slow: a frame a second)
 node tools/node/viz-thumbs.mjs <book> [id …]   # thumb.jpg and the stills fig-<card>.<lang>.jpg of cited cards (honours PW_CHROMIUM_PATH)

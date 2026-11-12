@@ -37,6 +37,31 @@
         { "gid": "D5/S1/Deficit/GoldenPhaseDistribution.limiting_deficit_distribution" },
         { "gid": "D5/S1/Digit/Addition.zeck_add" }
       ]
+    },
+    {
+      "id": "phase-torus",
+      "code": "PHASE//TORUS",
+      "title": "相位环面 · 把相位正方形粘成环面",
+      "title_en": "Phase torus · the phase square glued into a torus",
+      "summary": "相位 p(v) = {(v + 1)φ} 只看小数部分，所以相位正方形的对边是同一条线。时间轴把它粘起来：先卷成管子，再弯成环面。颜色是相位判据的三块（已由 Lean 内核验证并冻结），两条斜线 p₁ + p₂ = 1/φ 与 p₁ + p₂ = φ 在环面上首尾相接成一条闭曲线（因为 φ = 1 + 1/φ）。舞台是受光的实体，可以转动；点环面上的珠子换一对数。",
+      "summary_en": "A phase p(v) = {(v + 1)φ} only sees the fractional part, so opposite edges of the phase square are the same line. The rail glues them: first into a tube, then into a torus. The colours are the three regions of the phase criterion (kernel-verified in Lean and frozen), and the two lines p₁ + p₂ = 1/φ and p₁ + p₂ = φ meet end to end into one closed curve on the torus (since φ = 1 + 1/φ). The stage is a lit solid you can turn; click a bead on the torus to change the pair.",
+      "path": "phase-torus/",
+      "thumbnail": "phase-torus/thumb.jpg",
+      "status": "live",
+      "added": "2026-11-12",
+      "tags": ["相位", "环面", "黄金比", "第一章"],
+      "tags_en": ["phases", "torus", "golden ratio", "chapter 1"],
+      "theory": [
+        {
+          "label": "本书第一章 · 相位判据",
+          "label_en": "Chapter 1 of this book · The phase criterion",
+          "href": "../zh/ch01-golden-deficit.html#thm-golden-phase",
+          "href_en": "../en/ch01-golden-deficit.html#thm-golden-phase"
+        }
+      ],
+      "lean": [
+        { "gid": "D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit" }
+      ]
     }
   ]
 }

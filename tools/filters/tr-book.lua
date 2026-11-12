@@ -46,7 +46,7 @@ end
 
 local function typst_content(inlines)
   local out = pandoc.write(pandoc.Pandoc({ pandoc.Plain(compat.inlines(inlines)) }), "typst")
-  out = out:gsub("%s+$", "")
+  out = out:gsub("[ \t\r\n]+$", "")
   return "[" .. out .. "]"
 end
 
@@ -303,6 +303,19 @@ end
 -- ------------------------------------------------------------------ filter
 
 function Pandoc(doc)
+  doc = doc:walk({ Header = function(h)
+    local marker = h.content[1]
+    if not marker or marker.t ~= "Span" or #marker.content ~= 0
+        or not marker.classes:includes("tr-heading-meta") then return nil end
+    local classes = pandoc.List({})
+    for _, class in ipairs(marker.classes) do
+      if class ~= "tr-heading-meta" then classes:insert(class) end
+    end
+    h.attr = pandoc.Attr(marker.identifier, classes, marker.attributes)
+    h.content:remove(1)
+    if h.content[1] and h.content[1].t == "Space" then h.content:remove(1) end
+    return h
+  end })
   doc = lift_heading_anchors(doc)
   local ids, raw_only = collect_ids(doc)
   doc = fix_links(doc, ids)

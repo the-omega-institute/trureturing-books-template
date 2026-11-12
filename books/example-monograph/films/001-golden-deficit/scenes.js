@@ -252,27 +252,57 @@ SCENES.lean = S => {
   const q0 = at(S, 0, 0.6, 0.2) * out;
   txt('c(v₁, v₂)  ∈  ℤ', fx, 300, { size: 58, fam: F.math, w: 700, c: C.white, a: q0, ab: 2 });
   txt('= signed count of the two bottom carry rules', fx, 352, { size: 24, fam: F.mono, w: 700, c: C.cyan, a: Q(S, 0, 'an integer', 0.6, 0.6) * out });
-  leanRef(fx, 414, 'deficit_integer', Q(S, 0, 'the signed count', 0.6, 0.3) * out);
+  leanChip(fx, 414, 'D5/S1/Deficit/DeficitInteger.deficit_integer', Q(S, 0, 'the signed count', 0.6, 0.3) * out);
   const q1 = at(S, 1, 0.6) * out;
   txt('c(v₁, v₂)  ∈  { −1, 0, 1 }', fx, 548, { size: 62, fam: F.math, w: 700, c: C.white, a: q1, ab: 3 });
   txt('∀ v₁ v₂ : ℕ', fx, 606, { size: 32, fam: F.mono, w: 700, c: C.cyan, a: Q(S, 1, 'For every input', 0.6, 0.4) * out });
-  leanRef(fx, 668, 'deficit_three_valued', Q(S, 1, 'or one', 0.6, 0.2) * out);
+  leanChip(fx, 668, 'D5/S1/Deficit/DeficitThreeValued.deficit_three_valued', Q(S, 1, 'or one', 0.6, 0.2) * out);
   stamp('PROVED FOR ALL INPUTS', 1290, 778, Q(S, 1, 'Lean has checked', 0.4, 0.2) * out, C.lean, 30, -0.05);
 };
-/* one Lean citation by short name: LEAN ✓ chip + the declaration's full name */
-function leanRef(x, y, short, a) {
+/* one Lean citation, by its GID (two citations may share a short name): LEAN ✓ chip + the declaration's name */
+function leanChip(x, y, gid, a) {
   if (a <= 0) return;
-  const r = DATA.lean.find(z => z.short === short && z.kind === 'theorem');
-  if (!r) { window.FILM_ERRORS.push(`film.json does not cite the theorem ${short}`); return; }
+  const r = leanCite(gid);
+  if (!r || r.kind !== 'theorem') { window.FILM_ERRORS.push(`film.json does not cite the theorem ${gid}`); return; }
   const head = STR.en.lean || 'LEAN ✓', wh = tw(head, 18, F.mono, 700, 1) + 20;
   fillBox(x, y - 24, wh, 32, C.lean, a);
   txt(head, x + 10, y - 2, { size: 18, fam: F.mono, w: 700, c: C.bg, a, ls: 1 });
-  txt(r.name, x + wh + 14, y, { size: 26, fam: F.mono, w: 700, c: C.lean, a });
+  txt(r.label, x + wh + 14, y, { size: 26, fam: F.mono, w: 700, c: C.lean, a });
+}
+
+/* ---------- the phase torus of chapter 1, a solid shot ----------
+   The object of the page viz/phase-torus: its model (shape, regions, pairs, how it is drawn) is
+   books/example-monograph/viz/phase-torus/model.js, inlined here by film.json "scripts", so the page and the film
+   draw one object. The square glues into the torus while the card comes in, then the torus turns; the label of the
+   amber pair (2, 2) follows its bead and dims while the torus hides it. A computed picture, not a Lean result. */
+const TORUS_PICK = 18;   // PHASE_TORUS.PAIRS[18] = (2, 2): p(2) + p(2) ≈ 1.708 ≥ φ, c(2, 2) = −1
+FILM.init.push(() => {
+  const q = PHASE_TORUS.PAIRS[TORUS_PICK], E = window.FILM_ERRORS;
+  if (q.v1 !== 2 || q.v2 !== 2 || q.c !== -1 || PHASE_TORUS.region(q.p1, q.p2) !== -1) E.push('phase torus: the pair (2, 2) changed');
+  if (PHASE_TORUS.gap(2) > 1e-9) E.push('phase torus: the two diagonal pieces do not meet on the torus');
+  /* c from the Beatty form agrees with the region of the phase criterion for all 64 pairs */
+  if (PHASE_TORUS.PAIRS.some(r => r.c !== PHASE_TORUS.region(r.p1, r.p2))) E.push('phase torus: a pair outside its region');
+});
+const TORUS_RECT = { x: 110, y: 170, w: 760, h: 680 };
+function phaseTorus(S, a) {
+  if (a <= 0.003) return;
+  const u = S.u, g = 2 * ease(clamp((u - 0.3) / 2.8));
+  const sh = solid('torus', Object.assign({ yaw: -0.5 + 0.32 * u, pitch: 0.78, zoom: 0.95 + 0.8 * ease(clamp(g - 1)), radius: 0.36, cy: 0.52 }, TORUS_RECT));
+  sh.begin();
+  const drawn = PHASE_TORUS.draw(sh, g, TORUS_PICK, { magenta: C.mag, dim: C.dim, cyan: C.cyan, violet: C.vio, amber: C.now });
+  sh.end(a);
+  /* 2D layer on top of the solid: the label of the current pair follows its bead */
+  const q = PHASE_TORUS.PAIRS[TORUS_PICK], at3 = sh.anchor(drawn[drawn.length - 1].p), la = a * (at3.hidden ? 0.28 : 1);
+  line(at3.x, at3.y - 12, at3.x - 34, at3.y - 52, C.now, la * 0.9, 1.5);
+  txt(`(${q.v1}, ${q.v2}) · c = −1`, at3.x - 40, at3.y - 58, { size: 24, fam: F.mono, w: 700, align: 'right', c: C.now, a: la });
+  txt(g < 1.995 ? `GLUE ${g.toFixed(2)} / 2` : 'PHASE TORUS · 相位环面', TORUS_RECT.x + 30, TORUS_RECT.y + TORUS_RECT.h - 28, { size: 20, fam: g < 1.995 ? F.mono : F.zh, w: 700, c: C.cyan, a: a * 0.9, ls: 2 });
+  txt('p₁ + p₂ = 1/φ ≡ φ (mod 1) · computed here', TORUS_RECT.x + 30, TORUS_RECT.y + TORUS_RECT.h + 4, { size: 17, fam: F.mono, c: C.dim, a: a * 0.9 });
 }
 
 SCENES.close = S => {
   badgeQ(S, [[0, null, 'lean']]);
-  closingCard(S, { from: 0.1, y: 330 });
+  phaseTorus(S, clamp(S.u / 0.6) * clamp((S.d - S.u) / 1.2));
+  closingCard(S, { from: 0.1, y: 330, x: 1250, hyper: false });
 };
 
 /* ---------- poster ---------- */

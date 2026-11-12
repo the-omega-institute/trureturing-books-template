@@ -60,9 +60,9 @@ M.RENAMES = {
 -- Widths are carried through the writer as \hspace{<SPACE_BASE + n>em}, n in 18ths of an em (1 mu).
 local SPACE_BASE, SPACE_SPAN = 5000, 2000
 
--- Spaces the writer drops, distorts or cannot read. Thin (\,), medium (\: \> \ ) and quad convert correctly.
+-- Carry thin spaces too: after a scripted fence the writer can emit the merged name "nthin".
 local SPACES = {
-  [";"] = 5, ["!"] = -3,
+  [","] = 3, [";"] = 5, ["!"] = -3,
   thickspace = 5, medspace = 4, thinspace = 3, enspace = 9,
   negthinspace = -3, negmedspace = -4, negthickspace = -5,
 }
@@ -345,7 +345,24 @@ function rewrite(tex, display)
   end
   while i <= n do
     local c = tex:sub(i, i)
-    if c ~= "\\" then
+    if c == "^" or c == "_" then
+      local k = skip_blank(tex, i + 1)
+      local word = tex:match("^\\([A-Za-z]+)", k)
+      if TAKES_ARGUMENT[word] then
+        -- Commands with arguments are handled by their own rules below (including fraction carriers).
+        emit(c)
+        i = i + 1
+      else
+        local first, last, after = argument(tex, k)
+        emit(c .. "{" .. inner(first, last) .. "}")
+        local next = tex:sub(skip_blank(tex, after), skip_blank(tex, after))
+        -- After a scripted fence texmath can merge even ordinary letters: (-1)^s e → \(-1\)^se.
+        -- An empty TeX group forces its writer to retain the boundary, without adding a Typst atom.
+        -- Keep a following script or prime attached to the original base.
+        if next ~= "" and next ~= "}" and next ~= "^" and next ~= "_" and next ~= "'" then emit("{}") end
+        i = after
+      end
+    elseif c ~= "\\" then
       emit(c)
       i = i + 1
     else
@@ -1151,12 +1168,13 @@ function M.rename(code)
       after.out = "/**/"
     end
   end
-  -- A replacement that starts with a name must not run into a name before it (w\| → w class(…)).
+  -- Removing a carrier or its blanks can join two unchanged names too (x^n<marker> thin → x^nthin).
+  -- Keep every emitted name separate from the preceding name, including after scripts.
   local out, last = {}, ""
   for k = 1, n do
     local piece = t[k].out
     if piece ~= "" then
-      if last:find("[A-Za-z0-9.]$") and piece:find("^[A-Za-z]") and piece ~= t[k].text then
+      if last:find("[A-Za-z0-9.]$") and piece:find("^[A-Za-z]") then
         out[#out + 1] = " "
       end
       if last:find("[/*]$") and piece:find("^/") then out[#out + 1] = " " end   -- not "*/" or "//"
@@ -1167,9 +1185,14 @@ function M.rename(code)
   return table.concat(out)
 end
 
+-- Stable, document-local identities let the layout look up just one formula's width.
+-- Both filters load this module separately, so keep their namespaces distinct.
+local inline_index = 0
+local inline_namespace = pandoc.path.filename(PANDOC_SCRIPT_FILE):gsub("%.lua$", "")
+
 local function write(el)
   local typ = pandoc.write(pandoc.Pandoc({ pandoc.Plain({ el }) }), "typst", { wrap_text = "wrap-none" })
-  return (typ:gsub("%s+$", ""))
+  return (typ:gsub("[ \t\r\n]+$", ""))
 end
 
 -- A Math element written as Typst with the fixes above; nil (keep the element) when it needs none.
@@ -1189,6 +1212,12 @@ function M.math(el)
   if source ~= el and (fixed:find("\238[\128-\135][\128-\191]") or fixed:find("#h%([3-6]%d%d%dem%)")) then
     source, typ = el, write(el)
     fixed = M.rename(typ)
+  end
+  if el.mathtype == "InlineMath" then
+    inline_index = inline_index + 1
+    -- Group the identity with its equation: in shorthand headings a bare label
+    -- would otherwise attach to the heading and replace its public anchor.
+    return pandoc.RawInline("typst", "#[" .. fixed .. "<tr-inline-" .. inline_namespace .. "-" .. inline_index .. ">]")
   end
   if fixed == typ and source == el then return nil end
   return pandoc.RawInline("typst", fixed)

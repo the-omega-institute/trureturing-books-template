@@ -44,6 +44,7 @@ import html
 import importlib
 import json
 import os
+import subprocess
 import posixpath
 import re
 import shutil
@@ -1237,6 +1238,10 @@ def slides_section(bi: Bi, view: BookView) -> str:
                 size = human_size((view.bdir / p).stat().st_size)
                 links.append(f'<a class="chip" href="{esc(p)}" type="application/pdf" hreflang="{esc(config.bcp47(lang))}">'
                              f'PDF <small>{esc(size)}</small></a>')
+            notes = str(it.get("notes_pdf", {}).get(lang) or "")
+            if notes and _exists(view.bdir, notes):
+                from . import slides
+                links.append(f'<a class="chip" href="{esc(notes)}" type="application/pdf">{esc(slides.t(lang, "notes_pdf"))}</a>')
             if links:
                 rows.append(f'<div class="deck-row" data-ed="{esc(lang)}">{"".join(links)}</div>')
         count = it.get("slides")
@@ -1435,6 +1440,12 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
                               "kind": "cover", "lang": ed.lang, "variant": "screen"})
         for it in v.media.get("slides", []):
             pdfs = it.get("pdf") if isinstance(it.get("pdf"), dict) else {}
+            pdfs = dict(pdfs)
+            for lang, rel in sorted(it.get("notes_pdf", {}).items()):
+                f = v.bdir / str(rel)
+                if f.is_file():
+                    files.append({"path": f"{book.slug}/{rel}", "size": f.stat().st_size, "sha256": _sha256(f),
+                                  "kind": "slides-notes-pdf", "lang": lang, "variant": str(it.get("id", "")) or None})
             for lang, rel in sorted(pdfs.items()):
                 f = v.bdir / str(rel)
                 if f.is_file():
@@ -1495,6 +1506,19 @@ def _site_books(books: list[config.Book], out: Path) -> list[config.Book]:
     return ordered + list(selected.values())
 
 
+def post_build(site: config.Site, out: Path) -> None:
+    """Run an explicitly configured repository command after successful assembly."""
+    command = site.raw.get("site", {}).get("post_build")
+    if command is not None:
+        if not isinstance(command, list) or not command or not all(isinstance(a, str) and a for a in command):
+            raise SiteError("site.post_build must be a nonempty array of command arguments")
+        env = dict(os.environ, TBOOK_SITE_OUT=str(out.resolve()))
+        try:
+            subprocess.run(command, cwd=site.root, env=env, check=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise SiteError(f"site.post_build failed: {exc}") from exc
+
+
 def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_root: Path | None = None) -> Path:
     """Assemble the site into ``out_dir`` and return it (see the module docstring).
 
@@ -1549,4 +1573,5 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
                                        encoding="utf-8")
     if problems:
         raise SiteError(f"site written to {out} with {len(problems)} problem(s):\n  " + "\n  ".join(problems))
+    post_build(site, out)
     return out

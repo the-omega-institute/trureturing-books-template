@@ -83,7 +83,8 @@ def cmd_pin(args) -> int:
 def cmd_build(args) -> int:
     from . import build
 
-    result = build.build(args.targets or ["all"], _books(args), args.lang or None, pdf_variants=args.variant or None)
+    result = build.build(args.targets or ["all"], _books(args), args.lang or None, pdf_variants=args.variant or None,
+                         films=args.film or None)
     for f in result.failures:
         print(f"FAILED {f}", file=sys.stderr)
     return 1 if result.failures else 0
@@ -263,6 +264,9 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--book", action="append")
     c.add_argument("--lang", action="append", help="limit to an edition language (repeatable)")
     c.add_argument("--variant", action="append", choices=list(config.PDF_VARIANTS), help="limit PDF variants")
+    c.add_argument("--film", action="append", metavar="NNN-NAME",
+                   help="with `build films`: render or restore only this film (repeatable); the others are only "
+                        "restored from the build cache")
     c.set_defaults(fn=cmd_build)
 
     c = sub.add_parser("theme", help="regenerate theme/generated/* from theme/tokens.json")
@@ -304,14 +308,25 @@ def parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("template", help="template version: status, update, manifest")
     tsub = c.add_subparsers(dest="template_cmd", required=True)
+    t = tsub.add_parser("list", help="list upstream and installed layers (for template-sync)")
+    t.add_argument("--json", action="store_true")
     t = tsub.add_parser("status", help="show the template version and local changes to managed files")
+    t.add_argument("--layer", help="upstream or layer name (default: all)")
     t = tsub.add_parser("update", help="update managed files to a template release")
+    t.add_argument("--layer", help="upstream or layer name (default: all)")
     t.add_argument("--to", help="template version or git ref (default: latest release)")
     t.add_argument("--source", help="local path or git URL of the template (default: template.toml repo)")
     t.add_argument("--dry-run", action="store_true")
     t.add_argument("--force", action="store_true", help="overwrite managed files with local changes")
     t = tsub.add_parser("manifest", help="(template repo) regenerate or check template-manifest.json")
     t.add_argument("--check", action="store_true")
+    t.add_argument("--layer", help="layer name (default: upstream)")
+    t = tsub.add_parser("install", help="install a layer from a local path or git source")
+    t.add_argument("layer", help="layer name")
+    t.add_argument("--source", required=True)
+    t.add_argument("--to", help="version or git ref (default: latest release)")
+    t.add_argument("--dry-run", action="store_true")
+    t.add_argument("--force", action="store_true")
     c.set_defaults(fn=cmd_template)
 
     c = sub.add_parser("cache", help="build cache: status, key, prune, export (see docs/ARCHITECTURE.md)")
@@ -347,7 +362,7 @@ def parser() -> argparse.ArgumentParser:
 
     for kind in ("viz", "slides", "film"):
         c = sub.add_parser(kind, help=f"{kind} helpers (new, list, …)")
-        c.add_argument("action", choices=["new", "list"])
+        c.add_argument("action", choices=["new", "list", "snapshots"] if kind == "slides" else ["new", "list"])
         c.add_argument("rest", nargs=argparse.REMAINDER)
         c.set_defaults(fn=cmd_media, kind=kind)
     return p

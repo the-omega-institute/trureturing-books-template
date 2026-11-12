@@ -10,7 +10,7 @@ Source layout of a book (``books/<slug>/``)::
 
 Published layout (:func:`build`, into ``_site/<slug>/viz/``)::
 
-    assets/{theme.css,shell.js,hub.css,hub.js,favicon.svg}   the shared runtime (theme/viz/)
+    assets/{theme.css,shell.js,kit.js,solid-core.js,…}   the shared runtime (theme/viz/; vendor/ is pinned three.js)
     assets/tokens.css                                        theme/generated/tokens.css
     <id>/…                                                   every *live* entry; Lean links pinned to the lock
     index.html                                               the hub: this book's live visualizations, bilingual
@@ -81,7 +81,7 @@ ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STATUSES = ("live", "draft")
 RESERVED = ("tests", "assets")
-RUNTIME_FILES = ("theme.css", "shell.js", "kit.js", "hub.css", "hub.js", "favicon.svg")
+RUNTIME_FILES = ("theme.css", "shell.js", "kit.js", "solid-core.js", "hub.css", "hub.js", "favicon.svg")
 THUMB_EXT = (".jpg", ".jpeg", ".png", ".webp")
 PRESET_RE = re.compile(r"^[A-Za-z0-9][\w-]*$")
 _PRESET_ATTR_RE = re.compile(r'\bdata-preset="([^"]+)"')
@@ -623,6 +623,131 @@ def fixed_wait_message(line: int) -> str:
             "until(page, () => …) for playback (skills/book-viz)")
 
 
+_VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+_TAG_RE = re.compile(r"<(/?)([a-zA-Z][\w-]*)([^>]*?)(/?)>")
+_JS_ID_RE = re.compile(r"""\$\(\s*['"]([\w-]+)['"]\s*\)|getElementById\(\s*['"]([\w-]+)['"]|querySelector(?:All)?\(\s*['"]#([\w-]+)""")
+
+
+def okmarks_outside_lean(page_html: str, js: str = "") -> list[tuple[str, int]]:
+    """Green ticks outside the evidence boxes: ``[(where, line)]`` with ``where`` ``index.html`` or ``main.js``.
+
+    Green (``.okmark``) belongs to a Lean-verified statement, inside a ``.lean`` box; a number the page checked itself
+    is marked ``.nummark`` (neutral). In the page, an element with class ``okmark`` and no ``.lean`` ancestor; in its
+    script, a line that writes ``okmark`` unless it names (``$('id')``, ``getElementById``, ``querySelector('#id')``)
+    an element of the page that sits in a ``.lean`` box. tools/node/viz-validate.mjs applies the same rule."""
+    blank = lambda m: re.sub(r"[^\n]", " ", m.group(0))
+    body = re.sub(r"<!--.*?-->", blank, page_html, flags=re.S)
+    body = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", blank, body, flags=re.S | re.I)
+    out: list[tuple[str, int]] = []
+    in_lean: dict[str, bool] = {}
+    stack: list[tuple[str, bool]] = []
+    for m in _TAG_RE.finditer(body):
+        tag = m.group(2).lower()
+        if m.group(1):
+            names = [t for t, _ in stack]
+            if tag in names:
+                del stack[len(names) - 1 - names[::-1].index(tag):]
+            continue
+        cm = re.search(r'\bclass\s*=\s*"([^"]*)"', m.group(3))
+        classes = cm.group(1).split() if cm else []
+        im = re.search(r'\bid\s*=\s*"([^"]*)"', m.group(3))
+        lean_box = (stack[-1][1] if stack else False) or "lean" in classes
+        if "okmark" in classes and not lean_box:
+            out.append(("index.html", page_html.count("\n", 0, m.start()) + 1))
+        if im:
+            in_lean[im.group(1)] = lean_box
+        if not m.group(4) and tag not in _VOID_TAGS:
+            stack.append((tag, lean_box))
+    for k, line in enumerate(js.split("\n"), 1):
+        t = line.strip()
+        if not re.search(r"\bokmark\b", line) or t.startswith(("//", "*", "/*")):
+            continue
+        ids = [next(g for g in m.groups() if g) for m in _JS_ID_RE.finditer(line)]
+        if not any(in_lean.get(i) for i in ids):
+            out.append(("main.js", k))
+    return out
+
+
+def okmark_message(where: str, line: int) -> str:
+    return (f".okmark (a green ✓) at {where} line {line} is outside a .lean box: green belongs to Lean-verified "
+            "statements; mark a number the page checked itself with .nummark (neutral) (skills/book-viz)")
+
+
+# The evidence boxes of skills/book-viz: .lean (green, LEAN ✓: a theorem the book's text cites with lean=) and its
+# modifiers. .frozen (neutral, FROZEN) is a theorem frozen in trureturing that no theorem environment of the text
+# cites; it names that theorem with <a data-lean-gid> like a green box (the GID must be a theorem of the lock).
+EVIDENCE_KINDS = ("num", "model", "argued", "open", "frozen")
+
+
+def evidence_boxes(page_html: str) -> list[dict]:
+    """Every ``.lean`` evidence box of a page: ``[{"line", "kinds", "gids"}]`` where ``kinds`` are the classes after
+    ``lean`` and ``gids`` the ``data-lean-gid`` links inside it. tools/node/viz-validate.mjs reads boxes the same way."""
+    blank = lambda m: re.sub(r"[^\n]", " ", m.group(0))
+    body = re.sub(r"<!--.*?-->", blank, page_html, flags=re.S)
+    body = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", blank, body, flags=re.S | re.I)
+    boxes: list[dict] = []
+    stack: list[tuple[str, int]] = []   # (tag, index of the innermost evidence box or -1)
+    for m in _TAG_RE.finditer(body):
+        tag = m.group(2).lower()
+        if m.group(1):
+            names = [t for t, _ in stack]
+            if tag in names:
+                del stack[len(names) - 1 - names[::-1].index(tag):]
+            continue
+        cm = re.search(r'\bclass\s*=\s*"([^"]*)"', m.group(3))
+        classes = cm.group(1).split() if cm else []
+        box = stack[-1][1] if stack else -1
+        if "lean" in classes:
+            boxes.append({"line": page_html.count("\n", 0, m.start()) + 1,
+                          "kinds": [c for c in classes if c != "lean"], "gids": []})
+            box = len(boxes) - 1
+        gm = re.search(r'\bdata-lean-gid\s*=\s*"([^"]*)"', m.group(3))
+        if tag == "a" and gm and box >= 0:
+            boxes[box]["gids"].append(gm.group(1))
+        if not m.group(4) and tag not in _VOID_TAGS:
+            stack.append((tag, box))
+    return boxes
+
+
+def evidence_problems(page_html: str) -> list[tuple[int, str]]:
+    """Warnings about the evidence boxes of a page: ``[(line, message)]`` (same rules as viz-validate.mjs)."""
+    out: list[tuple[int, str]] = []
+    for b in evidence_boxes(page_html):
+        odd = [k for k in b["kinds"] if k not in EVIDENCE_KINDS]
+        if odd:
+            out.append((b["line"], f'evidence box class "lean {" ".join(b["kinds"])}" names {", ".join(odd)}, which is not an '
+                                   f'evidence kind; the kinds are .lean (LEAN ✓) and .lean.{", .lean.".join(EVIDENCE_KINDS)} (skills/book-viz)'))
+        if "frozen" in b["kinds"] and not b["gids"]:
+            out.append((b["line"], 'a .lean.frozen box (FROZEN) names the theorem it shows with <a data-lean-gid="<GID>">; '
+                                   'the GID must be a theorem of trureturing.lock.json (skills/book-viz)'))
+    return out
+
+
+def frozen_gids(page_html: str) -> list[str]:
+    """GIDs linked from ``.lean.frozen`` boxes: frozen in trureturing, cited by no theorem environment of the text."""
+    return [g for b in evidence_boxes(page_html) if "frozen" in b["kinds"] for g in b["gids"]]
+
+
+def check_frozen(book, models) -> list[Issue]:
+    """A ``.lean.frozen`` box shows a theorem no theorem environment of the text cites; one the text does cite with
+    ``lean=`` belongs in a green ``.lean`` box (LEAN ✓). ``models``: the book's edition models (warnings only)."""
+    from .model import FORMAL
+    in_text = {gid for m in models.values() for _, _, gid, env in m.cited_gids() if env is not None and env.kind in FORMAL}
+    issues: list[Issue] = []
+    for v in entries(book):
+        vid = str(v.get("id", ""))
+        page = book.viz_dir / vid / "index.html"
+        if not (ID_RE.match(vid) and page.is_file()):
+            continue
+        text = page.read_text(encoding="utf-8")
+        for gid in frozen_gids(text):
+            if gid in in_text:
+                issues.append(Issue("warning", page, text.count("\n", 0, text.find(gid)) + 1,
+                                    f"{gid} is in a .lean.frozen box but a theorem environment of the text cites it "
+                                    "(lean=): show it in a green .lean box (LEAN ✓) and list it in the registry's lean"))
+    return issues
+
+
 PAGE_NEEDLES = (
     ('data-viz-id="{id}"', "body carries data-viz-id"),
     ('href="../assets/theme.css"', "loads the shared theme"),
@@ -656,6 +781,11 @@ def check_page(book, vid: str, page: Path, ids: set[str], *, lock=None, ledger=N
     zh, en = _class_count(text, "zh"), _class_count(text, "en")
     if zh != en:
         err(0, f"{zh} .zh fragments but {en} .en fragments; every text fragment needs both languages")
+    script = page.parent / "main.js"
+    for where, line in okmarks_outside_lean(text, script.read_text(encoding="utf-8") if script.is_file() else ""):
+        issues.append(Issue("warning", script if where == "main.js" else page, line, okmark_message(where, line)))
+    for line, msg in evidence_problems(text):
+        issues.append(Issue("warning", page, line, msg))
     for kind, value in pinned_refs(text):
         line = text.count("\n", 0, text.find(value)) + 1 if value else 0
         if kind == "gid":

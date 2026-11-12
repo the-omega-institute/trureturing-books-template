@@ -22,6 +22,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from example_support import example_shown
 
@@ -381,6 +382,24 @@ class StagingTest(unittest.TestCase):
 
 
 class HeadingHelpersTest(unittest.TestCase):
+    @unittest.skipUnless(have_pandoc(), "pandoc not available")
+    def test_pointer_headings_preserve_text_and_generated_anchors(self):
+        attrs = tp.mdscan.parse_attrs('#pointer .unnumbered')
+        for title in ("Dereference *ptr", "p = *p and **strong**", "*emphasis* and `*ptr`",
+                      r"标题 *ptr 与 $a*b$", r"A literal \*ptr"):
+            with self.subTest(title=title):
+                original = subprocess.run([tp.pandoc_path(), "-f", tp.READER, "-t", "json"],
+                                          input="## " + title, text=True, capture_output=True, check=True)
+                before = json.loads(original.stdout)["blocks"][0]["c"][2]
+                staged = tp.format_heading(2, title, attrs)
+                parsed = json.loads(run_filters(staged, "json"))["blocks"][0]["c"]
+                self.assertEqual(parsed[1], ["pointer", ["unnumbered"], []])
+                self.assertEqual(parsed[2], before)
+                typst = run_filters(staged + "\n\n[Back](#pointer)", "typst")
+                self.assertNotIn("tr-heading-meta", typst)
+                self.assertNotIn(r"{\#pointer}", typst)
+                self.assertIn("<pointer>", typst)
+
     def test_parse_heading_attrs_and_closing_hashes(self):
         level, text, attrs = tp.parse_heading("## Title ## {#x .y k=\"v\"}")
         self.assertEqual((level, text, attrs.id, attrs.classes, attrs.kv), (2, "Title", "x", ["y"], {"k": "v"}))
@@ -534,8 +553,35 @@ Real [B](b.md).
 class LuaFilterTest(unittest.TestCase):
     META = {"tr-punct-open": " (", "tr-punct-close": ")", "tr-lean-label": "Lean", "tr-badge-lean-title": "verified"}
 
+    def test_utf8_titles_do_not_depend_on_locale_whitespace(self):
+        # These final UTF-8 bytes include A0, which some locales classify as whitespace.
+        source = ('# 旋量自折叠 {.tr-chapter}\n\n'
+                  ':::::: {.tr-env tr-kind="remark" tr-ref="Remark" tr-title="递推与互惠"}\n'
+                  'Body.\n::::::\n')
+        for locale in ("C", "C.UTF-8", "en_US.UTF-8"):
+            with self.subTest(locale=locale), patch.dict(os.environ, {"LC_ALL": locale}):
+                out = run_filters(source, "typst", self.META)
+                self.assertIn("title: [旋量自折叠]", out)
+                self.assertIn("title: [递推与互惠]", out)
+                self.assertNotIn("\ufffd", out)
+
+    @unittest.skipUnless(have_typst(), "typst not available")
+    def test_inline_math_identities_preserve_heading_anchors(self):
+        import typst
+
+        out = run_filters("## Math $x$ and $y$ {#public-heading}\n\nBody $z$.\n", "typst", self.META)
+        identities = re.findall(r"<tr-inline-[^>]+>", out)
+        self.assertEqual(len(identities), 3)
+        self.assertEqual(len(set(identities)), 3)
+        _, warnings = typst.compile_with_warnings(out.encode())
+        self.assertFalse([w for w in warnings if "labelled" in w.message])
+        self.assertEqual(json.loads(typst.query(out.encode(), "<public-heading>", field="level")), [2])
+        for identity in identities:
+            self.assertEqual(json.loads(typst.query(out.encode(), identity, field="block")), [False])
+
     def test_typst_output(self):
         out = run_filters(ENV_MD, "typst", self.META)
+        out = re.sub(r"#\[(\$.*?)<tr-inline-[^>]+>\]", r"\1", out, flags=re.S)
         self.assertIn('#tr-env(kind: "theorem", status: "lean", label: "Theorem", number: "1.2", '
                       'ref: "Theorem 1.2", title: [Bound on $c$], badge: "LEAN ✓", '
                       'badge-url: "https://example.org/X.lean#L3", lean: ((gid: "D5/S1/X.y", name: "D5.S1.X.y", url: "https://example.org/X.lean#L3"),), '
@@ -592,8 +638,8 @@ class LuaFilterTest(unittest.TestCase):
         meta = {**self.META, "tr-tex-macros": mathrender.newcommands()}
         typst = run_filters(mathrender.newcommands() + "\n\n" + self.TITLED, "typst", meta)
         self.assertNotIn("\\norm", typst)
-        self.assertIn("for $lr(bar.v.double v bar.v.double)$]", typst)  # the title, read by tr-env.lua with the macros
-        self.assertIn("Body $lr(bar.v.double w bar.v.double)$.", typst)
+        self.assertRegex(typst, r"for\s+#\[\$lr\(bar.v.double v bar.v.double\)\$<tr-inline-tr-env-\d+>\]\]")
+        self.assertRegex(typst, r"Body #\[\$lr\(bar.v.double w bar.v.double\)\$<tr-inline-tr-book-\d+>\]\.")
         html = run_filters(mathrender.newcommands() + "\n\n" + self.TITLED, "html5", meta)
         self.assertNotIn("\\norm", html)
         self.assertNotIn("newcommand", html)
@@ -639,7 +685,7 @@ class TypstSymbolTest(unittest.TestCase):
               'tr-number="1.1" tr-ref="Remark 1.1" tr-title="On $A \\\\cap B$"}\nBody.\n::::::\n')
         out = run_filters(md, "typst", self.META)
         for new in ("A inter B", "inter.big", "inter.double", "inter.sq", "dot.o", "dot.o.big", "times.o",
-                    "times.o.big", "minus.o", "dash.o", 'title: [On $A inter B$]', 'upright("sect")/**/inter x'):
+                    "times.o.big", "minus.o", "dash.o", 'title: [On #[$A inter B$', 'upright("sect")/**/inter x'):
             self.assertIn(new, out)
         self.assertNotRegex(re.sub(r'"[^"]*"', "", out), r"\bsect\b|\.circle\b")
         self.assertIn("upright(i n t e r s e c t)", out)  # letters, not the name sect
@@ -779,6 +825,74 @@ class MetadataTest(unittest.TestCase):
         self.assertIn('href="text/ch003.xhtml" media-type="application/xhtml+xml" />', new)
 
 
+@unittest.skipUnless(have_typst(), "typst not available")
+class CompileTypstTest(unittest.TestCase):
+    def test_placeholder_fonts_are_excluded_without_losing_real_system_fonts(self):
+        from types import SimpleNamespace
+        from tbook import typst_worker
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            allowed = root / "NotoSans.otf"
+            blocked = root / "LastResort.otf"
+            allowed.touch()
+            blocked.touch()
+            catalog = [SimpleNamespace(family="Noto Sans", path=allowed),
+                       SimpleNamespace(family="LastResort", path=blocked)]
+            fake = SimpleNamespace(Fonts=lambda **_kw: SimpleNamespace(fonts=lambda: catalog))
+            aliases = root / "filtered"
+            aliases.mkdir()
+            options = {"font_paths": [str(root)]}
+            result = typst_worker.font_options(fake, options, aliases)
+            self.assertTrue(result["ignore_system_fonts"])
+            self.assertEqual(result["font_paths"], [str(aliases)])
+            self.assertEqual([p.resolve() for p in aliases.iterdir()], [allowed.resolve()])
+            catalog.pop()
+            self.assertIs(typst_worker.font_options(fake, options, aliases), options)
+
+    def test_consecutive_compilations_keep_inputs_formats_and_failure_details(self):
+        with tempfile.TemporaryDirectory(prefix="tbook typst worker ") as tmp:
+            root = Path(tmp)
+            main = root / "main.typ"
+            main.write_text('#set page(width: 80pt, height: 80pt)\n'
+                            '#link(sys.inputs.at("url"))[A document]\n', encoding="utf-8")
+            for i, fmt in enumerate(("svg", "pdf", "png", "svg")):
+                url = f"https://example.org/document/{i}"
+                out = root / "output files" / f"document-{i}.{fmt}"
+                self.assertEqual(tp.compile_typst(main, out, root=root, fmt=fmt, ppi=72,
+                    sys_inputs={"url": url}, timestamp=1767312000), out)
+                data = out.read_bytes()
+                if fmt == "svg":
+                    self.assertIn(url.encode(), data)
+                elif fmt == "pdf":
+                    self.assertTrue(data.startswith(b"%PDF-"))
+                else:
+                    self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
+            main.write_text('#undefined-compiler-variable()', encoding="utf-8")
+            with self.assertRaises(tp.PandocError) as caught:
+                tp.compile_typst(main, root / "bad.pdf", root=root)
+            self.assertIn("typst failed for", str(caught.exception))
+            self.assertIn("unknown variable: undefined-compiler-variable", str(caught.exception))
+            main.write_text("The next compilation succeeds.", encoding="utf-8")
+            out = tp.compile_typst(main, root / "recovered.pdf", root=root)
+            self.assertTrue(out.read_bytes().startswith(b"%PDF-"))
+
+    def test_real_font_warnings_keep_the_verbose_summary(self):
+        with tempfile.TemporaryDirectory(prefix="tbook-typst-warnings-") as tmp:
+            root = Path(tmp)
+            main = root / "main.typ"
+            main.write_text('#set text(font: "tbook-missing-test-font")\nText', encoding="utf-8")
+            for verbose in ("", "1"):
+                stderr = io.StringIO()
+                with patch.dict(os.environ, {"TBOOK_VERBOSE": verbose}), contextlib.redirect_stderr(stderr):
+                    tp.compile_typst(main, root / "out.pdf", root=root)
+                if verbose:
+                    self.assertEqual(stderr.getvalue(), "  typst: fonts not installed, using fallbacks: "
+                                     "tbook-missing-test-font\n")
+                else:
+                    self.assertEqual(stderr.getvalue(), "")
+
+
 @unittest.skipUnless(have_pandoc() and have_typst(), "pandoc or typst not available")
 class BuildTest(unittest.TestCase):
     """End-to-end builds of the synthetic book (PDF variants, EPUB, covers)."""
@@ -802,6 +916,11 @@ class BuildTest(unittest.TestCase):
             data = out.read_bytes()
             self.assertTrue(data.startswith(b"%PDF-"))
             self.assertGreater(len(data), 20_000)
+            self.assertEqual(b"/StructTreeRoot" in data, variant != "academic")
+        tagged = dataclasses.replace(self.book, pdf={**self.book.pdf, "academic_tags": True})
+        out = tp.build_pdf(self.site, tagged, self.ed, self.model, None, "academic",
+                           self.tmp / "tagged-preprint.pdf", stage_dir=self.tmp / "stage-tagged")
+        self.assertIn(b"/StructTreeRoot", out.read_bytes())
         main = (self.tmp / "stage-screen" / "main.typ").read_text(encoding="utf-8")
         self.assertIn('#tr-part(id: "tr-part-1"', main)
         self.assertIn('#tr-media(kind: "viz")[', main)
@@ -813,8 +932,9 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn("#cite", main)
         # Macros are expanded in math (no raw TeX fallback), titles included.
         self.assertNotIn("\\norm", main)
-        self.assertIn("a norm $lr(bar.v.double x bar.v.double)$ and $⌊y⌋$", main)
-        self.assertIn("== Bound $x^2$ for $lr(bar.v.double x bar.v.double)$", main)
+        expressions = re.sub(r"#\[(\$.*?)<tr-inline-[^>]+>\]", r"\1", main, flags=re.S)
+        self.assertIn("a norm $lr(bar.v.double x bar.v.double)$ and $⌊y⌋$", expressions)
+        self.assertIn("== Bound $x^2$ for $lr(bar.v.double x bar.v.double)$", expressions)
         # b.md#summary reaches B's "Summary", not A's.
         self.assertIn("#link(<ch-b--summary>)[the summary of B]", main)
         self.assertRegex(main, r"== Summary\s*<ch-b--summary>")

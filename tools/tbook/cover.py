@@ -59,7 +59,7 @@ def render_cover(site, book, edition, out_path: Path, *, fmt: str = "png", varia
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "pdf":
-        paper = meta.get("academic_paper", "iso-b5") if variant == "academic" else meta["paper"]
+        paper = meta.get("academic_paper", "a4") if variant == "academic" else meta["paper"]
         page = f'paper: "{paper}"'
     else:
         page = f"width: {COVER_IN[0]}in, height: {COVER_IN[1]}in"

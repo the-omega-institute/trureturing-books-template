@@ -100,3 +100,63 @@ hide = ["example-*"]
 0.5.0 向后兼容旧链接和视频清单。迁移仅把可视化里已带 `data-lean-gid` / `data-trureturing-path` 的 trureturing `href` 换成 `#`；构建和 `tools/node/viz-server.mjs` 仍给出精确永久链接。迁移幂等，不改无标记链接或历史档案。
 
 可选的内容迁移：按 `docs/AUTHORING.md` 把当前版本与审计表的行号、摘要改为保留链接标签；幻灯片用 `<PinnedCommit />`。视频若此前每次 pin 都复制 `subject_commit`，核对历史后改用 `publication_basis: "pinned"`；真正记录制作历史的 `subject_commit` 保留。可视化生成器只提交书的拓扑与引用关系，当前 repo/commit/line/kind 由生成的 `assets/trureturing.json` 解析。所有格式的精确提交仍进入构建输出，历史比较不迁移。
+
+
+## 模板层
+
+第二个模板不必分叉上游。下游自有的 `template.d/<name>.toml` 使用与
+`template.toml` 相同的 `[template]`（`name`、`repo`、`version`、可选 `tag_prefix`）
+与 `[managed]` 配置；`name` 必须与文件名相同（小写字母、数字、连字符；`upstream` 保留）。
+`template.d/<name>.manifest.json` 由同一工具生成，格式与上游清单相同。
+层的源仓库可以是从上游模板创建的仓库，也可以仅包含该层的文件与配置。
+
+```toml
+# template.d/example.toml：位于模板层的源仓库
+[template]
+name = "example"
+repo = "owner/example-layer"
+version = "1.0.0"
+[managed]
+paths = ["docs/layer-example/", "skills/layer-example-write/",
+         ".github/workflows/layer-example-check.yml"]
+```
+
+上游为层预留 `docs/layer-<name>/`、`skills/layer-<name>-*`、
+`.github/workflows/layer-<name>-*`；它们不进入上游清单，也不由上游升级写入或删除。
+层还可以认领未被上游或其他层使用的路径，但不能认领上游托管路径、书库自有路径
+（包括 `books/`、`site.toml`、`PROJECT.md`、`template.d/`，以及排除路径 `docs/project/` 与 `skills/local-*`），或另一层的命名空间。
+路径认领按整个目录检查，即使尚无文件也会拒绝重叠；`--force` 不绕过此边界。
+层配置及清单是命令单独管理的元数据，不列进层的 `[managed].paths`。
+
+```bash
+# 源仓库维护者：在含 tbook 的仓库中生成并检查清单
+./tbook template manifest --layer example
+./tbook template manifest --layer example --check
+# 若层的源仓库不含 tbook，可指定该目录并调用已有工具
+TBOOK_ROOT=/path/to/layer-source /path/to/tbook template manifest --layer example
+# 下游使用者：也支持本地 git 仓库与普通目录作为来源
+./tbook template install example --source https://github.com/owner/example-layer.git
+./tbook template status                         # 上游与所有已安装层
+./tbook template update --dry-run               # 各来源最新稳定版的升级预览
+./tbook template update                         # 先升级上游，再升级各层
+./tbook template update --layer example --to v1.1.0
+./tbook template update --layer upstream --source ../upstream
+./tbook template list --json                    # 供工作流发现各来源
+```
+
+有多层时，`--source`、`--to` 必须同时用 `--layer upstream|<name>`，以免把一个来源用到所有层。
+安装也支持 `--dry-run`，不会写入配置、清单、摘要或迁移。每层独立做三方比较、
+`.template-new` 冲突（退出码 3）、git 历史判断与“从不倒退”的发布选择，规则与第 2 节相同。
+摘要为 `build/template-update-<name>.md`；上游摘要路径不变。
+层的版本迁移放 `docs/layer-<name>/migrations/vX.Y.Z.py`，变更记录放
+`docs/layer-<name>/CHANGELOG.md`。迁移以新的 Python 进程运行，导入消费仓库的
+`tbook`；与上游迁移一样，只从信任的源运行，迁移负责保持自己的所有权边界。
+
+`template-sync` 每周发现已安装层，对上游及每层从同一基线分别开一个 PR；层分支为
+`template-update/<name>/<version>`，上游仍为 `template-update/<version>`。
+源仓库不为自己开升级 PR。层需按自己的 `tag_prefix` 发布版本 tag（默认 `vX.Y.Z`）；从上游模板创建的层源仓库宜用独立前缀，以免触发书籍发版工作流。没有正式发布时只提示、不开 PR。
+手动 workflow 的 `layer` 输入可选一个来源；多层时填写 `to` 必须也选 `layer`。默认都留空，逐来源取最新正式发布。
+
+此前未列在旧/新清单中的托管目录文件只会在 `status` 显示为“多出”，升级保留它们：
+`plan_update` 只遍历两份清单文件名的并集。若上游以后新增同名文件，会按新增冲突处理。
+层预留前缀使所有权明确，避免这种未来碰撞；上游升级也不复制源仓库的 `template.d/`。
