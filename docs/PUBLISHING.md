@@ -136,6 +136,13 @@ tag（标签）是给某一个提交起的固定名字。分支（如 `main`）�
 - tag 打错了（名字或提交不对）而 Release 还没发布时，删掉重打：`git push origin :refs/tags/<tag>` 删除远端 tag，`git tag -d <tag>` 删除本地 tag，并在 Releases 页删除留下的草稿。已发布的版本不要复用 tag，发一个新的补丁版本。
 - 推送 tag 需要对仓库有写权限；只能推送分支的环境（例如受限的自动化会话）推不了 tag，由有权限的人推送。
 
+## 7. 学术报告 PDF
+
+`./tbook build slides --book <slug>` 同时构建 Slidev 与 academic decks。后者用固定 **Tectonic 0.16.9** 与 `default_bundle_v33.tar`，输出 `build/slides/<slug>/<deck>-<lang>.pdf`（听众版，隐藏备注）和 `<deck>-<lang>-notes.pdf`（报告页与演讲备注）。站点在 `<slug>/slides/<deck>/` 下发布两个下载文件与按语言的 PDF 入口页；幻灯片索引、书的落地页与章节卡片包含两种链接，书库 Release 附上两种 PDF。`TBOOK_SLIDES_NO_PDF`/`NO_CHECK` 仍只控制 Slidev 的浏览器导出。
+
+引擎由 `./tbook doctor` 核对精确版本，Linux 安装脚本 `tools/install-tectonic.sh DESTINATION` 校验发布包 SHA-256；容器预装引擎与需要的 TeX 资源，普通 hosted runner 只在有 academic descriptor 的媒体/浏览器作业中安装到本地缓存目录。没有更换默认 runner 或现有必需检查。引擎、bundle、固定 epoch、书的章节/图件/可视化、主题与自有主题文件均进入幻灯片缓存键。构建的可复现设置和冷启动联网要求见 [Beamer 说明](../theme/beamer/README.md)。本地可以用 `TECTONIC` 指向已有的同版本引擎。
+
+
 ## Site post-build command
 
 A repository may set `[site].post_build = ["python3", "docs/project/site.py"]`

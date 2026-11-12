@@ -362,7 +362,7 @@ def parser() -> argparse.ArgumentParser:
 
     for kind in ("viz", "slides", "film"):
         c = sub.add_parser(kind, help=f"{kind} helpers (new, list, …)")
-        c.add_argument("action", choices=["new", "list"])
+        c.add_argument("action", choices=["new", "list", "snapshots"] if kind == "slides" else ["new", "list"])
         c.add_argument("rest", nargs=argparse.REMAINDER)
         c.set_defaults(fn=cmd_media, kind=kind)
     return p

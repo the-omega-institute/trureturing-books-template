@@ -167,6 +167,13 @@ runs:
         path: ~/.cache/ms-playwright
         key: ${{ steps.browsers-cache.outputs.cache-primary-key }}
 
+    - name: Install academic slides engine
+      if: steps.toolchain.outputs.preinstalled != 'true' && inputs.browsers == 'true' && hashFiles('books/*/slides/*/deck.toml') != ''
+      shell: bash
+      run: |
+        bash tools/install-tectonic.sh "$GITHUB_WORKSPACE/.cache/tectonic-bin"
+        echo "$GITHUB_WORKSPACE/.cache/tectonic-bin" >> "$GITHUB_PATH"
+
     - name: Install mdBook
       if: steps.toolchain.outputs.preinstalled != 'true' && (inputs.mdbook == 'true')
       uses: taiki-e/install-action@v2
@@ -248,5 +255,6 @@ runs:
         python --version
         node --version
         if command -v mdbook >/dev/null; then mdbook --version; fi
+        if command -v tectonic >/dev/null; then tectonic --version; fi
         if command -v ffmpeg >/dev/null; then ffmpeg -version | head -n 1; fi
         if command -v java >/dev/null; then java -version 2>&1 | head -n 1; else echo "::warning::java not found: EPUB validation (epubcheck) will be skipped or fail"; fi

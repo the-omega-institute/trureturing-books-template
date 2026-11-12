@@ -11,6 +11,7 @@ INPUTS = (
     "requirements.txt", "package.json", "package-lock.json",
     "theme/film/requirements.txt", "theme/film/setup.sh",
     "tools/fetch-fonts.sh", "theme/typst/fonts.sha256",
+    "tools/install-tectonic.sh",
 )
 
 

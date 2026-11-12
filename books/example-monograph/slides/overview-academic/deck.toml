@@ -1,0 +1,14 @@
+kind = "academic"
+editions = ["en"]
+aspect = "4:3"
+structure_colour = "#0e2c8e"
+short_author = "Example speaker"
+short_title = "Golden integers and observability"
+
+institution = "Example Mathematics Seminar"
+coauthors = "the example monograph contributors"
+date = "12 November 2026"
+navigation_symbols = false
+
+[title]
+en = "Golden Integers and Observability"

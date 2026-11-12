@@ -304,6 +304,16 @@ def check_ffmpeg(report: Report) -> None:
                      "sudo apt-get install ffmpeg (or set FFMPEG)", targets=("films",)))
 
 
+def check_tectonic(report: Report) -> None:
+    from . import academic
+    try:
+        executable = academic.engine()
+        report.add(Check(f"Tectonic {academic.ENGINE_VERSION}", True, executable, targets=("slides",)))
+    except RuntimeError as exc:
+        report.add(Check(f"Tectonic {academic.ENGINE_VERSION} (academic slides)", False, str(exc),
+                         "see theme/beamer/README.md; TECTONIC may point to a local binary", targets=("slides",)))
+
+
 # Whether theme/film/lib.js's Chromium can create a WebGL context (solid shots): prints the renderer, or nothing.
 _WEBGL_PROBE = """
 const { launch } = await import(process.argv[1]);
@@ -507,6 +517,7 @@ def collect() -> Report:
     check_node(report)
     check_node_modules(report)
     check_chromium(report)
+    check_tectonic(report)
     check_ffmpeg(report)
     check_film_webgl(report)
     check_fonts(report)

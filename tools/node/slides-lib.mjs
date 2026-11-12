@@ -449,7 +449,8 @@ export const themeRef = (deckDir, root = ROOT) => toPosix(relative(deckDir, join
 export function deckNames(book) {
   if (!existsSync(book.slidesDir)) return [];
   return readdirSync(book.slidesDir)
-    .filter((n) => !/^[_.]/.test(n) && statSync(join(book.slidesDir, n)).isDirectory())
+    .filter((n) => !/^[_.]/.test(n) && statSync(join(book.slidesDir, n)).isDirectory()
+      && !existsSync(join(book.slidesDir, n, 'deck.toml'))) // academic decks are checked/built by tbook.academic
     .sort();
 }
 

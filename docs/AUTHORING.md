@@ -220,3 +220,11 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 | `… and … sit next to each other with no text between them`（警告） | 把两块各自挪到对应的那句话之后，块与块之间有正文；完整实验室挪到章末最后一段之后 |
 | `no figure books/<slug>/figures/<name>.py` | `.figure` 的 `src` 没有对应脚本：核对图名，或 `./tbook fig new <slug> <name>` |
 | `no chapter, deck, film or visualization of this book uses this file`（警告） | `assets/` 里的遗留文件：删除，或在章节里引用 |
+
+## 9. 学术报告（Beamer）
+
+传统学术报告用 `./tbook slides new <book> <deck> "<title>" --academic --editions en`。`deck.toml` 声明 `kind="academic"`、所选 `editions`、`aspect="4:3"`（或 `16:9`）、`structure_colour`、短作者/标题，可选 `institution`、`coauthors`（原主题显示 Joint work with …）、`date`、`navigation_symbols=true`（默认隐藏导航按钮），以及自有 `theme_dir`/`theme_name` 与 `institution_graphic`。每个所选语言给一个标题；所选第一语言是 `slides.tex`，其他为 `slides.<lang>.tex`。可以只覆盖书的一部分语言；同一 deck 内逐帧对齐。现有 Slidev deck 的格式不变。
+
+TeX 源在导言区写 `\input{tbook-deck}`；用 `\begin{bookresult}{thm-…}` 引用书中 id，正文自己写，种类、编号、标题与 Lean 徽章由书和锁生成。开放问题没有 GID；未解析的 GID 显示 `UNVERIFIED` 并使检查失败。`\PinnedCommit` 显示当前钉版，`\FormalVerification` 生成本报告引用过的结果账本。按“标题页、提纲、section/subsection/frame、appendix”组织，逐帧写 `% Manuscript: ...`，用 `\note{...}` 保留演讲备注。
+
+`\BookViz{golden-carry}{plus}` 插入纸面静态图并链接在线实验；先用 `./tbook slides snapshots <book>` 生成并提交 `fig-<卡>.<语言>.paper.png`。`\BookFigure{phase-square}` 经现有 `figure.materialize(...,"paper")` 路径插图，检查会拒绝过期 SVG。章节仍用 `::: {.slides src="<deck>"}`，各语言媒体序列一致；deck 缺少该语言时链接所选第一语言。完整命令、源解析边界、自有主题与排版规范见 [theme/beamer/README.md](../theme/beamer/README.md) 和 `skills/book-slides`。

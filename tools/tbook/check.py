@@ -313,7 +313,7 @@ def check_unused_assets(book: config.Book, models: dict[str, EditionModel], site
         d = book.dir / sub
         if d.is_dir():
             for p in d.rglob("*"):
-                if p.is_file() and p.suffix.lower() in (".md", ".html", ".js", ".json", ".vue", ".css") and "node_modules" not in p.parts:
+                if p.is_file() and p.suffix.lower() in (".md", ".html", ".js", ".json", ".vue", ".css", ".tex", ".toml") and "node_modules" not in p.parts:
                     try:
                         elsewhere += p.read_text(encoding="utf-8", errors="ignore")
                     except OSError:

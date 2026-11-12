@@ -407,7 +407,7 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
     metadata, the slide theme and tools, the lock (cited GIDs), package-lock.json (Slidev, Playwright and its
     Chromium), the site's base path, Node's major version, and whether PDFs are exported and the decks
     checked in a browser (decks stored unchecked are not restored into a build that checks)."""
-    from . import slides
+    from . import academic, slides
 
     inputs = (Inputs()
               .files(book.dir / "book.toml", book.slides_dir, book.dir / "assets", paths.THEME / "slides",
@@ -419,6 +419,19 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
               .text("no_pdf", os.environ.get("TBOOK_SLIDES_NO_PDF") == "1")
               .text("no_check", os.environ.get("TBOOK_SLIDES_NO_CHECK") == "1")
               .text("node", node_version()))
+    academic_decks = [d for d in slides.deck_names(book) if academic.is_academic(book.slides_dir / d)]
+    if academic_decks:
+        inputs.files(book.dir, paths.THEME / "beamer", paths.TOOLS / "tbook",
+                     paths.TOKENS, paths.ROOT / "requirements.txt", paths.TOOLS / "install-tectonic.sh",
+                     paths.THEME / "typst" / "fonts").add(_fonts())
+        inputs.text("tectonic", academic.ENGINE_VERSION).text("bundle", academic.BUNDLE)
+        inputs.text("epoch", os.environ.get("SOURCE_DATE_EPOCH", academic.EPOCH))
+        inputs.text("typst", package_version("typst"))
+        for deck in academic_decks:
+            data = academic.settings(book, deck)
+            for key in ("theme_dir", "institution_graphic"):
+                if data.get(key):
+                    inputs.files((book.slides_dir / deck / data[key]).resolve())
     return Unit("slides", book.slug, inputs, [Path(out_dir)])
 
 

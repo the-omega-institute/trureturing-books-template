@@ -1,0 +1,96 @@
+% SPDX-License-Identifier: Apache-2.0
+% Original academic theme. Uses Beamer's public theme/template API.
+\ProvidesPackage{beamerthemeTBookAcademic}[2026/11/12 Academic book talks]
+\RequirePackage{tikz}
+\usetikzlibrary{shadows.blur}
+\mode<presentation>
+\useinnertheme[shadow=true]{rounded}
+\usefonttheme[onlymath]{serif}
+\providecolor{TBookStructure}{RGB}{14,44,142}
+\providecommand{\TBookCoauthors}{}
+\setbeamercolor{structure}{fg=TBookStructure}
+\setbeamercolor{normal text}{fg=black,bg=white}
+\setbeamercolor{title}{fg=white,bg=TBookStructure}
+\setbeamercolor{author}{fg=TBookStructure}
+\setbeamercolor{frametitle}{fg=white,bg=TBookStructure}
+\setbeamercolor{block title}{fg=white,bg=TBookStructure}
+\setbeamercolor{block body}{fg=black,bg=TBookStructure!12!white}
+\setbeamercolor{section in head/foot}{fg=white,bg=TBookStructure}
+\setbeamercolor{subsection in head/foot}{fg=white,bg=TBookStructure!78!white}
+\setbeamercolor{author in head/foot}{fg=white,bg=TBookStructure}
+\setbeamercolor{title in head/foot}{fg=white,bg=TBookStructure!78!white}
+% Semantic alert colour is supplied from tokens.json by tbook-lean.
+\AtBeginDocument{%
+  \setbeamercolor{alerted text}{fg=TBookOpen}%
+  \setbeamercolor{block title alerted}{fg=white,bg=TBookOpen}%
+  \setbeamercolor{block body alerted}{fg=black,bg=TBookOpen!12!white}%
+  \setbeamercolor{block title example}{parent=block title}%
+  \setbeamercolor{block body example}{parent=block body}%
+}
+\setbeamertemplate{navigation symbols}{}
+\setbeamerfont{frametitle}{size=\large}
+\setbeamerfont{block title}{size=\normalsize}
+\setbeamerfont{section in head/foot}{size=\tiny}
+\setbeamerfont{subsection in head/foot}{size=\tiny}
+\setbeamerfont{author in head/foot}{size=\fontsize{5.7}{6.8}\selectfont}
+\setbeamerfont{title in head/foot}{size=\fontsize{5.7}{6.8}\selectfont}
+\setbeamertemplate{section in head/foot}{\insertsectionhead}
+\setbeamertemplate{section in head/foot shaded}{\textcolor{white!55!TBookStructure}{\insertsectionhead}}
+\setbeamertemplate{subsection in head/foot}{\insertsubsectionhead}
+\setbeamertemplate{subsection in head/foot shaded}{\textcolor{white!55!TBookStructure}{\insertsubsectionhead}}
+\setbeamertemplate{headline}{%
+  \leavevmode
+  \hbox{\begin{beamercolorbox}[wd=.5\paperwidth,ht=7pt,dp=2pt,leftskip=4pt,rightskip=4pt]{section in head/foot}%
+    \insertsectionnavigationhorizontal{\dimexpr.5\paperwidth-8pt\relax}{}{\hfill}%
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=7pt,dp=2pt,leftskip=4pt,rightskip=4pt]{subsection in head/foot}%
+    \insertsubsectionnavigationhorizontal{\dimexpr.5\paperwidth-8pt\relax}{}{\hfill}%
+  \end{beamercolorbox}}%
+}
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt,leftskip=12pt,rightskip=12pt]{frametitle}%
+    \vskip5pt\usebeamerfont{frametitle}\strut\insertframetitle\strut\par
+    \ifx\insertframesubtitle\@empty\else
+      {\usebeamerfont{framesubtitle}\insertframesubtitle\par}%
+    \fi
+    \vskip5pt
+  \end{beamercolorbox}%
+}
+\newif\ifTBookAppendix
+\pretocmd{\appendix}{\global\TBookAppendixtrue}{}{}
+\setbeamertemplate{footline}{%
+  \leavevmode
+  \hbox{\begin{beamercolorbox}[wd=.5\paperwidth,ht=7.4pt,dp=2.5pt,leftskip=6pt,rightskip=6pt]{author in head/foot}%
+    \usebeamerfont{author in head/foot}\insertshortauthor
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=7.4pt,dp=2.5pt,leftskip=6pt,rightskip=6pt]{title in head/foot}%
+    \usebeamerfont{title in head/foot}\insertshorttitle\hfill
+    \ifTBookAppendix Appendix\else\insertframenumber/\inserttotalframenumber\fi
+  \end{beamercolorbox}}%
+}
+\setbeamertemplate{title page}{%
+  \centering
+  \vspace*{3pt}
+  % A centred blur gives the box an even shadow on all four sides.
+  \begin{tikzpicture}
+    \node[rounded corners=5pt,fill=TBookStructure,text=white,
+      text width=.87\textwidth,align=center,inner xsep=9pt,inner ysep=9pt,
+      blur shadow={shadow xshift=0pt,shadow yshift=0pt,shadow blur radius=3pt,shadow opacity=28}]{%
+      {\usebeamerfont{title}\inserttitle\par}%
+      \ifx\insertsubtitle\@empty\else
+        \vskip4pt{\small\insertsubtitle\par}%
+      \fi};
+  \end{tikzpicture}\par
+  \vskip13pt
+  {\usebeamercolor[fg]{author}\large\insertauthor\par}%
+  \ifdefempty{\TBookCoauthors}{}{%
+    \vskip4pt{\small Joint work with \TBookCoauthors\par}%
+  }%
+  \vskip7pt{\small\insertinstitute\par}%
+  \vskip5pt{\small\insertdate\par}%
+  \ifx\inserttitlegraphic\@empty\else
+    \vskip7pt\inserttitlegraphic\par
+  \fi
+}
+\mode<all>
