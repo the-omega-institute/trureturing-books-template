@@ -6,6 +6,9 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest import mock
+
+from test_film import Sandbox, needs_example
 
 
 def ci_module(name):
@@ -84,3 +87,28 @@ class FilmShardsTest(unittest.TestCase):
         for value in ("0/4", "5/4", "1/0", "1", "a/4", "1/2/3"):
             with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
                 films.shard(value)
+
+
+@needs_example
+class FilmBuildTest(unittest.TestCase):
+    def setUp(self):
+        self.sb = Sandbox(self)
+
+    def test_shards_and_the_site_share_the_existing_cache(self):
+        def render(item, dest):
+            dest.mkdir(parents=True)
+            for name in item.videos().values():
+                (dest / name).write_bytes(b"video")
+        with mock.patch.object(films.film, "toolchain_missing", return_value=[]), \
+                mock.patch.object(films.film, "render_videos", side_effect=render) as rendering:
+            self.assertEqual(films.build_one(self.sb.site, self.sb.film()), "built")
+            status = films.film.build_videos(self.sb.site, self.sb.book, mode="require")
+            self.assertEqual(status, {self.sb.film().id: "cached"})
+            self.assertEqual(rendering.call_count, 1)
+
+    def test_uncached_film_requires_a_working_toolchain(self):
+        with mock.patch.object(films.film, "toolchain_missing", return_value=["missing ffmpeg"]), \
+                mock.patch.object(films.film, "render_videos") as rendering:
+            with self.assertRaisesRegex(films.film.FilmError, "missing ffmpeg"):
+                films.build_one(self.sb.site, self.sb.film())
+            rendering.assert_not_called()

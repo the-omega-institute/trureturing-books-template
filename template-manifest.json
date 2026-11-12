@@ -500,7 +500,7 @@
       "mode": "100644"
     },
     "tools/ci/films.py": {
-      "sha256": "eb7eb058fe9d2b3bbb102952769905de60fefc7583d18373e1dbd453769a0af4",
+      "sha256": "0ed9024072f0761848ce82b5b4775ee0683b490151c831b1b19499e7c8cdbd21",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -656,7 +656,7 @@
       "mode": "100644"
     },
     "tools/tbook/film.py": {
-      "sha256": "25facde91345388a9360b7455a74b32fce6f4945f03c088398af23ebb16df3f4",
+      "sha256": "00574a5490e1eb0c3940a8d070e2938b1f3a792b47ee5898f2027da1229647d9",
       "mode": "100644"
     },
     "tools/tbook/html.py": {
@@ -748,7 +748,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "ff6344e0d714b0200a1b86260bafe3ad02e893e5f31816a40c42dad552efbe2c",
+      "sha256": "58de30672c1ff4741b3f96a432808794f2c6e35c874eb1efefe3a321882ba689",
       "mode": "100644"
     },
     "tools/tests/test_container.py": {
@@ -764,7 +764,7 @@
       "mode": "100644"
     },
     "tools/tests/test_film.py": {
-      "sha256": "df9c09f5f17440dac4a77d8bc15e6c599f999aacf3def364b9b527ac479d3839",
+      "sha256": "a3510cfc20f718d56fbb0387ff9c72652d262c13504c198c4817e1743319a66f",
       "mode": "100644"
     },
     "tools/tests/test_followups_core.py": {
