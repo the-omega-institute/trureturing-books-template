@@ -75,8 +75,19 @@ const _phrase = new Map();
 function phraseAt(S, k, phrase) {
   const L = lineAt(S, k); if (!L.en) return 1e9;
   const key = S.id + '|' + k + '|' + phrase; let off = _phrase.get(key);
-  if (off == null) { const i = phrase ? L.en.indexOf(phrase) : 0; off = i < 0 ? 0 : i / L.en.length * (L.e - L.s); _phrase.set(key, off); }
+  if (off == null) {
+    const i = phrase ? L.en.indexOf(phrase) : 0;
+    if (i < 0) phraseMissing(S, k, phrase);
+    off = i < 0 ? 0 : i / L.en.length * (L.e - L.s); _phrase.set(key, off);
+  }
   return L.s + off;
+}
+/* A phrase line k does not contain: timing falls back to the start of the line. A page error under FILM_STRICT=1 (the
+   build), else a console warning; theme/film/build.py and ./tbook check report the literal ones before any render. */
+function phraseMissing(S, k, phrase) {
+  const msg = `film: SCENES.${S.id}: line ${k} of scene ${S.id} does not contain the phrase ${JSON.stringify(phrase)}; ` +
+    'its timing falls back to the start of the line';
+  if (DATA.strict) window.FILM_ERRORS.push(msg); else console.warn(msg);
 }
 function Q(S, k, phrase, dur = 0.5, delay = 0) { return clamp((S.u - phraseAt(S, k, phrase) - delay) / dur); }
 
@@ -312,6 +323,62 @@ function grid(t, a = 0.5, hy = H * 0.64, col = C.mag, speed = 0.3) {
   ctx.restore();
 }
 
+/* ---------- solid shots: lit solids drawn by the modelling core of the visualizations ---------- */
+/* A film whose film.json says "solid": true gets theme/viz/solid-core.js (and the pinned three.js it imports) next to
+   its page; boot() imports it and makes one WebGL renderer on an offscreen canvas (pixel ratio 1, antialiasing on, a
+   fixed size per shot). solid(key, rect) returns the shot `key`: the primitives of kit.solid (surface, poly, glass,
+   tube, line, arrow, ring, bead, fan) between begin() and end(a); end() draws the solid synchronously and composites it
+   into the frame with drawImage, so whatever the scene draws after it (labels, panels, chips, stamps) and the
+   subtitles lie on top. p(v) / anchor(v) project a world point to frame pixels; anchor(v).hidden is true when a
+   surface or polyhedron of the shot is in front of it. No clock, animation loop or randomness: the frame stays a pure
+   function of t. Without WebGL the page fails to boot (no fallback), so a film with solid shots never renders blind. */
+const SOLID = { core: null, renderer: null, shots: new Map() };
+const SOLID_PALETTE = { stage: C.bg, ink: C.white, cyan: C.cyan, magenta: C.mag, violet: C.vio, amber: C.now, dim: C.dim,
+  lean: C.lean, blue: C.blue, orange: C.orange };
+async function solidInit() {
+  const id = (DATA.film && DATA.film.id) || 'film';
+  try {
+    SOLID.core = await import(new URL(DATA.solid.core, location.href).href);
+  } catch (e) {
+    throw new Error(`film ${id}: cannot load the modelling core ${DATA.solid.core} (${e && e.message})`);
+  }
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, preserveDrawingBuffer: true });
+  if (!gl) throw new Error(`film ${id} has solid shots ("solid": true in film.json) but this browser cannot create a WebGL ` +
+    'context: run Chromium with WebGL enabled (theme/film/lib.js starts it with SwiftShader, ' +
+    '--enable-unsafe-swiftshader; ./tbook doctor checks it); there is no fallback');
+  SOLID.renderer = SOLID.core.createRenderer(canvas, { pixelRatio: 1 });
+}
+function makeShot(key) {
+  const sc = SOLID.core.createScene({ palette: SOLID_PALETTE });
+  const sh = { key, x: 0, y: 0, w: 1, h: 1, scene: sc };
+  for (const name of ['surface', 'poly', 'glass', 'tube', 'line', 'arrow', 'ring', 'bead', 'fan']) sh[name] = (...a) => sc[name](...a);
+  sh.begin = () => { sc.begin(); return sh; };
+  /* draw the solid now and composite it at the shot's rectangle with opacity a */
+  sh.end = (a = 1) => {
+    sc.end(); sc.render(SOLID.renderer);
+    if (a > 0.003) { ctx.save(); ctx.globalAlpha = a; ctx.drawImage(SOLID.renderer.domElement, sh.x, sh.y, sh.w, sh.h); ctx.restore(); }
+    return sh;
+  };
+  /* world point → [x, y, depth] in frame pixels */
+  sh.p = v => { const q = sc.p(v); return [sh.x + q[0], sh.y + q[1], q[2]]; };
+  sh.occluded = (v, eps = 0.02) => sc.occluded(v, eps);
+  /* where a 2D label should go: { x, y, depth, hidden } (hidden: a solid of this shot is in front of the point) */
+  sh.anchor = (v, eps = 0.02) => { const q = sh.p(v); return { x: q[0], y: q[1], depth: q[2], hidden: sc.occluded(v, eps) }; };
+  sh.marks = () => sc.marks().map(m => Object.assign(m, { x: sh.x + m.x, y: sh.y + m.y }));
+  return sh;
+}
+/* solid(key, { x, y, w, h, yaw, pitch, zoom, radius | unit, cx, cy, lw }) → the shot, its camera set for this frame.
+   x, y, w, h: the rectangle in the 1920×1080 frame; the camera options are those of kit.solid / kit.stage3. */
+function solid(key, o = {}) {
+  if (!SOLID.renderer) throw new Error(`solid('${key}'): this film has no solid shots; set "solid": true in film.json`);
+  let sh = SOLID.shots.get(key);
+  if (!sh) { sh = makeShot(key); SOLID.shots.set(key, sh); }
+  sh.x = Math.round(o.x || 0); sh.y = Math.round(o.y || 0); sh.w = Math.round(o.w || W); sh.h = Math.round(o.h || H);
+  sh.scene.camera(Object.assign({}, o, { W: sh.w, H: sh.h }));
+  return sh;
+}
+
 /* ======================================================================= */
 /*                     SCENES (registered by scenes.js)                    */
 /* ======================================================================= */
@@ -351,36 +418,41 @@ function badgeQ(S, seq) {
   badge(clamp((S.u - st) / 0.5) * clamp(S.u / 0.8) * clamp((S.d - S.u) / 0.5), cur[2]);
 }
 /* LEAN ✓ declaration chips: the film's citations (DATA.lean) at the pinned commit. Only theorems get the green
-   chip (./tbook check refuses any other kind in film.json "lean"). */
+   chip (./tbook check refuses any other kind in film.json "lean"). Each shows r.label: the full Lean name, or the GID
+   when the declaration's namespace would name another module (tbook.film.cited_label). */
+/* the citation of one GID (film.json "lean"), or null: look citations up by the whole GID, not by the short name */
+function leanCite(gid) { return (DATA.lean || []).find(z => z.gid === gid) || null; }
 function leanList(x, y, a, o = {}) {
   if (a <= 0) return y;
   const size = o.size || 22, gap = o.gap || 44, align = o.align || 'left';
   for (const r of DATA.lean.filter(z => z.kind === 'theorem')) {
-    const head = STR.en.lean || 'LEAN ✓', wh = tw(head, size * 0.72, F.mono, 700, 1) + 18, wn = tw(r.name, size, F.mono, 700);
+    const name = r.label || r.name;
+    const head = STR.en.lean || 'LEAN ✓', wh = tw(head, size * 0.72, F.mono, 700, 1) + 18, wn = tw(name, size, F.mono, 700);
     const total = wh + 14 + wn, x0 = align === 'center' ? x - total / 2 : x;
     fillBox(x0, y - size * 0.95, wh, size * 1.25, C.lean, a * 0.95);
     txt(head, x0 + 9, y - size * 0.12, { size: size * 0.72, fam: F.mono, w: 700, c: C.bg, a, ls: 1 });
-    txt(r.name, x0 + wh + 14, y, { size, fam: F.mono, w: 700, c: C.lean, a });
+    txt(name, x0 + wh + 14, y, { size, fam: F.mono, w: 700, c: C.lean, a });
     y += gap;
   }
   return y;
 }
-/* end card: book code and titles, film title, Lean citations and the pinned commit */
+/* end card: book code and titles, film title, Lean citations and the pinned commit; o: from (seconds into the scene),
+   y (top line), x (centre, default the frame's), hyper (false: no hypercube behind it) */
 function closingCard(S, o = {}) {
   const from = o.from || 0, a = clamp((S.u - from) / 1.0) * clamp((S.d - S.u) / 1.2);
   if (a <= 0) return;
-  const b = DATA.book, f = DATA.film, cy = o.y || 300;
-  drawHyper(CUBE4, [[0, 3, S.t * 0.21], [1, 2, S.t * 0.13], [2, 3, S.t * 0.17]], { scale: 1.2, a: 0.35 * a, cy: cy - 30, camZ: 7, lw: 1.4, dots: false });
-  txt(b.code, W / 2, cy - 70, { size: 26, fam: F.mono, w: 700, align: 'center', c: C.cyan, a, ls: 10 });
-  txt(b.title.zh, W / 2, cy + 20, { size: 78, fam: F.zh, w: 900, align: 'center', c: C.white, a, ab: 3 });
-  txt(b.title.en, W / 2, cy + 90, { size: 40, fam: F.disp, w: 700, align: 'center', c: C.white, a: a * 0.92, ls: 2 });
+  const b = DATA.book, f = DATA.film, cy = o.y || 300, cx = o.x || W / 2;
+  if (o.hyper !== false) drawHyper(CUBE4, [[0, 3, S.t * 0.21], [1, 2, S.t * 0.13], [2, 3, S.t * 0.17]], { scale: 1.2, a: 0.35 * a, cx, cy: cy - 30, camZ: 7, lw: 1.4, dots: false });
+  txt(b.code, cx, cy - 70, { size: 26, fam: F.mono, w: 700, align: 'center', c: C.cyan, a, ls: 10 });
+  txt(b.title.zh, cx, cy + 20, { size: 78, fam: F.zh, w: 900, align: 'center', c: C.white, a, ab: 3 });
+  txt(b.title.en, cx, cy + 90, { size: 40, fam: F.disp, w: 700, align: 'center', c: C.white, a: a * 0.92, ls: 2 });
   const p2 = clamp((S.u - from - 0.8) / 0.8) * a;
-  txt(`${(STR.en.film || 'FILM').toUpperCase()} ${f.number} · ${f.title.toUpperCase()}`, W / 2, cy + 165, { size: 22, fam: F.mono, w: 700, align: 'center', c: C.mag, a: p2, ls: 3 });
-  txt(f.title_zh, W / 2, cy + 205, { size: 26, fam: F.zh, w: 700, align: 'center', c: C.white, a: p2 * 0.85 });
+  txt(`${(STR.en.film || 'FILM').toUpperCase()} ${f.number} · ${f.title.toUpperCase()}`, cx, cy + 165, { size: 22, fam: F.mono, w: 700, align: 'center', c: C.mag, a: p2, ls: 3 });
+  txt(f.title_zh, cx, cy + 205, { size: 26, fam: F.zh, w: 700, align: 'center', c: C.white, a: p2 * 0.85 });
   const p3 = clamp((S.u - from - 1.6) / 0.8) * a;
-  const y = leanList(W / 2, cy + 290, p3, { align: 'center', size: 24, gap: 46 });
+  const y = leanList(cx, cy + 290, p3, { align: 'center', size: 24, gap: 46 });
   const pin = DATA.pin || {};
-  if (pin.commit) txt(`github.com/${pin.repo} @ ${pin.commit.slice(0, 12)}`, W / 2, y + 16, { size: 20, fam: F.mono, align: 'center', c: C.dim, a: p3, ls: 1 });
+  if (pin.commit) txt(`github.com/${pin.repo} @ ${pin.commit.slice(0, 12)}`, cx, y + 16, { size: 20, fam: F.mono, align: 'center', c: C.dim, a: p3, ls: 1 });
 }
 /* placeholder for a scene of script.json that scenes.js does not define */
 function missingScene(S) {
@@ -555,6 +627,7 @@ async function boot() {
   const faces = DATA.fonts || [];
   await Promise.all(faces.map(([fam, w]) => document.fonts.load(`${w} 40px "${fam}"`, text).catch(e => { window.FILM_ERRORS.push(`font ${fam} ${w}: ${e}`); })));
   await document.fonts.ready;
+  if (DATA.solid) await solidInit();
   buildResources();
   computeStarPhase();
   for (const fn of FILM.init) fn();
@@ -565,3 +638,4 @@ window.renderAt = renderAt;
 window.poster = poster;
 window.SUBS = SUBS;
 window.FILM = FILM;
+window.solid = solid;

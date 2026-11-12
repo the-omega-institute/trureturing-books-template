@@ -42,10 +42,15 @@ Source layout (``books/<slug>/films/``)::
       "subtitles": ["zh", "en"],
       "lean": ["D5/S1/Deficit/DeficitThreeValued.deficit_three_valued", …],   theorems cited (LEAN ✓): GIDs of
                                                   trureturing.lock.json with kind "theorem"
-      "outputs": {"narrated_720p": "<file>.mp4", "cover": "<file>.jpg"}   what the build makes, by file name:
+      "outputs": {"narrated_720p": "<file>.mp4", "cover": "<file>.jpg"},  what the build makes, by file name:
                                                   the 720p narrated video the players play and the cover
                                                   (required); "narrated" (1080p), "music_only" (1080p) and
                                                   "music_only_720p" only when listed
+      "solid": true,                              optional: the film has solid shots (solid(…) in scenes.js); the
+                                                  page then loads the modelling core theme/viz/solid-core.js
+      "scripts": ["viz/<id>/model.js"]            optional: classic scripts of the book (paths relative to
+                                                  books/<slug>/) inlined before scenes.js, e.g. the model a
+                                                  visualization page loads too, so that both draw one object
     }
 
 ``release_tag`` and ``published_tag`` (per-film releases) are no longer used; ``./tbook check`` warns.
@@ -79,6 +84,7 @@ import re
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -129,6 +135,10 @@ LINE_PAD_SECONDS = 0.3
 LINE_GAP_SECONDS = 0.6  # silence between lines inside a scene; must equal GAP in theme/film/tts.py
 
 THEME_FILM = paths.THEME / "film"
+THEME_VIZ = paths.THEME / "viz"
+SOLID_CORE = THEME_VIZ / "solid-core.js"  # the modelling core of solid shots and of kit.solid
+SOLID_VENDOR = THEME_VIZ / "vendor"       # the pinned three.js it imports
+SCRIPT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\.js$")
 TEMPLATES_FILM = paths.TEMPLATES / "film"
 FILMS_MODES = ("auto", "require", "skip")  # TBOOK_FILMS
 # The Kokoro-82M model release theme/film/setup.sh downloads (KOKORO_RELEASE there; a test keeps them equal).
@@ -291,6 +301,17 @@ class Film:
     def lean(self) -> list[str]:
         gids = (self.meta or {}).get("lean") or []
         return [str(g) for g in gids] if isinstance(gids, list) else []
+
+    @property
+    def solid(self) -> bool:
+        """Whether the film has solid shots (film.json ``"solid": true``)."""
+        return (self.meta or {}).get("solid") is True
+
+    @property
+    def scripts(self) -> list[Path]:
+        """The book's scripts film.json ``scripts`` lists, inlined before scenes.js (paths as listed, unchecked)."""
+        names = (self.meta or {}).get("scripts") or []
+        return [self.book.dir / str(n) for n in names] if isinstance(names, list) else []
 
     def videos(self) -> dict[str, str]:
         """{output key: file name} of what the build makes: the outputs film.json lists (:meth:`listed`), in
@@ -606,6 +627,19 @@ def validate_meta(meta: dict, film_dir: Path, book: config.Book, lock: lean.Lock
             elif res.kind not in lean.FORMAL_KINDS:
                 err(f"film.json: {gid} is a Lean {res.kind}, not a theorem; lean lists the theorems the film cites "
                     "(shown as LEAN ✓)")
+    if "solid" in meta and not isinstance(meta["solid"], bool):
+        err("film.json: solid must be true (the film has solid shots) or false")
+    scripts = meta.get("scripts")
+    if scripts is not None:
+        if not isinstance(scripts, list) or not all(isinstance(x, str) for x in scripts):
+            err("film.json: scripts must be a list of script paths relative to the book, e.g. [\"viz/<id>/model.js\"]")
+        else:
+            for name in scripts:
+                if not SCRIPT_RE.match(name) or ".." in name.split("/"):
+                    err(f"film.json: scripts: {name!r} must be a .js path inside the book (relative to "
+                        f"books/{book.slug}/, no '..')")
+                elif not (book.dir / name).is_file():
+                    err(f"film.json: scripts: books/{book.slug}/{name} does not exist")
     for key in LEGACY_KEYS:
         if key in meta:
             warn(f"film.json: {key} is no longer used: the videos are built with the site (./tbook build films) "
@@ -718,6 +752,94 @@ def scene_ids_defined(scenes_js: str) -> set[str]:
     return {m.group("a") or m.group("b") for m in SCENE_DEF_RE.finditer(scenes_js)}
 
 
+_JS_STR = r"'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\""
+_TIMED_RE = re.compile(r"\b(?P<fn>Q|phraseAt|at)\(\s*S\s*,\s*(?P<k>\d+)\s*(?:,\s*(?P<s>" + _JS_STR + r"))?")
+_BADGEQ_RE = re.compile(r"\bbadgeQ\(\s*S\s*,\s*\[(?P<body>.*?)\]\s*\)", re.S)
+_BADGE_ENTRY_RE = re.compile(r"\[\s*(?P<k>\d+)\s*,\s*(?P<s>null|" + _JS_STR + r")\s*,")
+_TOP_LEVEL_RE = re.compile(r"(?m)^(?!\})\S")
+
+
+def _js_string(lit: str) -> str | None:
+    """The value of a simple JavaScript string literal ('…' or "…"), or None when it is not one."""
+    body = lit[1:-1]
+    out, i = [], 0
+    simple = {"n": "\n", "t": "\t", "\\": "\\", "'": "'", '"': '"'}
+    while i < len(body):
+        ch = body[i]
+        if ch != "\\":
+            out.append(ch)
+            i += 1
+            continue
+        nxt = body[i + 1:i + 2]
+        if nxt in simple:
+            out.append(simple[nxt])
+            i += 2
+        elif nxt == "u" and re.match(r"[0-9a-fA-F]{4}", body[i + 2:i + 6]):
+            out.append(chr(int(body[i + 2:i + 6], 16)))
+            i += 6
+        else:
+            return None
+    return "".join(out)
+
+
+def phrase_issues(scenes_js: str, script: dict | None) -> list[tuple[int, str]]:
+    """(line of scenes.js, message) for each literal timing call that does not fit script.json.
+
+    Inside the body of ``SCENES.<id> = …`` (up to the next top-level statement), ``Q(S, k, '…')``,
+    ``phraseAt(S, k, '…')``, ``at(S, k, …)`` and the entries ``[k, '…', kind]`` of ``badgeQ(S, [...])`` must name
+    a line k of scene <id>, and the phrase must occur in its English narration: the engine times the phrase by its
+    character offset and falls back to the start of the line when it is missing. Calls with a computed line or
+    phrase, or outside a scene's body, are not checked here (the engine reports those while it renders)."""
+    if not isinstance(script, dict):
+        return []
+    lines_of: dict[str, list[str]] = {}
+    for sc in script.get("scenes") or []:
+        if isinstance(sc, dict) and isinstance(sc.get("id"), str) and isinstance(sc.get("lines"), list):
+            lines_of[sc["id"]] = [str(ln[0]) if isinstance(ln, list) and ln else "" for ln in sc["lines"]]
+    out: list[tuple[int, str]] = []
+    defs = list(SCENE_DEF_RE.finditer(scenes_js))
+    for m in defs:
+        sid = m.group("a") or m.group("b")
+        if sid not in lines_of:
+            continue
+        nl = scenes_js.find("\n", m.end())
+        nxt = _TOP_LEVEL_RE.search(scenes_js, nl + 1) if nl >= 0 else None
+        start, end = m.start(), (nxt.start() if nxt else len(scenes_js))
+        body = scenes_js[start:end]
+        lines = lines_of[sid]
+
+        def where(pos: int) -> int:
+            return scenes_js.count("\n", 0, start + pos) + 1
+
+        def check(pos: int, call: str, k: int, phrase: str | None) -> None:
+            if k >= len(lines):
+                out.append((where(pos), f"SCENES.{sid}: {call}: scene {sid!r} has {len(lines)} line(s) in "
+                                        f"script.json, no line {k}"))
+            elif phrase and phrase not in lines[k]:
+                out.append((where(pos), f"SCENES.{sid}: {call}: line {k} of scene {sid!r} does not contain "
+                                        f"{phrase!r} (its timing falls back to the start of the line): "
+                                        f"{lines[k]!r}"))
+
+        for t in _TIMED_RE.finditer(body):
+            k, lit = int(t.group("k")), t.group("s")
+            if t.group("fn") == "at":
+                check(t.start(), f"at(S, {k}, …)", k, None)
+                continue
+            if lit is None:
+                continue
+            phrase = _js_string(lit)
+            if phrase is not None:
+                check(t.start(), f"{t.group('fn')}(S, {k}, {lit})", k, phrase)
+        for b in _BADGEQ_RE.finditer(body):
+            for e in _BADGE_ENTRY_RE.finditer(b.group("body")):
+                k, lit = int(e.group("k")), e.group("s")
+                phrase = None if lit == "null" else _js_string(lit)
+                if lit != "null" and phrase is None:
+                    continue
+                check(b.start("body") + e.start(), f"badgeQ entry [{k}, {lit}, …]", k, phrase)
+    return out
+
+
 def node_executable() -> str | None:
     return shutil.which("node")
 
@@ -775,6 +897,12 @@ def check_film(film: Film, lock: lean.Lock | None) -> list[Issue]:
         errors = js_syntax_errors([scenes])
         for path, msg in (errors or {}).items():
             add("error", scenes, f"JavaScript syntax error: {msg}")
+        for line, msg in phrase_issues(text, film.script):
+            add("warning", scenes, msg, line)
+    if film.meta is not None:
+        listed = [p for p in film.scripts if p.is_file()]
+        for path, msg in (js_syntax_errors(listed) or {}).items():
+            add("error", path, f"JavaScript syntax error: {msg}")
     data_dir = d / "data"
     if data_dir.is_dir():
         for p in sorted(data_dir.iterdir()):
@@ -858,8 +986,26 @@ def cited_gids(book) -> list[tuple[Path, int, str]]:
 # --------------------------------------------------------------------------- data for pages
 
 
+def cited_label(g: lean.Gid, name: str) -> str:
+    """How a film shows the cited declaration ``g`` whose full Lean name is ``name``: the Lean name when its
+    namespace lies on the module's path (``D5.S1.Deficit.deficit_integer`` in ``D5/S1/Deficit/DeficitInteger``),
+    else the GID itself. A namespace off that path can name another module (the theorem of
+    ``…/Bloch/QubitBloch`` declared in ``namespace …Measurement.FourQubitParentConstruction``), so the Lean name
+    alone would point the reader at the wrong file."""
+    module = g.lean_module.split(".")
+    want = [str(c) for c in g.parts]
+    comps = lean.name_components(name)
+    if len(comps) < len(want) or comps[len(comps) - len(want):] != want:
+        return g.text
+    namespace = comps[:len(comps) - len(want)]
+    return name if namespace == module[:len(namespace)] else g.text
+
+
 def lean_refs(gids: list[str], lock: lean.Lock | None) -> list[dict]:
-    """{gid, name, short, kind, url, line, statement_id, signature} for each cited GID."""
+    """{gid, name, label, short, kind, url, line, statement_id, signature} for each cited GID, resolved by the
+    whole GID (module and name): ``name`` is the full Lean name, ``label`` what the film and its page show
+    (:func:`cited_label`), ``short`` the last component of the cited name. Look a citation up by ``gid``: two
+    cited declarations may share a short name."""
     out = []
     for gid in gids:
         try:
@@ -871,7 +1017,8 @@ def lean_refs(gids: list[str], lock: lean.Lock | None) -> list[dict]:
         out.append({
             "gid": gid,
             "name": name,
-            "short": name.rsplit(".", 1)[-1],
+            "label": cited_label(g, name),
+            "short": g.parts[-1] if g.parts else name.rsplit(".", 1)[-1],
             "kind": res.kind if res else "",
             "url": lock.source_url(gid) if lock else "",
             "line": res.line if res else 0,
@@ -1129,7 +1276,7 @@ def _film_card(site: config.Site, film: Film, lock: lean.Lock | None, built: boo
         player = f'<div class="missing">{_ui_pair("ui.poster_unavailable")}</div>'
     refs = []
     for r in lean_refs(film.lean, lock):
-        name = esc(r["name"])
+        name = esc(r["label"])
         link = (f'<a href="{esc(r["url"])}" target="_blank" rel="noopener" title="{esc(r["gid"])}"><code>{name}</code></a>'
                 if r["url"] else f"<code>{name}</code>")
         # green LEAN ✓ only for a locked theorem; anything else (check refuses it) is a plain Lean link
@@ -1423,7 +1570,9 @@ def video_unit(site: config.Site, film: Film) -> buildcache.Unit:
     are the same wherever the site is served. Not the probed ffmpeg, Chromium or film Python either
     (:func:`tbook.buildcache.series`): a build without the film toolchain (``TBOOK_FILMS=auto|skip``) must
     find the same key to restore the videos, and a new ffmpeg package revision on the runner does not
-    change what a film shows.
+    change what a film shows. A film with solid shots (``"solid": true``) adds the modelling core
+    ``theme/viz/solid-core.js`` and the pinned three.js of ``theme/viz/vendor/``, and the scripts film.json
+    ``scripts`` lists are inputs too; a film without solid shots does not depend on three.js.
     """
     where = paths.rel(film.dir)
     inputs = (buildcache.Inputs()
@@ -1434,6 +1583,11 @@ def video_unit(site: config.Site, film: Film) -> buildcache.Unit:
               .text("npm", _npm_packages())
               .text("kokoro", KOKORO_RELEASE)
               .text("node", buildcache.node_version()))
+    scripts = [p for p in film.scripts if p.is_file()]
+    if scripts:
+        inputs.files(*scripts)
+    if film.solid:
+        inputs.files(SOLID_CORE, SOLID_VENDOR)
     return buildcache.Unit("films", f"{film.book.slug}/{film.id}", inputs, [film.build_dir])
 
 
@@ -1511,6 +1665,22 @@ def render_videos(film: Film, dest: Path) -> None:
               f"{format_duration(float(measured))} ({float(measured):.2f} s); update film.json")
 
 
+_ONLY: set[str] | None = None  # the films of `./tbook build films --film <id>`; None: every film
+
+
+@contextmanager
+def only(film_ids: list[str] | None):
+    """Limit :func:`build_videos` to ``film_ids`` (``<NNN>-<name>``) while the block runs: the other films of the
+    book are restored from the build cache when their key is cached and never rendered (as with
+    ``TBOOK_FILMS=skip``), so the films page still lists them. None or empty: every film."""
+    global _ONLY
+    saved, _ONLY = _ONLY, (set(film_ids) if film_ids else None)
+    try:
+        yield
+    finally:
+        _ONLY = saved
+
+
 def build_videos(site: config.Site, book: config.Book, *, mode: str | None = None) -> dict[str, str]:
     """Render or restore the videos of every film of ``book`` into ``build/films/<slug>/<id>/``.
 
@@ -1519,8 +1689,8 @@ def build_videos(site: config.Site, book: config.Book, *, mode: str | None = Non
     (:func:`render_videos`) according to ``mode`` (default ``$TBOOK_FILMS``): ``auto`` renders when the
     toolchain is complete (:func:`toolchain_missing`) and otherwise leaves the film out with a warning,
     ``require`` raises :class:`FilmError` instead, ``skip`` never renders. A film left out has no build
-    directory, so no video of older inputs is published. Returns {film id: "cached" | "release" | "built" |
-    "skipped"}.
+    directory, so no video of older inputs is published. Inside :func:`only`, the films it does not name are
+    never rendered (only restored). Returns {film id: "cached" | "release" | "built" | "skipped"}.
     """
     mode = mode or films_mode()
     if mode not in FILMS_MODES:
@@ -1533,7 +1703,11 @@ def build_videos(site: config.Site, book: config.Book, *, mode: str | None = Non
         unit = video_unit(site, film)
         label = f"{book.slug}/{film.id}"
 
-        def render(film: Film = film, unit: buildcache.Unit = unit, label: str = label) -> None:
+        chosen = _ONLY is None or film.id in _ONLY
+
+        def render(film: Film = film, unit: buildcache.Unit = unit, label: str = label, chosen: bool = chosen) -> None:
+            if not chosen:
+                raise _NotRendered("not selected by --film")
             if mode == "skip":
                 raise _NotRendered("TBOOK_FILMS=skip")
             missing = toolchain_missing()

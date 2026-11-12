@@ -382,6 +382,24 @@ class StagingTest(unittest.TestCase):
 
 
 class HeadingHelpersTest(unittest.TestCase):
+    @unittest.skipUnless(have_pandoc(), "pandoc not available")
+    def test_pointer_headings_preserve_text_and_generated_anchors(self):
+        attrs = tp.mdscan.parse_attrs('#pointer .unnumbered')
+        for title in ("Dereference *ptr", "p = *p and **strong**", "*emphasis* and `*ptr`",
+                      r"标题 *ptr 与 $a*b$", r"A literal \*ptr"):
+            with self.subTest(title=title):
+                original = subprocess.run([tp.pandoc_path(), "-f", tp.READER, "-t", "json"],
+                                          input="## " + title, text=True, capture_output=True, check=True)
+                before = json.loads(original.stdout)["blocks"][0]["c"][2]
+                staged = tp.format_heading(2, title, attrs)
+                parsed = json.loads(run_filters(staged, "json"))["blocks"][0]["c"]
+                self.assertEqual(parsed[1], ["pointer", ["unnumbered"], []])
+                self.assertEqual(parsed[2], before)
+                typst = run_filters(staged + "\n\n[Back](#pointer)", "typst")
+                self.assertNotIn("tr-heading-meta", typst)
+                self.assertNotIn(r"{\#pointer}", typst)
+                self.assertIn("<pointer>", typst)
+
     def test_parse_heading_attrs_and_closing_hashes(self):
         level, text, attrs = tp.parse_heading("## Title ## {#x .y k=\"v\"}")
         self.assertEqual((level, text, attrs.id, attrs.classes, attrs.kv), (2, "Title", "x", ["y"], {"k": "v"}))
@@ -809,6 +827,29 @@ class MetadataTest(unittest.TestCase):
 
 @unittest.skipUnless(have_typst(), "typst not available")
 class CompileTypstTest(unittest.TestCase):
+    def test_placeholder_fonts_are_excluded_without_losing_real_system_fonts(self):
+        from types import SimpleNamespace
+        from tbook import typst_worker
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            allowed = root / "NotoSans.otf"
+            blocked = root / "LastResort.otf"
+            allowed.touch()
+            blocked.touch()
+            catalog = [SimpleNamespace(family="Noto Sans", path=allowed),
+                       SimpleNamespace(family="LastResort", path=blocked)]
+            fake = SimpleNamespace(Fonts=lambda **_kw: SimpleNamespace(fonts=lambda: catalog))
+            aliases = root / "filtered"
+            aliases.mkdir()
+            options = {"font_paths": [str(root)]}
+            result = typst_worker.font_options(fake, options, aliases)
+            self.assertTrue(result["ignore_system_fonts"])
+            self.assertEqual(result["font_paths"], [str(aliases)])
+            self.assertEqual([p.resolve() for p in aliases.iterdir()], [allowed.resolve()])
+            catalog.pop()
+            self.assertIs(typst_worker.font_options(fake, options, aliases), options)
+
     def test_consecutive_compilations_keep_inputs_formats_and_failure_details(self):
         with tempfile.TemporaryDirectory(prefix="tbook typst worker ") as tmp:
             root = Path(tmp)
@@ -875,6 +916,11 @@ class BuildTest(unittest.TestCase):
             data = out.read_bytes()
             self.assertTrue(data.startswith(b"%PDF-"))
             self.assertGreater(len(data), 20_000)
+            self.assertEqual(b"/StructTreeRoot" in data, variant != "academic")
+        tagged = dataclasses.replace(self.book, pdf={**self.book.pdf, "academic_tags": True})
+        out = tp.build_pdf(self.site, tagged, self.ed, self.model, None, "academic",
+                           self.tmp / "tagged-preprint.pdf", stage_dir=self.tmp / "stage-tagged")
+        self.assertIn(b"/StructTreeRoot", out.read_bytes())
         main = (self.tmp / "stage-screen" / "main.typ").read_text(encoding="utf-8")
         self.assertIn('#tr-part(id: "tr-part-1"', main)
         self.assertIn('#tr-media(kind: "viz")[', main)

@@ -115,7 +115,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
         "pdf.edition": "版本说明",
         "pdf.variant_screen": "屏幕版（深色）",
         "pdf.variant_print": "印刷版（浅色）",
-        "pdf.variant_academic": "学术专著版",
+        "pdf.variant_academic": "学术预印本",
         "pdf.typeset": "排版",
         "pdf.typeset_value": "Pandoc 与 Typst，由 trureturing 书籍模板构建",
         "pdf.source": "源文件",
@@ -140,7 +140,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
         "pdf.edition": "Edition",
         "pdf.variant_screen": "Screen edition (dark)",
         "pdf.variant_print": "Print edition (light)",
-        "pdf.variant_academic": "Academic edition",
+        "pdf.variant_academic": "Research preprint",
         "pdf.typeset": "Typeset with",
         "pdf.typeset_value": "Pandoc and Typst, built with the trureturing books template",
         "pdf.source": "Source",
@@ -515,6 +515,11 @@ def parse_heading(line: str) -> tuple[int, str, mdscan.Attrs | None] | None:
 def format_heading(level: int, text: str, attrs: mdscan.Attrs | None) -> str:
     line = "#" * level + " " + text
     if attrs and (attrs.id or attrs.classes or attrs.kv):
+        if "*" in text:
+            # An unmatched asterisk can make Pandoc consume trailing attributes
+            # as title text. Carry generated metadata before the untouched title.
+            marker = attrs.to_pandoc()[:-1] + " .tr-heading-meta}"
+            return "#" * level + " []" + marker + " " + text
         line += " " + attrs.to_pandoc()
     return line
 
@@ -1519,7 +1524,7 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
         "publisher": site.text(site.title, lang),
         "keywords": _keywords(book, edition),
         "paper": str(book.pdf.get("paper", "a4")),
-        "academic_paper": str(book.pdf.get("academic_paper", "iso-b5")),
+        "academic_paper": str(book.pdf.get("academic_paper", "a4")),
         "online_url": online,
         "repo_url": f"https://github.com/{site.repo}" if site.repo else "",
         "formal_count": formal,
@@ -1618,11 +1623,14 @@ _TYPST_FONT_WARNING = re.compile(r"unknown font family: (.+)")
 
 
 def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", ppi: float | None = None,
-                  sys_inputs: dict[str, str] | None = None, timestamp: int | None = None) -> Path:
+                  sys_inputs: dict[str, str] | None = None, timestamp: int | None = None,
+                  pdf_tags: bool = True) -> Path:
     """Compile in a fresh process so each document releases its Typst memory on exit."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     kwargs = dict(output=str(out_path), root=str(root), font_paths=[str(d) for d in font_dirs()],
                   format=fmt, sys_inputs=sys_inputs or {})
+    if fmt == "pdf":
+        kwargs["pdf_tags"] = pdf_tags
     if ppi:
         kwargs["ppi"] = ppi
     if timestamp:
@@ -1664,7 +1672,8 @@ def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
         raise PandocError(f"unknown PDF variant {variant!r}; expected one of {config.PDF_VARIANTS}")
     staged = typst_source(site, book, edition, model, lock, stage_dir=stage_dir)
     return compile_typst(staged.dir / "main.typ", Path(out_path), root=staged.dir,
-                         sys_inputs={"tr-variant": variant}, timestamp=source_date_epoch(book) or None)
+                         sys_inputs={"tr-variant": variant}, timestamp=source_date_epoch(book) or None,
+                         pdf_tags=bool(book.pdf.get("academic_tags", False)) if variant == "academic" else True)
 
 
 # --------------------------------------------------------------------------- EPUB

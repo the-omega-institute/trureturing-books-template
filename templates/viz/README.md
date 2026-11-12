@@ -23,6 +23,12 @@ The generated page runs as it is and passes its own test: a point on the unit ci
 
 The finished example is `books/example-monograph/viz/golden-carry/`: the same layout and kit, four scenes on one rail, ten experiment cards, four of them cited from chapter 1, and a suite that runs the quality gates and then checks every claim independently. The starter is its smallest form.
 
+## 实体舞台 · Lit solids
+
+对象本身是面或体、画成受光的实体确实更清楚时（带、环面、多面体、可行域、球里有东西的布洛赫球），在舞台上调用 `TRV.kit.solid(stage, { canvas, onChange: paint, … })`；它不是统一风格，曲线、格点、矩阵、记号串照旧。页面不多加载任何脚本：`kit.js` 在第一次调用时才取造型核心 `assets/solid-core.js` 与它导入的、`assets/vendor/` 里钉版的 three.js，所以页面契约不变（两者都是运行时自己的文件，`vendor/` 不做语法检查）。用法、取舍与测试（`stageFirstChecks(…, { solid: true })`）见 `skills/book-viz/SKILL.md` 的“具象”一节；成品示例是 `books/example-monograph/viz/phase-torus/`。
+
+When the object itself is a surface or a body and a lit solid makes it clearer, call `TRV.kit.solid(stage, { canvas, onChange: paint, … })` on the stage; it is one more option, not a house style. The page loads no extra script: `kit.js` fetches the modelling core `assets/solid-core.js`, and with it the pinned three.js from `assets/vendor/`, on the first call, so the page contract is unchanged. See the section on solids in `skills/book-viz/SKILL.md`; the finished example is `books/example-monograph/viz/phase-torus/`.
+
 ## 注册表 · Registry (`books/<book>/viz/visualizations.json`)
 
 ```json
@@ -61,6 +67,7 @@ The finished example is `books/example-monograph/viz/golden-carry/`: the same la
 
 - `<body data-viz-id="<id>">`；`<html data-title-en="…">` 与 `<title>`。
 - `<link rel="stylesheet" href="../assets/theme.css">`；`<head>` 内 `<script src="../assets/shell.js"></script>`（`window.TRV`），其后可加 `<script src="../assets/kit.js"></script>`（`TRV.kit`：舞台、小图、时间轴、实验卡等辅助，见 skill 的速查表）。
+- 页面自己的脚本是底部的 `main.js`；与视频共用造型时，可在它之前加载同目录的 `model.js`（经典脚本，见 `skills/book-viz` 的“具象”）。
 - `<a class="crumb" href="../">` 返回本书的可视化索引；语言切换 `data-lang-set="zh"` / `data-lang-set="en"`。
 - 所有可见文字成对：`<span class="zh">…</span><span class="en">…</span>`；脚本文字用 `TRV.L('中文', 'English')` 并在语言切换时重绘（`kit.painter` 已代办）；`aria-label` 写中文、`data-aria-en` 写英文。
 - Lean 定理引用写成 `<a data-lean-gid="<GID>" href="…">`（GID 须是锁文件中种类为 `theorem` 的声明）；定义等其他 trureturing 文件写成 `<a data-trureturing-path="<path>" href="…">`：构建与本地预览把 href 固定到所钉提交。依据框：
@@ -81,6 +88,7 @@ The finished example is `books/example-monograph/viz/golden-carry/`: the same la
   | `?shot=1&preset=<卡>&lang=<语言>` | 被引用卡的带标签静态图，供 PDF/EPUB | `TRV.shot`、`TRV.still` |
 
   `TRV.still` 为真时不播放动画，直接显示那张卡的关键帧。
+- 停帧（still frame）：会自己播放的卡在页面的卡片表里声明 `still`（时间轴上的值，或 `'end'`），把表交给 `kit.cards(el, { presets: PRESETS, … })`，它把声明写到卡上的 `data-still`（也可直接写在 HTML 里）；`TRV.still` 为真时页面把时钟放到那里。A card that plays by itself declares the frame its still shows as `still` in the page's table of cards; `kit.cards({ presets })` writes it onto the card as `data-still`, and the page puts its clock there when `TRV.still` is set. `stageFirstChecks` warns about a card that plays without one; a suite opens the still with `openStill(T, book, id, card, lang)` and checks that the frame carries the numbers of its caption.
 - 手机宽度（390px）无横向滚动；尊重 `prefers-reduced-motion`。
 
 ## 嵌入书中 · Embedding in a chapter

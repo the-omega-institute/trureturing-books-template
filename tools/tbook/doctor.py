@@ -304,6 +304,49 @@ def check_ffmpeg(report: Report) -> None:
                      "sudo apt-get install ffmpeg (or set FFMPEG)", targets=("films",)))
 
 
+# Whether theme/film/lib.js's Chromium can create a WebGL context (solid shots): prints the renderer, or nothing.
+_WEBGL_PROBE = """
+const { launch } = await import(process.argv[1]);
+const b = await launch();
+try {
+  const p = await b.newPage();
+  const r = await p.evaluate(() => { const c = document.createElement('canvas');
+    const g = c.getContext('webgl2', { antialias: true, alpha: true, preserveDrawingBuffer: true });
+    if (!g) return ''; const d = g.getExtension('WEBGL_debug_renderer_info');
+    return String(g.getParameter(g.VERSION)) + (d ? ' · ' + g.getParameter(d.UNMASKED_RENDERER_WEBGL) : ''); });
+  console.log(r);
+} finally { await b.close(); }
+"""
+
+
+def film_webgl() -> tuple[bool | None, str]:
+    """(ok, detail) of a WebGL context in the Chromium the film pipeline launches (theme/film/lib.js); ok is None
+    when node, Playwright or a Chromium is missing (reported by their own checks)."""
+    node = shutil.which("node")
+    if not node or not chromium_path() or not any((paths.ROOT / "node_modules" / p).is_dir()
+                                                  for p in ("playwright-chromium", "playwright")):
+        return None, "needs node, Playwright and a Chromium"
+    lib = (paths.THEME / "film" / "lib.js").resolve().as_uri()
+    try:
+        r = subprocess.run([node, "--input-type=module", "-e", _WEBGL_PROBE, lib], capture_output=True, text=True,
+                           timeout=90, cwd=paths.ROOT)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"the probe did not run: {exc}"
+    out = r.stdout.strip()
+    if r.returncode != 0:
+        return False, (r.stderr.strip().splitlines() or ["the probe failed"])[-1][:200]
+    return (True, out) if out else (False, "Chromium starts but creates no WebGL context")
+
+
+def check_film_webgl(report: Report) -> None:
+    ok, detail = film_webgl()
+    if ok is None:
+        return
+    report.add(Check("WebGL for solid shots (films)", ok, detail,
+                     "films with \"solid\": true need WebGL; theme/film/lib.js starts Chromium with "
+                     "--enable-unsafe-swiftshader (SwiftShader, no GPU needed)", targets=("films",)))
+
+
 def _fc_families() -> set[str] | None:
     exe = shutil.which("fc-list")
     if not exe:
@@ -465,6 +508,7 @@ def collect() -> Report:
     check_node_modules(report)
     check_chromium(report)
     check_ffmpeg(report)
+    check_film_webgl(report)
     check_fonts(report)
     check_lean(report)
     return report

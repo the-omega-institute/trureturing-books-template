@@ -26,7 +26,7 @@ version = "1.0.0"
 [managed]
 paths = ["tools/", "docs/", "skills/", ".github/workflows/", "template.toml"]
 owned = ["books/", "site.toml", "PROJECT.md", "template.d/"]
-exclude = ["docs/project/", "docs/layer-", "skills/layer-", ".github/workflows/layer-"]
+exclude = ["docs/project/", "skills/local-", "docs/layer-", "skills/layer-", ".github/workflows/layer-"]
 ''')
         write(self.up / "docs/base.md", "base one\n")
         t.cmd_manifest(self.up, out=lambda _: None)
@@ -116,13 +116,15 @@ paths = {claims or [f"docs/layer-{name}/", f"skills/layer-{name}-task/", f".gith
         self.assertEqual(changed, {"docs/base.md", "template-manifest.json"})
 
     def test_path_claims_refused_before_writes(self):
-        for path in ["tools/", "docs/", "docs/base.md", "books/", "template.d/", "../escape", "docs/layer-beta/"]:
+        for path in ["tools/", "docs/", "docs/base.md", "books/", "template.d/", "../escape", "docs/layer-beta/",
+                     "docs/project/", "docs/project/owned.md", "skills/local-task/"]:
             with self.subTest(path=path):
                 p = self.layer / "template.d/alpha.toml"
                 p.write_text('[template]\nname="alpha"\nversion="1.0.0"\n[managed]\npaths=["' + path + '"]\n')
                 before = tree_snapshot(self.down)
-                with self.assertRaises(t.TemplateError):
-                    self.install()
+                for force in (False, True):
+                    with self.subTest(force=force), self.assertRaises(t.TemplateError):
+                        self.install(force=force)
                 self.assertEqual(before, tree_snapshot(self.down))
 
     def test_two_layers_and_overlap(self):

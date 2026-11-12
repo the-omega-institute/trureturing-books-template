@@ -1,4 +1,4 @@
-// Scholarly monograph layout. All theorem text and numbering come from the shared model.
+// Single-column research preprint. The shared model owns all text and numbering.
 // The paper palette supplies ink and the two verification states; the text has no accent colour.
 #import "../generated/tokens.typ": tr-paper
 
@@ -8,34 +8,16 @@
 #let ink = tr-paper.ink
 #let secondary = ink.lighten(28%)
 #let rule = ink.lighten(65%)
-#let f-latin = ("Libertinus Serif", "New Computer Modern", "Noto Serif")
+#let f-latin = ("New Computer Modern", "Libertinus Serif", "Noto Serif")
 #let f-cjk = ("Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong")
 #let f-body = if cjk {
   (..f-latin.map(n => (name: n, covers: "latin-in-cjk")), ..f-cjk)
 } else { (..f-latin, ..f-cjk) }
 #let f-mono = ("JetBrains Mono", "DejaVu Sans Mono", ..f-cjk)
 #let f-symbol = ("DejaVu Sans", "Noto Sans Symbols 2", "Libertinus Serif")
-#let base-size = 10.5pt
+#let base-size = 11pt
 #let tr-fig-ext = ".print.svg"
-#let chapter-start = <tr-academic-chapter-start>
-#let chapter-end = <tr-academic-chapter-end>
-#let main-start = <tr-academic-main-start>
-#let in-main() = {
-  let starts = query(main-start)
-  starts.len() > 0 and here().page() >= starts.first().location().page()
-}
-#let page-label-at(loc) = {
-  let starts = query(main-start)
-  let style = if starts.len() > 0 and loc.page() >= starts.first().location().page() { "1" } else { "i" }
-  numbering(style, ..counter(page).at(loc))
-}
-#let folio-numbering(n) = context numbering(if in-main() { "1" } else { "i" }, n)
-#let main-boundary() = {
-  [#metadata("main")#main-start]
-  context {
-    if query(main-start).first().location().page() == here().page() { counter(page).update(1) }
-  }
-}
+#let page-label-at(loc) = numbering("1", ..counter(page).at(loc))
 
 #let fit-width(body, width) = {
   let natural = measure(body)
@@ -48,130 +30,59 @@
 #let title-text(s) = s.replace(regex("\\s*=\\s*"), "\u{A0}=\u{A0}")
 #let horizontalrule = block(above: 1em, below: 1em, align(center, line(length: 25%, stroke: 0.4pt + rule)))
 
-#let new-recto() = {
-  [#metadata("end")#chapter-end]
-  pagebreak(weak: true, to: "odd")
-}
-
-#let on-opener-page() = {
-  let pg = here().page()
-  query(chapter-start).any(m => m.location().page() == pg)
-}
-
-#let on-blank-page() = {
-  let pg = here().page()
-  let last-end = none
-  let blank = false
-  for m in query(selector(chapter-end).or(chapter-start)) {
-    if m.value == "end" { if last-end == none { last-end = m.location().page() } } else {
-      if last-end != none and last-end < pg and pg < m.location().page() { blank = true }
-      last-end = none
-    }
-  }
-  blank
-}
-
-#let running-header = context {
-  if not in-main() or on-opener-page() or on-blank-page() { return }
-  let before = query(heading.where(level: 1).before(here()))
-  let chapter = if before.len() > 0 { before.last().body } else { [] }
-  let folio = text(size: 8.5pt, counter(page).display(here().page-numbering()))
-  let title = text(size: 7.5pt, style: if cjk { "normal" } else { "italic" },
-    if calc.even(here().page()) { meta.title } else { chapter })
-  set par(justify: false, first-line-indent: 0pt, leading: 0.25em)
-  if calc.even(here().page()) {
-    grid(columns: (auto, 1fr), column-gutter: 12pt, align: (left, right), folio, title)
-  } else {
-    grid(columns: (1fr, auto), column-gutter: 12pt, align: (left, right), title, folio)
-  }
-}
-
-#let opening-footer = context {
-  if not on-blank-page() and (not in-main() or on-opener-page()) {
-    align(center, text(size: 9pt, counter(page).display(here().page-numbering())))
-  }
-}
-
-#let front-footer = context {
-  if not on-blank-page() {
-    align(center, text(size: 9pt, counter(page).display(here().page-numbering())))
-  }
-}
-
-#let title-page() = page(header: none, footer: none, {
+#let title-block() = block(width: 100%, above: 8mm, below: 9mm, {
+  set align(center)
   set par(first-line-indent: 0pt, justify: false, leading: 0.45em)
-  v(14mm)
-  block(text(size: 14pt, meta.authors.join(if cjk { "、" } else { ", " })))
-  v(19mm)
-  block(text(size: if cjk { 27pt } else { 28pt }, weight: "bold", hyphenate: false, title-text(meta.title)))
+  block(text(size: 22pt, hyphenate: false, title-text(meta.title)))
   if meta.subtitle != "" {
-    v(10mm)
-    block(text(size: 14pt, hyphenate: false, title-text(meta.subtitle)))
+    v(5pt)
+    block(text(size: 13pt, hyphenate: false, title-text(meta.subtitle)))
   }
-  v(1fr)
-  block(text(size: 10pt, meta.publisher))
-  v(3mm)
-  block(text(size: 9pt, fill: secondary, [#S.lang_name · #meta.date.year]))
-  v(9mm)
+  v(11pt)
+  block(text(size: 12pt, meta.authors.join(if cjk { "、" } else { ", " })))
+  v(7pt)
+  block(text(size: 10pt, meta.date.iso))
 })
 
-#let colophon-page() = page(header: none, footer: none, {
-  set par(first-line-indent: 0pt, justify: false, leading: 0.45em, spacing: 0.6em)
-  set text(size: 8.5pt)
-  v(1fr)
-  block(text(weight: "bold", meta.title))
-  if meta.subtitle != "" { block(meta.subtitle) }
-  block(meta.authors.join(if cjk { "、" } else { ", " }))
-  v(5mm)
-  block([#S.variant_academic · #S.version #meta.version · #meta.date.iso])
-  if meta.isbn != "" { block([#S.isbn: #meta.isbn]) }
-  if meta.license != "" { block([#S.license: #meta.license]) }
-  v(4mm)
-  block(S.verified_statement)
-  if S.open_statement != "" { block(S.open_statement) }
-  if meta.trureturing.commit != "" {
-    block([#S.pinned_at: #link(meta.trureturing.url, text(font: f-mono, size: 7.6pt, meta.trureturing.short))])
-  }
-  if meta.online_url != "" { block([#S.online: #link(meta.online_url)]) }
-  if meta.repo_url != "" { block([#S.source: #link(meta.repo_url)]) }
-  v(5mm)
-  block(text(size: 7.5pt, fill: secondary, S.typeset_value))
-  v(6mm)
-})
-
-#let abstract-page() = {
+#let abstract-block() = {
   if meta.description != "" {
-    block(above: 7mm, below: 8mm, text(size: 18pt, weight: "bold", S.abstract))
-    set par(first-line-indent: 0pt)
-    meta.description
-    pagebreak()
+    block(inset: (x: 8mm), below: 1.2em, {
+      set text(size: 10pt)
+      set par(first-line-indent: 0pt, justify: not cjk, leading: if cjk { 0.6em } else { 0.45em })
+      align(center, text(weight: "bold", S.abstract))
+      v(5pt)
+      meta.description
+    })
   }
 }
+
+#let publication-note() = block(inset: (x: 8mm), above: 0.6em, {
+  set text(size: 8pt, fill: secondary)
+  set par(first-line-indent: 0pt, justify: false, leading: 0.4em, spacing: 0.3em)
+  S.verified_statement
+  parbreak()
+  [#S.version #meta.version]
+  if meta.license != "" { [ · #meta.license] }
+  if meta.trureturing.commit != "" {
+    [ · #S.pinned_at: #link(meta.trureturing.url, text(font: f-mono, size: 7.5pt, meta.trureturing.short))]
+  }
+})
 
 #let contents-page() = {
-  block(above: 7mm, below: 9mm, text(size: 18pt, weight: "bold", S.contents))
+  block(above: 0.5em, below: 1em, text(size: 15pt, weight: "bold", S.contents))
   outline(title: none, depth: 2, indent: 1.3em)
 }
 
 #let tr-chapter(id: "", kicker: "", section: "", outlined: true, title: []) = {
-  new-recto()
-  [#metadata(section)#chapter-start]
-  if section != "prefix" { main-boundary() }
-  v(10mm)
   let hd = heading(level: 1, outlined: outlined, bookmarked: outlined, title)
   if id != "" [#hd#label(id)] else { hd }
-  v(8mm)
 }
 
 #let tr-part(id: "", kicker: "", section: "", outlined: true, title: []) = {
-  new-recto()
-  [#metadata("part")#chapter-start]
-  main-boundary()
-  v(1fr)
-  let hd = heading(level: 1, outlined: outlined, bookmarked: outlined, title)
-  align(center, if id != "" [#hd#label(id)] else { hd })
-  v(2fr)
-  pagebreak(weak: true)
+  block(above: 2.2em, below: 0.8em, sticky: true, {
+    let hd = heading(level: 1, outlined: outlined, bookmarked: outlined, title)
+    align(center, if id != "" [#hd#label(id)] else { hd })
+  })
 }
 
 #let tr-env(kind: "", status: "", label: "", number: "", ref: "", title: none,
@@ -194,12 +105,12 @@
     }
     if lean.len() > 0 {
       block(above: 0.45em, {
-        set text(size: 7pt, fill: secondary)
+        set text(size: 8pt, fill: secondary)
         set par(first-line-indent: 0pt, justify: false, leading: 0.35em)
         text(style: "italic", S.lean_label + ": ")
         for (i, e) in lean.enumerate() {
           if i > 0 { [; ] }
-          let name = text(font: f-mono, size: 6.7pt, breakable-name(e.name))
+          let name = text(font: f-mono, size: 7.5pt, breakable-name(e.name))
           if e.url != "" { link(e.url, name) } else { name }
         }
       })
@@ -216,7 +127,7 @@
 
 #let tr-media(kind: "media", body) = block(width: 100%, above: 1.2em, below: 1.2em, breakable: true, {
   set par(first-line-indent: 0pt, justify: false, leading: 0.45em, spacing: 0.5em)
-  set text(size: if kind == "figure" { 8.5pt } else { 9pt })
+  set text(size: if kind == "figure" { 10pt } else { 9.5pt })
   show link: it => if type(it.dest) == str and it.body == text(it.dest) {
     text(size: 7.5pt, fill: secondary, it)
   } else { it }
@@ -227,18 +138,19 @@
   let d = meta.date
   set document(title: meta.title, author: meta.authors, keywords: meta.keywords,
     date: datetime(year: d.year, month: d.month, day: d.day), description: meta.description)
-  set page(paper: meta.at("academic_paper", default: "iso-b5"),
-    margin: (inside: 23mm, outside: 19mm, top: 23mm, bottom: 23mm),
-    fill: none, numbering: "i", header: none, footer: none, header-ascent: 35%, footer-descent: 35%)
+  set page(paper: meta.at("academic_paper", default: "a4"),
+    margin: 25.4mm, fill: none, numbering: "1", header: none,
+    footer: context align(center, text(size: 10pt, counter(page).display("1"))),
+    footer-descent: 35%)
   set text(font: f-body, size: base-size, fill: ink, lang: meta.lang,
     region: if meta.region != "" { lower(meta.region) } else { none }, hyphenate: not cjk)
-  set par(justify: true, leading: if cjk { 0.65em } else { 0.48em }, spacing: 0.35em,
-    first-line-indent: (amount: if cjk { 2em } else { 1em }, all: false))
+  set par(justify: not cjk, leading: if cjk { 0.6em } else { 0.45em }, spacing: if cjk { 0.6em } else { 0.45em },
+    first-line-indent: (amount: if cjk { 2em } else { 1.5em }, all: false))
   set raw(theme: "/_theme/typst/code-academic.tmTheme")
-  show raw: set text(font: f-mono, size: 0.84em, fill: ink)
-  show raw.where(block: false): it => text(font: f-mono, size: 0.84em, breakable-name(it.text))
+  show raw: set text(font: f-mono, size: 0.9em, fill: ink)
+  show raw.where(block: false): it => text(font: f-mono, size: 0.9em, breakable-name(it.text))
   show raw.where(block: true): it => block(width: 100%, breakable: true, above: 0.8em, below: 0.8em,
-    inset: (left: 8pt), stroke: (left: 0.5pt + rule), {
+    {
       set par(justify: false, first-line-indent: 0pt, leading: 0.4em)
       it
     })
@@ -254,13 +166,13 @@
     let width-label = label("tr-academic-inline-measure-" + str(equation.label))
     let entry = query(width-label).find(item => item.value.loc == loc)
     let width = if entry == none { none } else { entry.value.width }
-    // A long expression leaves too little prose to justify the preceding line gracefully.
-    if entry != none and measure(equation).width > 0.5 * entry.value.available { linebreak(justify: false) }
+    if width != none and measure(equation).width > width { linebreak(justify: false) }
     box(width: if width == none { auto } else { width }, layout(size => {
-      let target = calc.min(measure(equation).width, size.width)
-      // Later passes lay out the box at its fitted width; retain the initial container measure.
-      let available = if entry == none { size.width } else { calc.max(size.width, entry.value.available) }
-      [#metadata((loc: loc, width: target, available: available))#width-label]
+      // Closing punctuation cannot break away from a formula. Reserve its width
+      // so a nearly full-line expression does not overflow with its suffix.
+      let container = if entry == none { size.width } else { calc.max(size.width, entry.value.container) }
+      let target = calc.min(measure(equation).width, calc.max(1pt, container - (1em).to-absolute()))
+      [#metadata((loc: loc, width: target, container: container))#width-label]
       fit-width(equation, target)
     }))
   } }
@@ -285,7 +197,7 @@
 
   set table(stroke: none, inset: (x: 4pt, y: 4pt), fill: none)
   set table.hline(stroke: 0.4pt + rule)
-  show table: set text(size: 8.6pt)
+  show table: set text(size: 9.5pt)
   show table: set align(start)
   show table: set par(justify: false, first-line-indent: 0pt, leading: 0.35em)
   show table: it => block(stroke: (top: 0.6pt + ink, bottom: 0.6pt + ink), inset: (y: 3pt), {
@@ -306,7 +218,7 @@
   })
   show figure.caption: it => align(left, block({
     set par(first-line-indent: 0pt, justify: false, leading: 0.4em)
-    text(size: 8.5pt, {
+    text(size: 10pt, {
       text(weight: "bold")[#it.supplement #context it.counter.display(it.numbering).]
       h(0.4em)
       it.body
@@ -316,14 +228,14 @@
   set heading(numbering: none)
   show heading: set text(hyphenate: false)
   show heading: set par(first-line-indent: 0pt, justify: false)
-  show heading.where(level: 1): it => block(below: 0pt, {
+  show heading.where(level: 1): it => block(above: 1.8em, below: 0.7em, sticky: true, {
     set par(leading: 0.45em)
-    text(size: if cjk { 21pt } else { 22pt }, weight: "bold", it.body)
+    text(size: 15pt, weight: "bold", it.body)
   })
   show heading.where(level: 2): it => block(above: 1.6em, below: 0.7em, sticky: true,
-    text(size: 13pt, weight: "bold", it.body))
+    text(size: 12pt, weight: "bold", it.body))
   show heading.where(level: 3): it => block(above: 1.3em, below: 0.6em, sticky: true,
-    text(size: 11.5pt, weight: "bold", it.body))
+    text(size: 11pt, weight: "bold", it.body))
   show heading.where(level: 4): it => block(above: 1.1em, below: 0.5em, sticky: true,
     text(size: 10.5pt, weight: "bold", it.body))
   show heading.where(level: 5): it => block(above: 1em, below: 0.4em, sticky: true,
@@ -337,14 +249,11 @@
       link(target, it.indented(it.prefix(), [#it.body() #box(width: 1fr, it.fill) #sym.wj#box(page-label-at(target))])))
   }
 
-  title-page()
-  colophon-page()
-  set page(footer: front-footer)
-  counter(page).update(1)
-  abstract-page()
+  title-block()
+  abstract-block()
+  publication-note()
+  v(2em)
   contents-page()
-  [#metadata("end")#chapter-end]
-  pagebreak(weak: true, to: "odd")
-  set page(numbering: folio-numbering, header: running-header, footer: opening-footer)
+  v(2em)
   doc
 }

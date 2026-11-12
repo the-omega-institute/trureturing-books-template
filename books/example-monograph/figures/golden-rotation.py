@@ -13,10 +13,10 @@ from tbook import figkit
 SIZE = (400, 272)
 MARKUP = 2
 ALT = {
-    "zh": "一个球，赤道是周长为 1 的相位圆，圆盘按两段着色：青色的一段（长 1/φ ≈ 0.618）对应字母 a，品红的一段"
+    "zh": "一个由前上方照亮的球，赤道是周长为 1 的相位圆，圆盘按两段着色：青色的一段（长 1/φ ≈ 0.618）对应字母 a，品红的一段"
           "（长 1/φ² ≈ 0.382）对应字母 b。赤道上标出相位 x₀ 到 x₇ 的点，按所在的段着色，旁边写着序号。"
           "一支绕竖直轴的箭头沿球外从 x₀ 转到 x₁，标注“转过 1/φ”。",
-    "en": "A ball whose equator is the phase circle of circumference 1. The disc is coloured in two segments: cyan, of "
+    "en": "A ball lit from the front and above, whose equator is the phase circle of circumference 1. The disc is coloured in two segments: cyan, of "
           "length 1/φ ≈ 0.618, for the letter a, and magenta, of length 1/φ² ≈ 0.382, for the letter b. The phases x₀ "
           "to x₇ are dots on the equator, coloured by their segment and numbered. An arrow turning about the vertical "
           "axis runs outside the ball from x₀ to x₁, labelled 'turn by 1/φ'.",
@@ -51,6 +51,7 @@ def at(x, r=1.0):
 def draw(fig):
     t = fig.t
     sp = fig.sphere(212, 150, 108, az=110, el=34)
+    sp.shade("dim", rim=0.03, peak=0.22)         # a ball, not a disc: denser where the light falls
     sp.outline(fill=None, color="faint", width=1.2)
     sp.sector(Z, at(CUT), 360 * (1 - CUT), "cyan", fill_opacity=0.2)
     sp.sector(Z, at(0), 360 * CUT, "magenta", fill_opacity=0.24)

@@ -78,6 +78,7 @@ CHANGELOG = "docs/CHANGELOG.md"
 SELF_FILES = (TEMPLATE_TOML, MANIFEST_NAME)  # never listed in the manifest itself
 LAYER_DIR = "template.d"
 LAYER_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+LAYER_PREFIXES = ("docs/layer-", "skills/layer-", ".github/workflows/layer-")
 
 DEFAULT_REPO = "the-omega-institute/trureturing-books-template"
 
@@ -399,6 +400,8 @@ def validate_claims(root: Path, candidate: TemplateConfig | None = None) -> None
             if not _safe_relpath(clean) or "\\" in clean or "." in clean.split("/") or any(c in clean for c in "*?["):
                 raise TemplateError(f"layer {name}: invalid managed path {entry!r}")
             if any(_overlap(entry, p) for p in [*SELF_FILES, LAYER_DIR + "/", *upstream.owned]):
+                raise TemplateError(f"layer {name}: cannot claim repository-owned path {entry!r}")
+            if any(entry.startswith(p) for p in upstream.exclude if p not in LAYER_PREFIXES):
                 raise TemplateError(f"layer {name}: cannot claim repository-owned path {entry!r}")
             for prefix, own in [("docs/layer-", f"docs/layer-{name}/"),
                                 ("skills/layer-", f"skills/layer-{name}-"),
