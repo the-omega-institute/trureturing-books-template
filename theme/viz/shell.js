@@ -270,7 +270,8 @@
     }
   }
   let hudQueued = false;
-  const hudLater = () => { if (!hudQueued) { hudQueued = true; requestAnimationFrame(hudFit); } };
+  const nextFrame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 16);
+  const hudLater = () => { if (!hudQueued) { hudQueued = true; nextFrame(hudFit); } };
   document.addEventListener('DOMContentLoaded', () => {
     keepCase(document.body);
     hudFit();
