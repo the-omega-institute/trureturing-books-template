@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "7c47e64b4738c2359a98ef9483e8946e46f09df7ec891fa34843b8c597e9f3a9",
+      "sha256": "5e5a4dd5a68fc3439889d06ace19020c39551c7660b871d5a370eaac49a7ccb3",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -496,7 +496,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "c271d2721cfd6981ed73d9212e4d1eb37998aa2c6bf6f47c83d0b5f56e21df04",
+      "sha256": "8924e09ae6ab420f3eaaf090fb6fd7de64901296de197b83881b93a97ce9ba0a",
       "mode": "100644"
     },
     "tools/container/Dockerfile": {
@@ -592,7 +592,7 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "589d2e873aa0abcfd1d290be6f0e102ce7e9b6ca2cc4aa4c007ea63467dbba4f",
+      "sha256": "892a94536f625cf8501efd1fb3619a6bf62729405902618d1c88d528d5ab55ea",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {

@@ -179,6 +179,76 @@ export async function evidenceChecks(T, slug, id, page) {
   if (drawer != null) check('evidence: the drawer says in both languages that the page is not a proof', /不是证明/.test(drawer) && /not a proof/.test(drawer));
 }
 
+const RAIL_RANGE ='footer.rail .clock input[type=range]';
+/** Frame widths of the whole lab inside a chapter: phones (a 390px page leaves the frame 334px), and both sides of
+    the 600px breakpoint of theme.css. */
+const RAIL_WIDTHS = [320, 334, 360, 600, 601];
+
+/** The clock rail as laid out now: sideways overflow of the document and of the body (in a book's frame the body is
+    the scroller, so the document alone reports 0 for a rail that sticks out), the slider, and what is wrong with the
+    rendered controls. null when the page has no rail. */
+const railState = (page) => page.evaluate((sel) => {
+  const rail = document.querySelector('footer.rail'); if (!rail) return null;
+  const root = document.documentElement, body = document.body, vw = root.clientWidth, range = document.querySelector(sel);
+  const bad = [];
+  for (const el of rail.querySelectorAll('.transport button, .clock .tau, .clock input')) {
+    if (!el.getClientRects().length) continue;   // not rendered (a cited figure hides the speed chips)
+    const r = el.getBoundingClientRect(), what = el.id || el.dataset.speed || el.className;
+    if (r.width < 1 || r.height < 1 || r.left < -0.5 || r.right > vw + 0.5) bad.push(`${what}: ${r.left.toFixed(0)} … ${r.right.toFixed(0)} × ${r.height.toFixed(0)} of ${vw}`);
+    if (!el.matches('.tau') && !(el.getAttribute('aria-label') || el.textContent).trim()) bad.push(`${what}: no name`);
+  }
+  if (!range) bad.push('no slider');
+  const tau = rail.querySelector('.clock .tau');
+  return {
+    overflow: Math.max(root.scrollWidth - root.clientWidth, body.scrollWidth - body.clientWidth), bad,
+    width: range ? range.getBoundingClientRect().width : 0, value: range ? parseFloat(range.value) : NaN, max: range ? parseFloat(range.max) : NaN,
+    focused: !!range && document.activeElement === range, readout: tau ? tau.textContent.trim() : null
+  };
+}, RAIL_RANGE);
+
+/** The rail of the whole lab in narrow frames of a book, in one language (see stageFirstChecks, "rail"). */
+async function railChecks(T, slug, id, lang) {
+  const { check } = T;
+  const page = await T.open(slug, id, `?embed=1&lang=${lang}`, { viewport: { width: 334, height: 620 }, locale: lang === 'zh' ? 'zh-CN' : 'en-US' });
+  await settle(page, 400);
+  if (!(await railState(page))) { await page.context().close(); return; }
+  for (const w of RAIL_WIDTHS) {
+    await page.setViewportSize({ width: w, height: 620 }); await settle(page, 60);
+    const g = await railState(page), tag = `rail (${lang}, ${w}px frame)`;
+    check(`${tag}: neither the document nor the body scrolls sideways`, g.overflow <= 0, `${g.overflow}px`);
+    check(`${tag}: the transport, the readout and the slider are inside the frame and named`, g.bad.length === 0, g.bad.slice(0, 4).join(' | '));
+  }
+
+  // use it as a reader does, in the frame of a 390px page: press at a quarter, drag to 70%, then the keyboard
+  await page.setViewportSize({ width: 334, height: 620 }); await settle(page, 60);
+  const tag = `rail (${lang}, 334px frame)`;
+  const at = await page.evaluate((sel) => {
+    const el = document.querySelector(sel); if (!el) return null;
+    el.scrollIntoView({ block: 'center' });
+    const r = el.getBoundingClientRect(), y = r.top + r.height / 2, x = (f) => r.left + r.width * f;
+    return { x25: x(0.25), x70: x(0.7), y, width: r.width, hit: [0.25, 0.7].every((f) => document.elementFromPoint(x(f), y) === el) };
+  }, RAIL_RANGE);
+  check(`${tag}: the slider can be pressed where it is drawn`, !!at && at.hit, JSON.stringify(at));
+  if (!at || !at.hit) {   // nothing to press: say so instead of waiting for a control that never becomes usable
+    check(`${tag}: dragging the slider moves the clock`, false, 'the slider cannot be pressed');
+    check(`${tag}: Home, → and End move the clock and the readout`, false, 'the slider cannot be pressed');
+    await page.context().close(); return;
+  }
+  await page.mouse.move(at.x25, at.y); await page.mouse.down(); await settle(page);
+  const a = await railState(page);
+  await page.mouse.move(at.x70, at.y, { steps: 6 }); await page.mouse.up(); await settle(page);
+  const b = await railState(page);
+  const near = (s, f) => Math.abs(s.value / s.max - f) < 0.08;
+  check(`${tag}: dragging the slider moves the clock`, near(a, 0.25) && near(b, 0.7), `${a.value} → ${b.value} of ${b.max}`);
+  await page.keyboard.press('Home'); await settle(page); const home = await railState(page);
+  await page.keyboard.press('ArrowRight'); await settle(page); const right = await railState(page);
+  await page.keyboard.press('End'); await settle(page); const end = await railState(page);
+  check(`${tag}: Home, → and End move the clock and the readout`,
+    b.focused && home.value === 0 && right.value > 0 && right.value < end.value && end.value === end.max && home.readout !== end.readout,
+    JSON.stringify({ focused: b.focused, home: [home.value, home.readout], right: right.value, end: [end.value, end.readout], max: end.max }));
+  await page.context().close();
+}
+
 /**
  * The checks every stage-first page must pass, whatever it shows (skills/book-viz, "质量门"). They cannot tell a good
  * picture from a bad one, but they catch the regressions that make a page unreadable inside a book:
@@ -188,6 +258,10 @@ export async function evidenceChecks(T, slug, id, page) {
  *   English   no Chinese left on screen after going through every card
  *   embed     (740 × 620, ?embed=1) the page chrome is gone, the stage starts at the top and fills most of the first
  *             screen, the tour bar is on that first screen, nothing scrolls sideways
+ *   rail      (?embed=1 in frames 320 … 601 wide, the whole lab inside a chapter on a phone, in both languages)
+ *             neither the document nor the body scrolls sideways; every transport control, the readout and the
+ *             slider are rendered (not collapsed), inside the frame and named; the slider can be pressed, follows a
+ *             pointer drag and answers Home / → / End, and the readout follows
  *   figure    (740 × 500, ?embed=1&preset=<card>, what a chapter shows when it cites one card) the page opens on
  *             that card; the stage, the one-sentence note and ◀ ▶ fit the frame and nothing scrolls inside it;
  *             ?shot=1 (the still that PDF/EPUB print) fills the frame on the same card, labels kept, in one language
@@ -197,10 +271,10 @@ export async function evidenceChecks(T, slug, id, page) {
  * and no page error, console error or failed request anywhere.
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
- *       settle (ms to wait after a click).
+ *       rail (true; a page without footer.rail is not checked), settle (ms to wait after a click).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
-  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, settle: 120, ...opts };
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, settle: 120, ...opts };
   const { check } = T;
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
   const runCards = async (page, tag) => {
@@ -269,6 +343,9 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
     check('embed: the tour bar names the experiment', (await embed.textContent('.tour .what')).trim().length > 8);
   }
   await embed.context().close();
+
+  // rail: the whole lab in the narrow frame of a chapter read on a phone
+  if (o.rail) for (const lang of ['zh', 'en']) await railChecks(T, slug, id, lang);
 
   // cited figure: a chapter cites one card with `::: {.viz src=… preset=…}`
   if (o.cards) {

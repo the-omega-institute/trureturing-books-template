@@ -382,6 +382,11 @@ dl.ro .ok dd, .okmark { color: var(--ok); }
 @media (max-width: 600px) {
   :root[data-embed] .app.lab { grid-template-columns: minmax(0, 1fr); }
   :root[data-embed] .lab .strip { grid-auto-flow: row; height: auto; }
+  /* the whole lab in a narrow frame: the transport (with its speed chips), the readout and the slider each take a
+     row, so the slider spans the frame whatever the other two need. A cited figure hides the chips and keeps one row. */
+  :root[data-embed]:not([data-figure]) .app.lab > footer.rail,
+  :root[data-embed]:not([data-figure]) .lab .rail > .clock { grid-template-columns: minmax(0, 1fr); }
+  :root[data-embed]:not([data-figure]) .lab .rail > .clock > .marks { grid-column: 1; }
 }
 
 /* cited figure (?embed=1&preset=<card>, i.e. `::: {.viz src=… preset=…}` in a chapter): the stage, the one-sentence
