@@ -464,7 +464,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "6bcccd0618fbf5edd32b467782bf5e379a8d0e623e8a7bdb1ba3e81d64fca110",
+      "sha256": "a80dc8de34e3517c8d5adab0606d2dd31ca3e714a76488ec4d45b9621d6dac27",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -816,7 +816,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "9e7914168f4e23410e403f8dadd9d29393a0eeddf226fc49fe35d165cf688405",
+      "sha256": "a01a6626f5b482c79b0eb896e8b91430858efb58b9ec9f8001268cabac3215f2",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {

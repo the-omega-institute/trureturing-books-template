@@ -93,6 +93,7 @@ class PdfLayoutTest(unittest.TestCase):
 
         main = self.stage / "blank.typ"
         main.write_text(r'''#import "/_theme/typst/book.typ": *
+#import "/_theme/typst/academic.typ": page-label-at
 #show: tr-book
 #tr-chapter(id: "preface", section: "prefix", title: [Preface])
 #context metadata((role: "preface", folio: counter(page).get().first()))
@@ -100,6 +101,7 @@ Preface text.
 #tr-chapter(id: "chapter", section: "numbered", title: [Chapter])
 #context metadata((role: "chapter", folio: counter(page).get().first()))
 Body text.
+#context metadata((role: "toc-chapter", page: page-label-at(query(heading).filter(h => h.body == [Chapter]).first().location())))
 ''', encoding="utf-8")
         meta = dict(self.meta, description="", cjk=False, lang="en")
         target = self.stage / "blank-meta.json"
@@ -114,6 +116,7 @@ Body text.
         folios = {v["role"]: v["folio"] for v in values if isinstance(v, dict) and "folio" in v}
         self.assertGreater(folios["preface"], 1)
         self.assertEqual(folios["chapter"], 1)
+        self.assertEqual(next(v["page"] for v in values if isinstance(v, dict) and v.get("role") == "toc-chapter"), "1")
 
     def test_formulas_and_code_stay_inside_their_containers(self):
         import typst

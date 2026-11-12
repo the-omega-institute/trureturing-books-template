@@ -24,6 +24,11 @@
   let starts = query(main-start)
   starts.len() > 0 and here().page() >= starts.first().location().page()
 }
+#let page-label-at(loc) = {
+  let starts = query(main-start)
+  let style = if starts.len() > 0 and loc.page() >= starts.first().location().page() { "1" } else { "i" }
+  numbering(style, ..counter(page).at(loc))
+}
 #let folio-numbering(n) = context numbering(if in-main() { "1" } else { "i" }, n)
 #let main-boundary() = {
   [#metadata("main")#main-start]
@@ -307,9 +312,13 @@
   show heading.where(level: 5): it => block(above: 1em, below: 0.4em, sticky: true,
     text(size: 10.5pt, style: if cjk { "normal" } else { "italic" }, it.body))
   set outline.entry(fill: repeat([.], gap: 0.2em))
-  show outline.entry: set par(first-line-indent: 0pt, justify: false)
-  show outline.entry.where(level: 1): it => block(above: 0.8em, below: 0.3em, text(weight: "bold", size: 10pt, it))
-  show outline.entry.where(level: 2): set text(size: 9pt)
+  show outline.entry: it => context {
+    set par(first-line-indent: 0pt, justify: false)
+    set text(size: if it.level == 1 { 10pt } else { 9pt }, weight: if it.level == 1 { "bold" } else { "regular" })
+    let target = it.element.location()
+    block(above: if it.level == 1 { 0.8em } else { 0pt }, below: 0.3em,
+      link(target, it.indented(it.prefix(), [#it.body()#h(0.5em)#box(width: 1fr, it.fill)#h(0.5em)#page-label-at(target)])))
+  }
 
   title-page()
   colophon-page()
