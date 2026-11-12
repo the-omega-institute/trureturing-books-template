@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "2a585cb8430984393f3ddb661aa985bf0bb2a36e05f0262c6e2b65924672b2c5",
+      "sha256": "10c80d73c663270f5bdda1b998648b54a4d5f92dcbed5c5eced1f885bf1fda26",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -132,7 +132,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "8679933ff43f507b75ebbd848208399daf7ec9877e00f3202d5fb843274e16a2",
+      "sha256": "ad62c4f685d83b30f5ca0b73da4f2f17686c201fcf5121d094a95fb981692507",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -520,7 +520,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "15f6b5daba7a0b8e3d0f1bdb2703b421eb867daa2ea90f8445c72c9719b0e886",
+      "sha256": "e492c8487c3eed8b48284f32211103ed8918837b531895d1da555a9c058bf789",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -628,7 +628,7 @@
       "mode": "100644"
     },
     "tools/node/viz-common.mjs": {
-      "sha256": "3dd62cc29edddd582520e88dce40b778038b9da47751869df1d203907253fd52",
+      "sha256": "b2de99bf910407e07bad0a86f3dd9b22fe34f6f3ea503da68fb343235fbdd4b1",
       "mode": "100644"
     },
     "tools/node/viz-new.mjs": {
@@ -932,7 +932,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "4816453613727d20bb513fda8ecae4737d49667661222e8df34193a556ae4746",
+      "sha256": "a68ef19101a6c6a71ea65758ce7a185a68f4ed35eec3fd40e424155bf9599a81",
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {

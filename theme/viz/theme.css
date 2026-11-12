@@ -316,8 +316,8 @@ footer.rail { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; ga
    The stage is the page: it takes the middle column and most of the height; an optional .strip of small plots sits
    under it; experiment cards and controls are on the left, readouts and evidence on the right, the clock along the
    bottom. Narrow screens and the book's iframe (?embed=1) put the stage first and the columns below it.
-   Every row of the middle column is at least as tall as what it holds (the stage: its minimum height or its title
-   band, whichever is taller), and so is the middle row of the lab: on a screen shorter than that the page scrolls
+   Every row of the middle column is at least as tall as what it holds (the stage keeps its minimum height), and so
+   is the middle row of the lab: on a screen shorter than that the page scrolls
    instead of drawing the strip over the stage or cutting off the rail. The two side columns scroll on their own. */
 body:has(> .app.lab) { overflow-x: hidden; overflow-y: auto; }
 .app.lab {

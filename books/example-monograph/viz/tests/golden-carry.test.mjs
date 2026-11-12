@@ -340,5 +340,70 @@ await page.click('.card[data-viz="golden-carry"] .enter'); await page.waitForLoa
 check('the hub card opens this page', (await D(() => document.body.dataset.vizId)) === ID);
 await D(() => localStorage.removeItem('tr-lang'));
 
+/* ---------- actual canvas bounds and pixels on the short/narrow layouts ---------- */
+const canvasPage = await T.newPage();
+await canvasPage.addInitScript(() => {
+  // Observe drawing commands, independently of the page's layout formulas and debug geometry.
+  const proto = CanvasRenderingContext2D.prototype, original = {};
+  window.canvasInk = { text: [], rect: [], dots: [] };
+  for (const name of ['clearRect', 'fillText', 'strokeRect', 'arc']) {
+    original[name] = proto[name];
+    proto[name] = function (...a) {
+      if (this.canvas.id === 'cv') {
+        const ink = window.canvasInk;
+        if (name === 'clearRect') { ink.text = []; ink.rect = []; ink.dots = []; }
+        if (name === 'fillText') {
+          const [s, x, y] = a, m = this.measureText(s);
+          ink.text.push({ s, l: x - m.actualBoundingBoxLeft, r: x + m.actualBoundingBoxRight,
+            t: y - m.actualBoundingBoxAscent, b: y + m.actualBoundingBoxDescent });
+        }
+        if (name === 'strokeRect') ink.rect.push({ x: a[0], y: a[1], w: a[2], h: a[3], color: this.strokeStyle });
+        if (name === 'arc' && a[2] < 3) ink.dots.push({ x: a[0], y: a[1] });
+      }
+      return original[name].apply(this, a);
+    };
+  }
+});
+for (const lang of ['zh', 'en']) for (const mode of ['dark', 'light']) {
+  for (const [width, height, figure] of [[1440, 500, false], [1081, 500, false], [334, 500, true], [740, 500, true]]) {
+    await canvasPage.setViewportSize({ width, height });
+    await T.goto(BOOK, ID, `?lang=${lang}${figure ? '&embed=1&preset=window' : ''}`, canvasPage);
+    await canvasPage.emulateMedia({ colorScheme: mode });
+    await canvasPage.evaluate(() => document.fonts.ready);
+    for (const card of ['cancel', 'long', 'window', 'sweep']) {
+      await canvasPage.evaluate((id) => document.querySelector(`[data-preset="${id}"]`).click(), card);
+      await canvasPage.evaluate(() => { GC_DEBUG.seek(GC_DEBUG.state.max); });
+      await settle(canvasPage);
+      const ink = await canvasPage.evaluate((figure) => {
+        const cv = document.querySelector('#cv'), ctx = cv.getContext('2d'), frame = cv.getBoundingClientRect();
+        const hud = document.querySelector('.hud-tl').getBoundingClientRect(), legend = document.querySelector('#legend').getBoundingClientRect();
+        const top = hud.bottom - frame.top, bottom = legend.top - frame.top;
+        const text = window.canvasInk.text, bad = text.filter((r) => r.l < -0.5 || r.r > frame.width + 0.5 || r.t < top || r.b > bottom);
+        const rect = window.canvasInk.rect.filter((r) => r.color === TRV.palette.amber.toLowerCase() && r.w > r.h).at(-1);
+        let amber = 0;
+        if (rect && rect.y >= top && rect.y + rect.h <= bottom) {
+          const scale = cv.width / frame.width, pixels = ctx.getImageData(Math.floor(rect.x * scale), Math.floor(rect.y * scale), Math.ceil(rect.w * scale), Math.ceil(rect.h * scale)).data;
+          for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 150 && pixels[i + 1] > 90 && pixels[i + 2] < 100 && pixels[i + 3] > 100) amber++;
+        }
+        const dots = window.canvasInk.dots;
+        return { bad, text: text.map((r) => r.s), amber, points: dots.length,
+          dotSpan: dots.length ? Math.max(...dots.map((p) => p.y)) - Math.min(...dots.map((p) => p.y)) : 0,
+          dotsClear: dots.every((p) => p.y > top + 2 && p.y < bottom - 2),
+          scroll: figure ? document.documentElement.scrollHeight - innerHeight : 0 };
+      }, figure);
+      const tag = `canvas (${lang}, ${mode}, ${width} × ${height}, ${card})`;
+      check(`${tag}: every label is inside the canvas between the HUD and legend`, ink.bad.length === 0, JSON.stringify(ink.bad));
+      if (card === 'cancel' || card === 'long') {
+        check(`${tag}: the final numbered row and its amber outline are actually painted`, ink.text.includes(card === 'cancel' ? '#3' : '#50') && ink.amber > 30, JSON.stringify(ink));
+      } else {
+        check(`${tag}: the point cloud has positive readable height and clears the HUD`, ink.points >= 35 && ink.dotSpan >= 30 && ink.dotsClear, JSON.stringify(ink));
+        check(`${tag}: the complete symbolic formula and substituted result are drawn`, ink.text.includes('c = β′(v₁) + β′(v₂) − β′(v₁ + v₂)') && ink.text.some((s) => s.startsWith('= ') && s.endsWith('= −1')), JSON.stringify(ink.text));
+      }
+      check(`${tag}: the cited frame has no scrolling`, ink.scroll <= 0, String(ink.scroll));
+    }
+  }
+}
+await canvasPage.close();
+
 check('no page error, console error or failed request (page-specific part)', T.errors.length === 0, T.errors.slice(0, 4).join(' | '));
 await T.finish();

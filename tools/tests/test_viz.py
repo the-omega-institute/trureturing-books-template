@@ -1378,7 +1378,7 @@ class StageViewGate(unittest.TestCase):
     )
     # the shared layout of 0.5.2, which these copies put back one piece at a time
     OLD_HUD = (".stage:has(> .hud-tl, > .hud-tr) { display: block; padding: 0; }\n"
-               ".stage > .hud-tl { position: absolute; top: 14px; left: 20px; max-width: calc(100% - 40px); }\n"
+               ".stage > .hud-tl, .stage.hud-stack > .hud-tl { position: absolute; top: 14px; left: 20px; max-width: calc(100% - 40px); }\n"
                ".stage > .hud-tr { position: absolute; top: 12px; right: 18px; max-width: 60%; }\n")
     OLD_ROWS = (".app.lab { grid-template-rows: auto minmax(0, 1fr) auto; }\n"
                 ".lab .center { min-height: 0; grid-template-rows: minmax(0, 1fr) auto; }\n"
@@ -1413,7 +1413,7 @@ process.exit(0);
             "view-old-rows": (same, cls.OLD_ROWS + cls.NO_SCROLL),
             "view-no-scroll": (same, cls.NO_SCROLL),
             "view-cut": (buttons, ".stage > .hud-tl .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n"),
-            "view-buried": (buttons, ".stage > .hud-tr { order: -1; }\n"),
+            "view-buried": (buttons, ".stage > .hud-tr { z-index: -1; }\n"),
         }
 
     @staticmethod

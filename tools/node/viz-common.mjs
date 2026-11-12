@@ -133,8 +133,6 @@ export function resolveHref(href, lock) {
 }
 
 /* ---------- chapter citations: `::: {.viz src="<id>" preset="<card>" height="<px>"}` ---------- */
-/** Frame height of an embed when a chapter gives none or an unusable one, and the accepted range (tools/tbook/viz.py). */
-export const EMBED_HEIGHT = 560, EMBED_HEIGHTS = [160, 2400];
 // The chapters are read by the book tools themselves (tbook.viz.citations over tbook.model.load_edition), so the cards
 // that the quality gate opens and that viz-thumbs.mjs captures (and keeps) are the ones the published book cites: the
 // same editions, SUMMARY selection, Markdown grammar, kind and attributes. The interpreter is chosen as ./tbook does.
