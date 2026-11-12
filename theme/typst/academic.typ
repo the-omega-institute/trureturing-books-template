@@ -144,7 +144,7 @@
     footer-descent: 35%)
   set text(font: f-body, size: base-size, fill: ink, lang: meta.lang,
     region: if meta.region != "" { lower(meta.region) } else { none }, hyphenate: not cjk)
-  set par(justify: not cjk, leading: if cjk { 0.6em } else { 0.45em }, spacing: 0.2em,
+  set par(justify: not cjk, leading: if cjk { 0.6em } else { 0.45em }, spacing: if cjk { 0.6em } else { 0.45em },
     first-line-indent: (amount: if cjk { 2em } else { 1.5em }, all: false))
   set raw(theme: "/_theme/typst/code-academic.tmTheme")
   show raw: set text(font: f-mono, size: 0.9em, fill: ink)
@@ -168,8 +168,11 @@
     let width = if entry == none { none } else { entry.value.width }
     if width != none and measure(equation).width > width { linebreak(justify: false) }
     box(width: if width == none { auto } else { width }, layout(size => {
-      let target = calc.min(measure(equation).width, size.width)
-      [#metadata((loc: loc, width: target))#width-label]
+      // Closing punctuation cannot break away from a formula. Reserve its width
+      // so a nearly full-line expression does not overflow with its suffix.
+      let container = if entry == none { size.width } else { calc.max(size.width, entry.value.container) }
+      let target = calc.min(measure(equation).width, calc.max(1pt, container - (1em).to-absolute()))
+      [#metadata((loc: loc, width: target, container: container))#width-label]
       fit-width(equation, target)
     }))
   } }

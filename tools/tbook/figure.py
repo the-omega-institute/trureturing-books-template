@@ -103,14 +103,18 @@ def pdf_svg(svg: str, palette: str) -> str:
     Canonical figures, HTML, EPUB and slide copies retain their font stacks.
     """
     def font_for_marks(match):
-        if not any(unicodedata.combining(c) for c in html.unescape(match["text"])):
+        if not any(unicodedata.combining(c) for c in html.unescape(match[0])):
             return match[0]
-        attrs = re.sub(r'\sfont-family="[^"]*"', "", match["attrs"] or "")
-        family = "'New Computer Modern', 'Libertinus Serif', " + figkit.FONT_BODY
-        return f'<{match["tag"]}{attrs} font-family="{family}">{match["text"]}</{match["tag"]}>'
+        family = "'Libertinus Serif', 'New Computer Modern', " + figkit.FONT_BODY
+        # Apply to the text root: SVG shapers can ignore a font switch on a
+        # shifted tspan (e.g. the R-tilde following a subscript).
+        opening, body = match[0].split(">", 1)
+        opening = re.sub(r'\sfont-family="[^"]*"', "", opening)
+        return f'{opening} font-family="{family}">{body}'
 
-    return re.sub(r'<(?P<tag>text|tspan)(?P<attrs>\s[^<>]*?)?>(?P<text>[^<>]*)</(?P=tag)>',
-                  font_for_marks, materialize(svg, palette))
+    return re.sub(r'<text\b[^>]*>.*?</text>',
+                  font_for_marks,
+                  materialize(svg, palette), flags=re.S)
 
 
 def mdbook_css() -> str:

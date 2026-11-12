@@ -123,6 +123,33 @@ Body text.
         self.assertEqual(folios["chapter"], positions["chapter"]["physical"])
         self.assertEqual(next(v["page"] for v in values if isinstance(v, dict) and v.get("role") == "toc-chapter"), str(folios["chapter"]))
 
+    def test_preprint_paragraph_boundaries_keep_the_line_spacing(self):
+        import typst
+
+        main = self.stage / "paragraphs.typ"
+        main.write_text(r'''#import "/_theme/typst/book.typ": *
+#show: tr-book
+#let mark(name) = context metadata((name: name, y: here().position().y.pt()))
+#mark("first")A line of ordinary prose.
+#linebreak()
+#mark("second")Another line within the same paragraph.
+
+#mark("third")A new paragraph must keep a full baseline interval.
+
++ #mark("item")An enumerated item follows the paragraph.
+''', encoding="utf-8")
+        for cjk in (False, True):
+            meta = dict(self.meta, cjk=cjk, lang="zh" if cjk else "en")
+            target = self.stage / "paragraph-meta.json"
+            target.write_text(json.dumps(meta), encoding="utf-8")
+            values = json.loads(typst.query(str(main), "metadata", field="value", root=str(self.stage),
+                                font_paths=[str(p) for p in tp.font_dirs()],
+                                sys_inputs={"tr-variant": "academic", "tr-meta": "/paragraph-meta.json"}))
+            ys = {v["name"]: v["y"] for v in values if isinstance(v, dict) and "name" in v}
+            interval = ys["second"] - ys["first"]
+            self.assertGreaterEqual(ys["third"] - ys["second"], interval - 0.01)
+            self.assertGreaterEqual(ys["item"] - ys["third"], interval - 0.01)
+
     def test_formulas_and_code_stay_inside_their_containers(self):
         import typst
 
@@ -187,6 +214,9 @@ Body text.
 #block(width: 180pt)[#reused]
 #block(width: 80pt)[#reused]
 #block(width: 180pt)[Label before#mark("wide-prefix") $#mark("wide-start")#box(width: 100pt)[x]#mark("wide-end")$<tr-inline-wide>.]
+#block(width: 180pt)[
+  + Label before#mark("edge-prefix") $#mark("edge-start")#box(width: 164pt)[x]#mark("edge-end")$<tr-inline-edge>;
+]
 ''', encoding="utf-8")
         for cjk in (False, True):
             with self.subTest(cjk=cjk):
@@ -208,8 +238,12 @@ Body text.
                 self.assertGreaterEqual(marks["nested-after"]["x"], marks["nested-end"]["x"] - 0.1)
                 reused = [v for v in values if isinstance(v, dict) and v.get("name") == "reused-end"]
                 self.assertEqual(len(reused), 2)
-                self.assertAlmostEqual(reused[0]["x"], 210, places=2)
-                self.assertAlmostEqual(reused[1]["x"], 110, places=2)
+                self.assertGreater(reused[0]["x"], 190)
+                self.assertLessEqual(reused[0]["x"], 210)
+                self.assertGreater(reused[1]["x"], 90)
+                self.assertLessEqual(reused[1]["x"], 110)
+                self.assertLessEqual(marks["edge-end"]["x"], 210)
+                self.assertGreater(marks["edge-start"]["y"], marks["edge-prefix"]["y"])
                 self.assertAlmostEqual(marks["wide-prefix"]["x"], 30 + marks["wide-prefix"]["prefix_width"], places=2)
                 self.assertAlmostEqual(marks["wide-start"]["y"], marks["wide-prefix"]["y"], places=2)
                 self.assertAlmostEqual(marks["wide-end"]["x"] - marks["wide-start"]["x"], 100, places=2)
