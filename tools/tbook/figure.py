@@ -36,6 +36,7 @@ import re
 import string
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 from . import config, figkit, paths
@@ -92,6 +93,24 @@ def materialize(svg: str, palette: str, *, ground: bool = False) -> str:
     if not n:
         raise FigureError("not a canonical figure: no style sheet (regenerate it with ./tbook fig build)")
     return out
+
+
+def pdf_svg(svg: str, palette: str) -> str:
+    """Give Typst a Latin font with combining marks before the CJK fallback.
+
+    Some CJK subsets map an unsupported combining cluster to .notdef instead of
+    falling back. Keep the label text intact (e.g. n + hat, R + tilde).
+    Canonical figures, HTML, EPUB and slide copies retain their font stacks.
+    """
+    def font_for_marks(match):
+        if not any(unicodedata.combining(c) for c in html.unescape(match["text"])):
+            return match[0]
+        attrs = re.sub(r'\sfont-family="[^"]*"', "", match["attrs"] or "")
+        family = "'New Computer Modern', 'Libertinus Serif', " + figkit.FONT_BODY
+        return f'<{match["tag"]}{attrs} font-family="{family}">{match["text"]}</{match["tag"]}>'
+
+    return re.sub(r'<(?P<tag>text|tspan)(?P<attrs>\s[^<>]*?)?>(?P<text>[^<>]*)</(?P=tag)>',
+                  font_for_marks, materialize(svg, palette))
 
 
 def mdbook_css() -> str:
@@ -441,8 +460,8 @@ def render_embed(env, ctx, inner: str, doc) -> str:
     if not problem:
         rel = f"{FIG_DIR}/{src}.{lang}"
         ctx.book_texts[rel + ".svg"] = materialize(svg, "paper", ground=True)  # EPUB
-        ctx.book_texts[rel + PRINT_EXT] = materialize(svg, "paper")
-        ctx.book_texts[rel + SCREEN_EXT] = materialize(svg, "screen")
+        ctx.book_texts[rel + PRINT_EXT] = pdf_svg(svg, "paper")
+        ctx.book_texts[rel + SCREEN_EXT] = pdf_svg(svg, "screen")
         chapter_dir = posixpath.dirname(doc.chapter.path or "") or "."
         img = posixpath.relpath(posixpath.join(ctx.book_prefix, rel + ".svg"), chapter_dir)
         label = re.search(r'aria-label="([^"]*)"', svg)

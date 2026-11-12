@@ -226,6 +226,19 @@ class GenerationTests(unittest.TestCase):
 
 
 class RenderingTests(unittest.TestCase):
+    def test_pdf_labels_keep_combining_marks_with_a_latin_font(self):
+        f = figkit.Figure("marks", "zh", 300, 100, alt="labels")
+        f.text(20, 40, "转轴 n̂，旋子 R̃", size=16)
+        svg = f.svg()
+        from xml.etree import ElementTree as ET
+        for palette in ("paper", "screen"):
+            pdf = figure.pdf_svg(svg, palette)
+            labels = [el for el in ET.fromstring(pdf).iter() if el.text and "n̂" in el.text]
+            self.assertTrue(labels[0].attrib["font-family"].startswith("'New Computer Modern',"))
+            self.assertEqual("".join(ET.fromstring(pdf).itertext()),
+                             "".join(ET.fromstring(figure.materialize(svg, palette)).itertext()))
+        self.assertNotIn("New Computer Modern", svg)
+
     def test_palettes(self):
         tokens = json.loads((paths.THEME / "tokens.json").read_text(encoding="utf-8"))
         f = figkit.Figure("t", "en", 100, 100, alt="alt")

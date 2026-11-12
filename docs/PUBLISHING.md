@@ -7,7 +7,7 @@
 | 在线 HTML（mdBook） | `./tbook build html` | `build/html/<slug>/<lang>/` |
 | PDF 屏幕版（深色霓虹） | `./tbook build pdf --variant screen` | `build/dist/<slug>/<slug>-<version>-<lang>-screen.pdf` |
 | PDF 印刷版（白底） | `./tbook build pdf --variant print` | `build/dist/<slug>/<slug>-<version>-<lang>-print.pdf` |
-| PDF 学术专著版（B5 衬线学术专著） | `./tbook build pdf --variant academic`（书中须先启用） | `build/dist/<slug>/<slug>-<version>-<lang>-academic.pdf` |
+| PDF 学术预印本版（A4 单栏） | `./tbook build pdf --variant academic`（书中须先启用） | `build/dist/<slug>/<slug>-<version>-<lang>-academic.pdf` |
 | EPUB 3（Apple Books） | `./tbook build epub` | `build/dist/<slug>/<slug>-<version>-<lang>.epub` |
 | 演示文稿 | `./tbook build slides` | `build/slides/<slug>/`（PDF：`<deck>-<lang>.pdf`） |
 | 视频 | `./tbook build films` | `build/films/<slug>/<film id>/`（`film.json` 的 `outputs` 所列文件），并重新发布到已有站点的 `_site/<slug>/films/` |
@@ -19,7 +19,7 @@
 
 视频与其他产物一样随站点构建：站点在 `_site/<slug>/films/<film id>/<文件>` 同源托管视频（Content-Type 与按字节范围请求都正确，iOS Safari 需要这两点；Release 附件的地址在那里不能播放），不再为单个视频发 Release；视频计入 GitHub Pages 站点 1 GB 的上限。只构建、托管 `film.json` 的 `outputs` 所列的文件：默认只有 720p 旁白版与封面，50 秒的示例视频共约 6.5 MB（视频 6.1 MB、封面 0.5 MB，另有提交的海报 0.16 MB），约合每分钟 8 MB；同时列出 1080p 旁白版、1080p 与 720p 纯配乐时约 70 MB（每分钟约 84 MB）。渲染视频需要视频工具链（`bash theme/film/setup.sh` 与系统的 ffmpeg）。环境变量 `TBOOK_FILMS` 决定缓存未命中时怎么办：`auto`（默认）有工具链就渲染，没有则警告，站点不含该视频；`require` 无法渲染即构建失败；`skip` 从不渲染。三种情况下缓存命中的视频都照常恢复。
 
-学术专著版的开本、字体、前置页、定理与图表规范见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md)。
+学术预印本的官方技术要求与项目版式选择见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md)。
 
 ## 2. 站点
 
