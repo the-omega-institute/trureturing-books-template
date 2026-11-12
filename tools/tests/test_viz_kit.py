@@ -221,6 +221,7 @@ class KitInTheBrowser(unittest.TestCase):
 
     def test_capitals(self):
         self.expect("capitals: headings keep δ, u, x, μ and θ as written and set words in capitals",
+                    "capitals: the article \"a\" between two words is set in capitals, the variable a is not",
                     "capitals: card codes and chips keep Greek letters",
                     "capitals: stage labels written by st.tag keep δ, u and φ; Δ stays Δ",
                     "capitals: text that is not set in capitals is left alone",

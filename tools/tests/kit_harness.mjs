@@ -26,6 +26,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8">
 <canvas id="pl"></canvas>
 <i class="sw ik" id="swIk"></i><i class="sw cy" id="swCy"></i>
 <section class="sec"><h2 id="h2">phase δ and u · it's Δ · the x axis · μs · e^{iθ}</h2></section>
+<section class="sec"><h2 id="h2a"><span>moves in a straight line · radius a · a + b</span></h2></section>
 <button class="preset"><span class="code" id="code">δ-shift</span></button>
 <button class="chip" id="chip">φ gate</button>
 <p id="plain">phase δ stays as written in body text</p>
@@ -163,9 +164,10 @@ const dashS = { color: '#ffffff', width: 1.5, dash: [6, 6] };
   const r = await page.evaluate(() => ({
     h2: document.getElementById('h2').innerText, code: document.getElementById('code').innerText, chip: document.getElementById('chip').innerText,
     plain: document.getElementById('plain').innerText, tag: document.querySelector('#st .tag').innerText, upper: document.querySelectorAll('#st .tag')[1].innerText,
-    text: document.getElementById('h2').textContent
+    text: document.getElementById('h2').textContent, article: document.getElementById('h2a').innerText
   }));
   out('capitals: headings keep δ, u, x, μ and θ as written and set words in capitals', r.h2 === "PHASE δ AND u · IT'S Δ · THE x AXIS · μs · e^{iθ}" && r.text === "phase δ and u · it's Δ · the x axis · μs · e^{iθ}", JSON.stringify([r.h2, r.text]));
+  out('capitals: the article "a" between two words is set in capitals, the variable a is not', r.article === 'MOVES IN A STRAIGHT LINE · RADIUS a · a + b', r.article);
   out('capitals: card codes and chips keep Greek letters', r.code === 'δ-SHIFT' && r.chip === 'φ GATE', JSON.stringify([r.code, r.chip]));
   out('capitals: stage labels written by st.tag keep δ, u and φ; Δ stays Δ', r.tag === 'δ-SHIFT OF u BY φ' && r.upper === 'Δ STEP', JSON.stringify([r.tag, r.upper]));
   out('capitals: text that is not set in capitals is left alone', r.plain === 'phase δ stays as written in body text', r.plain);

@@ -191,7 +191,8 @@
      (text-transform: uppercase). CSS cannot exempt single characters, and capitals change what a symbol means: δ is
      not Δ, u is not U. keepCase(node) wraps, in every text node under node whose element is set in capitals, the runs
      of Greek letters (and µ) and every one-letter Latin variable (a lowercase letter with no Latin letter next to it,
-     an apostrophe between counting as next to it, so "it's" stays a word) in <span class="keepcase">, which the theme
+     an apostrophe between counting as next to it, so "it's" stays a word; "a" between two words is the article) in
+     <span class="keepcase">, which the theme
      sets as written. textContent is unchanged; words of two or more Latin letters are still set in capitals. It runs
      on the whole page when the document is ready and then on whatever the page writes (a MutationObserver);
      kit.stage3 and kit.solid also call it when they write a label. A page never needs to mark these by hand. */
@@ -211,6 +212,9 @@
     caseOf.set(el, { cls: el.className, upper });
     return upper;
   }
+  // the English article: "a" between two words of Latin letters ("in a straight line") is a word, not a variable
+  const ARTICLE_BEFORE = new RegExp(`[${LATIN}]{2,} +$`), ARTICLE_AFTER = new RegExp(`^ +[${LATIN}]{2,}`);
+  const article = (s, m) => m[0] === 'a' && ARTICLE_BEFORE.test(s.slice(0, m.index)) && ARTICLE_AFTER.test(s.slice(m.index + 1));
   function keepCase(node) {
     if (!KEEP || !node) return;
     const texts = [];
@@ -223,9 +227,11 @@
       const s = t.nodeValue, el = t.parentElement;
       if (!s || !el || !KEEP1.test(s) || el.closest(SKIP) || !el.isConnected) continue;
       if (!capitals(el)) continue;
+      const keep = [...s.matchAll(KEEP)].filter((m) => !article(s, m));
+      if (!keep.length) continue;
       const frag = document.createDocumentFragment();
       let at = 0;
-      for (const m of s.matchAll(KEEP)) {
+      for (const m of keep) {
         if (m.index > at) frag.append(s.slice(at, m.index));
         const sp = document.createElement('span'); sp.className = 'keepcase'; sp.textContent = m[0]; frag.append(sp);
         at = m.index + m[0].length;
