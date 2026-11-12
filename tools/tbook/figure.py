@@ -36,6 +36,7 @@ import re
 import string
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 from . import config, figkit, paths
@@ -92,6 +93,34 @@ def materialize(svg: str, palette: str, *, ground: bool = False) -> str:
     if not n:
         raise FigureError("not a canonical figure: no style sheet (regenerate it with ./tbook fig build)")
     return out
+
+
+def pdf_svg(svg: str, palette: str) -> str:
+    """Give Typst a Latin font with combining marks before the CJK fallback.
+
+    Some CJK subsets map an unsupported combining cluster to .notdef instead of
+    falling back. Keep the label text intact (e.g. n + hat, R + tilde).
+    Canonical figures, HTML, EPUB and slide copies retain their font stacks.
+    """
+    family = "'Libertinus Serif', 'New Computer Modern Math', 'New Computer Modern', " + figkit.FONT_BODY
+
+    def font_for_text(match):
+        text = html.unescape(match[0])
+        if any(unicodedata.combining(c) for c in text):
+            preferred = family
+        elif re.search(r"[\u2e80-\u9fff\uf900-\ufaff]", text):
+            preferred = figkit.FONT_BODY + ", 'New Computer Modern Math', 'Libertinus Serif'"
+        else:
+            return match[0]
+        # Apply to the text root: SVG shapers can ignore a font switch on a
+        # shifted tspan (e.g. the R-tilde following a subscript).
+        opening, body = match[0].split(">", 1)
+        opening = re.sub(r'\sfont-family="[^"]*"', "", opening)
+        return f'{opening} font-family="{preferred}">{body}'
+
+    return re.sub(r'<text\b[^>]*>.*?</text>',
+                  font_for_text,
+                  materialize(svg, palette).replace(figkit.FONT_BODY, family), flags=re.S)
 
 
 def mdbook_css() -> str:
@@ -441,8 +470,8 @@ def render_embed(env, ctx, inner: str, doc) -> str:
     if not problem:
         rel = f"{FIG_DIR}/{src}.{lang}"
         ctx.book_texts[rel + ".svg"] = materialize(svg, "paper", ground=True)  # EPUB
-        ctx.book_texts[rel + PRINT_EXT] = materialize(svg, "paper")
-        ctx.book_texts[rel + SCREEN_EXT] = materialize(svg, "screen")
+        ctx.book_texts[rel + PRINT_EXT] = pdf_svg(svg, "paper")
+        ctx.book_texts[rel + SCREEN_EXT] = pdf_svg(svg, "screen")
         chapter_dir = posixpath.dirname(doc.chapter.path or "") or "."
         img = posixpath.relpath(posixpath.join(ctx.book_prefix, rel + ".svg"), chapter_dir)
         label = re.search(r'aria-label="([^"]*)"', svg)

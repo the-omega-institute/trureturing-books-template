@@ -32,6 +32,8 @@ MIN_STROKE = 1.0
 MAX_WIDTH = 760  # the text column of the HTML edition; wider figures are scaled down everywhere
 TEXT_SLACK = 3.0  # how far the estimated extent of a label may pass the edge of its canvas
 MONO_ADVANCE = 0.6  # the advance of every monospace character in em (JetBrains Mono, DejaVu Sans Mono, Menlo)
+PHONE_WIDTH = 358  # the text column of a phone (tbook.figure): a wider drawing is shown this wide there
+PHONE_MIN_FONT = 10.0  # the smallest label a reader can still read on a phone, in CSS pixels
 
 # role → token of theme/tokens.json (the same names in the "screen" and the "paper" palette)
 ROLES: dict[str, str] = {
@@ -50,6 +52,7 @@ FONT_MONO = "'JetBrains Mono', 'DejaVu Sans Mono', ui-monospace, Menlo, Consolas
 FONT_SERIF = "'Noto Serif SC', 'Noto Serif', 'Times New Roman', serif"  # italic I with serifs (MARKUP = 2)
 
 Point = tuple[float, float]
+MINUS = "\u2212"
 
 
 class FigureError(Exception):
@@ -376,6 +379,19 @@ class Canvas:
         """The estimated width of the label ``s`` (markup read as this figure reads it) at ``size``."""
         return text_width(self._plain(s), size, mono)
 
+    @property
+    def phone_width(self) -> float:
+        """The width a phone scales this canvas by: the figure's, or this panel's in a figure made of panels
+        (``WRAP = True``), which a phone stacks (see :func:`tbook.figure.phone_label`)."""
+        return self.width
+
+    def label_floor(self, size: float = MIN_FONT) -> float:
+        """``size``, raised (in steps of 0.5) until a label of that size is at least :data:`PHONE_MIN_FONT`
+        on a phone, where the canvas is shown ``min(1, 358 / width)`` of its size: 12 up to 429 wide, 13.5 at
+        480, 20 at 716. The default size of axis ticks."""
+        need = PHONE_MIN_FONT * self.phone_width / PHONE_WIDTH
+        return max(float(size), math.ceil(need * 2 - 1e-9) / 2)
+
     def _paint(self, color: str | None, fill: str | None, width: float | None, *, dash: str | Sequence[float] | None = None,
                opacity: float | None = None, fill_opacity: float | None = None, cap: str | None = None,
                join: str | None = None) -> str:
@@ -541,7 +557,46 @@ class Canvas:
         if halo:
             cls.append("ts-bg")
             attrs.append(f'stroke-width="{num(max(3.0, size * 0.28))}" stroke-linejoin="round" paint-order="stroke"')
-        self.add(f'<text class="{" ".join(cls)}" {" ".join(attrs)}>{self._tspans(s, mono)}</text>')
+        inner = self._tspans(s, mono)
+        if mono and MINUS in inner:  # a monospace minus reads as a hyphen: set it in the body face
+            inner = inner.replace(MINUS, f'<tspan class="tr-fig-sans" font-family="{FONT_BODY}">{MINUS}</tspan>')
+        self.add(f'<text class="{" ".join(cls)}" {" ".join(attrs)}>{inner}</text>')
+
+    def _accent_box(self, x: float, y: float, s: str, size: float, anchor: str, middle: bool, mono: bool,
+                    italic: bool) -> tuple[float, float, float, float]:
+        """(left, right, top, slant) of the glyphs of label ``s`` as :meth:`text` sets it: ``top`` is the height
+        of its tallest letters above the baseline (cap height, else x-height), ``slant`` how far an italic leans
+        to the right at that height."""
+        text = self._plain(s)
+        w = text_width(text, size, mono)
+        left = x - (w if anchor == "end" else w / 2 if anchor == "middle" else 0)
+        base = y + (size * 0.36 if middle else 0)
+        tall = any(c.isupper() or c.isdigit() or c in "bdfhklt" or _WIDE.match(c) for c in text)
+        top = base - size * (0.72 if tall else 0.53)
+        lean = italic or (s.startswith("*") and s.endswith("*") and not s.startswith("**"))
+        return left, left + w, top, (base - top) * 0.2 if lean else 0.0
+
+    def overline(self, x: float, y: float, s: str, *, size: float = 14.0, color: str = "ink", anchor: str = "start",
+                 middle: bool = False, mono: bool = False, italic: bool = False, **kw) -> None:
+        """Label ``s`` (as :meth:`text`) with a bar drawn over it: ``fig.overline(x, y, "*c*")`` for c̄. A combining
+        macron (``c̄``, U+0304) is placed by whatever font the reader's system falls back to and often lands
+        beside the letter; a drawn bar sits where the kit puts the letter in every output."""
+        self.text(x, y, s, size=size, color=color, anchor=anchor, middle=middle, mono=mono, italic=italic, **kw)
+        left, right, top, slant = self._accent_box(x, y, s, size, anchor, middle, mono, italic)
+        yb = top - size * 0.14
+        pad = min(size * 0.06, (right - left) / 6)
+        self.line(left + pad + slant, yb, right - pad + slant, yb, color, max(MIN_STROKE, size * 0.075), cap="round")
+
+    def hat(self, x: float, y: float, s: str, *, size: float = 14.0, color: str = "ink", anchor: str = "start",
+            middle: bool = False, mono: bool = False, italic: bool = False, **kw) -> None:
+        """Label ``s`` (as :meth:`text`) with a circumflex drawn over its middle: ``fig.hat(x, y, "*n*")`` for n̂
+        (a unit vector, an operator), placed by the kit rather than by a combining character (U+0302)."""
+        self.text(x, y, s, size=size, color=color, anchor=anchor, middle=middle, mono=mono, italic=italic, **kw)
+        left, right, top, slant = self._accent_box(x, y, s, size, anchor, middle, mono, italic)
+        mid, half = (left + right) / 2 + slant, min((right - left) / 2, size * 0.24)
+        y0 = top - size * 0.08
+        self.polyline([(mid - half, y0), (mid, y0 - size * 0.2), (mid + half, y0)], color, max(MIN_STROKE, size * 0.075),
+                      join="round", cap="round")
 
     def lines(self, x: float, y: float, rows: Sequence[str], *, size: float = 14.0, leading: float = 1.45, **kw) -> None:
         """Several lines of text, the first with its baseline at ``y``."""
@@ -748,6 +803,11 @@ class Panel(Canvas):
     """A part of a figure with its own origin. In a figure made with ``wrap=True`` the panels sit side
     by side where there is room and stack on a narrow screen."""
 
+    @property
+    def phone_width(self) -> float:
+        # stacked on a phone, the panels of a WRAP figure all take the scale of the widest one (drawn so far)
+        return self.fig.phone_width if self.fig.wrap else self.fig.width
+
     def __init__(self, fig: "Figure", x: float, y: float, width: float, height: float):
         super().__init__(fig, width, height)
         self.x = float(x)
@@ -780,6 +840,10 @@ class Figure(Canvas):
     def t(self, zh: str, en: str | None = None, **more: str) -> str:
         table = {"zh": zh, "en": en if en is not None else zh, **more}
         return table.get(self._lang) or table.get("en") or zh
+
+    @property
+    def phone_width(self) -> float:
+        return max((p.width for p in self.panels), default=self.width) if self.wrap else self.width
 
     def panel(self, x: float, y: float, width: float, height: float) -> Panel:
         """A panel at ``(x, y)``; draw on what this returns."""
@@ -857,8 +921,10 @@ class Axes:
         self.cv.rect(self.x, self.y, self.w, self.h, color=color, width=width)
 
     def xaxis(self, at: float | None = None, *, ticks: Sequence[float] = (), labels: Sequence[str] | None = None, label: str = "",
-              color: str = "dim", size: float = 12.0, arrow: bool = False, fmt: Callable[[float], str] | None = None) -> None:
-        """The horizontal axis at data height ``at`` (the bottom edge by default) with ticks and a label."""
+              color: str = "dim", size: float | None = None, arrow: bool = False, fmt: Callable[[float], str] | None = None) -> None:
+        """The horizontal axis at data height ``at`` (the bottom edge by default) with ticks and a label. The tick
+        labels are ``size`` (default: 12, raised by :meth:`Canvas.label_floor` so that they stay ≥ 10 px on a phone)."""
+        size = self.cv.label_floor(12.0) if size is None else size
         y = self.Y(self.yr[0] if at is None else at)
         if arrow:
             self.cv.arrow(self.x, y, self.x + self.w + 8, y, color, 1.3, head=7)
@@ -877,8 +943,10 @@ class Axes:
             self.cv.text(self.x + self.w, y + (5 + size * 2.25 if ticks else size * 1.4), label, size=max(size, 13), color=color, anchor="end")
 
     def yaxis(self, at: float | None = None, *, ticks: Sequence[float] = (), labels: Sequence[str] | None = None, label: str = "",
-              color: str = "dim", size: float = 12.0, arrow: bool = False, fmt: Callable[[float], str] | None = None) -> None:
-        """The vertical axis at data abscissa ``at`` (the left edge by default) with ticks and a label."""
+              color: str = "dim", size: float | None = None, arrow: bool = False, fmt: Callable[[float], str] | None = None) -> None:
+        """The vertical axis at data abscissa ``at`` (the left edge by default) with ticks and a label (``size`` as
+        for :meth:`xaxis`)."""
+        size = self.cv.label_floor(12.0) if size is None else size
         x = self.X(self.xr[0] if at is None else at)
         if arrow:
             self.cv.arrow(x, self.y + self.h, x, self.y - 8, color, 1.3, head=7)
@@ -1046,6 +1114,33 @@ def rotate(v: Sequence[float], axis: Sequence[float], angle: float) -> Vec:
     return tuple(v[i] * c + kv[i] * s + k[i] * kd * (1 - c) for i in range(3))  # type: ignore[return-value]
 
 
+def _on_arc(x: Sequence[float], a: Sequence[float], b: Sequence[float]) -> bool:
+    """Whether the unit vector ``x``, on the great circle through ``a`` and ``b``, lies on the shorter arc between them."""
+    ab = dot3(a, b)
+    return dot3(x, a) >= ab - 1e-12 and dot3(x, b) >= ab - 1e-12
+
+
+def _inside_ring(ring: Sequence[Sequence[float]], p: Sequence[float]) -> bool:
+    """Whether the unit vector ``p`` lies in the region that the closed spherical polygon ``ring`` (unit vectors
+    in order, sides the shorter great-circle arcs) bounds around its centre (the normalised sum of its
+    vertices): the arc from the centre to ``p`` crosses the sides an even number of times."""
+    c = unit(tuple(sum(v[i] for v in ring) for i in range(3)))
+    n1 = cross(c, p)
+    if math.sqrt(dot3(n1, n1)) < 1e-12:
+        return dot3(c, p) > 0
+    crossings = 0
+    for a, b in zip(ring, list(ring[1:]) + [ring[0]]):
+        n2 = cross(a, b)
+        d = cross(n1, n2)
+        if math.sqrt(dot3(d, d)) < 1e-12:
+            continue
+        x = unit(d)
+        for y in (x, tuple(-v for v in x)):
+            if _on_arc(y, c, p) and _on_arc(y, a, b):
+                crossings += 1
+    return crossings % 2 == 0
+
+
 class Sphere:
     """A sphere drawn in orthographic projection: +z is up on the page, the view is turned by ``az``
     about z and tilted by ``el``. Curves on the far side are dashed and fainter."""
@@ -1067,8 +1162,104 @@ class Sphere:
         x, y, _ = self.proj(v, scale)
         return x, y
 
-    def outline(self, color: str = "dim", width: float = 1.5, *, fill: str | None = "cyan", fill_opacity: float = 0.04) -> None:
+    def outline(self, color: str = "dim", width: float = 1.5, *, fill: str | None = "cyan", fill_opacity: float = 0.04,
+                shade: str | None = None) -> None:
+        """The rim of the ball. ``shade`` (a colour role) shades the ball in it first (:meth:`shade`)."""
+        if shade:
+            self.shade(shade)
         self.cv.circle(self.cx, self.cy, self.r, color=color, fill=fill, width=width, fill_opacity=fill_opacity)
+
+    def shade(self, fill: str = "cyan", *, light: Sequence[float] | None = None, rim: float = 0.05, peak: float = 0.4,
+              steps: int = 16) -> None:
+        """Light and shade on the ball: the colour role ``fill`` is densest at the point facing the light and
+        thins out towards the rim (a radial fill, lit in front and dark behind on the screen palette; on paper
+        the same falloff reads as the curve of the ball). ``light`` is the direction of the light (default:
+        towards the viewer, up and to the left); ``rim`` and ``peak`` are the opacities at the rim and at the
+        lit point. Drawn as ``steps`` nested discs of the role, so every output paints it with the palette's
+        colour and no gradient is needed."""
+        if not 0 <= rim < peak < 1:
+            raise FigureError(f"shade: need 0 ≤ rim < peak < 1, not rim={rim}, peak={peak}")
+        if light is None:
+            light = tuple(self.toward[i] + 0.45 * self.up[i] - 0.35 * self.right[i] for i in range(3))
+        lu = unit(light)
+        if dot3(lu, self.toward) < 0:
+            raise FigureError("shade: the light must come from the viewer's side of the ball")
+        hx, hy = self.xy(lu)
+        self.cv.circle(self.cx, self.cy, self.r, color=None, fill=fill, fill_opacity=rim)
+        each = 1 - ((1 - peak) / (1 - rim)) ** (1 / steps)  # n layers of `each` over `rim` make `peak`
+        for k in range(1, steps + 1):
+            f = k / (steps + 1)
+            self.cv.circle(self.cx + (hx - self.cx) * f, self.cy + (hy - self.cy) * f, self.r * (1 - f), color=None,
+                           fill=fill, fill_opacity=each)
+
+    def _visible(self, ring: Sequence[Sequence[float]], inside: Callable[[Sequence[float]], bool]) -> list[list[Point]]:
+        """The part of a region of the sphere that faces the viewer, in projection: closed polygons (the second
+        of two is a hole, for an even-odd fill). ``ring`` is the region's boundary as unit vectors in order,
+        ``inside(v)`` tells whether a unit vector lies in the region."""
+        k = self.toward
+        depth = [dot3(v, k) for v in ring]
+        n = len(ring)
+        limb = lambda a: tuple(self.right[i] * math.cos(a) + self.up[i] * math.sin(a) for i in range(3))
+        full = [self.xy(limb(2 * math.pi * j / 120)) for j in range(120)]
+        if all(d >= 0 for d in depth):
+            own = [self.xy(v) for v in ring]
+            return [full, own] if inside(tuple(-c for c in k)) else [own]
+        if all(d < 0 for d in depth):
+            return [full] if inside(k) else []
+        start = next(i for i in range(n) if depth[i] < 0)
+        order = [ring[(start + j) % n] for j in range(n + 1)]
+        dep = [depth[(start + j) % n] for j in range(n + 1)]
+
+        def cross_at(a, b, da, db):
+            t = da / (da - db)
+            return unit(tuple(a[i] + (b[i] - a[i]) * t for i in range(3)))
+
+        runs: list[list[Vec]] = []
+        for j in range(n):
+            a, b, da, db = order[j], order[j + 1], dep[j], dep[j + 1]
+            if da < 0 <= db:
+                runs.append([cross_at(a, b, da, db)])
+            if db >= 0 and runs:
+                runs[-1].append(tuple(b))
+            if da >= 0 > db and runs:
+                runs[-1].append(cross_at(a, b, da, db))
+        ang = lambda v: math.atan2(dot3(v, self.up), dot3(v, self.right))
+        out: list[Point] = []
+        for r, run in enumerate(runs):
+            out.extend(self.xy(v) for v in run)
+            a0, a1 = ang(run[-1]), ang(runs[(r + 1) % len(runs)][0])
+            ccw = (a1 - a0) % (2 * math.pi)
+            spans = (ccw, ccw - 2 * math.pi)  # the two ways round the rim
+            span = next((sp for sp in spans if inside(limb(a0 + sp / 2))), spans[0] if ccw <= math.pi else spans[1])
+            m = max(2, int(abs(span) / (2 * math.pi) * 120))
+            out.extend(self.xy(limb(a0 + span * j / m)) for j in range(1, m))
+        return [out]
+
+    def _fill_visible(self, polys: list[list[Point]], fill: str, fill_opacity: float) -> None:
+        if not polys:
+            return
+        if len(polys) == 1:
+            self.cv.polygon(polys[0], fill, fill_opacity=fill_opacity)
+            return
+        d = " ".join("M" + " L".join(f"{num(x)} {num(y)}" for x, y in poly) + " Z" for poly in polys)
+        self.cv.add(f'<path d="{d}" fill-rule="evenodd"{self.cv._paint(None, fill, None, fill_opacity=fill_opacity)}/>')
+
+    def cap(self, axis: Sequence[float], angle: float, fill: str = "magenta", *, fill_opacity: float = 0.2,
+            color: str | None = None, width: float = 1.3, n: int = 120) -> None:
+        """The spherical cap of the points within ``angle`` degrees of ``axis`` (a polar cap when the axis is
+        z), filled in the role ``fill`` where it faces the viewer: the part behind the ball is not painted.
+        ``color`` draws its rim, solid in front and dashed behind (:meth:`small_circle`)."""
+        if not 0 < angle < 180:
+            raise FigureError(f"cap: the angle must lie strictly between 0 and 180 degrees, not {angle}")
+        a3 = unit(axis)
+        b = unit(cross(a3, (0.0, 0.0, 1.0) if abs(a3[2]) < 0.9 else (1.0, 0.0, 0.0)))
+        c = cross(a3, b)
+        co, si = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+        ring = [tuple(a3[i] * co + si * (b[i] * math.cos(t) + c[i] * math.sin(t)) for i in range(3))
+                for t in (2 * math.pi * j / n for j in range(n))]
+        self._fill_visible(self._visible(ring, lambda v: dot3(v, a3) >= co - 1e-12), fill, fill_opacity)
+        if color:
+            self.small_circle(a3, angle, color, width)
 
     def curve(self, pts: Sequence[Sequence[float]], color: str = "ink", width: float = 1.8, *, back: bool = True,
               scale: float = 1.0, dash_back: str = "4 4", back_opacity: float = 0.55, **kw) -> None:
@@ -1227,9 +1418,12 @@ class Sphere:
         self.cv.polygon(pts, fill, color=color, width=width, fill_opacity=fill_opacity, **kw)
 
     def patch(self, points: Sequence[Sequence[float]], fill: str = "cyan", *, color: str | None = None, width: float = 1.3,
-              fill_opacity: float = 0.18, flat: bool = False, n: int = 24, scale: float = 1.0) -> None:
+              fill_opacity: float = 0.18, flat: bool = False, n: int = 24, scale: float = 1.0, front: bool = False) -> None:
         """The region bounded by ``points`` in order: on the sphere, its sides great-circle arcs (``flat``:
-        straight, a face of a solid). Filled in projection; ``color`` draws the boundary, dashed behind."""
+        straight, a face of a solid). Filled in projection; ``color`` draws the boundary, dashed behind. With
+        ``front=True`` (on the sphere, ``scale`` 1, a region within a hemisphere: the side of its boundary that
+        holds the centre of its corners) only the part that faces the viewer is filled, the part behind the
+        ball is left unpainted, as :meth:`cap` does."""
         pts = [tuple(v) for v in points]
         if len(pts) < 3:
             raise FigureError("patch: a region needs at least three points")
@@ -1239,7 +1433,11 @@ class Sphere:
                 ring.append(a)
             else:
                 ring.extend(slerp(a, b, j / n) for j in range(n))
-        self.cv.polygon([self.xy(v, scale) for v in ring], fill, fill_opacity=fill_opacity)
+        if front and not flat and scale == 1.0:
+            unit_ring = [unit(v) for v in ring]
+            self._fill_visible(self._visible(unit_ring, lambda v: _inside_ring(unit_ring, v)), fill, fill_opacity)
+        else:
+            self.cv.polygon([self.xy(v, scale) for v in ring], fill, fill_opacity=fill_opacity)
         if color:
             self.curve(ring + ring[:1], color, width, scale=scale)
 

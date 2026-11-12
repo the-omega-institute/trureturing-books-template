@@ -19,6 +19,8 @@
 各端显示紫色“书面证明 / WRITTEN PROOF”，不带验证链接、不计入 Lean 数量，
 账本单列；真正开放才用 conjecture/problem。见 [写作手册](docs/AUTHORING.md)。
 
+传统学术报告也可用 Beamer：`./tbook slides new <book> <deck> "<title>" --academic --editions en`。白底 4:3（可选 16:9）、定理与 Lean 链接由书和锁生成，输出听众 PDF 与演讲备注 PDF，可使用书库自有主题。见 [theme/beamer/README.md](theme/beamer/README.md)。Slidev 继续提供现有的在线演示。
+
 ## 承诺与检查
 
 书中的 `theorem / lemma / proposition / corollary` 默认引用匹配的冻结 Lean 声明：

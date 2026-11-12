@@ -4,7 +4,7 @@
 // stageFirstChecks with { solid: true } adds the checks of a page that draws a lit solid with kit.solid. Then every
 // claim of the page is recomputed here: the deficit by the Beatty form and by the phase criterion, the regions the
 // page colours, the gluing (the two diagonal pieces meet only once the torus is closed), and picking a bead.
-import { session, stageFirstChecks, settle, until } from '../../../../tools/node/viz-testkit.mjs';
+import { session, stageFirstChecks, settle, until, openStill } from '../../../../tools/node/viz-testkit.mjs';
 
 const T = await session();
 const { check } = T;
@@ -68,5 +68,11 @@ await page.click('[data-preset="torus"]'); await settle(page);
 await page.keyboard.press('Home'); await page.keyboard.press('Space');
 check('Space plays the gluing', await until(page, () => window.TORUS_DEBUG.state.playing && window.TORUS_DEBUG.state.glue > 0.1));
 await page.keyboard.press('Space'); check('Space pauses', !(await state()).playing);
+// the still a chapter cites: the caption describes the closed torus, so the still shows the gluing finished
+check('TORUS declares its still frame: the gluing finished', (await page.evaluate(() => document.querySelector('[data-preset="torus"]').dataset.still)) === '2');
+const still = await openStill(T, 'example-monograph', 'phase-torus', 'torus', 'en');
+const ts = await still.evaluate(() => window.TORUS_DEBUG.state);
+check('still TORUS: glue 2 (both pairs of edges glued), at rest', Math.abs(ts.glue - 2) < 1e-9 && !ts.playing && ts.preset === 'torus', JSON.stringify(ts));
+await still.context().close();
 check('no page error, console error or failed request (page-specific part)', T.errors.length === 0, T.errors.slice(0, 4).join(' | '));
 await T.finish();

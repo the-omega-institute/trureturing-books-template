@@ -124,7 +124,8 @@
 
   /** Match a canvas backing store to its CSS box; returns the device pixel ratio used. */
   function fitCanvas(cv) {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // Labelled print stills can be captured at 4×; interactive canvases retain the 2× cap.
+    const dpr = Math.min(shot ? 4 : 2, window.devicePixelRatio || 1);
     const w = Math.max(10, Math.round(cv.clientWidth * dpr));
     const h = Math.max(10, Math.round(cv.clientHeight * dpr));
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }

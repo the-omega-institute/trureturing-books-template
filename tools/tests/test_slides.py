@@ -324,7 +324,7 @@ class ExampleDeckTest(unittest.TestCase):
             self.assertIsNotNone(lock.get(g), g)
 
     def test_items(self):
-        (it,) = slides.items(self.book)
+        it = next(it for it in slides.items(self.book) if it["id"] == "overview")
         self.assertEqual(it["id"], "overview")
         self.assertEqual(it["languages"], ["zh", "en"])
         self.assertEqual(it["href"], {"zh": "slides/overview/", "en": "slides/overview/en/"})
@@ -492,6 +492,11 @@ class BrokenDeckTest(unittest.TestCase):
 @needs_example
 class PublishTest(unittest.TestCase):
     def setUp(self):
+        # This fixture builds only the original Slidev deck; academic publication
+        # has its own scratch-book integration test in test_academic.
+        patch = mock.patch.object(slides, "deck_names", return_value=["overview"])
+        patch.start()
+        self.addCleanup(patch.stop)
         self.tmp = Path(tempfile.mkdtemp(prefix="tbook-slides-pub-"))
         self.book = config.load_book("example-monograph")
         self.site = config.load_site()

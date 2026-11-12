@@ -199,3 +199,9 @@ This agrees with [@thm-golden-phase] (with $p$ the golden phase from the proof a
 ::: {.slides src="overview"}
 Ten slides: the book at a glance, and the main results of chapters 1 and 2.
 :::
+
+An academic seminar version is also available, with speaker notes and a verification ledger.
+
+::: {.slides src="overview-academic"}
+Nine Beamer frames in English, with a paper visualization snapshot and a generated book figure.
+:::

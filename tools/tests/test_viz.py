@@ -80,6 +80,9 @@ def copy_golden_carry(book) -> None:
         (book.dir / lang).mkdir(exist_ok=True)
         (book.dir / lang / "ch01-golden-deficit.md").write_text("# 1\n", encoding="utf-8")
     shutil.copytree(src / "golden-carry", book.viz_dir / "golden-carry")
+    # a downstream copy of the example may predate .nummark: its readout ticks are the page's own checks either way
+    script = book.viz_dir / "golden-carry" / "main.js"
+    script.write_text(script.read_text(encoding="utf-8").replace('class="okmark"', 'class="nummark"'), encoding="utf-8")
     (book.viz_dir / "tests").mkdir(parents=True, exist_ok=True)
     # Downstream example books are not managed and may retain an older browser
     # suite. Registry fixtures do not execute it; browser behaviour is checked
@@ -232,6 +235,49 @@ class RegistryChecks(unittest.TestCase):
                                capture_output=True, text=True, cwd=paths.ROOT, timeout=120)
             self.assertEqual(r.returncode, 0, r.stderr)
             node = [(p["severity"], p["message"]) for p in json.loads(r.stdout) if "fixed time" in p["message"]]
+            self.assertEqual(node, [("warning", found[0].message)])
+
+    def test_okmarks_outside_lean_boxes(self):
+        page = ('<html><body>\n'
+                '<!-- <span class="okmark">a comment</span> -->\n'
+                '<div class="lean"><a data-lean-gid="x">T</a> <span class="okmark">✓</span><b id="inBox"></b></div>\n'
+                '<dl class="ro"><dd id="roKey"></dd><dd><span class="okmark">✓</span></dd></dl>\n'
+                '<div class="lean num"><img src="a.png"><br><span id="numBox"></span></div>\n'
+                '<script>const s = "<span class=\\"okmark\\">";</script>\n'
+                '</body></html>\n')
+        js = ("$('inBox').innerHTML = '<span class=\"okmark\">✓</span>';\n"
+              "$('roKey').innerHTML = `${x} <span class=\"okmark\">✓</span>`;\n"
+              "set(3, 'sum', `${s} <span class=\"okmark\">✓</span>`);\n"
+              "// <span class=\"okmark\"> in a comment\n"
+              "document.getElementById('numBox').innerHTML = '<span class=\"okmark\">✓</span>';\n"
+              "$('roKey').innerHTML = `${x} <span class=\"nummark\">✓</span>`;\n")
+        self.assertEqual(viz.okmarks_outside_lean(page, js), [("index.html", 4), ("main.js", 2), ("main.js", 3)],
+                         "inside any .lean box (also .lean.num) a tick is fine; a readout, a helper or a comment is not a box")
+        self.assertIn(".nummark", viz.okmark_message("main.js", 2))
+        if NODE:
+            code = ("import { okmarksOutsideLean } from './tools/node/viz-validate.mjs';"
+                    f"console.log(JSON.stringify(okmarksOutsideLean({json.dumps(page)}, {json.dumps(js)})));")
+            r = subprocess.run([NODE, "--input-type=module", "-e", code], capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual([(o["where"], o["line"]) for o in json.loads(r.stdout.strip().splitlines()[-1])],
+                             [("index.html", 4), ("main.js", 2), ("main.js", 3)], "the Node twin agrees")
+
+    @needs_example
+    def test_okmarks_in_pages_are_warned(self):
+        book = fake_book(self.tmp)
+        copy_golden_carry(book)
+        script = book.viz_dir / "golden-carry" / "main.js"
+        self.assertEqual([i for i in viz.check_native(book, lock=self.lock) if "okmark" in i.message], [])
+        text = script.read_text(encoding="utf-8")
+        script.write_text(text.replace('class="nummark"', 'class="okmark"', 1), encoding="utf-8")
+        found = [i for i in viz.check_native(book, lock=self.lock) if "okmark" in i.message]
+        self.assertEqual([(i.severity, i.path.name) for i in found], [("warning", "main.js")])
+        line = text[:text.index('class="nummark"')].count("\n") + 1
+        self.assertEqual(found[0].line, line)
+        if NODE:
+            r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-validate.mjs"), "--json", "--only=lean", str(book.dir)],
+                               capture_output=True, text=True, cwd=paths.ROOT, timeout=120)
+            node = [(p["severity"], p["message"]) for p in json.loads(r.stdout) if "okmark" in p["message"]]
             self.assertEqual(node, [("warning", found[0].message)])
 
     @needs_example

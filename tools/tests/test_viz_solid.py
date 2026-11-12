@@ -61,6 +61,12 @@ class VendoredThree(unittest.TestCase):
             self.assertNotIn(word, code, word)
         self.assertIn("solid-core.js", viz.RUNTIME_FILES)
 
+    def test_browser_fixture_names_no_book(self):
+        # A books repository hides the example books; the harness must run under whichever book is visible.
+        harness = (paths.TOOLS / "tests" / "solid_harness.mjs").read_text(encoding="utf-8")
+        self.assertNotIn("/site/example-", harness)
+        self.assertIn("listBooks()", harness)
+
     def test_published_with_the_runtime(self):
         import tempfile
         from pathlib import Path
@@ -90,6 +96,8 @@ class SolidInTheBrowser(unittest.TestCase):
         for line in r.stdout.splitlines():
             if line.startswith("{"):
                 row = json.loads(line)
+                if "skip" in row:  # no visible book to serve the runtime from
+                    raise unittest.SkipTest(row["skip"])
                 cls.results[row["name"]] = row
 
     def expect(self, name: str):

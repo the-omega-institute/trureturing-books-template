@@ -345,7 +345,7 @@ jobs:
         id: decks
         # Decks of the books that site.toml [books].hide does not hide.
         run: |
-          decks="$(./tbook books --files 'slides/*/slides.md')"
+          decks="$(./tbook books --files 'slides/*/slides.*')"
           if [ -n "$decks" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else

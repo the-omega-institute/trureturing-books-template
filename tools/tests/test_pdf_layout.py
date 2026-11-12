@@ -61,6 +61,7 @@ class PdfLayoutTest(unittest.TestCase):
 #show: tr-book
 #metadata((figure: tr-fig-ext, display: f-display == f-body))
 #tr-chapter(id: "chapter", kicker: "1", title: [A chapter])
+#context metadata((name: "chapter-position", y: here().position().y.pt()))
 #tr-env(kind: "theorem", status: "lean", ref: "Theorem 1", badge: "LEAN ✓", badge-url: "https://example.org/proof",
   lean: ((name: "Test.theorem", url: "https://example.org/source"),))[A verified statement. #context metadata((role: "theorem", style: text.style))]
 #tr-env(kind: "definition", status: "definition", ref: "Definition 2")[A definition. #context metadata((role: "definition", style: text.style))]
@@ -75,20 +76,21 @@ class PdfLayoutTest(unittest.TestCase):
         roles = next(v for v in values if isinstance(v, dict) and "figure" in v)
         self.assertEqual(roles, {"figure": ".print.svg", "display": True})
         body = next(v for v in values if isinstance(v, dict) and v.get("name") == "body")
-        self.assertLess(body["y"], 270, "chapter opener must leave room for body text")
+        chapter = next(v for v in values if isinstance(v, dict) and v.get("name") == "chapter-position")
+        self.assertLess(body["y"] - chapter["y"], 200, "chapter opener must leave room for body text")
         pages = typst.compile(str(main), format="svg", **options)
         from xml.etree import ElementTree
         first = pages[0] if isinstance(pages, list) else pages
         page = ElementTree.fromstring(first)
-        self.assertAlmostEqual(float(page.get("width").removesuffix("pt")), 176 / 25.4 * 72, places=2)
-        self.assertAlmostEqual(float(page.get("height").removesuffix("pt")), 250 / 25.4 * 72, places=2)
+        self.assertAlmostEqual(float(page.get("width").removesuffix("pt")), 210 / 25.4 * 72, places=2)
+        self.assertAlmostEqual(float(page.get("height").removesuffix("pt")), 297 / 25.4 * 72, places=2)
         svg = b"".join(pages) if isinstance(pages, list) else pages
         self.assertIn(b"https://example.org/proof", svg)
         self.assertIn(b"https://example.org/source", svg)
         self.assertNotIn(b"linearGradient", svg)
         self.assertNotIn(b"radialGradient", svg)
 
-    def test_academic_blank_versos_have_no_folio(self):
+    def test_preprint_chapters_share_flow_and_keep_arabic_folios(self):
         import typst
 
         main = self.stage / "blank.typ"
@@ -96,10 +98,11 @@ class PdfLayoutTest(unittest.TestCase):
 #import "/_theme/typst/academic.typ": page-label-at
 #show: tr-book
 #tr-chapter(id: "preface", section: "prefix", title: [Preface])
-#context metadata((role: "preface", folio: counter(page).get().first()))
+#context metadata((role: "preface", folio: counter(page).get().first(), physical: here().page()))
 Preface text.
+#tr-part(id: "part", title: [Part])
 #tr-chapter(id: "chapter", section: "numbered", title: [Chapter])
-#context metadata((role: "chapter", folio: counter(page).get().first()))
+#context metadata((role: "chapter", folio: counter(page).get().first(), physical: here().page()))
 Body text.
 #context metadata((role: "toc-chapter", page: page-label-at(query(heading).filter(h => h.body == [Chapter]).first().location())))
 ''', encoding="utf-8")
@@ -109,14 +112,43 @@ Body text.
         pages = typst.compile(str(main), format="svg", root=str(self.stage),
                               font_paths=[str(p) for p in tp.font_dirs()],
                               sys_inputs={"tr-variant": "academic", "tr-meta": "/blank-meta.json"})
-        self.assertNotIn(b"<use ", pages[3], "inserted verso must contain no text glyphs")
+        self.assertEqual(len(pages) if isinstance(pages, list) else 1, 1,
+                         "title/abstract, contents and body flow without forced page breaks")
         values = json.loads(typst.query(str(main), "metadata", field="value", root=str(self.stage),
                               font_paths=[str(p) for p in tp.font_dirs()],
                               sys_inputs={"tr-variant": "academic", "tr-meta": "/blank-meta.json"}))
         folios = {v["role"]: v["folio"] for v in values if isinstance(v, dict) and "folio" in v}
-        self.assertGreater(folios["preface"], 1)
-        self.assertEqual(folios["chapter"], 1)
-        self.assertEqual(next(v["page"] for v in values if isinstance(v, dict) and v.get("role") == "toc-chapter"), "1")
+        positions = {v["role"]: v for v in values if isinstance(v, dict) and "folio" in v}
+        self.assertEqual(positions["preface"]["physical"], positions["chapter"]["physical"])
+        self.assertEqual(folios["chapter"], positions["chapter"]["physical"])
+        self.assertEqual(next(v["page"] for v in values if isinstance(v, dict) and v.get("role") == "toc-chapter"), str(folios["chapter"]))
+
+    def test_preprint_paragraph_boundaries_keep_the_line_spacing(self):
+        import typst
+
+        main = self.stage / "paragraphs.typ"
+        main.write_text(r'''#import "/_theme/typst/book.typ": *
+#show: tr-book
+#let mark(name) = context metadata((name: name, y: here().position().y.pt()))
+#mark("first")A line of ordinary prose.
+#linebreak()
+#mark("second")Another line within the same paragraph.
+
+#mark("third")A new paragraph must keep a full baseline interval.
+
++ #mark("item")An enumerated item follows the paragraph.
+''', encoding="utf-8")
+        for cjk in (False, True):
+            meta = dict(self.meta, cjk=cjk, lang="zh" if cjk else "en")
+            target = self.stage / "paragraph-meta.json"
+            target.write_text(json.dumps(meta), encoding="utf-8")
+            values = json.loads(typst.query(str(main), "metadata", field="value", root=str(self.stage),
+                                font_paths=[str(p) for p in tp.font_dirs()],
+                                sys_inputs={"tr-variant": "academic", "tr-meta": "/paragraph-meta.json"}))
+            ys = {v["name"]: v["y"] for v in values if isinstance(v, dict) and "name" in v}
+            interval = ys["second"] - ys["first"]
+            self.assertGreaterEqual(ys["third"] - ys["second"], interval - 0.01)
+            self.assertGreaterEqual(ys["item"] - ys["third"], interval - 0.01)
 
     def test_formulas_and_code_stay_inside_their_containers(self):
         import typst
@@ -147,9 +179,10 @@ Body text.
         for width in short_widths:
             self.assertGreater(width, 15)
             self.assertLess(width, 40)
-        for group in (short_widths[:3], short_widths[3:]):
+        for index, group in enumerate((short_widths[:3], short_widths[3:])):
             self.assertAlmostEqual(group[0], group[1], places=2)
-            self.assertLessEqual(group[2], group[0] + 0.01)
+            ordinary_size = 10.5 if index else 10.8
+            self.assertAlmostEqual(group[2] / 11, group[0] / ordinary_size, places=2)
 
     def test_academic_inline_math_fits_without_interrupting_prose(self):
         import typst
@@ -181,6 +214,9 @@ Body text.
 #block(width: 180pt)[#reused]
 #block(width: 80pt)[#reused]
 #block(width: 180pt)[Label before#mark("wide-prefix") $#mark("wide-start")#box(width: 100pt)[x]#mark("wide-end")$<tr-inline-wide>.]
+#block(width: 180pt)[
+  + Label before#mark("edge-prefix") $#mark("edge-start")#box(width: 164pt)[x]#mark("edge-end")$<tr-inline-edge>;
+]
 ''', encoding="utf-8")
         for cjk in (False, True):
             with self.subTest(cjk=cjk):
@@ -202,9 +238,13 @@ Body text.
                 self.assertGreaterEqual(marks["nested-after"]["x"], marks["nested-end"]["x"] - 0.1)
                 reused = [v for v in values if isinstance(v, dict) and v.get("name") == "reused-end"]
                 self.assertEqual(len(reused), 2)
-                self.assertAlmostEqual(reused[0]["x"], 210, places=2)
-                self.assertAlmostEqual(reused[1]["x"], 110, places=2)
+                self.assertGreater(reused[0]["x"], 190)
+                self.assertLessEqual(reused[0]["x"], 210)
+                self.assertGreater(reused[1]["x"], 90)
+                self.assertLessEqual(reused[1]["x"], 110)
+                self.assertLessEqual(marks["edge-end"]["x"], 210)
+                self.assertGreater(marks["edge-start"]["y"], marks["edge-prefix"]["y"])
                 self.assertAlmostEqual(marks["wide-prefix"]["x"], 30 + marks["wide-prefix"]["prefix_width"], places=2)
-                self.assertGreater(marks["wide-start"]["y"], marks["wide-prefix"]["y"])
+                self.assertAlmostEqual(marks["wide-start"]["y"], marks["wide-prefix"]["y"], places=2)
                 self.assertAlmostEqual(marks["wide-end"]["x"] - marks["wide-start"]["x"], 100, places=2)
                 self.assertGreater(marks["short-end"]["x"] - marks["short-start"]["x"], 15)

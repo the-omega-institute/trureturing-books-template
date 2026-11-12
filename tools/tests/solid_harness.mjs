@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 // Browser checks of kit.solid (theme/viz/kit.js), run by tools/tests/test_viz_solid.py: one line of JSON per check,
-// { name, ok, detail }. A fixture page under the example book's viz/ is served by the same viz server as the books
+// { name, ok, detail }. A fixture page under the viz/ of a visible book is served by the same viz server as the books
 // (so assets/kit.js and assets/vendor/ come from theme/viz/), and every claim is checked against an independent
 // computation written here: rays against the analytic sphere and torus, the camera basis of kit.stage3.
+// The book is the first visible one with a viz/ directory: a books repository hides the template's example books
+// (site.toml hide = ["example-*"]), and the server serves visible books only. Without one, a single { skip } line.
+import fs from 'node:fs';
+import path from 'node:path';
 import { session, settle } from '../node/viz-testkit.mjs';
+import { listBooks } from '../node/viz-common.mjs';
 
 const out = (name, ok, detail = '') => console.log(JSON.stringify({ name, ok: !!ok, detail: String(detail) }));
+const book = listBooks().find((b) => fs.existsSync(path.join(b.dir, 'viz')));
+if (!book) { console.log(JSON.stringify({ skip: 'no visible book with a viz/ directory to serve the runtime from' })); process.exit(0); }
 const T = await session({ viewport: { width: 800, height: 600 } });
-const FIXTURE = `${T.origin}/site/example-monograph/viz/__solid__/`;
+const FIXTURE = `${T.origin}/site/${book.slug}/viz/__solid__/`;
 const HTML = `<!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="../assets/theme.css">
 <script src="../assets/shell.js"></script><script src="../assets/kit.js"></script>

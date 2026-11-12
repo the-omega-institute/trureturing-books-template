@@ -84,8 +84,27 @@ def _figures(book: config.Book) -> None:
         raise RuntimeError("; ".join(errors))
 
 
+def check_films(targets: list[str], books: list[config.Book], film_ids: list[str] | None) -> None:
+    """``--film`` names films of the selected books and goes with ``build films`` only."""
+    if not film_ids:
+        return
+    if set(targets) != {"films"}:
+        raise config.ConfigError("--film limits `./tbook build films`; build site and build all publish every film")
+    from . import film
+
+    have = {f.id for book in books for f in film.films(book)}
+    missing = [f for f in film_ids if f not in have]
+    if missing:
+        raise config.ConfigError(f"--film {', '.join(missing)}: no such film in "
+                                 f"{', '.join(b.slug for b in books) or 'the selected books'} "
+                                 f"(films: {', '.join(sorted(have)) or 'none'})")
+
+
 def build(targets: list[str], books: list[config.Book], langs: list[str] | None = None,
-          *, pdf_variants: list[str] | None = None) -> BuildResult:
+          *, pdf_variants: list[str] | None = None, films: list[str] | None = None) -> BuildResult:
+    """Build ``targets`` of ``books``. ``films`` (``--film``, with the target ``films`` only): render or restore
+    these films; the other films of the books are only restored from the build cache (:func:`tbook.film.only`)."""
+    check_films(targets, books, films)
     unknown = [lang for lang in langs or [] if not any(lang in book.languages for book in books)]
     if unknown:
         have = "; ".join(f"{book.slug} ({', '.join(book.languages)})" for book in books) or "no books"
@@ -139,6 +158,9 @@ def build(targets: list[str], books: list[config.Book], langs: list[str] | None 
     if "site" in want or "viz" in want or "films" in want:
         from . import site as site_mod
 
-        _timed("site", lambda: site_mod.build(site, books, paths.SITE_OUT,
-                                              only={"viz", "films"} & want if "site" not in want else None), result)
+        from . import film as film_mod
+
+        with film_mod.only(films):
+            _timed("site", lambda: site_mod.build(site, books, paths.SITE_OUT,
+                                                  only={"viz", "films"} & want if "site" not in want else None), result)
     return result

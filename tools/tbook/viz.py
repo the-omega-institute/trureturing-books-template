@@ -623,6 +623,56 @@ def fixed_wait_message(line: int) -> str:
             "until(page, () => …) for playback (skills/book-viz)")
 
 
+_VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+_TAG_RE = re.compile(r"<(/?)([a-zA-Z][\w-]*)([^>]*?)(/?)>")
+_JS_ID_RE = re.compile(r"""\$\(\s*['"]([\w-]+)['"]\s*\)|getElementById\(\s*['"]([\w-]+)['"]|querySelector(?:All)?\(\s*['"]#([\w-]+)""")
+
+
+def okmarks_outside_lean(page_html: str, js: str = "") -> list[tuple[str, int]]:
+    """Green ticks outside the evidence boxes: ``[(where, line)]`` with ``where`` ``index.html`` or ``main.js``.
+
+    Green (``.okmark``) belongs to a Lean-verified statement, inside a ``.lean`` box; a number the page checked itself
+    is marked ``.nummark`` (neutral). In the page, an element with class ``okmark`` and no ``.lean`` ancestor; in its
+    script, a line that writes ``okmark`` unless it names (``$('id')``, ``getElementById``, ``querySelector('#id')``)
+    an element of the page that sits in a ``.lean`` box. tools/node/viz-validate.mjs applies the same rule."""
+    blank = lambda m: re.sub(r"[^\n]", " ", m.group(0))
+    body = re.sub(r"<!--.*?-->", blank, page_html, flags=re.S)
+    body = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", blank, body, flags=re.S | re.I)
+    out: list[tuple[str, int]] = []
+    in_lean: dict[str, bool] = {}
+    stack: list[tuple[str, bool]] = []
+    for m in _TAG_RE.finditer(body):
+        tag = m.group(2).lower()
+        if m.group(1):
+            names = [t for t, _ in stack]
+            if tag in names:
+                del stack[len(names) - 1 - names[::-1].index(tag):]
+            continue
+        cm = re.search(r'\bclass\s*=\s*"([^"]*)"', m.group(3))
+        classes = cm.group(1).split() if cm else []
+        im = re.search(r'\bid\s*=\s*"([^"]*)"', m.group(3))
+        lean_box = (stack[-1][1] if stack else False) or "lean" in classes
+        if "okmark" in classes and not lean_box:
+            out.append(("index.html", page_html.count("\n", 0, m.start()) + 1))
+        if im:
+            in_lean[im.group(1)] = lean_box
+        if not m.group(4) and tag not in _VOID_TAGS:
+            stack.append((tag, lean_box))
+    for k, line in enumerate(js.split("\n"), 1):
+        t = line.strip()
+        if not re.search(r"\bokmark\b", line) or t.startswith(("//", "*", "/*")):
+            continue
+        ids = [next(g for g in m.groups() if g) for m in _JS_ID_RE.finditer(line)]
+        if not any(in_lean.get(i) for i in ids):
+            out.append(("main.js", k))
+    return out
+
+
+def okmark_message(where: str, line: int) -> str:
+    return (f".okmark (a green ✓) at {where} line {line} is outside a .lean box: green belongs to Lean-verified "
+            "statements; mark a number the page checked itself with .nummark (neutral) (skills/book-viz)")
+
+
 PAGE_NEEDLES = (
     ('data-viz-id="{id}"', "body carries data-viz-id"),
     ('href="../assets/theme.css"', "loads the shared theme"),
@@ -656,6 +706,9 @@ def check_page(book, vid: str, page: Path, ids: set[str], *, lock=None, ledger=N
     zh, en = _class_count(text, "zh"), _class_count(text, "en")
     if zh != en:
         err(0, f"{zh} .zh fragments but {en} .en fragments; every text fragment needs both languages")
+    script = page.parent / "main.js"
+    for where, line in okmarks_outside_lean(text, script.read_text(encoding="utf-8") if script.is_file() else ""):
+        issues.append(Issue("warning", script if where == "main.js" else page, line, okmark_message(where, line)))
     for kind, value in pinned_refs(text):
         line = text.count("\n", 0, text.find(value)) + 1 if value else 0
         if kind == "gid":

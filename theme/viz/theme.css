@@ -251,7 +251,10 @@ canvas.plot { width: 100%; display: block; }
 .tag.ink { color: var(--ink); }
 /* legend along the bottom edge of a stage: what each colour on the stage means */
 .hud-bl { position: absolute; left: 20px; right: 20px; bottom: 12px; pointer-events: none; display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 11.5px; color: var(--ink); text-shadow: 0 0 6px var(--tr-void-deep), 0 0 2px var(--tr-void-deep); }
-.hud-bl span { display: inline-flex; align-items: center; gap: 6px; }
+/* a legend entry is one line of inline text after its swatch, so a <sub> or <sup> stays on its letter (a flex entry
+   would make it an item of its own, set apart by the gap) */
+.hud-bl > span { display: inline-block; white-space: nowrap; }
+.hud-bl > span > .sw { margin-right: 6px; vertical-align: middle; }
 .sw { width: 14px; height: 3px; display: inline-block; background: var(--cyan); flex: none; }
 .sw.box { height: 10px; width: 10px; }
 .sw.cy { background: var(--cyan); } .sw.mg { background: var(--magenta); } .sw.am { background: var(--amber); }
@@ -340,6 +343,9 @@ dl.ro .key dd { font-size: 12px; color: var(--dim); }
 dl.ro .key dd b { display: block; font-weight: 600; font-size: 19px; line-height: 1.3; color: var(--ink); text-shadow: 0 0 12px color-mix(in srgb, currentColor 45%, transparent); }
 dl.ro dd small { font-size: 11px; color: var(--dim); }
 dl.ro .ok dd, .okmark { color: var(--ok); }
+/* a number the page checked itself (a sum, a bound, an identity at these values): neutral, not green; green ✓ (.okmark)
+   belongs inside .lean boxes, beside a Lean-verified statement */
+.nummark { color: var(--ink); font-family: var(--font-data); font-size: 0.92em; opacity: 0.85; }
 .c-cy { color: var(--cyan); } .c-mg { color: var(--magenta); } .c-am { color: var(--amber); } .c-ok { color: var(--ok); } .c-wn { color: var(--warn); } .c-vi { color: var(--violet); }
 .marks { position: relative; height: 12px; grid-column: 2; }
 .marks i { position: absolute; top: 0; font-style: normal; font-family: var(--font-data); font-size: 10px; color: var(--dim); transform: translateX(-50%); white-space: nowrap; }

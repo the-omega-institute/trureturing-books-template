@@ -4,6 +4,7 @@
 //   const T = await session();                       // server + browser + page (zh-CN, 1440×900)
 //   await T.goto('example-monograph', 'golden-carry', '?lang=zh');
 //   T.check('c(1, 1) = 1', value === 1, `got ${value}`);
+//   T.warn('…', detail);                             // reported, counted, never fails the suite
 //   await stageFirstChecks(T, 'my-book', 'my-viz');  // the quality gates every stage-first page must pass (see below)
 //   await T.finish();                                // prints the tally and exits non-zero on any failure
 //
@@ -58,6 +59,90 @@ export async function settle(page, ms = 0) {
     runner delivers frames late, so "press Space, wait 700 ms, read t" fails there although the page is right.
       check('Space plays', await until(page, () => window.MY_DEBUG.state.t > 0)); */
 export const until = (page, fn, arg, timeout = 30000) => page.waitForFunction(fn, arg, { timeout }).then(() => true, () => false);
+
+/** The clock of the page as the rail shows it: playing is the ▶ / ❚❚ button's aria-pressed (kit.clock writes it on
+    play() and pause()), t the slider's value. The default reader of playsAfter; null on a page without a rail. */
+export const railClock = () => {
+  const b = document.querySelector('footer.rail #play'), r = document.querySelector('footer.rail .clock input[type=range]');
+  return b && r ? { playing: b.getAttribute('aria-pressed') === 'true', t: parseFloat(r.value) } : null;
+};
+
+let playWatches = 0;
+/** Arm a watcher in the page before an action: it samples read() (evaluated in the page, returning { playing, t }) on
+    every animation frame and after every change of the DOM (kit.clock rewrites its readout on every tick), and records
+    whether the clock was seen starting (from rest, or again from an earlier time) and then seen past the time it
+    started from (played). Returns the
+    key of the record (window.__trvPlays[key]). */
+async function armPlayWatch(page, read) {
+  const key = ++playWatches;
+  await page.evaluate(`(() => {
+    const read = (${read.toString()}), key = ${key};
+    const all = window.__trvPlays = window.__trvPlays || {}, rec = all[key] = { started: false, played: false, from: null };
+    let prev = null;   // the state before the action: a clock already playing counts only once it starts again
+    const sample = () => {
+      let s = null; try { s = read(); } catch (e) { return; }
+      if (!s) return;
+      if (!rec.started && prev && s.playing && (!prev.playing || s.t < prev.t)) { rec.started = true; rec.from = s.t; }
+      else if (rec.started && s.t !== rec.from && (s.playing || s.t > rec.from)) rec.played = true;
+      prev = { playing: !!s.playing, t: s.t };
+    };
+    const mo = new MutationObserver(sample);
+    mo.observe(document.documentElement, { subtree: true, attributes: true, childList: true, characterData: true });
+    const tick = () => { if (rec.done) return; sample(); requestAnimationFrame(tick); };
+    rec.stop = () => { rec.done = true; mo.disconnect(); };
+    sample(); requestAnimationFrame(tick);
+  })()`);
+  return key;
+}
+const playRecord = (page, key) => page.evaluate((k) => { const r = (window.__trvPlays || {})[k]; if (r && r.stop) r.stop(); return r ? { started: r.started, played: r.played } : null; }, key);
+
+/** Whether the clock plays after an action, without a race: the watcher is in the page before action() runs (a click,
+    a key), so a playback that is over within a frame or two still counts. read() is evaluated in the page and returns
+    { playing, t } (default railClock: the rail's ▶ button and slider); "it played" means it was seen playing and then
+    seen past the time it started from. Resolves true as soon as that is recorded, false after opts.timeout (30000 ms).
+    Use it for every check of a playback shorter than a second or two (a card that sweeps a short stretch of the rail):
+    "click, settle, then until(playing && t > 0)" can start looking after the sweep has ended.
+      check('card fill plays', await playsAfter(page, () => page.click('[data-preset="fill"]'), () => window.GC_DEBUG.state)); */
+export async function playsAfter(page, action, read = railClock, opts = {}) {
+  const key = await armPlayWatch(page, read);
+  await action();
+  const ok = await until(page, (k) => !!(window.__trvPlays[k] && window.__trvPlays[k].played), key, opts.timeout == null ? 30000 : opts.timeout);
+  await playRecord(page, key);
+  return ok;
+}
+
+/** The labelled still that tools/node/viz-thumbs.mjs captures of a cited card: the size, scale and query it uses. */
+export const STILL = { width: 800, height: 450, scale: 2 };
+export const stillQuery = (preset, lang) => `?shot=1&lang=${lang}&preset=${preset}`;
+/** Bring a page opened on stillQuery() to the frame viz-thumbs.mjs photographs: fonts loaded, the [data-thumb] region
+    (else the stage) filling the viewport, canvases resized and drawn. Returns { has, on }: whether the page has the
+    card and opened on it. */
+export async function prepareStill(page, preset) {
+  await page.evaluate(() => document.fonts && document.fonts.ready);
+  await page.waitForTimeout(500);
+  const state = await page.evaluate((card) => {
+    if (!document.querySelector('[data-thumb]')) { const s = document.querySelector('.stage'); if (s) s.setAttribute('data-thumb', ''); }
+    window.dispatchEvent(new Event('resize'));
+    if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush();
+    const b = document.querySelector(`[data-preset="${card}"]`);
+    return { has: !!b, on: !!b && b.getAttribute('aria-pressed') === 'true' };
+  }, preset);
+  await page.waitForTimeout(700);
+  await settle(page);
+  return state;
+}
+/** Open the still of card `preset` in language `lang` exactly as viz-thumbs.mjs captures it (800 × 450, reduced motion,
+    ?shot=1&lang=…&preset=…) and return the page, so a suite can check that the frame the figure shows carries the
+    numbers its caption names:
+      const still = await openStill(T, 'example-monograph', 'golden-carry', 'cancel', 'zh');
+      check('the still of CANCEL shows the third pass, c = 0', (await still.evaluate(() => window.GC_DEBUG.state)).pass === 3);
+    Close it with still.context().close(). */
+export async function openStill(T, slug, id, preset, lang = 'zh') {
+  const page = await T.open(slug, id, stillQuery(preset, lang), { viewport: { width: STILL.width, height: STILL.height }, locale: lang === 'zh' ? 'zh-CN' : lang, reducedMotion: 'reduce' });
+  const state = await prepareStill(page, preset);
+  T.check(`still ${preset} (${lang}): the page opens on the card`, state.has && state.on, JSON.stringify(state));
+  return page;
+}
 
 /** The fraction of the viewport covered by the visible part of an element (0 when it is absent or off-screen). */
 export const viewportShare = (page, selector) => page.evaluate((sel) => {
@@ -140,6 +225,9 @@ export async function session(opts = {}) {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail && !ok ? '  — ' + detail : ''}`);
     return !!ok;
   };
+  /** Something to fix that does not fail the suite (a quality gate introduced after pages were written). */
+  const warnings = [];
+  const warn = (name, detail = '') => { warnings.push({ name, detail }); console.log(`WARN  ${name}${detail ? '  — ' + detail : ''}`); };
   const url = (slug, id, query = '') => vizUrl(origin, slug, id, query);
   const goto = async (slug, id, query = '', p = page) => { await p.goto(url(slug, id, query), { waitUntil: 'load' }); return p; };
   const newPage = async () => watch(await context.newPage());
@@ -160,10 +248,10 @@ export async function session(opts = {}) {
     await browser.close();
     if (server) server.close();
     const failed = results.filter((r) => !r.ok).length;
-    console.log(`\n${results.length - failed}/${results.length} passed`);
+    console.log(`\n${results.length - failed}/${results.length} passed${warnings.length ? `, ${warnings.length} warning${warnings.length > 1 ? 's' : ''}` : ''}`);
     process.exit(failed || !results.length ? 1 : 0);
   }
-  return { page, context, browser, origin, errors, results, check, goto, url, newPage, open, finish };
+  return { page, context, browser, origin, errors, results, warnings, check, warn, goto, url, newPage, open, finish };
 }
 
 /** Pixel statistics of the WebGL canvas of the first kit.solid stage on the page: the share of drawn (opaque) pixels,
@@ -442,25 +530,30 @@ export async function spaceAfterCard(T, page, wait = 120) {
  *   keys      (desktop) right after a card is clicked with the pointer, Space plays and pauses the clock instead of
  *             pressing the card again (pages without a ▶ button in footer.rail, or none a card enables, skip it)
  *   motion    under prefers-reduced-motion the page loads and a card still applies
+ *   still     (desktop, a warning, not a failure) a card whose click starts the clock (seen by a watcher armed before
+ *             the click, so a sweep of a fifth of a second counts) declares its still frame: data-still on the card,
+ *             written by kit.cards({ presets }) from the `still` of the page's table of cards
  * and no page error, console error or failed request anywhere.
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
  *       rail (true; a page without footer.rail is not checked), keys (true; false for a page that does not bind
- *       Space to its clock), settle (ms to wait after a click), solid (false; true or the options of solidChecks for a
+ *       Space to its clock), still (true; false skips the still-frame warning), settle (ms to wait after a click), solid (false; true or the options of solidChecks for a
  *       page that draws a lit solid with kit.solid).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
-  const o = { stage: '.stage', cover: '[data-thumb] canvas', solid: false, minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', solid: false, still: true, minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
   const { check } = T;
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
-  const runCards = async (page, tag) => {
+  const runCards = async (page, tag, played) => {
     for (const c of await cardIds(page)) {
+      const key = played ? await armPlayWatch(page, railClock) : null;   // armed before the click: a short sweep counts
       await page.click(`[data-preset="${c}"]`); await settle(page, o.settle);
       const state = await page.evaluate((cid) => {
         const b = document.querySelector(`[data-preset="${cid}"]`), note = document.querySelector('#presetNote, .presets + .note');
-        return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1 };
+        return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1, still: b.dataset.still == null ? null : b.dataset.still };
       }, c);
       check(`${tag}: card ${c} applies and explains itself`, state.pressed === 'true' && state.note !== 0, JSON.stringify(state));
+      if (played) { const r = await playRecord(page, key); if (r && r.started) played.push({ card: c, still: state.still }); }
     }
   };
 
@@ -473,7 +566,15 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   if (o.cards) {
     const n = (await cardIds(page)).length;
     check('desktop: at least four experiment cards', n >= 4, `${n}`);
-    await runCards(page, 'desktop');
+    const playing = [];
+    await runCards(page, 'desktop', o.still ? playing : null);
+    // a card that plays by itself declares the frame its still shows (kit.cards({ presets }) writes data-still)
+    for (const { card } of playing.filter((x) => x.still == null || x.still === '')) {
+      T.warn(`still: card ${card} plays by itself but declares no still frame`,
+        "give its entry in the page's table of cards a `still` (a clock time or 'end'), pass the table to kit.cards as " +
+        '`presets`, and put the clock there when TRV.still is set (or write data-still on the card); the figure a ' +
+        'chapter cites and the cover then show the frame its caption describes');
+    }
   }
   if (o.labels) { const bad = await labelOverlaps(page, `${o.stage} .tag`); check('desktop: stage labels do not sit on top of each other', bad.length === 0, JSON.stringify(bad.slice(0, 4))); }
   if (await page.$('#infoBtn')) {

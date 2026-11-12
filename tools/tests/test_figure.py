@@ -226,6 +226,23 @@ class GenerationTests(unittest.TestCase):
 
 
 class RenderingTests(unittest.TestCase):
+    def test_pdf_labels_keep_combining_marks_with_a_latin_font(self):
+        f = figkit.Figure("marks", "zh", 300, 100, alt="labels")
+        f.text(20, 40, "转轴 n̂，旋子 R̃", size=16)
+        f.text(20, 70, "axis *v* and n̂", size=16)
+        svg = f.svg()
+        from xml.etree import ElementTree as ET
+        for palette in ("paper", "screen"):
+            pdf = figure.pdf_svg(svg, palette)
+            labels = [el for el in ET.fromstring(pdf).iter() if el.tag.endswith("}text")
+                      and "n̂" in "".join(el.itertext())]
+            self.assertTrue(labels[0].attrib["font-family"].startswith("'Libertinus Serif',"))
+            self.assertTrue(all(el.attrib.get("font-family", "").startswith("'Libertinus Serif',")
+                                for el in labels))
+            self.assertEqual("".join(ET.fromstring(pdf).itertext()),
+                             "".join(ET.fromstring(figure.materialize(svg, palette)).itertext()))
+        self.assertNotIn("New Computer Modern", svg)
+
     def test_palettes(self):
         tokens = json.loads((paths.THEME / "tokens.json").read_text(encoding="utf-8"))
         f = figkit.Figure("t", "en", 100, 100, alt="alt")
@@ -475,13 +492,34 @@ class StandardTests(unittest.TestCase):
         with Repo() as repo:
             book = demo(repo)
             figure.build(book)
-            chapter(repo, "zh", media_chapter(fig, fig, "<!-- note -->", fig, fig, "Some prose.", fig, fig))
-            chapter(repo, "en", media_chapter(fig, fig, "Prose between.", fig, fig, "More prose.", fig))
+            chapter(repo, "zh", media_chapter(fig, fig, "<!-- note -->", fig, "Some prose.", fig))
+            chapter(repo, "en", media_chapter(fig, "Prose between.", fig, "More prose.", fig))
             found = self.issues(book)
-            self.assertEqual([(i.path.parent.name, i.line) for i in found], [("zh", 13)],
-                             "the third block of a run of four; a comment is no prose, two in a row are fine")
-            self.assertIn("4 media blocks in a row (figure → figure → figure → figure, from line 3)", found[0].message)
-            self.assertIn("line 13, line 17", found[0].message)
+            self.assertEqual([(i.path.parent.name, i.line) for i in found], [("zh", 7), ("zh", 13)],
+                             "every pair is reported on its second block; a comment is no prose")
+            self.assertTrue(all(i.severity == "warning" for i in found))
+            self.assertIn('figure "line" (line 3) and figure "line" (line 7) sit next to each other', found[0].message)
+            self.assertIn('figure "line" (line 7) and figure "line" (line 13)', found[1].message)
+            self.assertNotIn("full lab", found[0].message)
+
+    def test_the_full_lab_right_after_its_last_card(self):
+        card = '::: {.viz src="golden-carry" preset="fill"}\nA card.\n:::'
+        lab = '::: {.viz src="golden-carry"}\nThe lab.\n:::'
+        other = '::: {.viz src="phase-torus"}\nAnother lab.\n:::'
+        film = '::: {.film src="001-x"}\nA film.\n:::'
+        with Repo() as repo:
+            book = demo(repo)
+            chapter(repo, "zh", media_chapter(card, lab, "Prose.", card, other, "Prose.", lab, film))
+            chapter(repo, "en", media_chapter("Prose."))
+            found = [i for i in self.issues(book) if "next to each other" in i.message]
+            self.assertEqual([i.line for i in found], [7, 17, 27])
+            self.assertIn('viz "golden-carry" preset "fill" (line 3) and viz "golden-carry" (the full lab) (line 7)',
+                          found[0].message)
+            self.assertIn("move the lab after the last paragraph", found[0].message)
+            self.assertIn("put a sentence between the two", found[0].message)
+            self.assertNotIn("move the lab", found[1].message, "the lab of another page is no lab of this card")
+            self.assertIn('viz "golden-carry" (the full lab) (line 23) and film "001-x" (line 27)', found[2].message)
+            self.assertNotIn("move the lab", found[2].message)
 
     def test_labels_on_a_phone(self):
         with Repo() as repo:

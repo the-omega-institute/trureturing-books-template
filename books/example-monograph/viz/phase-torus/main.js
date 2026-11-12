@@ -5,44 +5,14 @@
    colours are the three regions of the phase criterion (Theorem thm-golden-phase); the two diagonal lines
    p₁ + p₂ = 1/φ and p₁ + p₂ = φ meet end to end on the torus, because φ = 1 + 1/φ. The beads are the 64 phase pairs
    with 0 ≤ v₁, v₂ ≤ 7, coloured by c(v₁, v₂) from the Beatty form; click one to make it the current pair.
-   The stage is drawn with kit.solid (theme/viz/kit.js). Read-only probe for the browser suite: window.TORUS_DEBUG. */
+   The object (shape, regions, pairs, how it is drawn) is model.js, which film 001 of this book draws too; the stage
+   is kit.solid (theme/viz/kit.js). Read-only probe for the browser suite: window.TORUS_DEBUG. */
 (() => {
   'use strict';
-  const { kit, L } = TRV, { v3, fix } = kit, P = TRV.palette;
+  const { kit, L } = TRV, { fix } = kit, P = TRV.palette;
   const $ = (id) => document.getElementById(id);
-  const PHI = (1 + Math.sqrt(5)) / 2, TAU = 2 * Math.PI, SIZE = 1.25;
-  const frac = (x) => x - Math.floor(x);
-  const phase = (v) => frac((v + 1) * PHI);
-  const s = (v) => Math.floor((v + 1) * PHI) - 1;
-  /** The deficit from the Beatty form, and the region of the phase criterion it falls in. */
-  const deficit = (v1, v2) => s(v1) + s(v2) - s(v1 + v2);
-  const region = (p1, p2) => (p1 + p2 < 1 / PHI ? 1 : p1 + p2 >= PHI ? -1 : 0);
-  const PAIRS = [];
-  for (let v1 = 0; v1 <= 7; v1++) for (let v2 = 0; v2 <= 7; v2++) PAIRS.push({ v1, v2, p1: phase(v1), p2: phase(v2), c: deficit(v1, v2) });
-
-  /* ---------- the gluing: square (g = 0) → tube (g = 1) → torus (g = 2) ----------
-     The square is 2 wide (p₁) and 1 high (p₂), so that the torus has its hole. Rolling wraps p₂ round a circle of
-     circumference 1 about an axis along p₁; bending wraps that axis round a circle of circumference 2. */
-  function shape(p1, p2, g) {
-    const a = Math.min(1, Math.max(0, g)), b = Math.min(1, Math.max(0, g - 1));
-    if (a < 1e-6) return [SIZE * 2 * (p1 - 0.5), SIZE * (p2 - 0.5), 0];
-    // rolled downwards, so that the side facing up stays the outside of the tube and of the torus
-    const r = 1 / (TAU * a), th = TAU * a * (p2 - 0.5), y = r * Math.sin(th), z = -2 * r * Math.sin(th / 2) ** 2;
-    if (b < 1e-6) return [SIZE * 2 * (p1 - 0.5), SIZE * y, SIZE * (z + r * (1 - Math.cos(Math.PI * a)) / 2)];
-    const Rb = 2 / (TAU * b), ph = TAU * b * (p1 - 0.5);
-    return [SIZE * (Rb - y) * Math.sin(ph), SIZE * (Rb - (Rb - y) * Math.cos(ph) - Rb * (1 - Math.cos(Math.PI * b)) / 2), SIZE * (z + r)];
-  }
-  /** The unit normal of the surface at (p₁, p₂), from its partial derivatives; it points away from the torus' tube axis. */
-  function normal(p1, p2, g) {
-    const h = 1e-4, a = shape(p1 + h, p2, g), b = shape(p1 - h, p2, g), c = shape(p1, p2 + h, g), d = shape(p1, p2 - h, g);
-    return v3.unit(v3.cross(v3.sub(a, b), v3.sub(c, d)));
-  }
-  const onSurface = (p1, p2, g, lift) => v3.add(shape(p1, p2, g), v3.scale(normal(p1, p2, g), lift));
-  /** The two pieces of the curve p₁ + p₂ ≡ 1/φ (mod 1): p₂ = 1/φ − p₁ for p₁ ≤ 1/φ, and p₂ = φ − p₁ for p₁ ≥ 1/φ. */
-  const lineA = (k, n) => { const p1 = (1 / PHI) * k / n; return [p1, 1 / PHI - p1]; };
-  const lineB = (k, n) => { const p1 = 1 / PHI + (1 - 1 / PHI) * k / n; return [p1, PHI - p1]; };
-  /** How far apart the ends of the two pieces are (they are the same points of the torus). */
-  const gap = (g) => Math.max(v3.len(v3.sub(shape(1 / PHI, 0, g), shape(1 / PHI, 1, g))), v3.len(v3.sub(shape(0, 1 / PHI, g), shape(1, 1 / PHI, g))));
+  /* the object itself: model.js, shared with film 001 of this book */
+  const { PHI, SIZE, region, PAIRS, shape, gap } = window.PHASE_TORUS;
 
   /* ---------- state and stage ---------- */
   const S = { pick: 18 };   // index into PAIRS: (2, 2)
@@ -57,23 +27,10 @@
     }
   });
   function drawStage() {
-    const st = stage, g = clock.t, lift = 0.005;
+    const st = stage, g = clock.t;
     st.begin();
-    st.surface('square', (p1, p2) => shape(p1, p2, g), { u: [0, 1], v: [0, 1], nu: 120, nv: 120, value: region, colors: [P.magenta, P.dim, P.cyan], range: [-1, 1], grid: { every: [12, 12] } });
-    const A = [], B = [];
-    for (let k = 0; k <= 60; k++) { const a = lineA(k, 60), b = lineB(k, 60); A.push(onSurface(a[0], a[1], g, lift)); B.push(onSurface(b[0], b[1], g, lift)); }
-    st.tube('lineA', A, { color: P.violet, width: 3.4 });
-    st.tube('lineB', B, { color: P.violet, width: 3.4 });
-    drawn = [];
-    PAIRS.forEach((q, i) => {
-      if (i === S.pick) return;
-      const p = onSurface(q.p1, q.p2, g, lift * 1.5);
-      drawn.push({ i, p });
-      st.bead(p, { color: q.c > 0 ? P.cyan : q.c < 0 ? P.magenta : P.dim, r: 3.2, glow: 0.3, key: `${q.v1},${q.v2}` });
-    });
-    const cur = PAIRS[S.pick], cp = onSurface(cur.p1, cur.p2, g, lift * 1.5);
-    drawn.push({ i: S.pick, p: cp });
-    st.bead(cp, { color: P.amber, r: 6.5, key: 'current' });
+    drawn = PHASE_TORUS.draw(st, g, S.pick, { magenta: P.magenta, dim: P.dim, cyan: P.cyan, violet: P.violet, amber: P.amber });
+    const cur = PAIRS[S.pick], cp = drawn[drawn.length - 1].p;
     st.tag('cur', cp, `(${cur.v1}, ${cur.v2})`, 'raw', { dx: 0, dy: -18 });
     st.end();
     $('hudBig').textContent = g < 0.995 ? L(`粘合 ${fix(g, 2)} · 上下两边${g > 0.005 ? '正在靠拢' : '还没粘'}`, `glue ${fix(g, 2)} · top and bottom ${g > 0.005 ? 'closing in' : 'not glued yet'}`)
@@ -148,7 +105,7 @@
     if (p.play) { if (TRV.still || (booting && !TRV.embed)) clock.set(p.still); else if (booting) kit.autoplay(clock, $('stage')); else clock.play(); }
     paint();
   }
-  const cards = kit.cards($('presets'), { notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
+  const cards = kit.cards($('presets'), { presets: PRESETS, notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
     idle: ['自由探索：拖动时间轴或滑块改变粘合程度，拖动舞台转动环面，点一颗珠子换一对数。', 'Free play: move the rail or the slider to glue, drag the stage to turn the torus, click a bead to change the pair.'] });
 
   TRV.drawer({ drawer: $('drawer'), open: $('infoBtn'), close: $('drawerClose') });

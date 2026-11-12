@@ -296,6 +296,24 @@
      const g = kit.plot(canvas, { x: [0, 10], y: [0, 1], pad: [left, right, top, bottom], logX, logY, equal });
      g.axes({ xTicks, yTicks, xFmt, yFmt, xLabel, yLabel }); g.line(points, color); g.dot(x, y, color); …
      `equal: true` gives both axes the same scale (a 2D stage: lattices, circles), widening one range to fit. */
+  /* ---------- sub- and superscripts in canvas text ---------- */
+  const SCRIPT = 0.72;   // a script's size, of its text's
+  /** The runs [{ t, sub, sup }] of a label with scripts, or null for plain text (drawn as before). A label is a string
+      that may write _{…} and ^{…}, or an array of pieces: a string, or { t, sub: true } / { t, sup: true }. */
+  function scripts(str) {
+    if (Array.isArray(str)) return str.map((p) => (typeof p === 'string' ? { t: p } : { t: String(p.t), sub: !!p.sub, sup: !!p.sup })).filter((r) => r.t);
+    if (typeof str !== 'string' || !/[_^]\{/.test(str)) return null;
+    const out = [], re = /([_^])\{([^{}]*)\}/g;
+    let at = 0, m;
+    while ((m = re.exec(str))) {
+      if (m.index > at) out.push({ t: str.slice(at, m.index) });
+      if (m[2]) out.push({ t: m[2], sub: m[1] === '_', sup: m[1] === '^' });
+      at = re.lastIndex;
+    }
+    if (at < str.length) out.push({ t: str.slice(at) });
+    return out;
+  }
+
   function plot(cv, o) {
     o = o || {};
     const dpr = TRV.fitCanvas(cv), W = cv.clientWidth, H = cv.clientHeight, ctx = cv.getContext('2d');
@@ -321,6 +339,21 @@
       scale: iw / (a1 - a0)
     };
     const font = (px, face) => `${px || 10}px ${face === 'body' ? TRV.fonts.body : face === 'display' ? TRV.fonts.display : TRV.fonts.data}`;
+    /** Draw runs [{ t, sub, sup }] from x, aligned as `align` ('left' | 'center' | 'right') at baseline-free y. */
+    const setRuns = (c, runs, x0, y0, size, face, align) => {
+      const sized = runs.map((r) => ({ ...r, px: r.sub || r.sup ? size * SCRIPT : size }));
+      let w = 0;
+      for (const r of sized) { c.font = font(r.px, face); r.w = c.measureText(r.t).width; w += r.w; }
+      let x = align === 'center' ? x0 - w / 2 : align === 'right' || align === 'end' ? x0 - w : x0;
+      c.textAlign = 'left';
+      for (const r of sized) {
+        c.font = font(r.px, face);
+        c.fillText(r.t, x, y0 + (r.sub ? size * 0.32 : r.sup ? -size * 0.36 : 0));
+        x += r.w;
+      }
+      c.font = font(size, face);
+      return w;
+    };
     const set = (color, s) => { s = s || {}; ctx.strokeStyle = ctx.fillStyle = color || P().cyan; ctx.lineWidth = s.width || 1.6; ctx.globalAlpha = s.alpha == null ? 1 : s.alpha; ctx.setLineDash(s.dash || []); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; return s; };
     const done = () => { ctx.globalAlpha = 1; ctx.setLineDash([]); ctx.shadowBlur = 0; };
     const trace = (pts) => { let pen = false; ctx.beginPath(); for (const p of pts) { if (p == null || !isFinite(p[1]) || !isFinite(p[0])) { pen = false; continue; } const x = X(p[0]), y = Y(p[1]); if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; } } };
@@ -374,24 +407,34 @@
       if (s.stroke) { ctx.globalAlpha = s.strokeAlpha == null ? 1 : s.strokeAlpha; ctx.strokeStyle = s.stroke; ctx.lineWidth = s.width || 1; if (s.glow) { ctx.shadowColor = s.stroke; ctx.shadowBlur = s.glow; } ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); }
       done();
     };
-    /** Text at a data point. s: align, base, size, face ('data' | 'body' | 'display'), dx, dy, alpha. */
+    /** Text at a data point. s: align, base, size, face ('data' | 'body' | 'display'), dx, dy, alpha. `str` may carry
+        sub- and superscripts, set smaller and lowered or raised on the canvas: written in the string as _{…} and ^{…}
+        ('E_{n}', 'φ^{−n}', '|ψ_{1}⟩'), or given as pieces [text | { t, sub: true } | { t, sup: true }, …]. */
     g.text = (x, y, str, color, s) => {
       s = s || {};
-      ctx.font = font(s.size || 10.5, s.face); ctx.fillStyle = color || P().dim; ctx.globalAlpha = s.alpha == null ? 1 : s.alpha;
+      const size = s.size || 10.5;
+      ctx.font = font(size, s.face); ctx.fillStyle = color || P().dim; ctx.globalAlpha = s.alpha == null ? 1 : s.alpha;
       ctx.textAlign = s.align || 'left'; ctx.textBaseline = s.base || 'middle';
-      ctx.fillText(str, X(x) + (s.dx || 0), Y(y) + (s.dy || 0)); done();
+      const runs = scripts(str);
+      if (!runs) { ctx.fillText(str, X(x) + (s.dx || 0), Y(y) + (s.dy || 0)); done(); return; }
+      setRuns(ctx, runs, X(x) + (s.dx || 0), Y(y) + (s.dy || 0), size, s.face, s.align || 'left'); done();
     };
-    /** A key in a corner: entries are [colour, label] or [colour, label, 'dash']. */
+    /** A key in a corner: entries are [colour, label] or [colour, label, 'dash']; a label may carry scripts as g.text. */
     g.legend = (items, s) => {
       s = s || {};
       ctx.font = font(10.5, 'body'); ctx.textBaseline = 'middle';
       const right = s.right !== false, lh = 14;
       let y = (s.bottom ? pt + ih - 9 - lh * (items.length - 1) : pt + 9) + (s.dy || 0);
       for (const [color, label, kind] of items) {
-        const w = ctx.measureText(label).width, x = right ? pl + iw - w - 26 : pl + 10;
+        const runs = scripts(label);
+        let w = ctx.measureText(runs ? '' : label).width;
+        if (runs) for (const r of runs) { ctx.font = font(r.sub || r.sup ? 10.5 * SCRIPT : 10.5, 'body'); w += ctx.measureText(r.t).width; }
+        ctx.font = font(10.5, 'body');
+        const x = right ? pl + iw - w - 26 : pl + 10;
         ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash(kind === 'dash' ? [4, 3] : []);
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 14, y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = P().ink; ctx.textAlign = 'left'; ctx.fillText(label, x + 19, y);
+        ctx.fillStyle = P().ink; ctx.textAlign = 'left';
+        if (runs) setRuns(ctx, runs, x + 19, y, 10.5, 'body', 'left'); else ctx.fillText(label, x + 19, y);
         y += lh;
       }
     };
@@ -467,13 +510,27 @@
     return api;
   }
   /** Experiment cards: buttons carrying data-preset inside el. opts: notes { id: [zh, en] }, noteEl, idle [zh, en],
-      onPick(id), tour (a .tour element with [data-tour="prev"], [data-tour="next"] and .what).
-      Returns { current, pick(id), step(±1), mark(id | null), initial(fallback) }: mark(null) when the reader leaves
-      the scenario by moving a control; initial() honours the card a chapter cites with ?preset=<id>. */
+      onPick(id), tour (a .tour element with [data-tour="prev"], [data-tour="next"] and .what), presets (the page's
+      table of cards { id: { …, still } }).
+      Still frame: a card that plays by itself declares the frame its still shows (the cover, the labelled figure a
+      chapter cites, PDF and EPUB) as `still` in the page's table, a clock time or 'end', and the page puts its clock
+      there when TRV.still is set. Passed the table as `presets`, cards() writes each declared value onto the card as
+      data-still (a card may also carry data-still in the HTML), where the quality gate (stageFirstChecks) reads it.
+      Returns { current, pick(id), step(±1), mark(id | null), initial(fallback), still(id) }: mark(null) when the reader
+      leaves the scenario by moving a control; initial() honours the card a chapter cites with ?preset=<id>; still(id)
+      is the declared still of a card (the table's value, else its data-still, else null). */
   function cards(el, o) {
     o = o || {};
     const api = { current: null };
     const ids = () => [...el.querySelectorAll('[data-preset]')].map((b) => b.dataset.preset);
+    const stillOf = (id) => {
+      const p = o.presets && o.presets[id];
+      if (p && p.still != null) return p.still;
+      const b = el.querySelector(`[data-preset="${id}"]`), v = b ? b.dataset.still : undefined;
+      return v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : v);
+    };
+    if (o.presets) for (const b of el.querySelectorAll('[data-preset]')) { const p = o.presets[b.dataset.preset]; if (p && p.still != null) b.dataset.still = String(p.still); }
+    api.still = stillOf;
     const tour = o.tour;
     function note() {
       const n = o.notes && api.current && o.notes[api.current], text = n ? TRV.L(n[0], n[1]) : (o.idle ? TRV.L(o.idle[0], o.idle[1]) : '');

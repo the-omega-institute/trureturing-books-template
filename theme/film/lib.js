@@ -31,6 +31,13 @@ export async function serve(dir) {
   return { url: `http://127.0.0.1:${port}/`, close: () => new Promise(r => server.close(r)) };
 }
 
+/* Solid shots (theme/film/engine.js solid()) need WebGL. Headless Chromium has no GPU and draws WebGL with SwiftShader,
+   its CPU renderer, which newer versions only allow with --enable-unsafe-swiftshader (the pages are our own). It does
+   not change the 2D canvas: frames without a solid stay identical, and every frame stays independent of the frames
+   drawn before it (--use-angle=swiftshader would move the 2D canvas onto ANGLE and break both). FILM_CHROMIUM_ARGS
+   adds arguments, separated by spaces (e.g. --disable-3d-apis to see how a film with solid shots fails without WebGL). */
+export const CHROMIUM_ARGS = ['--disable-gpu-vsync', '--font-render-hinting=none', '--enable-unsafe-swiftshader'];
+
 /** Launch Chromium. PW_CHROMIUM_PATH overrides Playwright's own browser download. */
 export async function launch() {
   let chromium;
@@ -41,7 +48,8 @@ export async function launch() {
       throw new Error('Playwright is not installed: run `npm ci` at the repository root');
     }
   }
-  const opts = { args: ['--disable-gpu-vsync', '--font-render-hinting=none'] };
+  const extra = (process.env.FILM_CHROMIUM_ARGS || '').split(/\s+/).filter(Boolean);
+  const opts = { args: [...CHROMIUM_ARGS, ...extra] };
   if (process.env.PW_CHROMIUM_PATH) opts.executablePath = process.env.PW_CHROMIUM_PATH;
   try {
     return await chromium.launch(opts);

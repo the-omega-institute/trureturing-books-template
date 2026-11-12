@@ -67,6 +67,7 @@ When the object itself is a surface or a body and a lit solid makes it clearer, 
 
 - `<body data-viz-id="<id>">`；`<html data-title-en="…">` 与 `<title>`。
 - `<link rel="stylesheet" href="../assets/theme.css">`；`<head>` 内 `<script src="../assets/shell.js"></script>`（`window.TRV`），其后可加 `<script src="../assets/kit.js"></script>`（`TRV.kit`：舞台、小图、时间轴、实验卡等辅助，见 skill 的速查表）。
+- 页面自己的脚本是底部的 `main.js`；与视频共用造型时，可在它之前加载同目录的 `model.js`（经典脚本，见 `skills/book-viz` 的“具象”）。
 - `<a class="crumb" href="../">` 返回本书的可视化索引；语言切换 `data-lang-set="zh"` / `data-lang-set="en"`。
 - 所有可见文字成对：`<span class="zh">…</span><span class="en">…</span>`；脚本文字用 `TRV.L('中文', 'English')` 并在语言切换时重绘（`kit.painter` 已代办）；`aria-label` 写中文、`data-aria-en` 写英文。
 - Lean 定理引用写成 `<a data-lean-gid="<GID>" href="…">`（GID 须是锁文件中种类为 `theorem` 的声明）；定义等其他 trureturing 文件写成 `<a data-trureturing-path="<path>" href="…">`：构建与本地预览把 href 固定到所钉提交。依据框：
@@ -87,6 +88,7 @@ When the object itself is a surface or a body and a lit solid makes it clearer, 
   | `?shot=1&preset=<卡>&lang=<语言>` | 被引用卡的带标签静态图，供 PDF/EPUB | `TRV.shot`、`TRV.still` |
 
   `TRV.still` 为真时不播放动画，直接显示那张卡的关键帧。
+- 停帧（still frame）：会自己播放的卡在页面的卡片表里声明 `still`（时间轴上的值，或 `'end'`），把表交给 `kit.cards(el, { presets: PRESETS, … })`，它把声明写到卡上的 `data-still`（也可直接写在 HTML 里）；`TRV.still` 为真时页面把时钟放到那里。A card that plays by itself declares the frame its still shows as `still` in the page's table of cards; `kit.cards({ presets })` writes it onto the card as `data-still`, and the page puts its clock there when `TRV.still` is set. `stageFirstChecks` warns about a card that plays without one; a suite opens the still with `openStill(T, book, id, card, lang)` and checks that the frame carries the numbers of its caption.
 - 手机宽度（390px）无横向滚动；尊重 `prefers-reduced-motion`。
 
 ## 嵌入书中 · Embedding in a chapter

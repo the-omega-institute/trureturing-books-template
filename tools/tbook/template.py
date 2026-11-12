@@ -62,7 +62,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -76,6 +76,10 @@ SUMMARY_PATH = "build/template-update.md"
 MIGRATIONS_DIR = "tools/migrations"
 CHANGELOG = "docs/CHANGELOG.md"
 SELF_FILES = (TEMPLATE_TOML, MANIFEST_NAME)  # never listed in the manifest itself
+LAYER_DIR = "template.d"
+LAYER_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+LAYER_PREFIXES = ("docs/layer-", "skills/layer-", ".github/workflows/layer-")
+
 DEFAULT_REPO = "the-omega-institute/trureturing-books-template"
 
 EXIT_OK = 0
@@ -280,6 +284,23 @@ class TemplateConfig:
     managed: list[str] = field(default_factory=list)
     owned: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
+    layer: str | None = None
+
+    @property
+    def config_path(self) -> str:
+        return f"{LAYER_DIR}/{self.layer}.toml" if self.layer else TEMPLATE_TOML
+
+    @property
+    def manifest_path(self) -> str:
+        return f"{LAYER_DIR}/{self.layer}.manifest.json" if self.layer else MANIFEST_NAME
+
+    @property
+    def migrations_dir(self) -> str:
+        return f"docs/layer-{self.layer}/migrations" if self.layer else MIGRATIONS_DIR
+
+    @property
+    def changelog_path(self) -> str:
+        return f"docs/layer-{self.layer}/CHANGELOG.md" if self.layer else CHANGELOG
 
     @classmethod
     def from_bytes(cls, data: bytes, where: str = TEMPLATE_TOML) -> "TemplateConfig":
@@ -308,15 +329,18 @@ class TemplateConfig:
         )
 
     @classmethod
-    def load(cls, root: Path) -> "TemplateConfig":
-        path = root / TEMPLATE_TOML
+    def load(cls, root: Path, layer: str | None = None) -> "TemplateConfig":
+        validate_layer_name(layer)
+        path = root / (f"{LAYER_DIR}/{layer}.toml" if layer else TEMPLATE_TOML)
         if not path.is_file():
+            if layer:
+                raise TemplateError(f"{path}: layer is not installed (use ./tbook template install {layer} --source <source>)")
             raise TemplateError(
                 f"{TEMPLATE_TOML} not found in {root}; a repository that was not created from the template "
                 "can adopt it: copy tbook, tools/ and template.toml from a template release, then run "
                 "./tbook template update, which installs the other managed files (docs/UPGRADING.md §5)"
             )
-        return cls.from_bytes(path.read_bytes(), str(path))
+        return replace(cls.from_bytes(path.read_bytes(), str(path)), layer=layer)
 
     def under_managed(self, path: str) -> bool:
         return any(_under(path, e) for e in self.managed)
@@ -333,9 +357,76 @@ class TemplateConfig:
 
     def manages(self, path: str) -> bool:
         """True for files whose content the template owns (and lists in the manifest)."""
-        if path in SELF_FILES or path.endswith(CONFLICT_SUFFIX):
+        if path in (*SELF_FILES, self.config_path, self.manifest_path) or path.endswith(CONFLICT_SUFFIX):
             return False
         return self.under_managed(path) and not self.protects(path)
+
+
+def validate_layer_name(name: str | None) -> None:
+    if name is not None and (not LAYER_RE.fullmatch(name) or name == "upstream"):
+        raise TemplateError(f"invalid layer name {name!r}; use lowercase words, digits and hyphens (upstream is reserved)")
+
+
+def layer_configs(root: Path) -> list[TemplateConfig]:
+    return [TemplateConfig.load(root, p.stem) for p in sorted((root / LAYER_DIR).glob("*.toml"))]
+
+
+def _overlap(a: str, b: str) -> bool:
+    return _under(a.rstrip("/"), b) or _under(b.rstrip("/"), a) or a.rstrip("/") == b.rstrip("/")
+
+
+def validate_claims(root: Path, candidate: TemplateConfig | None = None) -> None:
+    """Reject overlapping namespaces before any writes, even when the files do not exist yet.
+
+    Claims inside upstream directories must fit entirely within an excluded prefix.
+    The three reserved namespaces are partitioned by layer name; other unclaimed
+    paths may also be managed, but repository-owned paths and template.d are protected.
+    """
+    if (root / LAYER_DIR).is_symlink():
+        raise TemplateError("template.d must be a real downstream-owned directory")
+    # A standalone layer source has no upstream config. Its manifest can still be
+    # generated; ownership against the consumer's upstream is checked at install.
+    upstream = candidate if candidate is not None and not candidate.layer else (
+        TemplateConfig.load(root) if (root / TEMPLATE_TOML).is_file() else None)
+    upstream_owned = upstream.owned if upstream else []
+    upstream_exclude = upstream.exclude if upstream else []
+    upstream_managed = upstream.managed if upstream else []
+    layers = {c.layer: c for c in layer_configs(root)}
+    if candidate is not None and candidate.layer:
+        layers[candidate.layer] = candidate
+    claimed: list[tuple[str, str]] = []
+    for name, cfg in sorted(layers.items()):
+        for metadata in (cfg.config_path, cfg.manifest_path):
+            if (root / metadata).is_symlink() or not _inside(root, root / metadata):
+                raise TemplateError(f"{metadata}: layer metadata must be inside the repository, without symlinks")
+        if cfg.name != name or parse_semver(cfg.version) is None:
+            raise TemplateError(f"layer {name}: [template].name must match its filename and version must be semver")
+        for entry in cfg.managed:
+            clean = entry.rstrip("/")
+            if not _safe_relpath(clean) or "\\" in clean or "." in clean.split("/") or any(c in clean for c in "*?["):
+                raise TemplateError(f"layer {name}: invalid managed path {entry!r}")
+            if any(_overlap(entry, p) for p in [*SELF_FILES, LAYER_DIR + "/", *upstream_owned]):
+                raise TemplateError(f"layer {name}: cannot claim repository-owned path {entry!r}")
+            if any(entry.startswith(p) for p in upstream_exclude if p not in LAYER_PREFIXES):
+                raise TemplateError(f"layer {name}: cannot claim repository-owned path {entry!r}")
+            for prefix, own in [("docs/layer-", f"docs/layer-{name}/"),
+                                ("skills/layer-", f"skills/layer-{name}-"),
+                                (".github/workflows/layer-", f".github/workflows/layer-{name}-")]:
+                if clean.startswith(prefix) and not (entry.startswith(own) or entry == own):
+                    raise TemplateError(f"layer {name}: path {entry!r} belongs to another layer namespace")
+            if any(_overlap(entry, p) for p in upstream_managed):
+                if not any(entry.startswith(e) for e in upstream_exclude):
+                    raise TemplateError(f"layer {name}: upstream manages {entry!r}")
+            for other, path in claimed:
+                if other != name and _overlap(entry, path):
+                    raise TemplateError(f"layer {name}: {entry!r} overlaps layer {other} claim {path!r}")
+            claimed.append((name, entry))
+
+
+def targets(root: Path) -> list[dict[str, str]]:
+    validate_claims(root)
+    return [{"name": c.layer or "upstream", "repo": c.repo, "version": c.version}
+            for c in [TemplateConfig.load(root), *layer_configs(root)]]
 
 
 # --------------------------------------------------------------------------- files and manifest
@@ -403,8 +494,8 @@ class Manifest:
         return cls(template=str(raw.get("template", "")), version=str(raw.get("version", "")), files=files)
 
     @classmethod
-    def load(cls, root: Path) -> "Manifest | None":
-        path = root / MANIFEST_NAME
+    def load(cls, root: Path, name: str = MANIFEST_NAME) -> "Manifest | None":
+        path = root / name
         if not path.is_file():
             return None
         return cls.from_bytes(path.read_bytes(), str(path))
@@ -526,12 +617,13 @@ def _origin_repo(root: Path) -> str:
     return m.group(1) if m else ""
 
 
-def cmd_manifest(root: Path, *, check: bool = False, out: Callable[[str], None] = print) -> int:
-    cfg = TemplateConfig.load(root)
+def cmd_manifest(root: Path, *, check: bool = False, layer: str | None = None, out: Callable[[str], None] = print) -> int:
+    cfg = TemplateConfig.load(root, layer)
+    validate_claims(root, cfg)
     new = build_manifest(root, cfg)
     unreadable = ""
     try:
-        old = Manifest.load(root)
+        old = Manifest.load(root, cfg.manifest_path)
     except TemplateError as exc:
         old, unreadable = None, str(exc)
     if check:
@@ -540,13 +632,13 @@ def cmd_manifest(root: Path, *, check: bool = False, out: Callable[[str], None] 
         else:
             diff = manifest_diff(old, new) if old is None or old.to_json() != new.to_json() else []
         if diff:
-            out(f"{MANIFEST_NAME} is out of date; run ./tbook template manifest and commit it:")
+            out(f"{cfg.manifest_path} is out of date; run ./tbook template manifest and commit it:")
             for line in diff[:200]:
                 out(line)
             if len(diff) > 200:
                 out(f"  … and {len(diff) - 200} more")
             return EXIT_ERROR
-        out(f"{MANIFEST_NAME} is up to date ({len(new.files)} files, version {new.version})")
+        out(f"{cfg.manifest_path} is up to date ({len(new.files)} files, version {new.version})")
         return EXIT_OK
     origin = _origin_repo(root)
     if origin and cfg.repo and origin.lower() != cfg.repo.lower():
@@ -555,12 +647,12 @@ def cmd_manifest(root: Path, *, check: bool = False, out: Callable[[str], None] 
               "edits look like template content. Restore it with `git checkout -- template-manifest.json` "
               "unless that is what you want.", file=sys.stderr)
     text = new.to_json()
-    path = root / MANIFEST_NAME
+    path = root / cfg.manifest_path
     if not path.exists() or path.read_text(encoding="utf-8") != text:
         path.write_text(text, encoding="utf-8")
-        out(f"wrote {MANIFEST_NAME} ({len(new.files)} files, version {new.version})")
+        out(f"wrote {cfg.manifest_path} ({len(new.files)} files, version {new.version})")
     else:
-        out(f"{MANIFEST_NAME} is up to date ({len(new.files)} files, version {new.version})")
+        out(f"{cfg.manifest_path} is up to date ({len(new.files)} files, version {new.version})")
     return EXIT_OK
 
 
@@ -579,10 +671,10 @@ class Status:
 
 def compute_status(root: Path, cfg: TemplateConfig | None = None) -> Status:
     cfg = cfg or TemplateConfig.load(root)
-    manifest = Manifest.load(root)
+    manifest = Manifest.load(root, cfg.manifest_path)
     st = Status(version=cfg.version, manifest=manifest)
     candidates = candidate_files(root, cfg)
-    st.pending = [p for p in candidates if p.endswith(CONFLICT_SUFFIX) and cfg.under_managed(p)]
+    st.pending = [p for p in candidates if p.endswith(CONFLICT_SUFFIX) and cfg.under_managed(p) and not cfg.protects(p)]
     if manifest is None:
         return st
     for p, base in sorted(manifest.files.items()):
@@ -601,8 +693,9 @@ def compute_status(root: Path, cfg: TemplateConfig | None = None) -> Status:
     return st
 
 
-def cmd_status(root: Path, *, out: Callable[[str], None] = print) -> int:
-    cfg = TemplateConfig.load(root)
+def cmd_status(root: Path, *, layer: str | None = None, out: Callable[[str], None] = print) -> int:
+    cfg = TemplateConfig.load(root, layer)
+    validate_claims(root, cfg)
     lang = _lang(root)
     colon = _t(lang, "colon")
     st = compute_status(root, cfg)
@@ -730,13 +823,15 @@ def fetch_upstream(source: str, ref: str, dest: Path) -> str:
     return _git(dest, "rev-parse", "HEAD", check=True).stdout.decode().strip()
 
 
-def load_upstream(src_dir: Path, *, source: str, ref: str, commit: str) -> Upstream:
-    toml_path = src_dir / TEMPLATE_TOML
+def load_upstream(src_dir: Path, *, source: str, ref: str, commit: str,
+                  layer: str | None = None) -> Upstream:
+    config_path = f"{LAYER_DIR}/{layer}.toml" if layer else TEMPLATE_TOML
+    toml_path = src_dir / config_path
     if not toml_path.is_file():
-        raise TemplateError(f"{source} at {ref or 'its working tree'} has no {TEMPLATE_TOML}: not a books template")
-    cfg = TemplateConfig.from_bytes(toml_path.read_bytes(), f"{source}:{TEMPLATE_TOML}")
+        raise TemplateError(f"{source} at {ref or 'its working tree'} has no {config_path}: not the requested template")
+    cfg = replace(TemplateConfig.from_bytes(toml_path.read_bytes(), f"{source}:{config_path}"), layer=layer)
     try:
-        declared = Manifest.load(src_dir)
+        declared = Manifest.load(src_dir, cfg.manifest_path)
     except TemplateError as exc:
         declared = None
         warn = [f"upstream {MANIFEST_NAME} is unreadable ({exc}); using the fetched tree"]
@@ -1074,8 +1169,8 @@ def _changelog_link(up: Upstream) -> str:
     m = re.match(r"^(?:https://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?$", up.source)
     if m and up.ref:
         ref = up.ref[len("refs/tags/"):] if up.ref.startswith("refs/tags/") else up.ref
-        return f"https://github.com/{m.group(1)}/blob/{ref}/{CHANGELOG}"
-    return f"`{CHANGELOG}`"
+        return f"https://github.com/{m.group(1)}/blob/{ref}/{up.cfg.changelog_path}"
+    return f"`{up.cfg.changelog_path}`"
 
 
 # --------------------------------------------------------------------------- update command
@@ -1187,7 +1282,7 @@ def render_summary(res: UpdateResult, lang: str) -> str:
         lines += [f"### {t('sec_changelog')}", "", t("changelog_link", link=_changelog_link(up)), ""]
         if res.changelog:
             excerpt = res.changelog if len(res.changelog) < 20000 else res.changelog[:20000] + "\n…"
-            lines += ["<details>", f"<summary>{CHANGELOG}</summary>", "", excerpt, "", "</details>", ""]
+            lines += ["<details>", f"<summary>{up.cfg.changelog_path}</summary>", "", excerpt, "", "</details>", ""]
     steps = []
     if res.conflicts:
         steps.append(t("next_conflicts"))
@@ -1199,10 +1294,19 @@ def render_summary(res: UpdateResult, lang: str) -> str:
 
 
 def update(root: Path, *, to: str | None = None, source: str | None = None, dry_run: bool = False,
-           force: bool = False) -> UpdateResult:
+           force: bool = False, layer: str | None = None, install: bool = False) -> UpdateResult:
     """Update the managed files of ``root`` to a template release (see the module docstring)."""
-    local_cfg = TemplateConfig.load(root)
-    base = Manifest.load(root)
+    validate_layer_name(layer)
+    validate_claims(root)
+    if install:
+        if not layer or not source:
+            raise TemplateError("install requires a layer name and --source")
+        if (root / f"{LAYER_DIR}/{layer}.toml").exists():
+            raise TemplateError(f"layer {layer} is already installed; use update --layer {layer}")
+        local_cfg = TemplateConfig(name=layer, repo="", version="0.0.0", layer=layer)
+    else:
+        local_cfg = TemplateConfig.load(root, layer)
+    base = Manifest.load(root, local_cfg.manifest_path)
     warnings: list[str] = []
     if base is None:
         warnings.append(f"no local {MANIFEST_NAME}: every managed file that differs from the template is "
@@ -1217,9 +1321,16 @@ def update(root: Path, *, to: str | None = None, source: str | None = None, dry_
         if _is_local(src) and not _is_git_dir(Path(src)):
             if to:
                 raise TemplateError(f"--to needs a git source; {src} is a plain directory")
-            up = load_upstream(Path(src), source=src, ref="", commit="")
+            up = load_upstream(Path(src), source=src, ref="", commit="", layer=layer)
             latest = False  # the directory given is the target
         else:
+            if install and not to:
+                # A new consumer has no config yet. Read the source's default branch
+                # to discover its release namespace, then install a stable release.
+                discovery = Path(tmp) / "discovery"
+                fetch_upstream(src, "HEAD", discovery)
+                discovered = TemplateConfig.load(discovery, layer)
+                local_cfg = replace(local_cfg, tag_prefix=discovered.tag_prefix)
             tags = remote_tags(src)
             ref, label = resolve_target(to, tags, local_cfg.tag_prefix, src)
             latest = not to  # the newest stable release, picked automatically
@@ -1236,13 +1347,14 @@ def update(root: Path, *, to: str | None = None, source: str | None = None, dry_
                     raise TemplateError(f"{exc}\n(an abbreviated commit SHA is expanded only in a local git "
                                         "source; pass the full 40-character SHA, a tag or a branch)") from None
                 raise
-            up = load_upstream(Path(tmp) / "template", source=src, ref=label, commit=commit)
+            up = load_upstream(Path(tmp) / "template", source=src, ref=label, commit=commit, layer=layer)
             if label.startswith(local_cfg.tag_prefix) and parse_semver(label[len(local_cfg.tag_prefix):]):
                 if label[len(local_cfg.tag_prefix):] != up.cfg.version:
                     warnings.append(f"tag {label} carries {TEMPLATE_TOML} version {up.cfg.version}")
         if local_cfg.name and up.cfg.name and local_cfg.name != up.cfg.name and not force:
             raise TemplateError(f"{src} is template {up.cfg.name!r}, but this repository uses {local_cfg.name!r} "
                                 "(pass --force to switch templates)")
+        validate_claims(root, up.cfg)
         old_v, new_v = local_cfg.version, up.cfg.version
         ko, kn = parse_semver(old_v), parse_semver(new_v)
         # Without --to, never go back: an older release, or the same version from another snapshot (a
@@ -1269,11 +1381,11 @@ def update(root: Path, *, to: str | None = None, source: str | None = None, dry_
         actions = plan_update(root, local_cfg, base, up, force=force, never_had=never_had)
         res = UpdateResult(old_version=old_v, new_version=new_v, actions=actions, upstream=up,
                            warnings=warnings, dry_run=dry_run)
-        changelog_file = up.dir / CHANGELOG
+        changelog_file = up.dir / up.cfg.changelog_path
         if changelog_file.is_file():
             res.changelog = changelog_sections(changelog_file.read_text(encoding="utf-8", errors="replace"),
                                                old_v, new_v)
-        migrations = find_migrations(up.dir / MIGRATIONS_DIR, old_v, new_v)
+        migrations = find_migrations(up.dir / up.cfg.migrations_dir, old_v, new_v)
         res.pending_migrations = [m.name for m in migrations]
         if not dry_run:
             res.errors += apply_plan(root, up, actions)
@@ -1281,7 +1393,7 @@ def update(root: Path, *, to: str | None = None, source: str | None = None, dry_
                 _write_self(root, up)
                 for mig in migrations:
                     try:
-                        res.migrations.append((mig.name, run_migration(mig, root, up.dir / "tools")))
+                        res.migrations.append((mig.name, run_migration(mig, root, (root if layer else up.dir) / "tools")))
                     except Exception as exc:  # noqa: BLE001 - report any migration failure with its name
                         error = str(exc) if isinstance(exc, TemplateError) else f"{type(exc).__name__}: {exc}"
                         res.errors.append(_t(_lang(root), "migration_failed", name=mig.name, error=error))
@@ -1291,22 +1403,27 @@ def update(root: Path, *, to: str | None = None, source: str | None = None, dry_
 
 def _write_self(root: Path, up: Upstream) -> None:
     """The new template.toml (verbatim) and the manifest of the fetched tree."""
-    (root / TEMPLATE_TOML).write_bytes((up.dir / TEMPLATE_TOML).read_bytes())
-    (root / MANIFEST_NAME).write_text(up.manifest.to_json(), encoding="utf-8")
+    for name in (up.cfg.config_path, up.cfg.manifest_path):
+        if not _inside(root, root / name) or (root / name).is_symlink():
+            raise TemplateError(f"{name}: metadata path leaves the repository or is a symlink")
+    (root / up.cfg.config_path).parent.mkdir(parents=True, exist_ok=True)
+    (root / up.cfg.config_path).write_bytes((up.dir / up.cfg.config_path).read_bytes())
+    (root / up.cfg.manifest_path).write_text(up.manifest.to_json(), encoding="utf-8")
 
 
 def cmd_update(root: Path, *, to: str | None, source: str | None, dry_run: bool, force: bool,
-               out: Callable[[str], None] = print) -> int:
+               out: Callable[[str], None] = print, layer: str | None = None, install: bool = False) -> int:
     lang = _lang(root)
-    res = update(root, to=to, source=source, dry_run=dry_run, force=force)
+    res = update(root, to=to, source=source, dry_run=dry_run, force=force, layer=layer, install=install)
     res.summary = render_summary(res, lang)
     out(res.summary.rstrip())
     if not dry_run:
-        path = root / SUMMARY_PATH
+        summary_path = f"build/template-update-{layer}.md" if layer else SUMMARY_PATH
+        path = root / summary_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(res.summary, encoding="utf-8")
         out("")
-        out(_t(lang, "wrote_summary", path=SUMMARY_PATH))
+        out(_t(lang, "wrote_summary", path=summary_path))
     return res.exit_code
 
 
@@ -1318,13 +1435,28 @@ def main(args) -> int:
     root = paths.ROOT
     cmd = getattr(args, "template_cmd", None)
     try:
-        if cmd == "status":
-            return cmd_status(root)
+        selected = getattr(args, "layer", None)
+        layer = None if selected == "upstream" else selected
+        validate_layer_name(layer)
+        if cmd == "list":
+            rows = targets(root)
+            print(json.dumps(rows) if getattr(args, "json", False) else "\n".join(r["name"] for r in rows))
+            return EXIT_OK
         if cmd == "manifest":
-            return cmd_manifest(root, check=bool(getattr(args, "check", False)))
-        if cmd == "update":
-            return cmd_update(root, to=getattr(args, "to", None), source=getattr(args, "source", None),
-                              dry_run=bool(getattr(args, "dry_run", False)), force=bool(getattr(args, "force", False)))
+            return cmd_manifest(root, check=bool(getattr(args, "check", False)), layer=layer)
+        if cmd in ("status", "update", "install"):
+            names = [layer] if selected or cmd == "install" else [None, *[c.layer for c in layer_configs(root)]]
+            if cmd == "update" and len(names) > 1 and (args.to or args.source):
+                raise TemplateError("--to and --source require --layer upstream|<name> when layers are installed")
+            codes = []
+            for name in names:
+                if cmd == "status":
+                    codes.append(cmd_status(root, layer=name))
+                else:
+                    codes.append(cmd_update(root, to=getattr(args, "to", None), source=getattr(args, "source", None),
+                                            dry_run=bool(getattr(args, "dry_run", False)),
+                                            force=bool(getattr(args, "force", False)), layer=name, install=cmd == "install"))
+            return EXIT_ERROR if EXIT_ERROR in codes else EXIT_CONFLICTS if EXIT_CONFLICTS in codes else EXIT_OK
     except TemplateError as exc:
         print(f"template: {exc}", file=sys.stderr)
         return EXIT_ERROR

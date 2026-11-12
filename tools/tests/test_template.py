@@ -1145,12 +1145,12 @@ class UnitTests(unittest.TestCase):
 
     def test_main_dispatch_and_errors(self):
         with tempfile.TemporaryDirectory() as tmp:
-            args = mock.Mock(template_cmd="status")
+            args = mock.Mock(template_cmd="status", layer=None)
             with mock.patch.object(paths, "ROOT", Path(tmp)), redirect_stderr(io.StringIO()) as err:
                 self.assertEqual(template.main(args), 1)
             self.assertIn("template.toml not found", err.getvalue())
             with redirect_stderr(io.StringIO()):
-                self.assertEqual(template.main(mock.Mock(template_cmd="bogus")), 1)
+                self.assertEqual(template.main(mock.Mock(template_cmd="bogus", layer=None)), 1)
 
     def test_language_selection(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -20,6 +20,7 @@ def main() -> None:
 
     root = Path(os.environ.get("TBOOK_TOOLCHAIN", "/opt/tbook"))
     run("mdbook", "--version")
+    run("tectonic", "--version")
     run("java", "-version")
     run("ffmpeg", "-version", stdout=subprocess.DEVNULL)
     run("gh", "--version", stdout=subprocess.DEVNULL)
@@ -28,6 +29,12 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="tbook-image-") as tmp:
         tmp = Path(tmp)
         source = tmp / "smoke.typ"
+        beamer = tmp / "smoke.tex"
+        beamer.write_text(r"\documentclass{beamer}\usepackage{amssymb,xurl,appendixnumberbeamer}\begin{document}\begin{frame}{Academic slides}Toolchain\end{frame}\end{document}")
+        run("tectonic", "-X", "compile", "--only-cached", "--bundle",
+            "https://relay.fullyjustified.net/default_bundle_v33.tar", str(beamer),
+            env=dict(os.environ, SOURCE_DATE_EPOCH="946684800"))
+        assert beamer.with_suffix(".pdf").read_bytes().startswith(b"%PDF")
         source.write_text('#set text(font: "Noto Sans CJK SC")\n容器构建 $x^2 + y^2 = 1$\n')
         pdf = typst.compile(str(source))
         assert pdf.startswith(b"%PDF"), "Typst did not produce a PDF"
