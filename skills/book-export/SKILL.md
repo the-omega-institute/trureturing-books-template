@@ -52,6 +52,8 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 12. **最小复现**：把出问题的公式单独送过真实的转换链，比读整本书的中间文件快。PDF 端：`PYTHONPATH=tools:tools/tests python3 -c "from test_pdf_math import typst_code; print(typst_code([r'\exp\!\left(x\right)'])[0])"` 打印这条公式最终写进 PDF 的 Typst 代码（已展开预设宏、经过 Lua 过滤器）；`typst_code([...], display=True)` 对应独立公式。EPUB 端：`printf '%s\n' '$a\big/b$' | pandoc -f markdown -t html --mathml`（没有全局 `pandoc` 时用 `python3 -c "import pypandoc; print(pypandoc.get_pandoc_path())"` 给出的路径；预设宏要写展开后的形式，见 `tools/tbook/mathrender.py` 的 `TEX_MACROS`）。要看排出来的样子，把 Typst 代码写进 `t.typ` 后用 `python3 -c "import typst; typst.compile('t.typ', output='t.png', format='png', ppi=170)"` 渲染成图；主题相关的问题要像 `test_pdf_math.py` 那样在暂存目录里连主题一起编译。
 13. **越界扫描**：`pdftotext -bbox <pdf> out.html` 给出每个词的坐标。正文各行 `xMax` 的众数就是版心右缘；`xMax` 明显超过它的词即越界（封面的彩色叠印除外）。它只能发现文字越界，发现不了第 10 条那类重叠。
 
+14. **预印本投稿检查**：按 `docs/PDF-TYPOGRAPHY.md` 核对字体嵌入、占位字体（尤其 LastResort）、组合标记、文本检索与完整图件；不能只以“提取文本没有乱码”判定图中不缺字。确认 PDF 小于 50,000,000 字节，或在真实投稿后申请超限例外。默认 academic 省略可选结构标签，需结构标签时设 `[pdf] academic_tags = true` 并重新核对体积。
+
 ## 完成标准
 
 目标产物在 `build/` 下生成；HTML 无原始 `$`；每个定理都有 `LEAN ✓` 徽章与指向所钉提交的 Lean 链接；PDF 首页、目录、定理与账本符合对应变体规范；academic 的字体嵌入、文本检索与活动内容检查通过，文字扫描无源码泄漏、无越界，改动过的公式所在页面已渲染查看；EPUB epubcheck 无错误。

@@ -515,6 +515,11 @@ def parse_heading(line: str) -> tuple[int, str, mdscan.Attrs | None] | None:
 def format_heading(level: int, text: str, attrs: mdscan.Attrs | None) -> str:
     line = "#" * level + " " + text
     if attrs and (attrs.id or attrs.classes or attrs.kv):
+        if "*" in text:
+            # An unmatched asterisk can make Pandoc consume trailing attributes
+            # as title text. Carry generated metadata before the untouched title.
+            marker = attrs.to_pandoc()[:-1] + " .tr-heading-meta}"
+            return "#" * level + " []" + marker + " " + text
         line += " " + attrs.to_pandoc()
     return line
 
@@ -1618,11 +1623,14 @@ _TYPST_FONT_WARNING = re.compile(r"unknown font family: (.+)")
 
 
 def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", ppi: float | None = None,
-                  sys_inputs: dict[str, str] | None = None, timestamp: int | None = None) -> Path:
+                  sys_inputs: dict[str, str] | None = None, timestamp: int | None = None,
+                  pdf_tags: bool = True) -> Path:
     """Compile in a fresh process so each document releases its Typst memory on exit."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     kwargs = dict(output=str(out_path), root=str(root), font_paths=[str(d) for d in font_dirs()],
                   format=fmt, sys_inputs=sys_inputs or {})
+    if fmt == "pdf":
+        kwargs["pdf_tags"] = pdf_tags
     if ppi:
         kwargs["ppi"] = ppi
     if timestamp:
@@ -1664,7 +1672,8 @@ def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
         raise PandocError(f"unknown PDF variant {variant!r}; expected one of {config.PDF_VARIANTS}")
     staged = typst_source(site, book, edition, model, lock, stage_dir=stage_dir)
     return compile_typst(staged.dir / "main.typ", Path(out_path), root=staged.dir,
-                         sys_inputs={"tr-variant": variant}, timestamp=source_date_epoch(book) or None)
+                         sys_inputs={"tr-variant": variant}, timestamp=source_date_epoch(book) or None,
+                         pdf_tags=bool(book.pdf.get("academic_tags", False)) if variant == "academic" else True)
 
 
 # --------------------------------------------------------------------------- EPUB

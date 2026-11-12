@@ -102,19 +102,25 @@ def pdf_svg(svg: str, palette: str) -> str:
     falling back. Keep the label text intact (e.g. n + hat, R + tilde).
     Canonical figures, HTML, EPUB and slide copies retain their font stacks.
     """
-    def font_for_marks(match):
-        if not any(unicodedata.combining(c) for c in html.unescape(match[0])):
+    family = "'Libertinus Serif', 'New Computer Modern Math', 'New Computer Modern', " + figkit.FONT_BODY
+
+    def font_for_text(match):
+        text = html.unescape(match[0])
+        if any(unicodedata.combining(c) for c in text):
+            preferred = family
+        elif re.search(r"[\u2e80-\u9fff\uf900-\ufaff]", text):
+            preferred = figkit.FONT_BODY + ", 'New Computer Modern Math', 'Libertinus Serif'"
+        else:
             return match[0]
-        family = "'Libertinus Serif', 'New Computer Modern', " + figkit.FONT_BODY
         # Apply to the text root: SVG shapers can ignore a font switch on a
         # shifted tspan (e.g. the R-tilde following a subscript).
         opening, body = match[0].split(">", 1)
         opening = re.sub(r'\sfont-family="[^"]*"', "", opening)
-        return f'{opening} font-family="{family}">{body}'
+        return f'{opening} font-family="{preferred}">{body}'
 
     return re.sub(r'<text\b[^>]*>.*?</text>',
-                  font_for_marks,
-                  materialize(svg, palette), flags=re.S)
+                  font_for_text,
+                  materialize(svg, palette).replace(figkit.FONT_BODY, family), flags=re.S)
 
 
 def mdbook_css() -> str:
