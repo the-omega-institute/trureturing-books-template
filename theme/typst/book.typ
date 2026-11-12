@@ -21,8 +21,10 @@
 
 #let variant = sys.inputs.at("tr-variant", default: "screen")
 #let meta = json(sys.inputs.at("tr-meta", default: "/meta.json"))
+#let is-academic = variant == "academic"
+#let is-paper = variant != "screen"
 #let is-print = variant == "print"
-#let pal = if is-print { tr-paper } else { tr-screen }
+#let pal = if is-paper { tr-paper } else { tr-screen }
 #let S = meta.strings
 #let cjk = meta.at("cjk", default: false)
 
@@ -40,7 +42,7 @@
 #let f-body = if cjk {
   (..latin-in-cjk(("Noto Serif", "Libertinus Serif")), ..f-cjk-serif, "Libertinus Serif")
 } else { (..f-latin-serif, ..f-cjk-serif) }
-#let f-display = if cjk {
+#let f-display = if is-academic { f-body } else if cjk {
   (..latin-in-cjk(("Chakra Petch", "Inter")), ..f-cjk-sans, "DejaVu Sans")
 } else { (..f-latin-display, ..f-cjk-sans) }
 #let f-sans = if cjk {
@@ -50,13 +52,13 @@
 #let base-size = if cjk { 10.5pt } else { 10.8pt }
 
 // ------------------------------------------------------------------ palette roles
-#let page-fill = if is-print { none } else { pal.void }
+#let page-fill = if is-paper { none } else { pal.void }
 #let page-bg = if is-print { pal.void } else { pal.void }
 #let ink = pal.ink
-#let link-colour = pal.cyan
+#let link-colour = if is-academic { ink } else { pal.cyan }
 #let heading-colour = if is-print { pal.ink } else { pal.ink }
 #let accent-colour = pal.cyan
-#let panel-fill = if is-print { pal.void-deep } else { pal.panel-solid }
+#let panel-fill = if is-paper { pal.void-deep } else { pal.panel-solid }
 // Frame accent per status (same mapping as theme/mdbook/tr-book.css): green only for
 // Lean-verified results; labels stay cyan so green marks the verification itself.
 #let status-colour(status) = (
@@ -67,7 +69,9 @@
   lean: pal.cyan, definition: pal.cyan, open: pal.warn, informal: pal.dim, proof: pal.dim,
 ).at(status, default: pal.cyan)
 
-#let margins = if is-print {
+#let margins = if is-academic {
+  (x: 25mm, top: 24mm, bottom: 24mm)
+} else if is-print {
   (inside: 26mm, outside: 21mm, top: 25mm, bottom: 27mm)
 } else {
   (x: 25mm, top: 26mm, bottom: 25mm)
@@ -83,19 +87,22 @@
 
 // A cut-corner frame: notch the top-right corner of a filled/stroked block.
 #let cut-corner(size: 8pt, dx: 0pt, dy: 0pt, stroke: none) = {
+  if is-academic { return }
   place(top + right, dx: dx, dy: dy, polygon(fill: page-bg, (0pt, 0pt), (size, 0pt), (size, size)))
   if stroke != none {
     place(top + right, dx: dx, dy: dy, line(start: (0pt, 0pt), end: (size, size), stroke: stroke))
   }
 }
 
-#let horizontalrule = align(center, block(above: 1.4em, below: 1.4em, {
+#let horizontalrule = if is-academic {
+  block(above: 1em, below: 1em, line(length: 100%, stroke: 0.4pt + pal.faint))
+} else { align(center, block(above: 1.4em, below: 1.4em, {
   box(width: 18pt, height: 0.6pt, fill: pal.line-hot)
   h(5pt)
   box(width: 4pt, height: 4pt, fill: pal.magenta)
   h(5pt)
   box(width: 18pt, height: 0.6pt, fill: pal.line-hot)
-}))
+})) }
 
 // Long inline code (Lean names): allow line breaks after dots and slashes.
 #let tr-code-break(s) = raw(s.replace(".", ".\u{200B}").replace("/", "/\u{200B}"))
@@ -129,6 +136,10 @@
 }
 
 #let tr-badge(badge, colour, url: "") = {
+  if is-academic {
+    let b = text(font: f-body, size: 7.5pt, fill: colour, badge)
+    return if url != "" { link(url, b) } else { b }
+  }
   let b = box(stroke: 0.6pt + colour, inset: (x: 4pt, y: 2.4pt), baseline: 0pt,
     text(font: f-mono, size: 6.8pt, weight: "bold", fill: colour, tracking: 0.08em, badge))
   if url != "" { link(url, b) } else { b }
@@ -140,7 +151,7 @@
   let c = status-colour(status)
   let light = status == "informal"
   let head = {
-    text(font: f-display, weight: "bold", fill: label-colour(status), size: 0.95em, tracking: 0.02em, ref)
+    text(font: f-display, weight: "bold", fill: if is-academic { ink } else { label-colour(status) }, size: 0.95em, tracking: 0.02em, ref)
     if title != none {
       text(font: f-display, weight: "semibold", fill: heading-colour, size: 0.95em)[#S.title_open#title#S.title_close]
     }
@@ -148,11 +159,11 @@
   let badge-box = if badge != "" {
     tr-badge(badge, c, url: badge-url)
   } else { none }
-  let fill = if light { none } else { panel-fill }
-  let edge = if light { none } else { 0.5pt + pal.panel-edge }
+  let fill = if light or is-academic { none } else { panel-fill }
+  let edge = if light or is-academic { none } else { 0.5pt + pal.panel-edge }
   block(width: 100%, breakable: true, above: 1.35em, below: 1.35em, fill: fill,
-    stroke: (left: 2pt + c, top: edge, right: edge, bottom: edge),
-    inset: (left: 11pt, right: 11pt, top: 8pt, bottom: 9pt), {
+    stroke: if is-academic { none } else { (left: 2pt + c, top: edge, right: edge, bottom: edge) },
+    inset: if is-academic { 0pt } else { (left: 11pt, right: 11pt, top: 8pt, bottom: 9pt) }, {
       if not light { cut-corner(size: 8pt, dx: 11.25pt, dy: -8.25pt, stroke: 0.5pt + pal.panel-edge) }
       set par(first-line-indent: 0pt)
       block(below: 0.75em, sticky: true, grid(columns: (1fr, auto), column-gutter: 10pt,
@@ -167,13 +178,13 @@
 #let tr-qed() = { h(1fr); text(font: f-symbol, fill: pal.dim, size: 0.9em)[∎] }
 
 #let tr-proof(label: "", id: "", body) = block(width: 100%, breakable: true, above: 1em, below: 1.3em,
-  inset: (left: 10pt), stroke: (left: (paint: pal.faint, thickness: 0.6pt, dash: "dashed")), {
+  inset: (left: if is-academic { 0pt } else { 10pt }), stroke: if is-academic { none } else { (left: (paint: pal.faint, thickness: 0.6pt, dash: "dashed")) }, {
     set par(first-line-indent: 0pt)
     body
   })
 
 // A figure (tbook.figure) is staged with each palette written in; the variant picks the file.
-#let tr-fig-ext = if is-print { ".print.svg" } else { ".screen.svg" }
+#let tr-fig-ext = if is-paper { ".print.svg" } else { ".screen.svg" }
 
 #let tr-media(kind: "media", body) = if kind == "figure" {
   // a static figure: the drawing on the page itself, its caption below in the caption style
@@ -186,7 +197,7 @@
   })
 } else {
   block(width: 100%, breakable: false, above: 1.4em, below: 1.4em,
-    fill: panel-fill, stroke: 0.5pt + pal.panel-edge, inset: 10pt, {
+    fill: if is-academic { none } else { panel-fill }, stroke: 0.5pt + pal.panel-edge, inset: 10pt, {
       cut-corner(size: 10pt, dx: 10.25pt, dy: -10.25pt, stroke: 0.5pt + pal.panel-edge)
       set par(first-line-indent: 0pt)
       mono-text(size: 6.8pt, fill: pal.cyan, tracking: 0.16em, upper(kind))
@@ -211,6 +222,13 @@
 #let tr-chapter(id: "", kicker: "", section: "", outlined: true, title: []) = {
   new-recto()
   [#metadata(section)#chapter-start]
+  if is-academic {
+    if kicker != "" { block(below: 6pt, text(size: 10pt, fill: pal.dim, kicker)) }
+    let hd = heading(level: 1, outlined: outlined, bookmarked: outlined, title)
+    if id != "" [#hd#label(id)] else { hd }
+    v(16pt)
+    return
+  }
   v(30mm)
   let kc = kicker-colour(section)
   block(below: 12pt, grid(columns: (auto, 1fr), column-gutter: 10pt, align: horizon,
@@ -232,7 +250,10 @@
   new-recto()
   [#metadata("part")#chapter-start]
   v(1fr)
-  if kicker != "" { mono-text(size: 9pt, fill: pal.magenta, tracking: 0.2em, kicker) }
+  if kicker != "" {
+    if is-academic { text(font: f-display, size: 10pt, fill: ink, kicker) }
+    else { mono-text(size: 9pt, fill: pal.magenta, tracking: 0.2em, kicker) }
+  }
   v(6pt)
   line(length: 100%, stroke: 0.6pt + pal.line-hot)
   v(10pt)
@@ -264,6 +285,11 @@
 
 #let running-header = context {
   if on-opener-page() or on-blank-page() { return }
+  if is-academic {
+    let before = query(heading.where(level: 1).before(here()))
+    if before.len() > 0 { align(center, text(font: f-body, size: 8pt, fill: pal.dim, before.last().body)) }
+    return
+  }
   let before = query(heading.where(level: 1).before(here()))
   let chapter = if before.len() > 0 { before.last().body } else { none }
   let book-title = text(font: f-display, size: 7.5pt, fill: pal.dim, tracking: 0.04em, meta.title)
@@ -290,6 +316,7 @@
 #let running-footer = context {
   if on-blank-page() { return }
   let n = counter(page).display(here().page-numbering())
+  if is-academic { return align(center, text(font: f-body, size: 9pt, fill: ink, n)) }
   let num = text(font: f-mono, size: 8pt, fill: pal.cyan, weight: "bold", tracking: 0.08em, n)
   let tag = mono-text(size: 6.5pt, fill: pal.faint, [#meta.code #h(4pt) v#meta.version])
   set par(first-line-indent: 0pt)
@@ -302,7 +329,7 @@
 }
 
 #let opener-background = context {
-  if is-print or on-blank-page() or not on-opener-page() { return }
+  if is-paper or on-blank-page() or not on-opener-page() { return }
   // scanline band and a faint aurora on chapter opener pages (screen only)
   place(top, rect(width: 100%, height: 92mm, fill: gradient.linear(
     (pal.cyan.transparentize(91%), 0%), (pal.cyan.transparentize(100%), 100%), angle: 90deg)))
@@ -318,6 +345,27 @@
 
 #let title-page() = page(header: none, footer: none, background: none, {
   set par(first-line-indent: 0pt, justify: false)
+  if is-academic {
+    set align(center)
+    v(8%)
+    block(text(font: f-body, size: 25pt, weight: "bold", meta.title))
+    if meta.subtitle != "" { v(12pt); block(text(size: 13pt, meta.subtitle)) }
+    v(18pt)
+    block(text(size: 12pt, meta.authors.join(if cjk { "、" } else { ", " })))
+    v(8pt)
+    block(text(size: 10pt, meta.date.iso))
+    v(18pt)
+    block(width: 100%, {
+      set align(left)
+      set text(size: 9pt)
+      if meta.description != "" {
+        block(above: 6pt, below: 5pt, text(weight: "bold", S.abstract))
+        block(meta.description)
+      }
+      block(above: 12pt, [#S.variant_academic · v#meta.version · #S.lang_name])
+    })
+    return
+  }
   v(16%)
   mono-text(size: 9pt, fill: pal.cyan, tracking: 0.22em, meta.code)
   v(4pt)
@@ -354,7 +402,7 @@
   v(12pt)
   let tru = meta.trureturing
   let rows = (
-    kv-row(S.version, [#meta.version #h(6pt) #text(fill: pal.dim)[#if is-print { S.variant_print } else { S.variant_screen }]]),
+    kv-row(S.version, [#meta.version #h(6pt) #text(fill: pal.dim)[#if is-academic { S.variant_academic } else if is-print { S.variant_print } else { S.variant_screen }]]),
     kv-row(S.date, meta.date.iso),
   )
   if meta.authors.len() > 0 { rows.push(kv-row(S.authors, meta.authors.join(if cjk { "、" } else { ", " }))) }
@@ -381,10 +429,10 @@
 
 #let contents-page() = {
   set par(first-line-indent: 0pt, justify: false)
-  v(18mm)
-  block(below: 8pt, grid(columns: (auto, 1fr), column-gutter: 10pt, align: horizon,
+  v(if is-academic { 0mm } else { 18mm })
+  if not is-academic { block(below: 8pt, grid(columns: (auto, 1fr), column-gutter: 10pt, align: horizon,
     text(font: f-mono, size: 12pt, weight: "bold", fill: pal.cyan, tracking: 0.12em, "//"),
-    line(length: 100%, stroke: 0.6pt + pal.line-hot)))
+    line(length: 100%, stroke: 0.6pt + pal.line-hot))) }
   text(font: f-display, size: 22pt, weight: "bold", fill: ink, S.contents)
   v(18pt)
   outline(title: none, depth: 2, indent: 1.4em)
@@ -401,13 +449,13 @@
   set text(font: f-body, size: base-size, fill: ink, lang: meta.lang,
     region: if meta.region != "" { lower(meta.region) } else { none }, hyphenate: not cjk)
   set par(justify: true,
-    leading: if cjk { 0.95em } else { 0.72em },
-    spacing: if cjk { 0.95em } else { 0.72em },
+    leading: if is-academic { 0.65em } else if cjk { 0.95em } else { 0.72em },
+    spacing: if is-academic { 0.6em } else if cjk { 0.95em } else { 0.72em },
     first-line-indent: if cjk { (amount: 2em, all: true) } else { (amount: 1.3em, all: false) })
   set raw(theme: "/_theme/typst/code-" + variant + ".tmTheme")
   show raw: set text(font: f-mono, size: 0.9em)
   show raw.where(block: false): set text(fill: if is-print { pal.sigma } else { pal.sigma })
-  show raw.where(block: true): it => block(width: 100%, fill: panel-fill, stroke: 0.5pt + pal.panel-edge,
+  show raw.where(block: true): it => block(width: 100%, fill: if is-academic { none } else { panel-fill }, stroke: 0.5pt + pal.panel-edge,
     inset: (x: 10pt, y: 8pt), above: 1.1em, below: 1.1em, breakable: true, {
       cut-corner(size: 7pt, dx: 10.25pt, dy: -8.25pt, stroke: 0.5pt + pal.panel-edge)
       if it.lang != none and it.lang != "" {
@@ -443,7 +491,7 @@
 
   // tables (the verification ledger and pipe tables)
   set table(stroke: none, inset: (x: 6pt, y: 5pt),
-    fill: (x, y) => if y == 0 { panel-fill } else if calc.even(y) { if is-print { pal.void-deep } else { pal.sheet } } else { none })
+    fill: (x, y) => if is-academic { none } else if y == 0 { panel-fill } else if calc.even(y) { if is-print { pal.void-deep } else { pal.sheet } } else { none })
   set table.hline(stroke: 0.7pt + pal.line-hot)
   show table: set text(size: 0.86em)
   // Pandoc centres tables (align(center)[#table…]) and leaves column alignment on auto,
@@ -459,7 +507,7 @@
     })
     it
   }
-  show table.cell.where(y: 0): set text(font: f-display, weight: "semibold", fill: pal.cyan, size: 0.95em)
+  show table.cell.where(y: 0): set text(font: f-display, weight: "semibold", fill: if is-academic { ink } else { pal.cyan }, size: 0.95em)
   show figure.where(kind: table): set figure.caption(position: top)
   show figure.where(kind: table): set block(breakable: true)
 
@@ -487,9 +535,8 @@
     text(font: f-display, size: if cjk { 23pt } else { 24pt }, weight: "bold", fill: ink, it.body)
   })
   show heading.where(level: 2): it => block(above: 1.9em, below: 1em, sticky: true, {
-    box(width: 3pt, height: 0.85em, fill: pal.magenta, baseline: 0.05em)
-    h(7pt)
-    text(font: f-display, size: 14.5pt, weight: "bold", fill: if is-print { ink } else { pal.cyan }, it.body)
+    if not is-academic { box(width: 3pt, height: 0.85em, fill: pal.magenta, baseline: 0.05em); h(7pt) }
+    text(font: f-display, size: 14.5pt, weight: "bold", fill: if is-paper { ink } else { pal.cyan }, it.body)
   })
   show heading.where(level: 3): it => block(above: 1.6em, below: 0.85em, sticky: true,
     text(font: f-display, size: 12pt, weight: "bold", fill: ink, it.body))
@@ -506,8 +553,8 @@
   show outline.entry.where(level: 2): it => text(size: 9.5pt, fill: pal.dim, it)
 
   // ---------------------------------------------------------------- front matter
-  page(margin: 0pt, header: none, footer: none, fill: if is-print { none } else { pal.void-deep }, background: none,
-    tr-cover(meta, variant: variant))
+  if not is-academic { page(margin: 0pt, header: none, footer: none, fill: if is-print { none } else { pal.void-deep }, background: none,
+    tr-cover(meta, variant: variant)) }
   if is-print { page(header: none, footer: none, [])}
   title-page()
   colophon-page()

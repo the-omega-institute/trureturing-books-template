@@ -53,6 +53,33 @@ class PdfLayoutTest(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
+    def test_academic_layout_keeps_semantics_on_paper(self):
+        import typst
+
+        main = self.stage / "academic.typ"
+        main.write_text(r'''#import "/_theme/typst/book.typ": *
+#show: tr-book
+#metadata((figure: tr-fig-ext, display: f-display == f-body))
+#tr-chapter(id: "chapter", kicker: "1", title: [A chapter])
+#tr-env(status: "lean", ref: "Theorem 1", badge: "LEAN ✓", badge-url: "https://example.org/proof",
+  lean: ((name: "Test.theorem", url: "https://example.org/source"),))[A verified statement.]
+#context metadata((name: "body", y: here().position().y.pt()))
+#link(<chapter>)[Back to chapter]
+''', encoding="utf-8")
+        options = dict(root=str(self.stage), font_paths=[str(p) for p in tp.font_dirs()],
+                       sys_inputs={"tr-variant": "academic"})
+        values = json.loads(typst.query(str(main), "metadata", field="value", **options))
+        roles = next(v for v in values if isinstance(v, dict) and "figure" in v)
+        self.assertEqual(roles, {"figure": ".print.svg", "display": True})
+        body = next(v for v in values if isinstance(v, dict) and v.get("name") == "body")
+        self.assertLess(body["y"], 230, "chapter opener must leave room for body text")
+        pages = typst.compile(str(main), format="svg", **options)
+        svg = b"".join(pages) if isinstance(pages, list) else pages
+        self.assertIn(b"https://example.org/proof", svg)
+        self.assertIn(b"https://example.org/source", svg)
+        self.assertNotIn(b"linearGradient", svg)
+        self.assertNotIn(b"radialGradient", svg)
+
     def test_formulas_and_code_stay_inside_their_containers(self):
         import typst
 
@@ -60,7 +87,7 @@ class PdfLayoutTest(unittest.TestCase):
         for cjk in (False, True):
             meta = dict(self.meta, cjk=cjk, lang="zh" if cjk else "en")
             (self.stage / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
-            for variant in ("screen", "print"):
+            for variant in ("screen", "print", "academic"):
                 with self.subTest(cjk=cjk, variant=variant):
                     values = json.loads(typst.query(
                         str(self.stage / "main.typ"), "metadata", field="value",
@@ -82,5 +109,6 @@ class PdfLayoutTest(unittest.TestCase):
         for width in short_widths:
             self.assertGreater(width, 15)
             self.assertLess(width, 40)
-        self.assertAlmostEqual(short_widths[0], short_widths[1], places=2)
-        self.assertAlmostEqual(short_widths[2], short_widths[3], places=2)
+        for group in (short_widths[:3], short_widths[3:]):
+            for width in group[1:]:
+                self.assertAlmostEqual(group[0], width, places=2)

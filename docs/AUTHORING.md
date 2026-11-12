@@ -25,7 +25,7 @@ books/<slug>/
 | `book.title` / `subtitle` / `description` | 每种语言一行：`zh = "…"`、`en = "…"` |
 | `book.authors`、`license`、`isbn`（按语言）、`date` | 进入版权页与 EPUB 元数据 |
 | `book.code` | 封面与站点卡片上的代号，形如 `GOLDEN//OBSERVE` |
-| `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]` |
+| `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]`；可选加 `"academic"` 导出论文风格版，省略配置或 `true` 仍只导出原两版 |
 | `pdf.paper` | Typst 纸张名（`a4`、`a5`、`us-letter`、`iso-b5`…） |
 | `epub.embed_fonts` | 是否嵌入标题与等宽字体 |
 

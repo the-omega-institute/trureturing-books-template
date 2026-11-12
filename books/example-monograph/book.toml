@@ -21,7 +21,7 @@ en = "Four chapters and an appendix: from the carry deficit of Zeckendorf repres
 
 [outputs]
 html = true
-pdf = ["screen", "print"]
+pdf = ["screen", "print", "academic"]
 epub = true
 
 [pdf]
