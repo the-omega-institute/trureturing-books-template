@@ -179,7 +179,7 @@ export async function evidenceChecks(T, slug, id, page) {
   if (drawer != null) check('evidence: the drawer says in both languages that the page is not a proof', /不是证明/.test(drawer) && /not a proof/.test(drawer));
 }
 
-const RAIL_RANGE ='footer.rail .clock input[type=range]';
+const RAIL_RANGE = 'footer.rail .clock input[type=range]';
 /** Frame widths of the whole lab inside a chapter: phones (a 390px page leaves the frame 334px), and both sides of
     the 600px breakpoint of theme.css. */
 const RAIL_WIDTHS = [320, 334, 360, 600, 601];
@@ -199,29 +199,78 @@ const railState = (page) => page.evaluate((sel) => {
   }
   if (!range) bad.push('no slider');
   const tau = rail.querySelector('.clock .tau');
+  const num = (s, empty) => (s === '' ? empty : parseFloat(s));   // an absent min is the default 0
   return {
     overflow: Math.max(root.scrollWidth - root.clientWidth, body.scrollWidth - body.clientWidth), bad,
     width: range ? range.getBoundingClientRect().width : 0, value: range ? parseFloat(range.value) : NaN, max: range ? parseFloat(range.max) : NaN,
+    min: range ? num(range.min, 0) : NaN, disabled: !!range && range.matches(':disabled'),
     focused: !!range && document.activeElement === range, readout: tau ? tau.textContent.trim() : null
   };
 }, RAIL_RANGE);
 
+/** A range input reports its value as a decimal string, and the browser writes the values it sets itself (End, a
+    drag to the edge) with RANGE_DIGITS significant digits: End on a clock whose max is 2π = 6.283185307179586 reads
+    6.28318530717959. Two readings are the same number when they agree to that precision (one unit in the last
+    serialized digit; the rounding itself moves a value by at most half of it). A clock that stops a keyboard step or
+    a pixel short of its end is many orders of magnitude outside this. */
+const RANGE_DIGITS = 15;
+const sameNumber = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= Math.max(Math.abs(a), Math.abs(b)) * 10 ** (1 - RANGE_DIGITS);
+/** The slider runs from 0 over a finite positive range and its value lies in it. */
+const railDomain = (s) => s.min === 0 && Number.isFinite(s.max) && s.max > 0 && Number.isFinite(s.value) && s.value >= 0 && (s.value <= s.max || sameNumber(s.value, s.max));
+
+/** A page may open on a card that has nothing to run (an empty program) and disable its clock until there is
+    something. Do what a reader does then: pick the experiment cards in turn (the card itself where it is rendered,
+    else the ▶ of the tour bar) until one enables the slider. Returns that card, or null when none does. */
+async function enableRail(page, wait) {
+  const disabled = async () => { await settle(page, wait); const s = await railState(page); return !s || s.disabled; };
+  const usable = (sel) => page.evaluate((s) => { const el = document.querySelector(s); return !!el && !el.disabled && el.getClientRects().length > 0; }, sel);
+  const press = (sel) => page.click(sel, { timeout: 5000 }).then(() => true, () => false);
+  const pressed = () => page.evaluate(() => { const b = document.querySelector('[data-preset][aria-pressed="true"]'); return b ? b.dataset.preset : null; });
+  const cards = await page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
+  for (const c of cards) {
+    const sel = `[data-preset="${c}"]`;
+    if (!(await usable(sel)) || !(await press(sel))) continue;
+    if (!(await disabled())) return c;
+  }
+  const next = '.tour [data-tour="next"]';
+  for (let i = 0; i < cards.length; i++) {
+    if (!(await usable(next)) || !(await press(next))) break;
+    if (!(await disabled())) return (await pressed()) || 'tour';
+  }
+  return null;
+}
+
 /** The rail of the whole lab in narrow frames of a book, in one language (see stageFirstChecks, "rail"). */
-async function railChecks(T, slug, id, lang) {
+async function railChecks(T, slug, id, lang, wait = 120) {
   const { check } = T;
   const page = await T.open(slug, id, `?embed=1&lang=${lang}`, { viewport: { width: 334, height: 620 }, locale: lang === 'zh' ? 'zh-CN' : 'en-US' });
   await settle(page, 400);
   if (!(await railState(page))) { await page.context().close(); return; }
-  for (const w of RAIL_WIDTHS) {
-    await page.setViewportSize({ width: w, height: 620 }); await settle(page, 60);
-    const g = await railState(page), tag = `rail (${lang}, ${w}px frame)`;
-    check(`${tag}: neither the document nor the body scrolls sideways`, g.overflow <= 0, `${g.overflow}px`);
-    check(`${tag}: the transport, the readout and the slider are inside the frame and named`, g.bad.length === 0, g.bad.slice(0, 4).join(' | '));
-  }
+  const layout = async (state) => {
+    for (const w of RAIL_WIDTHS) {
+      await page.setViewportSize({ width: w, height: 620 }); await settle(page, 60);
+      const g = await railState(page), tag = `rail (${lang}, ${w}px frame${state})`;
+      check(`${tag}: neither the document nor the body scrolls sideways`, g.overflow <= 0, `${g.overflow}px`);
+      check(`${tag}: the transport, the readout and the slider are inside the frame and named`, g.bad.length === 0, g.bad.slice(0, 4).join(' | '));
+    }
+    await page.setViewportSize({ width: 334, height: 620 }); await settle(page, 60);
+  };
+  await layout('');   // as the page opens, whatever its clock has to run
 
   // use it as a reader does, in the frame of a 390px page: press at a quarter, drag to 70%, then the keyboard
-  await page.setViewportSize({ width: 334, height: 620 }); await settle(page, 60);
   const tag = `rail (${lang}, 334px frame)`;
+  const unusable = async (why) => {   // say so instead of waiting for a control that never becomes usable
+    check(`${tag}: dragging the slider moves the clock`, false, why);
+    check(`${tag}: Home, → and End move the clock and the readout`, false, why);
+    await page.context().close();
+  };
+  if ((await railState(page)).disabled) {
+    // nothing to run yet: a reader picks an experiment, and the rail must work then (and still fit)
+    const card = await enableRail(page, wait);
+    check(`${tag}: a slider that starts disabled is enabled by an experiment card`, !!card, card ? `card ${card}` : 'no experiment card enables the slider');
+    if (!card) return unusable('the slider stays disabled');
+    await layout(`, card ${card}`);
+  }
   const at = await page.evaluate((sel) => {
     const el = document.querySelector(sel); if (!el) return null;
     el.scrollIntoView({ block: 'center' });
@@ -229,22 +278,22 @@ async function railChecks(T, slug, id, lang) {
     return { x25: x(0.25), x70: x(0.7), y, width: r.width, hit: [0.25, 0.7].every((f) => document.elementFromPoint(x(f), y) === el) };
   }, RAIL_RANGE);
   check(`${tag}: the slider can be pressed where it is drawn`, !!at && at.hit, JSON.stringify(at));
-  if (!at || !at.hit) {   // nothing to press: say so instead of waiting for a control that never becomes usable
-    check(`${tag}: dragging the slider moves the clock`, false, 'the slider cannot be pressed');
-    check(`${tag}: Home, → and End move the clock and the readout`, false, 'the slider cannot be pressed');
-    await page.context().close(); return;
-  }
+  if (!at || !at.hit) return unusable('the slider cannot be pressed');
+  const start = await railState(page);
+  check(`${tag}: the slider runs from 0 over a finite positive range`, railDomain(start), JSON.stringify({ min: start.min, max: start.max, value: start.value }));
   await page.mouse.move(at.x25, at.y); await page.mouse.down(); await settle(page);
   const a = await railState(page);
   await page.mouse.move(at.x70, at.y, { steps: 6 }); await page.mouse.up(); await settle(page);
   const b = await railState(page);
-  const near = (s, f) => Math.abs(s.value / s.max - f) < 0.08;
+  const near = (s, f) => railDomain(s) && Math.abs(s.value / s.max - f) < 0.08;
   check(`${tag}: dragging the slider moves the clock`, near(a, 0.25) && near(b, 0.7), `${a.value} → ${b.value} of ${b.max}`);
   await page.keyboard.press('Home'); await settle(page); const home = await railState(page);
   await page.keyboard.press('ArrowRight'); await settle(page); const right = await railState(page);
   await page.keyboard.press('End'); await settle(page); const end = await railState(page);
+  // the end is compared at the precision the browser serializes it with (sameNumber); the start is exactly 0
   check(`${tag}: Home, → and End move the clock and the readout`,
-    b.focused && home.value === 0 && right.value > 0 && right.value < end.value && end.value === end.max && home.readout !== end.readout,
+    b.focused && [home, right, end].every(railDomain) && home.value === 0 && right.value > 0 && right.value < end.value
+      && !sameNumber(right.value, end.value) && sameNumber(end.value, end.max) && home.readout !== end.readout,
     JSON.stringify({ focused: b.focused, home: [home.value, home.readout], right: right.value, end: [end.value, end.readout], max: end.max }));
   await page.context().close();
 }
@@ -260,8 +309,11 @@ async function railChecks(T, slug, id, lang) {
  *             screen, the tour bar is on that first screen, nothing scrolls sideways
  *   rail      (?embed=1 in frames 320 … 601 wide, the whole lab inside a chapter on a phone, in both languages)
  *             neither the document nor the body scrolls sideways; every transport control, the readout and the
- *             slider are rendered (not collapsed), inside the frame and named; the slider can be pressed, follows a
- *             pointer drag and answers Home / → / End, and the readout follows
+ *             slider are rendered (not collapsed), inside the frame and named; the slider can be pressed, runs from 0
+ *             over a finite positive range, follows a pointer drag and answers Home / → / End (the end compared at
+ *             the precision a range input serializes numbers with), and the readout follows. A page that opens
+ *             with nothing to run and its slider disabled is laid out as it opens, then an experiment card is
+ *             picked as a reader would and the same checks run on the enabled rail; no card enabling it is a failure
  *   figure    (740 × 500, ?embed=1&preset=<card>, what a chapter shows when it cites one card) the page opens on
  *             that card; the stage, the one-sentence note and ◀ ▶ fit the frame and nothing scrolls inside it;
  *             ?shot=1 (the still that PDF/EPUB print) fills the frame on the same card, labels kept, in one language
@@ -345,7 +397,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   await embed.context().close();
 
   // rail: the whole lab in the narrow frame of a chapter read on a phone
-  if (o.rail) for (const lang of ['zh', 'en']) await railChecks(T, slug, id, lang);
+  if (o.rail) for (const lang of ['zh', 'en']) await railChecks(T, slug, id, lang, o.settle);
 
   // cited figure: a chapter cites one card with `::: {.viz src=… preset=…}`
   if (o.cards) {

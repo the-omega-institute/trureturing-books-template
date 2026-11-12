@@ -1,8 +1,9 @@
 """Tests for tbook.viz (book-local visualizations) and its Node counterparts in tools/node/viz-*.mjs.
 
 Run: PYTHONPATH=tools .venv/bin/python -m unittest discover -s tools/tests -p 'test_viz.py'
-Node-dependent tests are skipped when ``node`` is not on PATH. Browser suites are not run here (see
-tools/node/viz-test.mjs); this file covers the registry checks, embeds, the publish step and scaffolding.
+Node-dependent tests are skipped when ``node`` is not on PATH. The browser suites of the books are not run here (see
+tools/node/viz-test.mjs); this file covers the registry checks, embeds, the publish step and scaffolding, and, where
+Playwright's Chromium is installed, the rail part of the shared quality gate on private copies of the starter page.
 """
 
 from __future__ import annotations
@@ -886,6 +887,169 @@ class Scaffold(unittest.TestCase):
         self.assertIn("live", out.getvalue())
         self.assertIn("usage: ./tbook viz new", err.getvalue())
         self.assertIn("already exists", err.getvalue())
+
+
+@unittest.skipUnless(NODE, "node not available")
+class RailGate(unittest.TestCase):
+    """The "rail" part of stageFirstChecks (tools/node/viz-testkit.mjs), run in Chromium on private copies of the
+    starter page. Each copy changes one thing about its clock; the gate must accept the legitimate ones and refuse
+    the broken ones. Skipped where Playwright or its Chromium is not installed (the unit-test job of a books
+    repository need not have a browser); the visualization suites exercise the same gate on every real page."""
+
+    SLUG = "rail-gate-fixture"
+    CLOCK = "  const clock = kit.clock({\n"
+    PRESET = "    const p = PRESETS[id];\n"
+    # the page keeps thinking in degrees; the rail (kit.clock and its <input type=range>) runs over 0 … 2π
+    RADIANS = (
+        "  const radians = (o) => {\n"
+        "    const K = Math.PI / 180;\n"
+        "    const R = kit.clock(Object.assign({}, o, { max: 2 * Math.PI, t: o.t * K, rate: o.rate * K, step: o.step * K,\n"
+        "      format: (t) => o.format(t / K), onChange: (t) => o.onChange(t / K) }));\n"
+        "    return { get t() { return R.t / K; }, get playing() { return R.playing; }, set: (t, quiet) => R.set(t * K, quiet),\n"
+        "      play: R.play, pause: R.pause };\n"
+        "  };\n"
+    )
+    DISABLE = "    for (const k of ['now', 'play', 'rew']) $(k).disabled = %s;\n"
+    DEAF = "document.addEventListener('input', (ev) => { if (ev.target.id === 'now') ev.stopPropagation(); }, true);\n"
+    RUNNER = """
+import fs from 'node:fs';
+const [kit, out, slug, ...ids] = process.argv.slice(2);
+const { session, stageFirstChecks } = await import(kit);
+const T = await session();
+const rail = {};
+for (const id of ids) {
+  const from = T.results.length;
+  await stageFirstChecks(T, slug, id, { cards: false, labels: false, evidence: false });
+  rail[id] = T.results.slice(from).filter((r) => r.name.startsWith('rail ('));
+}
+await T.browser.close();
+fs.writeFileSync(out, JSON.stringify(rail));
+process.exit(0);
+"""
+
+    @classmethod
+    def variants(cls) -> dict:
+        def swap(text: str, old: str, new: str) -> str:
+            if text.count(old) != 1:
+                raise AssertionError(f"templates/viz/main.js no longer has exactly one {old!r}")
+            return text.replace(old, new)
+
+        return {
+            # the starter as it is: a clock over 0 … 360
+            "rail-plain": lambda js: js,
+            # an angle: max = 2π = 6.283185307179586, which End reads back with 15 significant digits
+            "rail-angle": lambda js: swap(js, cls.CLOCK, cls.RADIANS + "  const clock = radians({\n"),
+            # nothing to run on the opening card: the clock is disabled until the reader picks the card that plays
+            "rail-empty": lambda js: swap(js, cls.PRESET, cls.PRESET + cls.DISABLE % "!p.play"),
+            # disabled whatever the reader picks
+            "rail-dead": lambda js: swap(js, cls.PRESET, cls.PRESET + cls.DISABLE % "true"),
+            # the slider moves but the clock never hears it
+            "rail-deaf": lambda js: cls.DEAF + js,
+        }
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="tbook-rail-"))
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        root = cls.tmp / "root"  # a repository root for the Node tools: the real theme and fonts, one private book
+        (root / "books").mkdir(parents=True)
+        try:
+            (root / "theme").symlink_to(paths.THEME, target_is_directory=True)
+            if (paths.ROOT / "node_modules").is_dir():
+                (root / "node_modules").symlink_to(paths.ROOT / "node_modules", target_is_directory=True)
+        except OSError as exc:
+            raise unittest.SkipTest(f"cannot link the theme into a private root: {exc}")
+        book = fake_book(root / "books", cls.SLUG)
+        for vid, change in cls.variants().items():
+            viz.scaffold(book, vid, vid.upper().replace("-", "//"), "时间轴", "Rail", added="2026-11-12")
+            main = book.viz_dir / vid / "main.js"
+            main.write_text(change(main.read_text(encoding="utf-8")), encoding="utf-8")
+        runner, out = cls.tmp / "rail-gate.mjs", cls.tmp / "rail-gate.json"
+        runner.write_text(cls.RUNNER, encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k != "VIZ_ORIGIN"}
+        env["TBOOK_ROOT"] = str(root)
+        kit = (paths.TOOLS / "node" / "viz-testkit.mjs").as_uri()
+        r = subprocess.run([NODE, str(runner), kit, str(out), cls.SLUG, *cls.variants()], capture_output=True,
+                           text=True, cwd=paths.ROOT, env=env, timeout=900)
+        if not out.is_file():
+            tail = (r.stdout + r.stderr)[-3000:]
+            if re.search(r"Playwright is not installed|Executable doesn't exist|browserType\.launch", tail):
+                raise unittest.SkipTest("Playwright Chromium is not available")
+            raise AssertionError(f"the rail gate did not run (exit {r.returncode}):\n{tail}")
+        cls.rail = json.loads(out.read_text(encoding="utf-8"))
+
+    def checks(self, vid: str, part: str) -> list[dict]:
+        found = [c for c in self.rail[vid] if part in c["name"]]
+        self.assertTrue(found, f"{vid}: no rail check named …{part}… in {[c['name'] for c in self.rail[vid]]}")
+        return found
+
+    def failed(self, vid: str) -> list[str]:
+        return [f"{c['name']} — {c['detail']}" for c in self.rail[vid] if not c["ok"]]
+
+    def keyboard(self, vid: str) -> list[dict]:
+        found = self.checks(vid, "Home, → and End move the clock and the readout")
+        self.assertEqual(len(found), 2, "one keyboard check per language")
+        return found
+
+    def test_the_starter_passes_with_every_positive_check(self):
+        self.assertEqual(self.failed("rail-plain"), [])
+        for part in ("neither the document nor the body scrolls sideways", "inside the frame and named",
+                     "can be pressed where it is drawn", "runs from 0 over a finite positive range",
+                     "dragging the slider moves the clock"):
+            self.assertGreaterEqual(len(self.checks("rail-plain", part)), 2, part)
+        for c in self.keyboard("rail-plain"):
+            d = json.loads(c["detail"])
+            self.assertTrue(d["focused"])
+            self.assertEqual((d["home"][0], d["end"][0], d["max"]), (0, 360, 360))
+            self.assertNotEqual(d["home"][1], d["end"][1])
+        self.assertFalse([c["name"] for c in self.rail["rail-plain"] if "starts disabled" in c["name"]])
+
+    def test_an_angle_endpoint_rounded_by_the_range_input_is_the_end(self):
+        """End on max = 2π reads 6.28318530717959 for a max of 6.283185307179586: the same end, not a failure."""
+        self.assertEqual(self.failed("rail-angle"), [])
+        for c in self.keyboard("rail-angle"):
+            d = json.loads(c["detail"])
+            end, top = d["end"][0], d["max"]
+            self.assertNotEqual(end, top, "the fixture no longer reproduces the rounded endpoint (an exact comparison would pass)")
+            self.assertLess(abs(end - top), 1e-13)
+            self.assertAlmostEqual(top, 6.283185307179586, places=12)
+            self.assertEqual(d["home"][0], 0)
+            self.assertTrue(0 < d["right"] < end - 1e-6)
+            self.assertTrue(d["home"][1].startswith("θ 0°"), d["home"][1])
+            self.assertTrue(d["end"][1].startswith("θ 360°"), d["end"][1])  # the readout reaches the end as well
+
+    def test_a_clock_with_nothing_to_run_is_checked_after_a_card_enables_it(self):
+        self.assertEqual(self.failed("rail-empty"), [])
+        enabled = self.checks("rail-empty", "a slider that starts disabled is enabled by an experiment card")
+        self.assertEqual([c["detail"] for c in enabled], ["card sweep", "card sweep"])  # zh, en: the only card that plays
+        names = [c["name"] for c in self.rail["rail-empty"]]
+        for lang in ("zh", "en"):
+            for width in (320, 334, 360, 600, 601):
+                for state in ("", ", card sweep"):  # laid out as it opens (disabled) and again once enabled
+                    for part in ("neither the document nor the body scrolls sideways",
+                                 "the transport, the readout and the slider are inside the frame and named"):
+                        name = f"rail ({lang}, {width}px frame{state}): {part}"
+                        self.assertTrue(any(n.startswith(name) for n in names), name)
+        self.assertEqual(len(self.checks("rail-empty", "dragging the slider moves the clock")), 2)
+        for c in self.keyboard("rail-empty"):
+            d = json.loads(c["detail"])
+            self.assertTrue(d["focused"])
+            self.assertEqual((d["home"][0], d["end"][0]), (0, 360))
+
+    def test_a_clock_no_card_enables_fails(self):
+        enabled = self.checks("rail-dead", "a slider that starts disabled is enabled by an experiment card")
+        self.assertEqual([(c["ok"], c["detail"]) for c in enabled], [(False, "no experiment card enables the slider")] * 2)
+        self.assertEqual([c["ok"] for c in self.keyboard("rail-dead")], [False, False])
+        self.assertEqual([c["ok"] for c in self.checks("rail-dead", "dragging the slider moves the clock")], [False, False])
+        # the layout of the disabled rail is still checked, and it is fine
+        self.assertTrue(all(c["ok"] for c in self.checks("rail-dead", "inside the frame and named")))
+
+    def test_a_slider_the_clock_does_not_follow_fails(self):
+        self.assertEqual([c["ok"] for c in self.keyboard("rail-deaf")], [False, False])
+        for c in self.keyboard("rail-deaf"):
+            d = json.loads(c["detail"])
+            self.assertEqual(d["home"][1], d["end"][1], "the readout must be what gave the broken clock away")
+        self.assertTrue(all(c["ok"] for c in self.checks("rail-deaf", "inside the frame and named")))
 
 
 class Strings(unittest.TestCase):
