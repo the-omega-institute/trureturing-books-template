@@ -808,7 +808,7 @@
       "mode": "100644"
     },
     "tools/tests/test_markdown.py": {
-      "sha256": "3636353ea8f35f9364db0ce6a5700a0e0cbaf1d7463b1fcf1ee505d717eb8864",
+      "sha256": "1c1041b9c36d8ea66aa03a1036a95018cc168559d6068f2048cabc1339cb3d85",
       "mode": "100644"
     },
     "tools/tests/test_migration_v0_2_0.py": {
