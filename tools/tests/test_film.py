@@ -581,7 +581,9 @@ class Sandbox:
         (self.book.dir / "zh").mkdir()
         (self.book.dir / "zh" / "ch01.md").write_text("# 第一章\n", encoding="utf-8")
         self.dir = copy_example(self.book)
-        self.site = dataclasses.replace(config.load_site(), repo="acme/books", base_url="")
+        # load_site is cached and may belong to an earlier, already removed sandbox.
+        # Repository hooks must run in this sandbox, just like its build/cache units.
+        self.site = dataclasses.replace(config.load_site(), root=self.root, repo="acme/books", base_url="")
 
     def film(self) -> film.Film:
         return film.get(self.book, self.dir.name)
