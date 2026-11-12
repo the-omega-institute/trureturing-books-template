@@ -113,6 +113,39 @@ export function okmarksOutsideLean(html, js = '') {
 export const OKMARK_MESSAGE = (where, line) => `.okmark (a green ✓) at ${where} line ${line} is outside a .lean box: green belongs to `
   + 'Lean-verified statements; mark a number the page checked itself with .nummark (neutral) (skills/book-viz)';
 
+/** The evidence kinds of skills/book-viz: .lean (green, LEAN ✓: a theorem the book's text cites with lean=) and its
+    modifiers; .frozen (neutral, FROZEN) is a theorem frozen in trureturing that no theorem environment of the text
+    cites, named with <a data-lean-gid> like a green box. Same as EVIDENCE_KINDS in tools/tbook/viz.py. */
+export const EVIDENCE_KINDS = ['num', 'model', 'argued', 'open', 'frozen'];
+/** Every .lean evidence box of a page: [{ line, kinds, gids }] (the classes after lean, the data-lean-gid links in it).
+    tools/tbook/viz.py (evidence_boxes) reads boxes the same way. */
+export function evidenceBoxes(html) {
+  const boxes = [], stack = [];
+  const lineAt = (i) => html.slice(0, i).split('\n').length;
+  const body = html.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' ')).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, (m) => m.replace(/[^\n]/g, ' '));
+  for (const m of body.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const tag = m[2].toLowerCase();
+    if (m[1]) { const k = stack.map((e) => e.tag).lastIndexOf(tag); if (k >= 0) stack.length = k; continue; }
+    const cls = (/\bclass\s*=\s*"([^"]*)"/.exec(m[3]) || [, ''])[1].split(/\s+/).filter(Boolean);
+    let box = stack.length ? stack[stack.length - 1].box : -1;
+    if (cls.includes('lean')) { boxes.push({ line: lineAt(m.index), kinds: cls.filter((c) => c !== 'lean'), gids: [] }); box = boxes.length - 1; }
+    const g = /\bdata-lean-gid\s*=\s*"([^"]*)"/.exec(m[3]);
+    if (tag === 'a' && g && box >= 0) boxes[box].gids.push(g[1]);
+    if (!m[4] && !VOID_TAGS.has(tag)) stack.push({ tag, box });
+  }
+  return boxes;
+}
+/** Warnings about the evidence boxes of a page: [{ line, message }] (the rules of evidence_problems in viz.py). */
+export function evidenceProblems(html) {
+  const out = [];
+  for (const b of evidenceBoxes(html)) {
+    const odd = b.kinds.filter((k) => !EVIDENCE_KINDS.includes(k));
+    if (odd.length) out.push({ line: b.line, message: `evidence box class "lean ${b.kinds.join(' ')}" names ${odd.join(', ')}, which is not an evidence kind; the kinds are .lean (LEAN ✓) and .lean.${EVIDENCE_KINDS.join(', .lean.')} (skills/book-viz)` });
+    if (b.kinds.includes('frozen') && !b.gids.length) out.push({ line: b.line, message: 'a .lean.frozen box (FROZEN) names the theorem it shows with <a data-lean-gid="<GID>">; the GID must be a theorem of trureturing.lock.json (skills/book-viz)' });
+  }
+  return out;
+}
+
 function scriptsOf(dir, out) {
   if (!fs.existsSync(dir)) return out;
   for (const name of fs.readdirSync(dir).sort()) {
@@ -222,6 +255,7 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
     if (on('lean')) {
       const js = path.join(dir, 'main.js');
       for (const o of okmarksOutsideLean(html, fs.existsSync(js) ? fs.readFileSync(js, 'utf8') : '')) warn(o.where === 'main.js' ? js : page, OKMARK_MESSAGE(o.where, o.line));
+      for (const p of evidenceProblems(html)) warn(page, p.message);
       for (const r of pinnedRefs(html)) {
         if (r.kind === 'gid') {
           if (!parseGid(r.value)) err(page, `data-lean-gid="${r.value}" is not a declaration GID`);
