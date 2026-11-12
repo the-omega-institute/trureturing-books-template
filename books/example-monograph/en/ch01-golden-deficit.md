@@ -201,8 +201,10 @@ If $(p(v_1), p(v_2))$ is replaced by a random point distributed uniformly on the
 For $n\ge1$, let $a_n^+$ and $a_n^-$ be the proportions of the $n^2$ pairs with $0\le v_1,v_2<n$ for which $c(v_1,v_2)=+1$ and $c(v_1,v_2)=-1$, respectively. Then
 
 $$
-\lim_{n\to\infty}a_n^+=P=\frac{1}{2\varphi^2},\qquad
-\lim_{n\to\infty}a_n^-=N=\frac{1}{2\varphi^4}.
+\begin{aligned}
+\lim_{n\to\infty}a_n^+&=P=\frac{1}{2\varphi^2},\\
+\lim_{n\to\infty}a_n^-&=N=\frac{1}{2\varphi^4}.
+\end{aligned}
 $$
 
 This is a written consequence of Weyl's equidistribution theorem; the cited paper does not use the book's deficit notation. The Lean declaration behind [@prop-phase-areas] computes the two integrals only and does not state these limits of integer sample proportions. No matching frozen declaration for these limits has been found.

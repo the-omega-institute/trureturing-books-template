@@ -201,8 +201,10 @@ $P$ 是图中左下三角形 $\{p_1 + p_2 < 1/\varphi\}$ 的面积，按竖直�
 对 $n\ge1$，记 $a_n^+$、$a_n^-$ 分别为 $0\le v_1,v_2<n$ 的 $n^2$ 个数对中，$c(v_1,v_2)=+1$、$c(v_1,v_2)=-1$ 的比例。则
 
 $$
-\lim_{n\to\infty}a_n^+=P=\frac{1}{2\varphi^2},\qquad
-\lim_{n\to\infty}a_n^-=N=\frac{1}{2\varphi^4}.
+\begin{aligned}
+\lim_{n\to\infty}a_n^+&=P=\frac{1}{2\varphi^2},\\
+\lim_{n\to\infty}a_n^-&=N=\frac{1}{2\varphi^4}.
+\end{aligned}
 $$
 
 这是由 Weyl 等分布定理推导的书面结论；所引论文没有使用本书的亏量记号。[@prop-phase-areas] 的 Lean 声明只计算两个积分，不包含这里的整数样本比例极限；这一极限尚无匹配的冻结声明。
