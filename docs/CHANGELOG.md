@@ -8,7 +8,7 @@
 
 ### 新增
 
-- 可选论文风格 PDF `academic`：白底衬线、标题/作者/日期与摘要、紧凑章首、简洁定理与页码，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
+- 可选论文风格 PDF `academic`：独立的 B5 学术专著版式、衬线正文、分开的标题/版权/内容提要/目录、对开页眉、传统定理与证明、三线表及无框图注，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》论文风格导出。
 
 - 画图库补上下游用到却没有的形状，均为新增接口，已有的图逐字节不变：流程图的 `fig.box(…)`（自动定宽与换行、虚线框、强调色框与 `chip`/`chip_size`，返回锚点；默认字号按不宽于 358 的一栏设计）与 `fig.link(a, b, elbow=…)`；球上的 `sp.turn(轴, 起点, 角度, arrow=True)`、`sp.small_circle(…, start=, span=, arrow=True)`、`sp.sector(…)`、`sp.patch(…)`、`sp.polytope(…)`；`fig.axes(…, logx=True, logy=True)`（自动十的幂刻度与细刻度、`ax.decades()`）；`ax.step(…)`、`ax.bars(…)`；`figkit.hull(…)`、`figkit.hull3(…)`；`fig.bounce(a, 镜面点, b)`；文字标记 `***粗斜体***` 与 `\bar{z}`；脚本可选 `MARKUP = 2`，让下标、上标里的标记嵌套、斜体 `I` 用衬线字形（不写时按旧规则）；等宽文字按每字 0.6 em 估宽（组合附加符不计），`fig.measure()`、`fig.wrap_text()`。示例专著第四章新增三张图（证明骨架、黄金旋转、回归得分的对数图）。来源：下游《量子计算的几何直觉》150 张图中各章各写一遍的辅助代码（#35）。
 

@@ -49,18 +49,18 @@
 
   if variant == "academic" {
     place(rect(width: W, height: H, fill: pal.void))
-    place(dx: W * 0.12, dy: H * 0.16, block(width: W * 0.76, {
-      set align(center)
-      set text(font: ("Noto Serif", "Libertinus Serif", "Noto Serif CJK SC", "Noto Serif SC"), fill: pal.ink)
-      block(text(size: W * 0.055, weight: "bold", meta.title))
-      v(H * 0.025)
-      block(text(size: W * 0.026, meta.subtitle))
-      v(H * 0.04)
-      block(text(size: W * 0.03, meta.authors.join(", ")))
-      v(H * 0.02)
-      block(text(size: W * 0.023, meta.date.iso))
-      v(H * 0.04)
-      block(text(size: W * 0.022, S.variant_academic))
+    place(dx: W * 0.13, dy: H * 0.15, block(width: W * 0.75, height: H * 0.72, {
+      set par(first-line-indent: 0pt, justify: false, leading: 0.45em)
+      set text(font: ("Libertinus Serif", "New Computer Modern", "Noto Serif CJK SC", "Noto Serif SC"), fill: pal.ink)
+      block(text(size: W * 0.028, meta.authors.join(", ")))
+      v(H * 0.08)
+      block(text(size: W * 0.056, weight: "bold", meta.title))
+      v(H * 0.035)
+      block(text(size: W * 0.027, meta.subtitle.replace(regex("\\s*=\\s*"), "\u{A0}=\u{A0}")))
+      v(1fr)
+      block(text(size: W * 0.021, meta.publisher))
+      v(H * 0.012)
+      block(text(size: W * 0.018, [#S.lang_name · #meta.date.year]))
     }))
     return
   }

@@ -68,19 +68,23 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "1cca66122ad50fe18fce8723ad17d3e710da583efeb29bf0f6e196be9590085d",
+      "sha256": "9e1d9ce76e75363c4317615793ca00cec07b3cd2d68a3c48dd6dcc6ea2299a1e",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "764793d32ed5307eb29168c4d7eec42c6104705bbc16dac11e2041955a7f197b",
+      "sha256": "352e22b9c7ec1fcc5705d2fe781d9432eedbbae9978cdff858ddd8e48019190c",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
       "sha256": "b96a9add0197ed31044d513d6b783f1c980e20e5a8e53257c8f0023fb712d610",
       "mode": "100644"
     },
+    "docs/PDF-TYPOGRAPHY.md": {
+      "sha256": "8b3f2559c12be3bafe61fff897f691ce4d5ea6b3872c3f322e6fc80024dae182",
+      "mode": "100644"
+    },
     "docs/PUBLISHING.md": {
-      "sha256": "4d41df57b3bc183df44af1aefa9bc2e129d8e4eec938bc494791d8212eab6ab1",
+      "sha256": "b9b26d37a9e7e99b93ce2223a4c6ad53c1f236b0341a7ae5077f16c8e893db63",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -104,7 +108,7 @@
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
-      "sha256": "7f67efe993cf3789106c235856f39499d0c222069a44cc19dde922bd43993271",
+      "sha256": "bd6b4e2bbcb1ccd8a4e2e0a482565823c26e385ef02ec755d739b3f63b7bdb4f",
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
@@ -328,7 +332,7 @@
       "mode": "100644"
     },
     "theme/i18n/zh.toml": {
-      "sha256": "b77cb12dd30c2e32f4c99f56e3880f34039efc2142f91233329b394372e7c703",
+      "sha256": "ae39e3ae3e0e977d4a7d0e5b5fcbd82f0c4e0de9d819d76e6b4c842bd5067109",
       "mode": "100644"
     },
     "theme/mdbook/favicon.svg": {
@@ -459,12 +463,16 @@
       "sha256": "7fd4bf81b8269d759ef6e43ca4ffb4686f5c2c247c7a8b8233c888825372eafd",
       "mode": "100644"
     },
+    "theme/typst/academic.typ": {
+      "sha256": "e8bc3d680e80db7d084b6249708dbf04c2950ce380c4dfb8455d57362878122d",
+      "mode": "100644"
+    },
     "theme/typst/book.typ": {
-      "sha256": "1fd68723d1cc4b6f20e358d1e1293dcefb3038c436226f6f08429156c74c4301",
+      "sha256": "48e6ca6add21563a8ffe7a4a71f230b5df5e2d891269fdd20699b82e7c9e74b0",
       "mode": "100644"
     },
     "theme/typst/cover.typ": {
-      "sha256": "1580ef5246b4b632849f0e3da74ed6d02333e9e4af4117af02e55c9b089f47c9",
+      "sha256": "f147d8a509b09ec77d930f623ee6dab1196581c42c0f75052a33ae816aa4b394",
       "mode": "100644"
     },
     "theme/typst/fonts.sha256": {
@@ -640,7 +648,7 @@
       "mode": "100644"
     },
     "tools/tbook/cover.py": {
-      "sha256": "97f8ab07dfa1ceb65b7b37374e48ff323848373a2d56e361bdb827c03245afd3",
+      "sha256": "f4bb1c52cb85fa736b1604718616e7e868278a8c7d353870d31cabcd1b17223e",
       "mode": "100644"
     },
     "tools/tbook/doctor.py": {
@@ -692,7 +700,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "ae326ded387783c1b3fd86bb44dea02b4ab0d0540ce4e29d1c7594bcebac956e",
+      "sha256": "ffe5bb9742c1b33a2cee990348d13e574eae390bb8a3bbee0675fca067d07f9f",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -808,7 +816,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "d67633740735f096c446481bb160ffbf0062563add381b5e2e177c7a225e721d",
+      "sha256": "9aced0c193101d0ff3513b81b99dc1a2f00de22655b10ca4a8ddf32d7fe03b4f",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {
@@ -824,7 +832,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "2527e6f3606e0c95a4e0bd96d4f75ae6c4153d4311950771480253791ddb9c0b",
+      "sha256": "4965909fbd27da0e4e146c21101fc9808ed0cf0df5499007ba39a8003eff408c",
       "mode": "100644"
     },
     "tools/tests/test_slides.py": {

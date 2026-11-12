@@ -310,7 +310,7 @@ class SiteBuildTest(SiteCase):
         for rel, prefix in (("index.html", "test-book/"), ("test-book/index.html", "")):
             page = (out / rel).read_text()
             self.assertIn(f'href="{prefix}downloads/{name}"', page)
-            self.assertIn("PDF · 论文版", page)
+            self.assertIn("PDF · 学术版", page)
             self.assertIn("PDF · academic", page)
         manifest = json.loads((out / "manifest.json").read_text())
         record = next(f for f in manifest["books"][0]["files"] if f["path"].endswith(name))

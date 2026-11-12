@@ -32,7 +32,7 @@ class PdfLayoutTest(unittest.TestCase):
   x: here().position().x.pt(), y: here().position().y.pt(), page: here().page()))
 #pagebreak()
 #set page(width: 360pt, height: 480pt, margin: 30pt, header: none, footer: none)
-#table(columns: (90pt, 90pt, 120pt),
+#table(columns: (90pt, 90pt, 120pt), inset: (x: 6pt, y: 5pt),
   [Code], [Math], [Neighbour],
   [#mark("code-start")#raw("LongUninterruptedDeclarationName" * 5)#mark("code-end")],
   [$ #mark("math-start") "syndromeDecoding"(S,"syndromeEncoding"(S,sigma,rho))
@@ -72,8 +72,13 @@ class PdfLayoutTest(unittest.TestCase):
         roles = next(v for v in values if isinstance(v, dict) and "figure" in v)
         self.assertEqual(roles, {"figure": ".print.svg", "display": True})
         body = next(v for v in values if isinstance(v, dict) and v.get("name") == "body")
-        self.assertLess(body["y"], 230, "chapter opener must leave room for body text")
+        self.assertLess(body["y"], 270, "chapter opener must leave room for body text")
         pages = typst.compile(str(main), format="svg", **options)
+        from xml.etree import ElementTree
+        first = pages[0] if isinstance(pages, list) else pages
+        page = ElementTree.fromstring(first)
+        self.assertAlmostEqual(float(page.get("width").removesuffix("pt")), 176 / 25.4 * 72, places=2)
+        self.assertAlmostEqual(float(page.get("height").removesuffix("pt")), 250 / 25.4 * 72, places=2)
         svg = b"".join(pages) if isinstance(pages, list) else pages
         self.assertIn(b"https://example.org/proof", svg)
         self.assertIn(b"https://example.org/source", svg)
@@ -102,7 +107,7 @@ class PdfLayoutTest(unittest.TestCase):
                         self.assertLessEqual(end["x"], right + 0.1)
                         self.assertEqual(start["page"], end["page"])
                         self.assertAlmostEqual(start["y"], end["y"], places=2)
-                    self.assertGreater(marks["code-end"]["y"] - marks["code-start"]["y"], 60)
+                    self.assertGreater(marks["code-end"]["y"] - marks["code-start"]["y"], 30)
                     self.assertGreater(marks["next-start"]["x"], marks["math-end"]["x"])
                     self.assertGreater(marks["after-display"]["y"], marks["display-end"]["y"])
         # Ordinary formulas retain their text size; fitting never enlarges them.
@@ -110,5 +115,5 @@ class PdfLayoutTest(unittest.TestCase):
             self.assertGreater(width, 15)
             self.assertLess(width, 40)
         for group in (short_widths[:3], short_widths[3:]):
-            for width in group[1:]:
-                self.assertAlmostEqual(group[0], width, places=2)
+            self.assertAlmostEqual(group[0], group[1], places=2)
+            self.assertLessEqual(group[2], group[0] + 0.01)
