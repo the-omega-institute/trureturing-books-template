@@ -80,4 +80,4 @@ npx slidev books/<book>/slides/<deck>/slides.md                  # 本地预览�
 
 运行 `./tbook check`、工具单元测试与 `./tbook build slides --book <book>`。Tectonic 0.16.9 同时构建 `<deck>-<lang>.pdf` 和 `<deck>-<lang>-notes.pdf`。查看渲染后的标题页、提纲、定理、媒体与账本页，确认听众版隐藏备注，并比较两次无缓存构建是否逐字节相同。站点索引、章节卡片与书籍 Release 均链接两种 PDF。演示稿可把获得相应授权的自有主题放在 `theme_dir`；不得把 GPL 主题文件或机构图形纳入 Apache 模板。
 
-学术报告默认使用原创主题的实色条带、白字块标题与纸面浅色块正文。填写 `short_author`、`institution`、可选的 `coauthors` 与 `date`；原创标题页在合作者前显示“Joint work with …”。导航按钮默认隐藏，设 `navigation_symbols = true` 才显示。纸面可视化静态图为 3200 × 1800 像素，占满幻灯片正文宽度。验证账本按结果、GID、状态三列排版，每帧最多十二条结果，页底标出所钉源码。构建后按 4:3 实际查看标题、提纲、定理、开放问题、静态图与账本页。
+学术报告默认使用原创主题的实色条带、白字块标题与纸面浅色块正文。填写 `short_author`、`institution`、可选的 `coauthors` 与 `date`；原创标题页在合作者前显示“Joint work with …”。导航按钮默认隐藏，设 `navigation_symbols = true` 才显示。纸面可视化静态图为 3200 × 1800 像素，占满幻灯片正文宽度。验证账本按结果、来源（Lean / DOI / 请求）、状态三列排版，每帧最多十二条结果，页底标出所钉源码。构建后按 4:3 实际查看标题、提纲、定理、开放问题、静态图与账本页。
