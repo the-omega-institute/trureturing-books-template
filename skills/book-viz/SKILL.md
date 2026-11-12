@@ -33,7 +33,7 @@ description: 为书做交互可视化时使用：先定这张图要让读者看�
 
 - **一句话**：读者看完能复述的结论，不带术语。它就是页面顶栏的 tagline。
 - **3–8 张实验卡**：每张是一个有名字的情形，写清四件事：状态（参数取什么）、读者会看到什么、一句解释、正文哪一处会引用它。写不出“正文哪一处”的卡通常不该存在。
-- **依据清单**：哪几条是锁文件里的定理（`LEAN ✓`），哪些是页面的数值（`NUM`）、示意模型（`MODEL`）、文献结果（`ARGUED`）、开放问题（`OPEN`）。
+- **依据清单**：哪几条是正文引用过的定理（`LEAN ✓`），哪几条是已冻结但正文未以定理环境引用的定理（`FROZEN`），哪些是页面的数值（`NUM`）、示意模型（`MODEL`）、文献结果（`ARGUED`）、开放问题（`OPEN`）。
 
 如果一个主题需要两个以上互不相同的对象，分成场景（同一页的几个舞台，共用一条时间轴），每个场景仍然回答同一个问题。
 
@@ -104,9 +104,10 @@ const h = sc.hit(ev);                            // { id, u, v, point, normal, f
 
 `<div class="app lab">`（`theme.css`）给出：左栏实验卡与控制、中间舞台（下面可有一条 `.strip` 小图）、右栏读数与依据、底部时间轴。它在窄屏和书内 iframe 里自动把舞台放到最前。在这个版式里：
 
-- **舞台**占视口的三成以上（质量门会量）。舞台上只留图形、短标签（`st.tag`）、左上角一行标题一行说明（`.hud-tl`）和底边图例（`.hud-bl`）。标题与场景按钮同在一行，手机上只剩两百像素：标题写“场景 · 关键量”，解释放进下一行说明。
+- **舞台**占视口的三成以上（质量门会量）。舞台上只留图形、短标签（`st.tag`）、左上角一行标题一行说明（`.hud-tl`）和底边图例（`.hud-bl`）。标题写“场景 · 关键量”，解释放进下一行说明。标题块与右上角的场景按钮（`.hud-tr`）一旦会相碰（手机、书内窄框、按钮多），`shell.js` 给舞台加 `.hud-stack`，标题块自动排到按钮下面（`--hud-tr-bottom` 是按钮的下沿）；不相碰时位置不变，宽屏画面照旧。不要再给 `.hud-tl` 手写 `top`。
 - **实验卡**（`.presets.cards` 里的 `button.preset[data-preset]`）：`.code` 是英文代号，`.cn` 是一句人话。点一张卡，舞台应当动起来（`kit.tween` 过渡），而不是硬切。
-- **条带小图**回答“沿时间轴，什么在变、什么不变”。一到两张，每张一个问题，标题就是那个问题。面板标题与小图标题按大写排版，单个字母的变量写进去会变样（u、m、φ 变成 U、M、Φ）：标题用词，变量留给坐标轴与说明。
+- **条带小图**回答“沿时间轴，什么在变、什么不变”。一到两张，每张一个问题，标题就是那个问题。
+- **大写只给词。** 舞台标签（`.tag`）、面板与小图标题、卡片代号、按钮按大写排版，但希腊字母与单个字母的变量照原样显示：`shell.js` 的 `TRV.keepCase` 把它们包进 `<span class="keepcase">`（页面加载时整页处理一次，之后页面写入的文字自动处理，`st.tag` / `sc.tag` 写标签时也会调用），δ 不会变成 Δ，u、m、φ 不会变成 U、M、Φ。两个以上拉丁字母的词照样大写；`it's` 这样带撇号的词算一个词，夹在两个词之间的 a 当冠词照样大写（“IN A STRAIGHT LINE”）。不必再逐个加 `raw`；已经写成大写希腊字母的（Δ、Φ）不受影响。质量门对仍被排成大写的小写希腊字母给警告。
 - **读数**不超过六项，外加一行放大的关键读数（`dl.ro .key`），用读者的话写标签（“线² + 面积²”，而不是变量名）。
 - **依据**就近：紧挨着它所担保的读数放一个 `LEAN ✓` 框，其余放在依据面板和理论抽屉里。
 - **时间轴**（`footer.rail` + `kit.clock`）只驱动一个量：步数、角度、时间。
@@ -131,8 +132,13 @@ const h = sc.hit(ev);                            // { id, u, v, point, normal, f
 
 ### 4. 诚实标注
 
-- `LEAN ✓`（`.lean`，绿色）只给锁文件里种类为 `theorem` 的声明，链接写 `data-lean-gid`。陈述与 Lean 一致，不夸大。
-- 页面算出的数标 `NUM`（`.lean.num`）；为画面选定的模型与本书的诠释标 `MODEL`（`.lean.model`）；有纸面证明但未在本书形式化的结论标 `ARGUED`（`.lean.argued`），正文写明“文献结果，未在本书形式化”；开放问题标 `OPEN`（`.lean.open`）。不自创别的类名。
+- `LEAN ✓`（`.lean`，绿色）只给正文用 `lean=` 引用过的定理（锁文件里种类为 `theorem` 的声明），链接写 `data-lean-gid`，并列进登记表的 `lean`。陈述与 Lean 一致，不夸大。
+- trureturing 中已冻结、但正文没有用定理环境引用的定理标 `FROZEN`（`.lean.frozen`，中性的墨色，不用绿色）。链接同样写 `<a data-lean-gid="<GID>">`，GID 必须是锁文件里的 `theorem`（`./tbook pin --refresh` 会把页面里的 GID 解析进锁文件），但**不**列进登记表的 `lean`（那是页面的 `LEAN ✓` 清单）。正文若用定理环境引用了它，就改成绿色框：`./tbook check` 对这种 `FROZEN` 框给警告。
+
+  ```html
+  <div class="lean frozen"><span class="ok">FROZEN</span><span><span class="zh">陈述，与 Lean 一致。trureturing 中已冻结，正文未以定理环境引用：</span><span class="en">The statement, as in Lean. Frozen in trureturing, not cited by a theorem environment of the text: </span><a data-lean-gid="<GID>" href="#" target="_blank" rel="noopener"><code>name</code></a></span></div>
+  ```
+- 页面算出的数标 `NUM`（`.lean.num`）；为画面选定的模型与本书的诠释标 `MODEL`（`.lean.model`）；有纸面证明但未在本书形式化的结论标 `ARGUED`（`.lean.argued`），正文写明“文献结果，未在本书形式化”；开放问题标 `OPEN`（`.lean.open`）。不自创别的类名：`viz-validate` 与 `./tbook check` 对 `.lean` 框上这六种之外的类名给警告，对没有 `data-lean-gid` 链接的 `.lean.frozen` 框也给警告。
 - 页面上的每个数都是真算出来的。几个事实并排展示时，说明它们是不同的事实，页面不声称其中一个推出另一个。
 - 页面只为自己算出的数负责。章节转述的新近文献（预印本、尚无定论的结果）在页面上只作为该章的转述出现，为它画的曲线标 `MODEL`，不替它背书；正文里的修辞（“永远无法”“必然”）进入页面之前先核对它在所画的例子里是否成立，不成立就只写图里成立的那一半。
 - 绿色只给 Lean 已验证；琥珀色只给“现在/当前选择”；颜色只来自令牌（`var(--cyan)`、`TRV.palette`），不写十六进制色值。
@@ -147,7 +153,11 @@ const h = sc.hit(ev);                            // { id, u, v, point, normal, f
 ```bash
 node tools/node/viz-shots.mjs <book> <id>                 # 桌面、书内、手机、封面，中英各一，写到 build/viz-shots/
 node tools/node/viz-shots.mjs <book> <id> --views desk --do "document.querySelector('[data-preset=x]').click()" --name x
+node tools/node/viz-shots.mjs <book> <id> --views embed --width 390 --preset x   # 窄宽度下书里引用卡 x 的那张图：<id>-embed-390-<语言>-x.png
+node tools/node/viz-shots.mjs <book> <id> --views phone,desk --width 360 --height 700 --plan   # 只列出要拍的画面，不开浏览器
 ```
+
+`--width`（可选 `--height`）改桌面、书内、手机三种画面的视口（封面固定 1280×720），文件名带上宽度；`--preset <卡>` 让页面开在那张卡上（与 `embed` 组合就是章节里 `::: {.viz src=… preset=…}` 显示的那张图），文件名带上卡名。不带这些参数时与原来完全一样。
 
 打开每一张，逐条问：
 
@@ -201,15 +211,17 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | 用途 | 调用 |
 | --- | --- |
 | 重绘 | `const paint = kit.painter(draw, [要监听尺寸的元素])`；`paint()` 请求一帧，`kit.flush()` 走完进行中的过渡并立即重绘（测试用） |
-| 三维舞台（二维画布上） | `const st = kit.stage3(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `st.begin()` … `st.sphere()`、`st.arc(u, v)`、`st.arrow(a, b)`、`st.path(pts)`、`st.poly(pts)`、`st.dot(p)`、`st.circle(c, n, r)`、`st.tag(key, p, html, cls)` … `st.end()`；`st.pick(ev)` 取指针下的球面点，`st.view('iso' \| 'front' \| 'top')` |
+| 三维舞台（二维画布上） | `const st = kit.stage3(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `st.begin()` … `st.sphere()`、`st.arc(u, v)`、`st.arrow(a, b)`、`st.path(pts)`、`st.poly(pts)`、`st.dot(p)`、`st.circle(c, n, r)`、`st.tag(key, p, html, cls)` … `st.end()`；`st.pick(ev)` 取指针下的球面点，`st.view('iso' \| 'front' \| 'top')`。虚线 `{ dash: [on, off] }`（像素）沿整条投影后的路径连续，采样疏密画出来一样，不必自己按弧长切段 |
 | 受光的实体（three.js，首次调用才加载） | `const sc = kit.solid(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `sc.begin()` … `sc.surface(key, f, s)`、`sc.glass(key, c, r)`、`sc.poly(key, { vertices, faces })`、`sc.tube(key, pts)`、`sc.line(pts)`、`sc.arrow(a, b)`、`sc.ring(p)`、`sc.bead(p)`、`sc.fan(pts)`、`sc.tag(…)` … `sc.end()`；`sc.hit(ev)`、`sc.nearest(ev, pts, px)`、`sc.occluded(p)`、`sc.view(…)`；`kit.ready()` |
-| 二维舞台与小图 | `const g = kit.plot(canvas, { x, y, pad, equal, logY })`；`g.axes()`、`g.line()`、`g.area()`、`g.rect()`、`g.poly()`、`g.dot()`、`g.vline()`、`g.hline()`、`g.text()`、`g.legend()`（文字可写 `_{…}`、`^{…}` 或片段数组）；`g.invX/invY` 把指针换回数据坐标 |
+| 二维舞台与小图 | `const g = kit.plot(canvas, { x, y, pad, equal, logY })`；`g.axes()`、`g.line()`、`g.area()`、`g.rect()`、`g.poly()`、`g.dot()`、`g.arrow([x0, y0], [x1, y1], { color, width, dash, head, headSize, glow, alpha })`（数据坐标，用法同 `st.arrow`）、`g.vline()`、`g.hline()`、`g.text()`、`g.legend()`（文字可写 `_{…}`、`^{…}` 或片段数组）；`g.invX/invY` 把指针换回数据坐标 |
 | 同一页既有二维又有三维场景 | 共用一块画布和一个 `kit.stage3`：二维场景里先 `st.begin(); st.end();` 再 `kit.plot(canvas, …)`；`onPick` 在二维场景返回 `true` 接管拖动（否则拖动会悄悄转动相机），并随场景切换舞台的 `still` 类 |
 | 时间轴 | `kit.clock({ range, play, label, speeds, max, rate, step, format, onChange })` → `set`、`setMax`、`play`、`pause`、`stepBy`；键盘 Space / ← → / Home / End 已绑定（用指针点过卡或 `kit.chips` 的按钮后焦点在舞台上，空格即播放）。`format(t, max)` 在构造时就被调用一次：只用这两个参数与页面状态，不引用时钟变量本身 |
 | 实验卡与导览条 | `kit.cards(el, { presets, notes, noteEl, tour, idle, onPick })` → `pick`、`mark(null)`（读者动了控件）、`initial(默认卡)`、`step(±1)`、`still(id)`（声明的停帧）；`presets` 是页面的卡片表，其中的 `still` 写到卡上的 `data-still` |
 | 进入视野才播放 | `kit.autoplay(clock, stageEl)` |
 | 过渡 | `kit.tween(ms, step, done)`（尊重 `prefers-reduced-motion`） |
 | 其余 | `kit.chips`（互斥按钮组）、`kit.field`（滑块与读数）、`kit.keys`（快捷键）、`kit.v3`（向量、`rot`、`slerp`、`sph`）、`kit.fix` / `kit.sgn`（不出现 `-0.00` 的数字） |
+
+图例色块（`.hud-bl` 里的 `<i class="sw …">`）：`cy` 青、`mg` 品红、`am` 琥珀、`ok` 绿、`vi` 紫、`dm` 暗、`wn` 红、`ik` 正文墨色；加 `box` 是方块。
 
 运行时状态（`shell.js`）：`TRV.embed`（书内）、`TRV.preset`（被引用的卡）、`TRV.figure`（书内且被引用）、`TRV.thumbMode`（无字封面）、`TRV.shot`（带标签静态图）、`TRV.still`（后两者之一：不播放，直接显示关键帧）。
 
@@ -244,8 +256,11 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | 警告 `.okmark (a green ✓) at … is outside a .lean box` | 页面自己核对的数改用 `.nummark`；真是 Lean 定理担保的读数，把它放进带 `data-lean-gid` 链接的 `.lean` 框 |
 | `LEAN ✓` 链接 404 或 GID 未登记 | `./tbook pin --refresh`；GID 必须是已冻结的 `theorem`，定义写成 `data-trureturing-path` |
 | 手机宽度横向滚动 | 网格列用 `minmax(0, 1fr)`，长数字允许换行 |
-| 手机上舞台标题被场景按钮压住 | 标题太长；只写“场景 · 关键量” |
-| 标题里的 φ、u 变成了 Φ、U | 标题按大写排版；变量不写进标题 |
+| 手机上舞台标题被场景按钮压住 | 运行时会把标题块排到按钮下面；页面自己给 `.hud-tl` 写的 `top` 会盖过这一点，删掉它。标题仍应短：“场景 · 关键量” |
+| 标题或标签里的 φ、u 变成了 Φ、U | 运行时保留希腊字母与单字母变量；仍变样时是页面的样式盖过了 `.keepcase`，或文字画在画布上（画布文字不做大写） |
+| 测试警告 `capitals: lowercase Greek letters are set in capitals` | 同上：找出页面里重设 `text-transform` 的样式 |
+| 警告 `a .lean.frozen box (FROZEN) names the theorem …` | 给 `FROZEN` 框加上 `<a data-lean-gid="<GID>">`，再 `./tbook pin --refresh` |
+| 警告 `… is in a .lean.frozen box but a theorem environment of the text cites it` | 正文已引用这条定理：换成绿色 `.lean` 框，并列进登记表的 `lean` |
 | `Cannot access '…' before initialization`，页面一片空白 | `kit.clock` 的 `format` 在构造时被调用，里面引用了尚未赋值的时钟变量 |
 | 书里的图内部出现滚动条 | 被引用的图（带 `preset`）不应滚动；检查是否有固定高度的元素撑破了舞台 |
 | 测试本地通过，CI 上偶尔有几条失败 | 多半是为过渡或播放等了固定时间；用 `node tools/node/viz-test.mjs <book> --slow`（即 `VIZ_SLOW_FRAMES=1000`）在本地复现，过渡改成 `settle(page)`，播放改成 `until(page, …)` 等状态本身 |

@@ -76,8 +76,18 @@ When the object itself is a surface or a body and a lit solid makes it clearer, 
   <div class="lean"><span class="ok">LEAN ✓</span><span><span class="zh">陈述，与 Lean 一致。已冻结：</span><span class="en">The statement, as in Lean. Frozen: </span><a class="leanref" data-lean-gid="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" href="https://github.com/the-omega-institute/trureturing/blob/dev/D5/S1/Deficit/DeficitThreeValued.lean" target="_blank" rel="noopener"><code>deficit_three_valued</code></a></span></div>
   ```
 
-  只有 Lean 已验证的定理用绿色 `LEAN ✓`；页面计算用 `.lean.num`（NUM）；示意模型与诠释 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。
-- 颜色只来自令牌：CSS 用 `var(--cyan)` 等（映射到 `--tr-*`），脚本用 `TRV.palette` / `TRV.rgb`。琥珀色只给“现在/当前选择”。
+  绿色 `LEAN ✓` 只给正文用 `lean=` 引用过的定理（列进登记表的 `lean`）。trureturing 中已冻结、但正文没有用定理环境引用的定理用中性的 `.lean.frozen`（FROZEN），链接同样写 `data-lean-gid`（必须是锁文件里的 `theorem`，`./tbook pin --refresh` 会解析它），不列进登记表的 `lean`：
+
+  ```html
+  <div class="lean frozen"><span class="ok">FROZEN</span><span><span class="zh">陈述，与 Lean 一致。trureturing 中已冻结，正文未以定理环境引用：</span><span class="en">The statement, as in Lean. Frozen in trureturing, not cited by a theorem environment of the text: </span><a data-lean-gid="<GID>" href="#" target="_blank" rel="noopener"><code>name</code></a></span></div>
+  ```
+
+  页面计算用 `.lean.num`（NUM）；示意模型与诠释 `.lean.model`（MODEL）；文献结果 `.lean.argued`（ARGUED）；开放问题 `.lean.open`（OPEN）。别的类名、没有链接的 FROZEN 框、正文已引用却放在 FROZEN 框里的定理，检查都会警告。
+
+  Green `LEAN ✓` is for the theorems the book's text cites with `lean=` (listed under `lean` in the registry). A theorem frozen in trureturing that no theorem environment of the text cites goes in a neutral `.lean.frozen` box (`FROZEN`), linked the same way with `data-lean-gid` (a theorem of the lock) and not listed under `lean`.
+- 颜色只来自令牌：CSS 用 `var(--cyan)` 等（映射到 `--tr-*`），脚本用 `TRV.palette` / `TRV.rgb`。琥珀色只给“现在/当前选择”。图例色块 `<i class="sw cy|mg|am|ok|vi|dm|wn|ik">`，`ik` 是正文墨色。
+- 大写排版（舞台标签、标题、卡片代号、按钮）只作用于词：希腊字母与单个字母的变量由 `shell.js`（`TRV.keepCase`）保留原样，不必逐个加 `raw`。Text set in capitals keeps its Greek letters and one-letter variables as written (`TRV.keepCase` in `shell.js`).
+- 舞台左上的标题块（`.hud-tl`）与右上的场景按钮（`.hud-tr`）相碰时（窄屏、书内窄框），运行时把标题块排到按钮下面；不要自己给 `.hud-tl` 写 `top`。
 - 运行模式（`shell.js` 按网址设置，页面不必自己解析）：
 
   | 网址 | 含义 | 页面看到的 |
@@ -112,6 +122,7 @@ With `preset` the chapter shows one card as a figure that does not scroll inside
 ```bash
 node tools/node/viz-server.mjs                 # local preview at http://127.0.0.1:8766/site/<book>/viz/
 node tools/node/viz-shots.mjs <book> <id>      # review screenshots (desktop, in-book frame, phone, cover) → build/viz-shots/
+node tools/node/viz-shots.mjs <book> <id> --views embed --width 390 --preset <card>   # a cited card in a 390px frame → <id>-embed-390-<lang>-<card>.png
 node tools/node/viz-validate.mjs [book]        # registry + page contract + links + JS syntax
 node tools/node/viz-test.mjs [book] [--shard i/n] [--slow]   # browser suites books/*/viz/tests/*.test.mjs (--slow: a frame a second)
 node tools/node/viz-thumbs.mjs <book> [id …]   # thumb.jpg and the stills fig-<card>.<lang>.jpg of cited cards (honours PW_CHROMIUM_PATH)
