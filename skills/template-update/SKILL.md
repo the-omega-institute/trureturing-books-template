@@ -32,6 +32,18 @@ description: 升级或完善书库模板本身时使用：把下游书库更新�
 
 `template-sync` 工作流每周自动执行 1–4 步并开 PR；合并前仍需完成 4–6 步中的人工部分（冲突、迁移检查、构建核对）。
 
+## 模板层
+
+`template.d/<name>.toml` 与 `<name>.manifest.json` 定义独立来源、版本及托管范围。
+先读 `docs/UPGRADING.md` 的“模板层”节。无 `--layer` 的 status/update 检查/升级上游及所有层；
+使用 `--source` 或 `--to` 时明确 `--layer upstream|<name>`。
+新层用 `./tbook template install <name> --source <路径或 git URL> --dry-run` 预览，再去掉
+`--dry-run`。层源码改完运行 `./tbook template manifest --layer <name>`，不要在消费者重置基准。
+每层沿用 A 的冲突、历史删除与发布选择规则；看自己的 `build/template-update-<name>.md`，
+变更记录和迁移在 `docs/layer-<name>/`。周更工作流分来源开 PR，不应将层变更回馈给上游。
+层只能认领自己的保留前缀或其他未认领路径，不能接管上游、其他层或书库自有文件；
+`--force` 也不能越界。层不应覆盖 CLI、共享运行时或输出契约。
+
 ## B/C. 回馈改进到模板仓库
 
 不要在书库里长期保留对托管文件的修改——下次升级会产生冲突，其他书库也得不到改进。

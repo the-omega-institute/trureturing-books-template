@@ -33,6 +33,7 @@ paths = [
 ]
 # 下游所有、模板更新永不触碰的路径（仅作说明，并由 `./tbook template status` 展示）。
 owned = [
+  "template.d/",
   "site.toml",
   "trureturing.lock.json",
   "books/",
@@ -45,6 +46,10 @@ owned = [
 exclude = [
   # 下游自己的 skill 放在 skills/local-<name>/（前缀匹配），模板更新不会触碰。
   "skills/local-",
+  # 为模板层预留的命名空间；每层只拥有与其名称对应的前缀。
+  "docs/layer-",
+  "skills/layer-",
+  ".github/workflows/layer-",
   # 下游自己的文档放在 docs/project/。
   "docs/project/",
 ]
