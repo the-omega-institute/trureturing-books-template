@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "c733ab885b120db5120b575ccc8994ef2288b8b0b8747f5698fec4515e0e506a",
+      "sha256": "5b984a4b2d588050a9c8f23c436684a2528b82e933e81f9f6f9f134035301aac",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -464,7 +464,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "a80dc8de34e3517c8d5adab0606d2dd31ca3e714a76488ec4d45b9621d6dac27",
+      "sha256": "28938d3d0c0d15c17f0d370e14f1630933ae5c7b61d592a82377ca6404024c15",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -852,7 +852,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "1ec06523f1b0cc5c0cfedd44a2d0a7d61709b5826039a2d6cdd32000485cee9c",
+      "sha256": "917140bdd01a09a883034475af3f75f509dabcbb09d93d9b75ae40e05204044c",
       "mode": "100644"
     }
   }

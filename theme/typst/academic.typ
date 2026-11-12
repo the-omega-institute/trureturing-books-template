@@ -317,7 +317,7 @@
     set text(size: if it.level == 1 { 10pt } else { 9pt }, weight: if it.level == 1 { "bold" } else { "regular" })
     let target = it.element.location()
     block(above: if it.level == 1 { 0.8em } else { 0pt }, below: 0.3em,
-      link(target, it.indented(it.prefix(), [#it.body()#h(0.5em)#box(width: 1fr, it.fill)#h(0.5em)#page-label-at(target)])))
+      link(target, it.indented(it.prefix(), [#it.body() #box(width: 1fr, it.fill) #sym.wj#box(page-label-at(target))])))
   }
 
   title-page()

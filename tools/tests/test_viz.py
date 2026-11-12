@@ -74,14 +74,18 @@ def fake_book(root: Path, slug: str = "tbook-viz-fixture"):
 
 
 def copy_golden_carry(book) -> None:
-    """Copy the example visualization (page, thumbnail, test, registry) into ``book``."""
+    """Copy the example page and registry, with an independent validation-only suite."""
     src = EXAMPLE / "viz"
     for lang in ("zh", "en"):  # the drawer links to chapter 1 of each edition
         (book.dir / lang).mkdir(exist_ok=True)
         (book.dir / lang / "ch01-golden-deficit.md").write_text("# 1\n", encoding="utf-8")
     shutil.copytree(src / "golden-carry", book.viz_dir / "golden-carry")
     (book.viz_dir / "tests").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src / "tests" / "golden-carry.test.mjs", book.viz_dir / "tests" / "golden-carry.test.mjs")
+    # Downstream example books are not managed and may retain an older browser
+    # suite. Registry fixtures do not execute it; browser behaviour is checked
+    # separately by viz-test.mjs against the real book.
+    (book.viz_dir / "tests" / "golden-carry.test.mjs").write_text(
+        "// Registry fixture: browser behaviour is checked separately.\nexport {};\n", encoding="utf-8")
     reg = json.loads((src / "visualizations.json").read_text(encoding="utf-8"))
     # the chapter link of the example points into its own editions; keep the fixture self-contained
     for ref in reg["visualizations"][0]["theory"]:

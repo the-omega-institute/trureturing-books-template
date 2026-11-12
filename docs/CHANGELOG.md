@@ -21,6 +21,7 @@
 
 ### 修复
 
+- 可视化注册表单元测试采用独立的测试套件样本，避免下游保留旧版示例书时，示例中的固定等待让模板升级后的工具测试失败；实际书籍的浏览器测试与检查继续覆盖原始套件。
 - 可视化：用指针点过实验卡、场景按钮（`kit.chips`）或导览条之后，空格键直接播放或暂停时钟，不再把那张卡重新按一遍（回到起点重播）。`theme/viz/kit.js` 在指针点击（`detail > 0`）后把焦点交给舞台（`.stage` 加 `tabindex="-1"`，按键时不画焦点框）；用 Tab 走到按钮上的读者，空格与回车仍由按钮响应。`stageFirstChecks` 新增 `keyboard: after a card is clicked, Space plays and pauses the clock`（没有 `footer.rail #play`、或没有一张卡能启用它的页面跳过；页面另有空格用法时传 `{ keys: false }`；也单独导出为 `spaceAfterCard(T, page)`），示例 `golden-carry` 补浏览器回归测试，单元测试在起始模板的副本上核对通过、失败（点击后焦点仍留在卡上）与跳过三种情形。来源：下游《量子计算的几何直觉》核查（trureturing-books#147），#36。
 
 ## [0.5.2] - 2026-11-12
