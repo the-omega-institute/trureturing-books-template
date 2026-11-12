@@ -118,6 +118,8 @@ def visible_page() -> tuple[str, str] | None:
     A books repository hides the example books (site.toml [books].hide) and viz-shots.mjs refuses a hidden book, so
     the tests of its plan name no book: they run on whichever page is visible first.
     """
+    if not paths.BOOKS.is_dir():   # a repository with no book at all
+        return None
     hidden = set(config.hidden_books())
     for book in sorted(d for d in paths.BOOKS.iterdir() if (d / "book.toml").is_file() and d.name not in hidden):
         registry = book / "viz" / "visualizations.json"
