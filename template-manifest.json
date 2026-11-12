@@ -68,11 +68,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "9e1d9ce76e75363c4317615793ca00cec07b3cd2d68a3c48dd6dcc6ea2299a1e",
+      "sha256": "04636f901b8716eb7136e036b6a017883e368eb3f4a7ee70bd3ddb4d2d93b206",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "352e22b9c7ec1fcc5705d2fe781d9432eedbbae9978cdff858ddd8e48019190c",
+      "sha256": "0e230062835f92a5ba9400d90532ed683db15cc2b93ec6ea0c8be96f31783d34",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -80,11 +80,11 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "8b3f2559c12be3bafe61fff897f691ce4d5ea6b3872c3f322e6fc80024dae182",
+      "sha256": "6a25d97d5187c10da53fcd3d95d370df61d7064a6ada9528857eccb9be4ec4e7",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "b9b26d37a9e7e99b93ce2223a4c6ad53c1f236b0341a7ae5077f16c8e893db63",
+      "sha256": "532a7dcc9a4e366d838280b6882dd75e9636cc08c0c80bfdaaa0abb8141287ec",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
-      "sha256": "bd6b4e2bbcb1ccd8a4e2e0a482565823c26e385ef02ec755d739b3f63b7bdb4f",
+      "sha256": "03385a430e52b626a1417ebfe2f307ae80ea6d0eca72e63b4260b1cc3dbd8fe7",
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
@@ -160,7 +160,7 @@
       "mode": "100644"
     },
     "templates/book/book.toml": {
-      "sha256": "f679d561f82146d5f755847548689620ed99dd1a1def7304b9650252b27606d8",
+      "sha256": "148e2cb565a43bf6dbe0ca546ce9a7e078cd64c2aebc632d32c17195aa25ca13",
       "mode": "100644"
     },
     "templates/book/en/README.md": {
@@ -464,7 +464,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "e8bc3d680e80db7d084b6249708dbf04c2950ce380c4dfb8455d57362878122d",
+      "sha256": "3849823aee33ec5e392ab5a7361811ebf918bd37c95166535e6c8ac86c598d07",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -816,7 +816,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "9aced0c193101d0ff3513b81b99dc1a2f00de22655b10ca4a8ddf32d7fe03b4f",
+      "sha256": "b10630804250a7d077481ed421ea6abe538119afa1e6ac9c293418bb31de46e2",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {

@@ -61,14 +61,17 @@ class PdfLayoutTest(unittest.TestCase):
 #show: tr-book
 #metadata((figure: tr-fig-ext, display: f-display == f-body))
 #tr-chapter(id: "chapter", kicker: "1", title: [A chapter])
-#tr-env(status: "lean", ref: "Theorem 1", badge: "LEAN ✓", badge-url: "https://example.org/proof",
-  lean: ((name: "Test.theorem", url: "https://example.org/source"),))[A verified statement.]
+#tr-env(kind: "theorem", status: "lean", ref: "Theorem 1", badge: "LEAN ✓", badge-url: "https://example.org/proof",
+  lean: ((name: "Test.theorem", url: "https://example.org/source"),))[A verified statement. #context metadata((role: "theorem", style: text.style))]
+#tr-env(kind: "definition", status: "definition", ref: "Definition 2")[A definition. #context metadata((role: "definition", style: text.style))]
 #context metadata((name: "body", y: here().position().y.pt()))
 #link(<chapter>)[Back to chapter]
 ''', encoding="utf-8")
         options = dict(root=str(self.stage), font_paths=[str(p) for p in tp.font_dirs()],
                        sys_inputs={"tr-variant": "academic"})
         values = json.loads(typst.query(str(main), "metadata", field="value", **options))
+        styles = {v["role"]: v["style"] for v in values if isinstance(v, dict) and "role" in v}
+        self.assertEqual(styles, {"theorem": "italic", "definition": "normal"})
         roles = next(v for v in values if isinstance(v, dict) and "figure" in v)
         self.assertEqual(roles, {"figure": ".print.svg", "display": True})
         body = next(v for v in values if isinstance(v, dict) and v.get("name") == "body")

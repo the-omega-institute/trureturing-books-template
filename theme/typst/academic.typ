@@ -166,7 +166,7 @@
       }
     })
     {
-      if not cjk and kind in ("theorem", "lemma", "proposition", "corollary") { set text(style: "italic") }
+      set text(style: if not cjk and kind in ("theorem", "lemma", "proposition", "corollary") { "italic" } else { "normal" })
       body
     }
     if lean.len() > 0 {
