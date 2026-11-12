@@ -744,7 +744,7 @@
       "mode": "100644"
     },
     "tools/tests/test_buildcache.py": {
-      "sha256": "2caa872fc2578f87d622c3594ac2e8fb128599df38d5302ebded59bed687c592",
+      "sha256": "30aa4aec1b469ac543f03e1a319277b017a6c0bd5a874179d9b2838c4d079c6a",
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
