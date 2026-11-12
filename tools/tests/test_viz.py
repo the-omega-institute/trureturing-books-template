@@ -427,27 +427,6 @@ class TheoremCitations(unittest.TestCase):
     def kind_errors(self, issues) -> list[str]:
         return sorted(i.message for i in issues if i.severity == "error" and "not a theorem" in i.message)
 
-    def test_frozen_declarations_are_neutral_and_pinned_in_both_validators(self):
-        book = self.book_citing()
-        page = book.viz_dir / "fib-walk" / "index.html"
-        text = page.read_text().replace("</body>", f'<div class="lean frozen"><span class="ok">FROZEN</span><a data-frozen-gid="{GIDDEF}" href="#">deficit</a></div></body>')
-        page.write_text(text)
-        self.assertEqual([i.format() for i in viz.check_native(book, lock=self.lock) if i.severity == "error"], [])
-        self.assertIn(("frozen", GIDDEF), viz.pinned_refs(text))
-        self.assertIn(self.lock.source_url(GIDDEF), viz.pin_links(text, self.lock))
-        self.assertIn(GIDDEF, [g for _, _, g in viz.cited_gids(book)])
-        self.lock.save(self.tmp / "trureturing.lock.json")
-        for gid in (GIDDEF, "D5/S1/Nowhere/Missing.thing"):
-            with self.subTest(gid=gid):
-                page.write_text(text.replace(GIDDEF, gid))
-                native = [i.message for i in viz.check_native(book, lock=self.lock) if i.severity == "error"]
-                self.assertEqual(bool(native), gid != GIDDEF)
-                if NODE:
-                    r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-validate.mjs"), "--json", "--only=lean", str(book.dir)],
-                                       capture_output=True, text=True, timeout=120,
-                                       env={**os.environ, "TBOOK_ROOT": str(self.tmp)})
-                    self.assertEqual([i["message"] for i in json.loads(r.stdout) if i["severity"] == "error"], native)
-
     def test_definitions_are_refused(self):
         book = self.book_citing(GID3, GIDDEF)
         issues = viz.check_native(book, lock=self.lock)

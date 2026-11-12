@@ -102,24 +102,22 @@ export function leanShortName(lock, gid) {
 
 const TAG_RE = /<a\b[^>]*>/g;
 const ATTR = (name) => new RegExp(`\\s${name}="([^"]*)"`);
-/** Every `<a data-lean-gid="…">` / `<a data-frozen-gid="…">` / `<a data-trureturing-path="…">` of a page: [{ kind, value }]. */
+/** Every `<a data-lean-gid="…">` / `<a data-trureturing-path="…">` of a page: [{ kind, value }]. */
 export function pinnedRefs(html) {
   const out = [];
   for (const m of html.matchAll(TAG_RE)) {
     const g = ATTR('data-lean-gid').exec(m[0]);
     if (g) out.push({ kind: 'gid', value: g[1] });
-    const f = ATTR('data-frozen-gid').exec(m[0]);
-    if (f) out.push({ kind: 'frozen', value: f[1] });
     const p = ATTR('data-trureturing-path').exec(m[0]);
     if (p) out.push({ kind: 'path', value: p[1] });
   }
   return out;
 }
-/** Point `<a data-lean-gid>` / `<a data-frozen-gid>` / `<a data-trureturing-path>` links at the pinned commit (mirrors tbook.viz.pin_links). */
+/** Point `<a data-lean-gid>` / `<a data-trureturing-path>` links at the pinned commit (mirrors tbook.viz.pin_links). */
 export function pinLinks(html, lock) {
   if (!lock) return html;
   return html.replace(TAG_RE, (tag) => {
-    const g = ATTR('data-lean-gid').exec(tag) || ATTR('data-frozen-gid').exec(tag), p = ATTR('data-trureturing-path').exec(tag);
+    const g = ATTR('data-lean-gid').exec(tag), p = ATTR('data-trureturing-path').exec(tag);
     const url = g ? leanUrl(lock, g[1]) : p ? trureturingUrl(lock, p[1]) : '';
     if (!url) return tag;
     const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');

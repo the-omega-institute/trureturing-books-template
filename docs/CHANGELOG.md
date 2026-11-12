@@ -6,8 +6,6 @@
 
 ### 新增
 
-- 可视化共享运行时（#54、#57）：二维箭头、墨色图例、标签衬底、中性冻结声明链接、球面圆与逐顶点透明度；二维与实体通过 `active` / `overlay` 共存。实体质量门可指定卡，尝试两个转动方向，暂停时钟后查释放上下文；截图工具支持 `--width`、`--height`、`--preset`。技能与起始模板说明补齐新接口和上游示例地址。
-
 - 独立模板层：下游 `template.d/<name>.toml` 与清单、保留的文档/skill/工作流前缀，沿用同一升级命令、三方冲突、迁移、版本与 git 历史规则；安装前拒绝路径认领重叠及认领下游专属排除路径，独立源仓库无需上游配置即可生成层清单。每周 `template-sync` 按来源独立开 PR。来源：第二个出版模板需叠加领域规则而不分叉上游。
 - 在 Slidev 之外支持学术 Beamer 演示稿：可选书中语言版本的子集、4:3/16:9 画布、原创 Apache-2.0 白底讨论班主题及演示稿自有主题和图片。结果块、所钉提交与验证账本均从书模型和锁文件生成；TeX 引用检查处理注释、原样文本与嵌套参数。
 - 原创讨论班主题提供实色导航、标题与页脚条带，块标题为白字、块正文用 12% 浅色底，开放问题用红色，标题框有均匀阴影，可声明合作者。验证表每帧最多十二条结果，高分辨率纸面静态图占满正文宽度，导航按钮按需启用。
@@ -19,6 +17,15 @@
 - 可视化运行时：`kit.plot` 的 `g.text` 与 `g.legend` 支持下标、上标（字符串里写 `_{…}`、`^{…}`，或传片段数组 `[text, { t, sub: true }, …]`），不含这两种写法的字符串照原样画；新的中性对勾 `.nummark` 给页面自己核对过的数，绿色 `.okmark` 只留给 `.lean` 依据框；`viz-validate` 与 `./tbook check` 对 `.lean` 框之外的 `.okmark` 给警告（示例 `golden-carry` 的两处已改为 `.nummark`）。示例专著的浏览器测试覆盖这三项与图例下标。
 - 视频的实体镜头（#45）：`film.json` 写 `"solid": true` 的视频可以在场景里用 `solid(key, { x, y, w, h, yaw, pitch, zoom … })` 画受光的实体，图元与页面的 `kit.solid` 同名（`surface`、`poly`、`glass`、`tube`、`line`、`arrow`、`ring`、`bead`、`fan`），`end(a)` 同步用造型核心 `theme/viz/solid-core.js` 画到离屏 WebGL 画布再 `drawImage` 合成，字幕、标签、徽章与面板仍盖在上面；`sh.anchor(v)` 给二维标签的位置与“是否被实体挡住”。没有时钟、动画循环与随机数，像素比 1：同一时刻两次渲染逐像素相同，与之前画过的帧无关（分段并行截帧与整段相同）。只有 `"solid": true` 的视频才在 `out/solid/` 放造型核心与 three.js 并在启动前导入；不能创建 WebGL 上下文时页面启动失败并说明原因（不回退）。`theme/film/lib.js` 以 `--enable-unsafe-swiftshader` 启动 Chromium，`FILM_CHROMIUM_ARGS` 可加参数；`./tbook doctor` 报告能否画实体镜头。新增 `film.json` 的 `scripts`：书里的经典脚本（如 `viz/<id>/model.js`），内联在 `scenes.js` 之前，让页面与视频共用一处造型。示例片 001 的结尾镜头画示例页 `phase-torus` 的环面，造型移到 `books/example-monograph/viz/phase-torus/model.js`，页面与视频都加载它；旁白、字幕与时间轴不变。有实体镜头的视频的构建键加上 `theme/viz/solid-core.js`、`theme/viz/vendor/` 与 `scripts` 所列脚本。
 - `./tbook build films --film <NNN>-<name>`（可重复）：只渲染或恢复这几部视频，本书其他视频只从缓存恢复、不渲染；`build site`、`build all` 不受影响（不接受 `--film`）。
+- 实验室运行时与出图工具的七处缺口（#54）：
+  - `kit.stage3` 的虚线沿整条投影后的路径连续：`st.path`、`st.line`、`st.arc`、`st.circle` 带 `dash` 时，按前后两侧分成的每一段各用一条子路径，并把虚线相位（`lineDashOffset`）设成它之前的投影长度，采样疏密画出来一样（原先逐段描线，每段都从头起一次虚线，采样一密整条线就成了实线）。不带虚线的路径、闭合路径、背面变淡与绘制顺序不变（浏览器测试逐像素核对与原算法相同）。`kit.solid` 与视频实体镜头共用的 `solid-core.js` 本来就沿整条折线切虚线，新增回归检查。
+  - `kit.plot` 新增 `g.arrow([x0, y0], [x1, y1], { color, width, dash, head, headSize, glow, alpha })`：数据坐标，用法同 `st.arrow`。
+  - 图例色块新增正文墨色 `.sw.ik`（`var(--ink)`），写法与下游各页自带的那份相同。
+  - 舞台左上的标题块（`.hud-tl`）与右上的场景按钮（`.hud-tr`）不再互相压住：`shell.js` 量出两者的文字行与按钮是否相碰，相碰时给舞台加 `.hud-stack`，标题块排到按钮下面（`--hud-tr-bottom`）；不相碰时位置不变，所以宽屏画面照旧。在尺寸、字体、语言与标题文字变化时重算；封面与静态图（`?thumb=1`、`?shot=1`）不动。
+  - 大写只作用于词：主题仍把舞台标签、面板与小图标题、卡片代号、按钮排成大写，`shell.js` 新增 `TRV.keepCase`，把其中的希腊字母（及 µ）与单个字母的变量包进 `<span class="keepcase">`（`text-transform: none`），页面加载时整页处理一次，之后页面写入的文字由 `MutationObserver` 处理，`st.tag` / `sc.tag` 写标签时也调用（`kit.setTag`）。δ 不再显示成 Δ，u、m、φ 不再变成 U、M、Φ；两个以上拉丁字母的词照样大写，夹在两个词之间的冠词 a 也照样大写，`textContent` 不变，已写成大写希腊字母的不受影响。CSS 的 `text-transform` 不能按字符豁免，所以在写入的文字上加标记，作者不必逐个加 `raw`。质量门 `stageFirstChecks` 新增“capitals”：中英两种语言、每张卡之后，查被排成大写的小写希腊字母（`capitalGreek(page)`），给警告。
+  - 新的依据类名 `.lean.frozen`（`FROZEN`，中性的墨色）：trureturing 中已冻结、但正文没有用定理环境引用的定理。链接照样写 `data-lean-gid`（必须是锁文件里的 `theorem`，`./tbook pin --refresh` 会解析它），不列进登记表的 `lean`。`viz-validate` 与 `./tbook check` 认得它：没有 `data-lean-gid` 链接的 FROZEN 框、`.lean` 框上六种之外的类名给警告；`./tbook check` 另对正文已用定理环境引用、却放在 FROZEN 框里的 GID 给警告。浏览器质量门的依据检查把 FROZEN 框当作中性：要有 Lean 链接，不要求列进登记表。
+  - `viz-shots.mjs` 新增 `--width`（可选 `--height`）与 `--preset <卡>`：改桌面、书内、手机三种画面的视口（封面固定 1280×720），开在那张卡上，可与 `--views embed` 组合成章节里那张图的窄宽度画面；文件名带上宽度与卡名（`<id>-embed-390-zh-<卡>.png`）。`--plan` 只列出要拍的画面。不带这些参数时与原来完全一样。
+  - 下游升级后可以删掉的绕行：`pulse-area-virtual-z` 的 `dashPath`（改回 `st.path(pts, { dash })`）；`bloch-noise`、`two-angle-addressing`、`zyz-compile`、`eth-horizon-crossover` 的 `.sw.ik`；各页为躲按钮手写的 `.hud-tl { top: 46px }`（手写的 `top` 会盖过运行时的排法）；为保住变量加的 `raw`；用 `p.note` 加 `data-trureturing-path` 写的“已冻结、正文未引用”（`navier-stokes-p-np`、`timeless-causal-crystal`、`gram-causal-elliptope`）可改成 `.lean.frozen` 框，改后运行 `./tbook pin --refresh`。
 - 旁白短语对不上不再静默：`Q(S, k, '短语')`、`phraseAt`、`badgeQ` 的短语不在第 k 句旁白里（或 `at`/`Q` 的句号越界）时，`./tbook check` 静态扫描 `scenes.js` 里字面量形式的调用并给警告，`film.sh <dir> timeline|build|all` 报出场景、行号与短语（`FILM_STRICT=1` 时失败，构建就这样运行），引擎渲染时也报出写成变量的短语。
 
 ### 变更
@@ -28,8 +35,8 @@
 
 ### 修复
 
-- PDF 数学导出（#56）：上下标后的分式占位符与薄空格保持 Typst 词法边界，原始 Taylor 和 monitoredStep 公式经过真实转换链编译并测量。
-- 可视化虚线按投影弧长连续；窄屏标题与场景按钮按实际高度上下占位；数学标签与标题保持源码大小写。实体管子参与遮挡，透明曲面和多面体不再挡住标记，`pick: false` 穿透拾取；投影和指针坐标统一到画布内框。首帧异步准备着色器，点卡更新视口外的实体帧；新增独立浏览器几何、像素、布局与质量门回归检查。
+- PDF 数学导出（#56）：保留上下标后分式、空格与普通符号的 Typst 词法边界；原始 Taylor、monitoredStep 及后续 `se`、`salpha` 复现经过真实转换链编译并测量。
+- 实体舞台（#57）：管子参与遮挡，透明曲面和多面体不挡标记，`pick: false` 穿透拾取；逐顶点透明度、球面圆、标签衬底与二维叠加层；投影和指针统一到画布内框。首帧异步准备着色器，点卡更新视口外帧。实体质量门可指定卡，默认尝试两个转动方向，暂停共享时钟后查释放上下文；补齐独立浏览器几何、像素与混合舞台回归检查及上游示例地址。
 
 - 文档语言与原文件保持一致：学术演示稿、站点构建后命令与模板层说明沿用中文；仓库守则明确现有文档、新文档及多语言文档的语言约定。
 - 实体舞台的浏览器单元测试（`tools/tests/solid_harness.mjs`）不再把测试页写死挂在 `example-monograph` 下：改为挂在第一本可见、且有 `viz/` 的书下。下游书库用 `site.toml` 的 `hide = ["example-*"]` 隐藏示例书，可视化服务器只服务可见的书，原写法在下游会因取不到运行时而失败；没有可用的书时这组测试跳过。

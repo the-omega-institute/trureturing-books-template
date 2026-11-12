@@ -1,7 +1,7 @@
 // Shared runtime regressions, independent of example-book content.
 import fs from 'node:fs';
 import path from 'node:path';
-import { session, settle, until, caseChanges, solidChecks, stageFirstChecks } from '../node/viz-testkit.mjs';
+import { session, settle, until, capitalGreek, solidChecks, stageFirstChecks } from '../node/viz-testkit.mjs';
 import { listBooks } from '../node/viz-common.mjs';
 const book = listBooks().find((b) => fs.existsSync(path.join(b.dir, 'viz')));
 if (!book) { console.log(JSON.stringify({ skip: 'no visible book with viz/' })); process.exit(0); }
@@ -12,42 +12,6 @@ const url = `${T.origin}/site/${book.slug}/viz/__runtime__/`;
 await T.context.route(`${url}**`, (r) => r.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../assets/theme.css"><script src="../assets/shell.js"></script><script src="../assets/kit.js"></script><style>#st{width:calc(100vw - 2px);height:590px}#st>canvas{position:absolute;inset:0;width:100%;height:100%}</style></head><body><div class="stage" id="st"><canvas class="fill" id="cv"></canvas><div class="hud-tl"><b class="big">δ u φ</b><span class="sub">A long description with mathematical variables δ and φ</span></div><div class="hud-tr">${Array.from({length:8},(_,i)=>`<button class="chip">Scene ${i}</button>`).join('')}</div></div></body></html>` }));
 await page.goto(url);
 await settle(page);
-const dashed = await page.evaluate(() => {
-  document.getElementById('st').style.setProperty('--hud-flow','0');
-  const st = TRV.kit.stage3(document.getElementById('st'), { canvas: document.getElementById('cv'), yaw: 0, pitch: 0 });
-  const frame = (n, fade) => {
-    st.begin(); st.path(Array.from({length:n+1},(_,i)=>[-1+2*i/n,-0.1,0]), { dash:[12,8], width:2, fade }); st.end();
-    const c=st.ctx, d=c.getImageData(0,Math.round(st.H/2),st.W,1).data;
-    return Array.from({length:st.W},(_,i)=>d[4*i+3]);
-  };
-  const sparse=frame(1,true), dense=frame(2000,true), plain=frame(1,false);
-  const delta=(a,b)=>a.reduce((s,x,i)=>s+Math.abs(x-b[i]),0)/a.length;
-  return { sparseDense:delta(sparse,dense), defaultUnfaded:delta(sparse,plain), gaps:dense.filter((x)=>x===0).length, ink:dense.filter((x)=>x>200).length };
-});
-check('dense dashed stage3 paths retain the gaps and the sparse-path phase', dashed.sparseDense < 2 && dashed.defaultUnfaded < 6 && dashed.gaps > 150 && dashed.ink > 100, dashed);
-const arrow = await page.evaluate(() => {
-  const cv=document.getElementById('cv'), g=TRV.kit.plot(cv,{x:[0,10],y:[0,10],pad:[0,0,0,0]});
-  g.arrow([2,5],[8,5],{color:TRV.palette.cyan,headSize:20,width:2});
-  const at=(x,y)=>g.ctx.getImageData(Math.round(x),Math.round(y),1,1).data[3];
-  const head=at(g.X(8)-12,g.Y(5)+3), shaft=at(g.X(5),g.Y(5));
-  TRV.kit.plot(cv,{x:[0,10],y:[0,10],pad:[0,0,0,0]}).arrow([2,5],[8,5],{head:false});
-  return {head,shaft,noHead:at(g.X(8)-12,g.Y(5)+3)};
-});
-check('plot arrows draw a screen-sized head and honour head:false', arrow.head > 200 && arrow.shaft > 200 && arrow.noHead === 0, arrow);
-await page.evaluate(()=>{const t=document.createElement('div');t.className='tag num c-cy backed';t.textContent='δ u φ';document.getElementById('st').appendChild(t);const sw=document.createElement('i');sw.className='sw ik';document.body.appendChild(sw);});
-const css=await page.evaluate(()=>({tag:getComputedStyle(document.querySelector('.tag')).color,ink:getComputedStyle(document.querySelector('.sw')).backgroundColor,cyan:(()=>{const e=document.createElement('i');e.style.color=TRV.palette.cyan;document.body.appendChild(e);const c=getComputedStyle(e).color;e.remove();return c})(),inkToken:(()=>{const e=document.createElement('i');e.style.color=TRV.palette.ink;document.body.appendChild(e);const c=getComputedStyle(e).color;e.remove();return c})(),transform:getComputedStyle(document.querySelector('.tag')).textTransform,back:getComputedStyle(document.querySelector('.tag')).backgroundColor}));
-check('numeric label colours and optional backings preserve mathematical case', css.tag===css.cyan && css.transform==='none' && css.back!=='rgba(0, 0, 0, 0)',css);
-check('the ink legend swatch uses the ink token',css.ink===css.inkToken,css);
-check('the Greek-case gate accepts unchanged notation',(await caseChanges(page)).length===0);
-await page.addStyleTag({content:'.tag { text-transform:uppercase!important }'});
-check('the Greek-case gate catches a page override',(await caseChanges(page)).some(t=>t.includes('δ')));
-await page.evaluate(()=>document.getElementById('st').style.removeProperty('--hud-flow'));
-for(const width of [334,390,740]){
-  await page.setViewportSize({width,height:700});
-  await until(page,()=>document.getElementById('st').hasAttribute('data-hud-flow'));
-  const b=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect();return {tl:r('.hud-tl').bottom,tr:r('.hud-tr').top,end:r('.hud-tr').bottom,cv:r('#cv').top,h:r('#cv').height}});
-  check(`HUD blocks and drawing have separate space at ${width}px`,b.tl<=b.tr && b.end<=b.cv && b.h>150,b);
-}
 // Independent geometry and pixels for the new solid options.
 await page.setViewportSize({width:800,height:600});
 await page.evaluate(async()=>{
