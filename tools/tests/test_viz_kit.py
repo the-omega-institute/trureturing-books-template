@@ -112,47 +112,74 @@ class FrozenEvidenceBoxes(unittest.TestCase):
         self.assertEqual(viz.check_frozen(fake, {}), [])   # cited by no theorem environment: nothing to say
 
 
+def visible_page() -> tuple[str, str] | None:
+    """(book slug, page id) of the first registered visualization of a visible book, or None.
+
+    A books repository hides the example books (site.toml [books].hide) and viz-shots.mjs refuses a hidden book, so
+    the tests of its plan name no book: they run on whichever page is visible first.
+    """
+    hidden = set(config.hidden_books())
+    for book in sorted(d for d in paths.BOOKS.iterdir() if (d / "book.toml").is_file() and d.name not in hidden):
+        registry = book / "viz" / "visualizations.json"
+        if not registry.is_file():
+            continue
+        try:
+            entries = json.loads(registry.read_text(encoding="utf-8")).get("visualizations", [])
+        except ValueError:
+            continue
+        for entry in entries:
+            vid = entry.get("id") if isinstance(entry, dict) else None
+            if vid and (book / "viz" / vid / "index.html").is_file():
+                return book.name, vid
+    return None
+
+
 @unittest.skipUnless(NODE, "node not available")
 class ShotsPlan(unittest.TestCase):
     """viz-shots.mjs --plan: the shots it would take, without a browser."""
 
+    def run_shots(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-shots.mjs"), self.book, self.vid, "--plan", *args],
+                              capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
+
     def plan(self, *args: str) -> list[dict]:
-        r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-shots.mjs"), "example-monograph", "golden-carry", "--plan", *args],
-                           capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
+        r = self.run_shots(*args)
         self.assertEqual(r.returncode, 0, r.stderr)
         return [json.loads(line) for line in r.stdout.splitlines() if line.startswith("{")]
 
     def setUp(self):
-        if not (paths.BOOKS / "example-monograph" / "viz" / "golden-carry").is_dir():
-            self.skipTest("books/example-monograph is absent")
+        page = visible_page()
+        if page is None:
+            self.skipTest("no visible book has a registered visualization")
+        self.book, self.vid = page
 
     def test_without_the_new_options_the_shots_are_as_before(self):
         rows = [(p["view"], p["lang"], p["width"], p["height"], p["query"], p["fullPage"], Path(p["file"]).name) for p in self.plan()]
+        v = self.vid
         self.assertEqual(rows, [
-            ("desk", "zh", 1440, 900, "lang=zh", False, "golden-carry-desk-zh.png"),
-            ("desk", "en", 1440, 900, "lang=en", False, "golden-carry-desk-en.png"),
-            ("embed", "zh", 740, 620, "embed=1&lang=zh", False, "golden-carry-embed-zh.png"),
-            ("embed", "en", 740, 620, "embed=1&lang=en", False, "golden-carry-embed-en.png"),
-            ("phone", "zh", 390, 844, "lang=zh", True, "golden-carry-phone-zh.png"),
-            ("phone", "en", 390, 844, "lang=en", True, "golden-carry-phone-en.png"),
-            ("thumb", "zh", 1280, 720, "thumb=1&lang=zh", False, "golden-carry-thumb.png"),
+            ("desk", "zh", 1440, 900, "lang=zh", False, f"{v}-desk-zh.png"),
+            ("desk", "en", 1440, 900, "lang=en", False, f"{v}-desk-en.png"),
+            ("embed", "zh", 740, 620, "embed=1&lang=zh", False, f"{v}-embed-zh.png"),
+            ("embed", "en", 740, 620, "embed=1&lang=en", False, f"{v}-embed-en.png"),
+            ("phone", "zh", 390, 844, "lang=zh", True, f"{v}-phone-zh.png"),
+            ("phone", "en", 390, 844, "lang=en", True, f"{v}-phone-en.png"),
+            ("thumb", "zh", 1280, 720, "thumb=1&lang=zh", False, f"{v}-thumb.png"),
         ])
 
     def test_width_height_and_preset_in_the_book(self):
         rows = self.plan("--views", "embed,thumb", "--width", "390", "--preset", "area", "--lang", "en")
         self.assertEqual([(p["view"], p["width"], p["height"], p["query"], Path(p["file"]).name) for p in rows], [
-            ("embed", 390, 620, "embed=1&lang=en&preset=area", "golden-carry-embed-390-en-area.png"),
-            ("thumb", 1280, 720, "thumb=1&lang=zh", "golden-carry-thumb.png"),   # the cover keeps its size
+            ("embed", 390, 620, "embed=1&lang=en&preset=area", f"{self.vid}-embed-390-en-area.png"),
+            ("thumb", 1280, 720, "thumb=1&lang=zh", f"{self.vid}-thumb.png"),   # the cover keeps its size
         ])
         rows = self.plan("--views", "desk", "--width", "600", "--height", "500", "--lang", "zh", "--name", "x")
         self.assertEqual([(p["width"], p["height"], p["query"], Path(p["file"]).name) for p in rows],
-                         [(600, 500, "lang=zh", "golden-carry-desk-600x500-zh-x.png")])
+                         [(600, 500, "lang=zh", f"{self.vid}-desk-600x500-zh-x.png")])
 
     def test_bad_values_are_refused(self):
+        self.assertEqual(self.run_shots().returncode, 0)   # the page itself is accepted: what follows is refused for its value
         for args in (["--width", "abc"], ["--width", "50"], ["--height", "500"], ["--preset", "../x"]):
-            r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-shots.mjs"), "example-monograph", "golden-carry", "--plan", *args],
-                               capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
-            self.assertEqual(r.returncode, 2, args)
+            self.assertEqual(self.run_shots(*args).returncode, 2, args)
 
     def test_help_names_the_options(self):
         r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-shots.mjs"), "--help"], capture_output=True, text=True, cwd=paths.ROOT, timeout=60)
