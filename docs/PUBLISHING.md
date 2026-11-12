@@ -135,3 +135,14 @@ tag（标签）是给某一个提交起的固定名字。分支（如 `main`）�
 - 不要在 GitHub 网页上用 “Draft a new release” 建发布。那样会先发布一个没有附件的 Release，随后运行的工作流遇到已发布的 Release 只更新标题与说明，PDF 与缓存文件就附不上去。
 - tag 打错了（名字或提交不对）而 Release 还没发布时，删掉重打：`git push origin :refs/tags/<tag>` 删除远端 tag，`git tag -d <tag>` 删除本地 tag，并在 Releases 页删除留下的草稿。已发布的版本不要复用 tag，发一个新的补丁版本。
 - 推送 tag 需要对仓库有写权限；只能推送分支的环境（例如受限的自动化会话）推不了 tag，由有权限的人推送。
+
+## Site post-build command
+
+A repository may set `[site].post_build = ["python3", "docs/project/site.py"]`
+in its owned `site.toml`. After a successful site assembly (including media-only
+updates), the builder executes this argument array without a shell, from the
+repository root. `TBOOK_SITE_OUT` names the absolute assembled output directory.
+A nonzero exit fails the build, so the Pages artifact is not deployed. The command
+is trusted repository code, like the build itself. It can add a repository-specific
+manifest or replace the library index with a redirect; book directories and their
+existing URLs need not change. No command runs unless explicitly configured.
