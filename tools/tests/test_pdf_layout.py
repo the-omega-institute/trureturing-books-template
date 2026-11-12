@@ -150,3 +150,35 @@ Body text.
         for group in (short_widths[:3], short_widths[3:]):
             self.assertAlmostEqual(group[0], group[1], places=2)
             self.assertLessEqual(group[2], group[0] + 0.01)
+
+    def test_academic_inline_math_fits_without_interrupting_prose(self):
+        import typst
+
+        main = self.stage / "inline.typ"
+        main.write_text(r'''#import "/_theme/typst/book.typ": tr-book
+#show: tr-book
+#pagebreak()
+#set page(width: 360pt, height: 480pt, margin: 30pt, header: none, footer: none)
+#let mark(name) = context metadata((name: name,
+  x: here().position().x.pt(), y: here().position().y.pt()))
+#block(width: 180pt)[
+  Before #mark("prefix")$#mark("short-start") x = y #mark("short-end")$ after#mark("suffix").
+
+  Evaluator $#mark("long-start") "interpret" : "InterpretationContext"
+    "Text" "ReaderAdmission" "Background" "EvaluationGoal" "Rule"
+    arrow.r "Concept" arrow.r "Meaning" #mark("long-end")$ continues.
+]
+''', encoding="utf-8")
+        for cjk in (False, True):
+            with self.subTest(cjk=cjk):
+                meta = dict(self.meta, cjk=cjk, lang="zh" if cjk else "en")
+                (self.stage / "inline-meta.json").write_text(json.dumps(meta), encoding="utf-8")
+                values = json.loads(typst.query(str(main), "metadata", field="value",
+                    root=str(self.stage), font_paths=[str(p) for p in tp.font_dirs()],
+                    sys_inputs={"tr-variant": "academic", "tr-meta": "/inline-meta.json"}))
+                marks = {v["name"]: v for v in values if isinstance(v, dict) and "name" in v}
+                self.assertGreaterEqual(marks["long-start"]["x"], 29.9)
+                self.assertLessEqual(marks["long-end"]["x"], 210.1)
+                self.assertAlmostEqual(marks["long-start"]["y"], marks["long-end"]["y"], places=2)
+                self.assertAlmostEqual(marks["prefix"]["y"], marks["suffix"]["y"], places=2)
+                self.assertGreater(marks["short-end"]["x"] - marks["short-start"]["x"], 15)

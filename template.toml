@@ -4,7 +4,7 @@
 [template]
 name = "trureturing-books-template"
 repo = "the-omega-institute/trureturing-books-template"
-version = "0.6.0"
+version = "0.6.1"
 # 模板发布 tag 的格式（`v<version>`）。
 tag_prefix = "v"
 

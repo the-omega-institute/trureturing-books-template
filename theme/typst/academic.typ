@@ -247,6 +247,7 @@
   set math.mat(column-gap: 1em)
   show math.equation.where(block: true): set block(above: 0.8em, below: 0.8em)
   show math.equation.where(block: true): it => layout(size => fit-width(it, size.width))
+  show math.equation.where(block: false): it => box(layout(size => fit-width(it, size.width)))
   show link: set text(fill: ink)
   set footnote.entry(separator: line(length: 25%, stroke: 0.4pt + rule), gap: 0.5em, indent: 0em)
   show footnote.entry: set text(size: 8pt)
