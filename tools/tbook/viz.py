@@ -594,7 +594,33 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
         for f in sorted(tdir.glob("*.test.mjs")):
             if f.name[: -len(".test.mjs")] not in seen:
                 warn(f, 0, f"tests/{f.name} belongs to no registered visualization")
+        for f in sorted(tdir.glob("*.test.mjs")):
+            for line in fixed_waits(f.read_text(encoding="utf-8")):
+                warn(f, line, fixed_wait_message(line))
     return issues
+
+
+_FIXED_WAIT = re.compile(r"\bwaitForTimeout\s*\(")
+
+
+def fixed_waits(text: str) -> list[int]:
+    """Line numbers of the ``waitForTimeout(`` calls of a browser suite, outside comment lines (one entry per call).
+
+    A suite waits for what the page reports (``settle`` for a transition, ``until`` for playback), never for a fixed
+    time (skills/book-viz); tools/node/viz-validate.mjs applies the same rule."""
+    lines = []
+    for k, line in enumerate(text.split("\n"), 1):
+        t = line.strip()
+        if t.startswith(("//", "*", "/*")):
+            continue
+        lines.extend(k for _ in _FIXED_WAIT.finditer(line))
+    return lines
+
+
+def fixed_wait_message(line: int) -> str:
+    return (f"waitForTimeout(…) at line {line} waits a fixed time, which passes on a fast machine and fails on a busy "
+            "runner; wait for what the page reports instead: settle(page) after a click or a transition, "
+            "until(page, () => …) for playback (skills/book-viz)")
 
 
 PAGE_NEEDLES = (

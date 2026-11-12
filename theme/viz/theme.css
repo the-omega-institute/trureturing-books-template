@@ -217,6 +217,9 @@ canvas.plot { width: 100%; display: block; }
 /* ---------- 2D / 3D stage ---------- */
 .stage { position: relative; min-height: 0; overflow: hidden; background: var(--stage-bg); border: 1px solid var(--panel-edge); touch-action: none; cursor: grab; }
 .stage:active { cursor: grabbing; }
+/* kit.js hands the focus to the stage after a pointer click on a card (tabindex −1: never reached with Tab); the stage is
+   not a control, so the keys pressed then (Space plays) draw no ring around it */
+.stage[tabindex="-1"]:focus-visible { outline: none; }
 .stage > canvas.gl, .stage > canvas.fill { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .stage.still { cursor: default; touch-action: auto; }
 .stage.still:active { cursor: default; }

@@ -11,11 +11,17 @@
 - 可选学术专著 PDF `academic`：独立的 B5 学术专著版式、衬线正文、分开的标题/版权/内容提要/目录、对开页眉、传统定理与证明、三线表及无框图注，保留 Lean 徽记、永久链接、公式适宽与验证账本；图件与代码高亮复用浅色配色。在 `[outputs] pdf` 中加 `"academic"` 后用 `./tbook build pdf --variant academic` 导出，站点与 Release 自动收录；已有书省略配置或 `pdf = true` 仍默认原两版。来源：下游《量子计算的几何直觉》学术专著导出。
 
 - 画图库补上下游用到却没有的形状，均为新增接口，已有的图逐字节不变：流程图的 `fig.box(…)`（自动定宽与换行、虚线框、强调色框与 `chip`/`chip_size`，返回锚点；默认字号按不宽于 358 的一栏设计）与 `fig.link(a, b, elbow=…)`；球上的 `sp.turn(轴, 起点, 角度, arrow=True)`、`sp.small_circle(…, start=, span=, arrow=True)`、`sp.sector(…)`、`sp.patch(…)`、`sp.polytope(…)`；`fig.axes(…, logx=True, logy=True)`（自动十的幂刻度与细刻度、`ax.decades()`）；`ax.step(…)`、`ax.bars(…)`；`figkit.hull(…)`、`figkit.hull3(…)`；`fig.bounce(a, 镜面点, b)`；文字标记 `***粗斜体***` 与 `\bar{z}`；脚本可选 `MARKUP = 2`，让下标、上标里的标记嵌套、斜体 `I` 用衬线字形（不写时按旧规则）；等宽文字按每字 0.6 em 估宽（组合附加符不计），`fig.measure()`、`fig.wrap_text()`。示例专著第四章新增三张图（证明骨架、黄金旋转、回归得分的对数图）。来源：下游《量子计算的几何直觉》150 张图中各章各写一遍的辅助代码（#35）。
+- `viz-validate` 与 `./tbook check` 对 `viz/tests/*.test.mjs` 里的每一处 `waitForTimeout(…)` 报警告（行号与改法：过渡用 `settle(page)`，播放用 `until(page, …)`）。
+- `node tools/node/viz-test.mjs --slow`：等价于 `VIZ_SLOW_FRAMES=1000`，以一秒一帧跑浏览器测试。`ci.yml` 新增 `viz-slow` 作业（8 片，同 `viz`），只在手动运行（输入 `slow_frames`，默认勾选）与每周三定时运行中出现，定时运行只跑它；PR 与推送的 CI 不变。何时跑见 `docs/PUBLISHING.md` §4。**需要手动操作（仅当分支保护列出所有检查时）**：新检查 “Visualization browser tests, slow frames (i/8)” 不在 PR 上运行，不要把它设为必需检查。
 
 ### 变更
 
 - `./tbook check` 拦住不按标准做的图（均为警告）：章节用图片语法引用、放在 `assets/`、写死颜色（没有角色类、也没有 `prefers-color-scheme`）的 SVG，提示改用 `::: {.figure}` 与 `figures/<name>.py`（照片与位图不报）；两种语言的章节共用一个带 `<text>` 的 SVG，提示每种语言一版标签；三块以上 `.figure`、`.viz`、`.film`、`.slides` 只隔着空行连排，从第三块起报位置。
 - 图在手机上的最小标签：`./tbook fig build` 与 `./tbook check` 按 `min(1, 358 / 宽度)`（`WRAP = True` 的分栏图按最宽一栏）算出手机上的最小字号，低于 10 px 时给出警告（图名、当前值与做窄、分栏、加大字号三种改法）；`site.toml` 的 `[figures]` `phone_labels = "error"` 可升为错误；`./tbook fig list` 增加一列“手机上的最小标签”。起始脚本 `templates/figure/figure.py` 与示例专著的 `carry-rules` 已调到不低于 10 px。`skills/book-figure`、`skills/book-viz` 与 `docs/AUTHORING.md` 写明手机上的字号下限、图片语法只用于照片一类、媒体块不连排。来源：《量子计算的几何直觉》有 9 张手绘图、73 张手机上标签不到 10 px 的图与 8 处媒体连排，`check` 均未报出（#34）。
+
+### 修复
+
+- 可视化：用指针点过实验卡、场景按钮（`kit.chips`）或导览条之后，空格键直接播放或暂停时钟，不再把那张卡重新按一遍（回到起点重播）。`theme/viz/kit.js` 在指针点击（`detail > 0`）后把焦点交给舞台（`.stage` 加 `tabindex="-1"`，按键时不画焦点框）；用 Tab 走到按钮上的读者，空格与回车仍由按钮响应。`stageFirstChecks` 新增 `keyboard: after a card is clicked, Space plays and pauses the clock`（没有 `footer.rail #play`、或没有一张卡能启用它的页面跳过；页面另有空格用法时传 `{ keys: false }`；也单独导出为 `spaceAfterCard(T, page)`），示例 `golden-carry` 补浏览器回归测试，单元测试在起始模板的副本上核对通过、失败（点击后焦点仍留在卡上）与跳过三种情形。来源：下游《量子计算的几何直觉》核查（trureturing-books#147），#36。
 
 ## [0.5.2] - 2026-11-12
 

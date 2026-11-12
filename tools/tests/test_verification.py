@@ -784,12 +784,18 @@ def plant_cache(commit: str, branch: str = "dev") -> None:
 def gha_if(expr: str, *, event: str, ref: str, default_branch: str | None = "main",
            context: dict[str, str] | None = None, cancelled: bool = False, **outputs: str) -> bool:
     """Evaluate a workflow step's ``if:`` written with the subset of GitHub's expression syntax used by the
-    cache steps: ``==``, ``!=``, ``!``, ``&&``, ``||``, parentheses, ``format``, ``startsWith``,
-    ``cancelled()``. ``context`` gives further names (``inputs.browsers``, ``steps.<id>.outputs.cache-hit``…)."""
+    cache steps and job conditions: ``==``, ``!=``, ``!``, ``&&``, ``||``, parentheses, ``format``, ``startsWith``,
+    ``contains`` (of a string), ``true`` / ``false`` / ``null``, ``cancelled()``. ``context`` gives further names
+    (``inputs.browsers``, ``steps.<id>.outputs.cache-hit``, ``github.workflow_ref``…; a name it does not give is
+    an error, so pass ``None`` for an input a run does not have)."""
     py = expr.strip().removeprefix("${{").removesuffix("}}")
     py = py.replace("cancelled()", repr(cancelled))
     py = re.sub(r"format\(('[^']*'),\s*([\w.]+)\)", r"\1.format(\2)", py)
     py = re.sub(r"startsWith\(([\w.]+),\s*('[^']*')\)", r"\1.startswith(\2)", py)
+    py = re.sub(r"contains\(([\w.]+),\s*('[^']*')\)", r"(\2 in \1)", py)
+    literals = {"true": "True", "false": "False", "null": "None"}
+    py = "".join(part if part.startswith("'") else re.sub(r"\b(true|false|null)\b", lambda m: literals[m.group(1)], part)
+                 for part in re.split(r"('[^']*')", py))
     py = re.sub(r"!(?!=)", " not ", py.replace("&&", " and ").replace("||", " or "))
     values = {"github.event.repository.default_branch": default_branch or "", "github.event_name": event,
               "github.ref": ref, **{f"steps.target.outputs.{k}": v for k, v in outputs.items()}, **(context or {})}

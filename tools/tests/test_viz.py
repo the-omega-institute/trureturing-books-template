@@ -3,7 +3,8 @@
 Run: PYTHONPATH=tools .venv/bin/python -m unittest discover -s tools/tests -p 'test_viz.py'
 Node-dependent tests are skipped when ``node`` is not on PATH. The browser suites of the books are not run here (see
 tools/node/viz-test.mjs); this file covers the registry checks, embeds, the publish step and scaffolding, and, where
-Playwright's Chromium is installed, the rail part of the shared quality gate on private copies of the starter page.
+Playwright's Chromium is installed, the rail and keys parts of the shared quality gate on private copies of the starter
+page.
 """
 
 from __future__ import annotations
@@ -164,6 +165,8 @@ class RegistryChecks(unittest.TestCase):
         page = page.replace(f'data-lean-gid="{GIDI}"', 'data-lean-gid="D5/S1/Nowhere/Missing.thing"', 1)
         (half / "index.html").write_text(page, encoding="utf-8")
         (book.viz_dir / "stray").mkdir()
+        suite = book.viz_dir / "tests" / "golden-carry.test.mjs"
+        suite.write_text(suite.read_text(encoding="utf-8") + "await page.waitForTimeout(300);\n", encoding="utf-8")
         return book
 
     @needs_example
@@ -189,9 +192,42 @@ class RegistryChecks(unittest.TestCase):
             'data-lean-gid="D5/S1/Nowhere/Missing.thing" is not in trureturing.lock.json',
             "viz/stray/ is not registered",
             "should have a browser test tests/half.test.mjs",
+            "waits a fixed time",
         ]
         for e in expect:
             self.assertTrue(any(e in m for m in msgs), f"missing problem {e!r} in:\n" + "\n".join(msgs))
+
+    def test_fixed_waits(self):
+        text = ("await settle(page, 400);\n"
+                "check('plays', await until(page, () => window.D.t > 0));\n"
+                "// never page.waitForTimeout(300) in a suite\n"
+                " * a doc comment may name waitForTimeout(…) too\n"
+                "await pick('x'); await page.waitForTimeout(400); await thumb.waitForTimeout (50);\n"
+                "const waitForTimeoutish = 1;\n")
+        self.assertEqual(viz.fixed_waits(text), [5, 5])
+        self.assertEqual(viz.fixed_waits("await settle(page);\n"), [])
+
+    @needs_example
+    def test_fixed_waits_in_suites_are_warned(self):
+        book = fake_book(self.tmp)
+        copy_golden_carry(book)
+        suite = book.viz_dir / "tests" / "golden-carry.test.mjs"
+        clean = suite.read_text(encoding="utf-8")
+        self.assertEqual([i for i in viz.check_native(book, lock=self.lock) if "fixed time" in i.message], [])
+        suite.write_text(clean + "// page.waitForTimeout(300) is how not to wait\nawait page.waitForTimeout(300);\n",
+                         encoding="utf-8")
+        line = clean.count("\n") + 2
+        found = [i for i in viz.check_native(book, lock=self.lock) if "fixed time" in i.message]
+        self.assertEqual([(i.severity, i.path.name, i.line) for i in found], [("warning", suite.name, line)])
+        self.assertIn(f"at line {line} waits a fixed time", found[0].message)
+        self.assertIn("settle(page)", found[0].message)
+        self.assertIn("until(page", found[0].message)
+        if NODE:
+            r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-validate.mjs"), "--json", "--only=tests", str(book.dir)],
+                               capture_output=True, text=True, cwd=paths.ROOT, timeout=120)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            node = [(p["severity"], p["message"]) for p in json.loads(r.stdout) if "fixed time" in p["message"]]
+            self.assertEqual(node, [("warning", found[0].message)])
 
     @needs_example
     def test_registry_line_numbers(self):
@@ -275,6 +311,45 @@ class NodeToolsWithoutVisualizations(unittest.TestCase):
                     self.assertEqual(r.returncode, 0, f"{script} {args} (books={books}): {r.stdout}{r.stderr}")
             self.assertIn("0 error(s)", subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-validate.mjs")], capture_output=True,
                                                        text=True, cwd=root, env=env, timeout=120).stdout)
+
+
+@unittest.skipUnless(NODE, "node not available")
+class NodeSuiteRunner(unittest.TestCase):
+    """tools/node/viz-test.mjs runs each suite in a child process; --slow hands it VIZ_SLOW_FRAMES=1000."""
+
+    def run_suites(self, *args, env_extra=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            book = fake_book(root / "books", "plain-book")
+            (book.viz_dir / "tests").mkdir(parents=True)
+            (book.viz_dir / "tests" / "probe.test.mjs").write_text(
+                "console.log(`frames=${process.env.VIZ_SLOW_FRAMES || 'none'}`);\n", encoding="utf-8")
+            env = {k: v for k, v in os.environ.items() if k != "VIZ_SLOW_FRAMES"}
+            env.update(TBOOK_ROOT=str(root), **(env_extra or {}))
+            return subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-test.mjs"), *args], capture_output=True,
+                                  text=True, cwd=root, env=env, timeout=120)
+
+    def test_slow_sets_slow_frames(self):
+        r = self.run_suites("--slow")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("frames=1000", r.stdout)
+        self.assertIn("1/1 suites passed, with slow frames (1000 ms)", r.stdout)
+
+    def test_without_slow_frames_are_not_slowed(self):
+        r = self.run_suites()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("frames=none", r.stdout)
+        self.assertNotIn("slow frames", r.stdout)
+
+    def test_slow_frames_from_the_environment_are_kept(self):
+        r = self.run_suites(env_extra={"VIZ_SLOW_FRAMES": "250"})
+        self.assertIn("frames=250", r.stdout)
+        self.assertIn("with slow frames (250 ms)", r.stdout)
+
+    def test_help_names_slow(self):
+        r = subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-test.mjs"), "--help"], capture_output=True, text=True,
+                           timeout=60)
+        self.assertIn("[--slow]", r.stdout)
 
 
 class TheoremCitations(unittest.TestCase):
@@ -1050,6 +1125,105 @@ process.exit(0);
             d = json.loads(c["detail"])
             self.assertEqual(d["home"][1], d["end"][1], "the readout must be what gave the broken clock away")
         self.assertTrue(all(c["ok"] for c in self.checks("rail-deaf", "inside the frame and named")))
+
+
+class KeysGate(unittest.TestCase):
+    """The "keys" part of stageFirstChecks (spaceAfterCard in tools/node/viz-testkit.mjs), run in Chromium on private
+    copies of the starter page: Space right after a pointer click on a card plays and pauses the clock; a page whose
+    card keeps the focus fails; a page without a clock button, or with one no card enables, is skipped. Skipped where
+    Playwright or its Chromium is not installed."""
+
+    SLUG = "keys-gate-fixture"
+    NAME = "keyboard: after a card is clicked, Space plays and pauses the clock"
+    RUNNER = """
+import fs from 'node:fs';
+const [kit, out, slug, ...ids] = process.argv.slice(2);
+const { session, spaceAfterCard, settle } = await import(kit);
+const T = await session();
+const res = {};
+for (const id of ids) {
+  const from = T.results.length;
+  const page = await T.goto(slug, id, '?lang=zh'); await settle(page, 300);
+  await spaceAfterCard(T, page);
+  const focus = await page.evaluate(() => document.activeElement === document.body);
+  res[id] = { checks: T.results.slice(from), blurred: focus };
+}
+await T.browser.close();
+fs.writeFileSync(out, JSON.stringify({ res, errors: T.errors }));
+process.exit(0);
+"""
+    # what kit.js did before: the clicked card keeps the focus, so Space presses it again
+    STICKY = ("document.addEventListener('click', (ev) => { const b = ev.target.closest && ev.target.closest('[data-preset]');"
+              " if (b && ev.detail > 0) b.focus(); });\n")
+    DISABLE = "    for (const k of ['now', 'play', 'rew']) $(k).disabled = true;\n"
+    PRESET = "    const p = PRESETS[id];\n"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="tbook-keys-"))
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        root = cls.tmp / "root"
+        (root / "books").mkdir(parents=True)
+        try:
+            (root / "theme").symlink_to(paths.THEME, target_is_directory=True)
+            if (paths.ROOT / "node_modules").is_dir():
+                (root / "node_modules").symlink_to(paths.ROOT / "node_modules", target_is_directory=True)
+        except OSError as exc:
+            raise unittest.SkipTest(f"cannot link the theme into a private root: {exc}")
+        book = fake_book(root / "books", cls.SLUG)
+
+        def swap(text: str, old: str, new: str) -> str:
+            if text.count(old) != 1:
+                raise AssertionError(f"templates/viz no longer has exactly one {old!r}")
+            return text.replace(old, new)
+
+        variants = {
+            "keys-plain": (lambda js: js, lambda h: h),
+            "keys-sticky": (lambda js: js + cls.STICKY, lambda h: h),
+            "keys-dead": (lambda js: swap(js, cls.PRESET, cls.PRESET + cls.DISABLE), lambda h: h),
+            # a page without the clock's ▶ in footer.rail (here: the same button under another id)
+            "keys-noplay": (lambda js: swap(js, "$('play')", "$('playBtn')"),
+                            lambda h: swap(h, 'id="play"', 'id="playBtn"')),
+        }
+        for vid, (js, page) in variants.items():
+            viz.scaffold(book, vid, vid.upper().replace("-", "//"), "键盘", "Keys", added="2026-11-12")
+            for name, change in (("main.js", js), ("index.html", page)):
+                f = book.viz_dir / vid / name
+                f.write_text(change(f.read_text(encoding="utf-8")), encoding="utf-8")
+        runner, out = cls.tmp / "keys-gate.mjs", cls.tmp / "keys-gate.json"
+        runner.write_text(cls.RUNNER, encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k != "VIZ_ORIGIN"}
+        env["TBOOK_ROOT"] = str(root)
+        kit = (paths.TOOLS / "node" / "viz-testkit.mjs").as_uri()
+        r = subprocess.run([NODE, str(runner), kit, str(out), cls.SLUG, *variants], capture_output=True,
+                           text=True, cwd=paths.ROOT, env=env, timeout=600)
+        if not out.is_file():
+            tail = (r.stdout + r.stderr)[-3000:]
+            if re.search(r"Playwright is not installed|Executable doesn't exist|browserType\.launch", tail):
+                raise unittest.SkipTest("Playwright Chromium is not available")
+            raise AssertionError(f"the keys gate did not run (exit {r.returncode}):\n{tail}")
+        data = json.loads(out.read_text(encoding="utf-8"))
+        cls.res, cls.errors = data["res"], data["errors"]
+
+    def outcome(self, vid: str) -> list[tuple[bool, str]]:
+        return [(c["ok"], c["detail"]) for c in self.res[vid]["checks"] if c["name"] == self.NAME]
+
+    def test_the_starter_passes(self):
+        [(ok, detail)] = self.outcome("keys-plain")
+        self.assertTrue(ok, detail)
+        self.assertRegex(detail, r"playing (true|false) → Space → (true|false) → Space → (true|false)")
+        self.assertTrue(self.res["keys-plain"]["blurred"], "the check leaves nothing focused for the checks after it")
+        self.assertEqual(self.errors, [])
+
+    def test_a_card_that_keeps_the_focus_fails(self):
+        [(ok, detail)] = self.outcome("keys-sticky")
+        self.assertFalse(ok, detail)
+
+    def test_pages_without_a_clock_to_run_are_skipped(self):
+        for vid in ("keys-dead", "keys-noplay"):
+            with self.subTest(vid):
+                self.assertEqual(self.outcome(vid), [])
+                self.assertEqual([c for c in self.res[vid]["checks"] if not c["ok"]], [])
 
 
 class Strings(unittest.TestCase):

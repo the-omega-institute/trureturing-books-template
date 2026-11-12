@@ -127,11 +127,13 @@ await stageFirstChecks(T, '<book>', '<id>');     // 所有舞台优先页面都�
 // 然后是这个页面自己的检查
 ```
 
-- `stageFirstChecks` 检查：舞台占比、每张卡能点且有说明、标签不重叠、抽屉、如实标注（每条 Lean 链接都是锁文件里的定理并指向所钉提交的文件与行；登记表列出的定理与页面引用的一致；绿色框恰好是引用 Lean 定理的框；抽屉用两种语言写明“不是证明”）、英文无残留中文、书内第一屏、被引用的图不滚动、静态图、手机无横向滚动、封面非空白、减少动效。
+- `stageFirstChecks` 检查：舞台占比、每张卡能点且有说明、标签不重叠、抽屉、点卡之后空格键控制播放、如实标注（每条 Lean 链接都是锁文件里的定理并指向所钉提交的文件与行；登记表列出的定理与页面引用的一致；绿色框恰好是引用 Lean 定理的框；抽屉用两种语言写明“不是证明”）、英文无残留中文、书内第一屏、被引用的图不滚动、静态图、手机无横向滚动、封面非空白、减少动效。
 - 页面自己的检查：每个控件一条；页面声称的每条性质一条，**用测试里另写的独立算法核对**（另一种表示、暴力枚举、数值积分），不调用页面自己的函数。页面通过只读探针 `window.<NAME>_DEBUG` 暴露状态。
 - 读状态前调用 `settle(page)`：无头浏览器每秒只渲染几帧，不要靠等待碰运气。它先把进行中的过渡（`kit.tween`、相机的 `st.view`）走完，再重绘：点完一张卡 `settle` 一下就能读到终态，不要为过渡等一个固定的毫秒数。过渡只在动画帧上前进，机器一忙，结束它的那一帧可能比标称时长晚得多。
 - 播放不是过渡，`settle` 不替时钟往前走。检查“空格开始播放”“这张卡会自己播”时，等页面自己报告动了：`check('Space plays', await until(page, () => window.<NAME>_DEBUG.state.t > 0))`。`until` 由 `viz-testkit.mjs` 导出，条件一成立就返回 `true`，30 秒仍不成立返回 `false`，本身就是这条检查的结果。不要写“按空格、等 700 毫秒、再读 t”：播放靠动画帧推进，机器一忙，700 毫秒里可能一帧都没到，页面没错，检查却失败。
-- 交付前加上 `VIZ_SLOW_FRAMES=1000` 再跑一遍测试（`VIZ_SLOW_FRAMES=1000 node books/<book>/viz/tests/<id>.test.mjs`）：它把动画帧拉开到一秒一帧，比 CI 最忙时还慢，耗时与平时几乎相同。为过渡或播放等固定时间而碰巧通过的检查在这里必然失败；间隔取得比测试里最长的固定等待短，就可能照不出来。
+- 不写 `page.waitForTimeout(…)`：`viz-validate`（与 `./tbook check`）对测试里的每一处固定等待报警告，并给出行号与改法。
+- 交付前加上 `VIZ_SLOW_FRAMES=1000` 再跑一遍测试（`VIZ_SLOW_FRAMES=1000 node books/<book>/viz/tests/<id>.test.mjs`，或整本书 `node tools/node/viz-test.mjs <book> --slow`）：它把动画帧拉开到一秒一帧，比 CI 最忙时还慢，耗时与平时几乎相同。为过渡或播放等固定时间而碰巧通过的检查在这里必然失败；间隔取得比测试里最长的固定等待短，就可能照不出来。CI 每周（与手动触发时）用 `--slow` 把全部测试跑一遍（`ci.yml` 的 `viz-slow`，`docs/PUBLISHING.md` §4），PR 不等它。
+- 键盘：用指针点了实验卡、场景按钮或导览条之后，`kit` 把焦点交给舞台，空格直接播放或暂停；用 Tab 走到按钮上的读者，空格与回车仍按下那个按钮。测试里点完卡就按空格，读到的是时钟的翻转；要测按钮本身对空格的响应，先 `page.focus(…)` 或用 Tab 走到它。
 - 用随机抽样做独立核对时，容差要对得上抽样的精度。落在尖点上的极值（多面体的面、绝对值之和）靠均匀抽样收敛很慢：先抽样，再在最好的点附近逐步收窄搜索。
 - 每提交一次输入（`fill` 加回车、点一次步进键或一张卡）也先 `settle(page)`，再去动下一个控件：页面在下一帧按状态重写全部输入框，上一次提交排定的那一帧若落在“第二个框已填、回车未按”之间，刚填的值被覆盖，第二次提交不会发生。本地机器快，几乎不触发；CI 上表现为同一条断言偶发失败、重跑又通过。
 
@@ -156,7 +158,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | 三维舞台（二维画布上） | `const st = kit.stage3(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `st.begin()` … `st.sphere()`、`st.arc(u, v)`、`st.arrow(a, b)`、`st.path(pts)`、`st.poly(pts)`、`st.dot(p)`、`st.circle(c, n, r)`、`st.tag(key, p, html, cls)` … `st.end()`；`st.pick(ev)` 取指针下的球面点，`st.view('iso' \| 'front' \| 'top')` |
 | 二维舞台与小图 | `const g = kit.plot(canvas, { x, y, pad, equal, logY })`；`g.axes()`、`g.line()`、`g.area()`、`g.rect()`、`g.poly()`、`g.dot()`、`g.vline()`、`g.hline()`、`g.text()`、`g.legend()`；`g.invX/invY` 把指针换回数据坐标 |
 | 同一页既有二维又有三维场景 | 共用一块画布和一个 `kit.stage3`：二维场景里先 `st.begin(); st.end();` 再 `kit.plot(canvas, …)`；`onPick` 在二维场景返回 `true` 接管拖动（否则拖动会悄悄转动相机），并随场景切换舞台的 `still` 类 |
-| 时间轴 | `kit.clock({ range, play, label, speeds, max, rate, step, format, onChange })` → `set`、`setMax`、`play`、`pause`、`stepBy`；键盘 Space / ← → / Home / End 已绑定。`format(t, max)` 在构造时就被调用一次：只用这两个参数与页面状态，不引用时钟变量本身 |
+| 时间轴 | `kit.clock({ range, play, label, speeds, max, rate, step, format, onChange })` → `set`、`setMax`、`play`、`pause`、`stepBy`；键盘 Space / ← → / Home / End 已绑定（用指针点过卡或 `kit.chips` 的按钮后焦点在舞台上，空格即播放）。`format(t, max)` 在构造时就被调用一次：只用这两个参数与页面状态，不引用时钟变量本身 |
 | 实验卡与导览条 | `kit.cards(el, { notes, noteEl, tour, idle, onPick })` → `pick`、`mark(null)`（读者动了控件）、`initial(默认卡)`、`step(±1)` |
 | 进入视野才播放 | `kit.autoplay(clock, stageEl)` |
 | 过渡 | `kit.tween(ms, step, done)`（尊重 `prefers-reduced-motion`） |
@@ -196,7 +198,10 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | 标题里的 φ、u 变成了 Φ、U | 标题按大写排版；变量不写进标题 |
 | `Cannot access '…' before initialization`，页面一片空白 | `kit.clock` 的 `format` 在构造时被调用，里面引用了尚未赋值的时钟变量 |
 | 书里的图内部出现滚动条 | 被引用的图（带 `preset`）不应滚动；检查是否有固定高度的元素撑破了舞台 |
-| 测试本地通过，CI 上偶尔有几条失败 | 多半是为过渡或播放等了固定时间；用 `VIZ_SLOW_FRAMES=1000` 在本地复现，过渡改成 `settle(page)`，播放改成 `until(page, …)` 等状态本身 |
+| 测试本地通过，CI 上偶尔有几条失败 | 多半是为过渡或播放等了固定时间；用 `node tools/node/viz-test.mjs <book> --slow`（即 `VIZ_SLOW_FRAMES=1000`）在本地复现，过渡改成 `settle(page)`，播放改成 `until(page, …)` 等状态本身 |
+| `viz-validate` 警告 `waitForTimeout(…) at line N waits a fixed time` | 测试第 N 行等了固定时间：点卡或过渡之后改成 `await settle(page)`，等播放改成 `check(…, await until(page, () => …))`；改完用 `--slow` 跑一遍 |
+| 点过一张卡后按空格，卡又重放了一遍，没有暂停 | 页面没有用 `kit.cards` / `kit.chips` 处理点击（自己写了 `click` 监听）：改用它们，或在自己的指针点击处理里把焦点交给 `.stage`；`stageFirstChecks` 的 `keyboard: after a card is clicked, Space plays and pauses the clock` 会抓到 |
+| 页面的空格不控制时钟（`kit.clock({ keys: false })`），这条键盘检查失败 | 页面另有空格的用法时，传 `stageFirstChecks(T, book, id, { keys: false })` 跳过它，并在页面自己的测试里检查那个用法 |
 
 ## 完成标准
 

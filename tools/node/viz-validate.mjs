@@ -3,7 +3,8 @@
 //   node tools/node/viz-validate.mjs                      every book under books/
 //   node tools/node/viz-validate.mjs example-monograph    one book (slug or directory; repeatable)
 //   options: --json (machine-readable problems on stdout), --only=registry,lean,pages,links,dirs,thumbs,tests,scripts
-// Exit code 1 when there is an error (warnings alone exit 0). ./tbook check runs the same rules in Python
+// Exit code 1 when there is an error (warnings alone exit 0). Group "tests": a live visualization without a browser
+// suite, and fixed waits (waitForTimeout) in a suite, are warnings. ./tbook check runs the same rules in Python
 // (tools/tbook/viz.py) and calls this script with --only=scripts for the JavaScript syntax check.
 // Adapted from trureturing-visualize/scripts/validate.mjs (Apache-2.0, the-omega-institute).
 //
@@ -66,6 +67,20 @@ function linkProblem(book, base, url, ids) {
   if (chapter) return fs.existsSync(chapter) ? null : `link "${url}" names a chapter that does not exist (${rel(chapter)})`;
   return `link "${url}" resolves to ${target}, which the build does not publish`;
 }
+
+/** Fixed waits in a browser suite: [line, …] of each waitForTimeout( call outside comment lines. A suite waits for what
+    the page reports (settle for a transition, until for playback), never for a fixed time (skills/book-viz). */
+export function fixedWaits(text) {
+  const lines = [];
+  text.split('\n').forEach((line, k) => {
+    const t = line.trim();
+    if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+    for (const _ of line.matchAll(/\bwaitForTimeout\s*\(/g)) lines.push(k + 1);
+  });
+  return lines;
+}
+export const FIXED_WAIT_MESSAGE = (line) => `waitForTimeout(…) at line ${line} waits a fixed time, which passes on a fast machine and fails on a busy runner; `
+  + 'wait for what the page reports instead: settle(page) after a click or a transition, until(page, () => …) for playback (skills/book-viz)';
 
 function scriptsOf(dir, out) {
   if (!fs.existsSync(dir)) return out;
@@ -199,6 +214,13 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
     if (fs.existsSync(tdir)) for (const f of fs.readdirSync(tdir).sort()) {
       const m = /^(.+)\.test\.mjs$/.exec(f);
       if (m && !seen.has(m[1])) warn(path.join(tdir, f), `tests/${f} belongs to no registered visualization`);
+    }
+  }
+  if (on('tests')) {
+    const tdir = path.join(vdir, 'tests');
+    if (fs.existsSync(tdir)) for (const f of fs.readdirSync(tdir).sort()) {
+      if (!f.endsWith('.test.mjs')) continue;
+      for (const line of fixedWaits(fs.readFileSync(path.join(tdir, f), 'utf8'))) warn(path.join(tdir, f), FIXED_WAIT_MESSAGE(line));
     }
   }
   return problems;

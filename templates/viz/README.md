@@ -105,7 +105,7 @@ With `preset` the chapter shows one card as a figure that does not scroll inside
 node tools/node/viz-server.mjs                 # local preview at http://127.0.0.1:8766/site/<book>/viz/
 node tools/node/viz-shots.mjs <book> <id>      # review screenshots (desktop, in-book frame, phone, cover) → build/viz-shots/
 node tools/node/viz-validate.mjs [book]        # registry + page contract + links + JS syntax
-node tools/node/viz-test.mjs [book] [--shard i/n]   # browser suites books/*/viz/tests/*.test.mjs
+node tools/node/viz-test.mjs [book] [--shard i/n] [--slow]   # browser suites books/*/viz/tests/*.test.mjs (--slow: a frame a second)
 node tools/node/viz-thumbs.mjs <book> [id …]   # thumb.jpg and the stills fig-<card>.<lang>.jpg of cited cards (honours PW_CHROMIUM_PATH)
 ./tbook viz list
 ```

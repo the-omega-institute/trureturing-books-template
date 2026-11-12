@@ -298,6 +298,40 @@ async function railChecks(T, slug, id, lang, wait = 120) {
   await page.context().close();
 }
 
+/** The ▶ / ❚❚ button of the clock (kit.clock sets its aria-pressed to whether the clock plays). */
+const PLAY = 'footer.rail #play';
+
+/** Space right after a card was clicked with the pointer (see stageFirstChecks, "keys"): it must play or pause the
+    clock, not press the card again (which would restart it), so the click must not leave the focus on the card.
+    Skipped on a page without a clock button, and on one where no card leaves that button enabled. `page` is open on
+    the visualization; `wait` is the settle after a click (ms). */
+export async function spaceAfterCard(T, page, wait = 120) {
+  const { check } = T;
+  const state = () => page.evaluate((sel) => { const b = document.querySelector(sel); return b ? b.getAttribute('aria-pressed') : null; }, PLAY);
+  const usable = () => page.evaluate((sel) => { const b = document.querySelector(sel); return !!b && !b.disabled && b.getClientRects().length > 0; }, PLAY);
+  if ((await state()) == null) return;
+  const cards = await page.$$eval('[data-preset]', (els) => els.filter((e) => !e.disabled && e.getClientRects().length > 0).map((e) => e.dataset.preset));
+  let card = null;
+  for (const c of cards) {
+    await page.click(`[data-preset="${c}"]`); await settle(page, wait);
+    if (await usable()) { card = c; break; }
+  }
+  if (!card) return;
+  // the button's state is written synchronously by play() and pause(), so it is read at once after each key: a clock
+  // that runs out by itself turns ▶ off but never on, and pressing the card again leaves both readings alike
+  const run = async () => {
+    await page.click(`[data-preset="${card}"]`); await settle(page, wait);
+    const s0 = await state();
+    await page.keyboard.press(' '); const s1 = await state();
+    await page.keyboard.press(' '); const s2 = await state();
+    return { ok: s0 !== s1 && s1 !== s2, detail: `card ${card}: playing ${s0} → Space → ${s1} → Space → ${s2}` };
+  };
+  let r = await run();
+  if (!r.ok) r = await run();   // once more: a clock may run out between reading it and the key (never twice)
+  check('keyboard: after a card is clicked, Space plays and pauses the clock', r.ok, r.detail);
+  await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+}
+
 /**
  * The checks every stage-first page must pass, whatever it shows (skills/book-viz, "质量门"). They cannot tell a good
  * picture from a bad one, but they catch the regressions that make a page unreadable inside a book:
@@ -319,14 +353,17 @@ async function railChecks(T, slug, id, lang, wait = 120) {
  *             ?shot=1 (the still that PDF/EPUB print) fills the frame on the same card, labels kept, in one language
  *   phone     (390 × 844) nothing scrolls sideways and the stage comes before the control deck
  *   cover     (?thumb=1) [data-thumb] fills 1280 × 720, window.TRV_THUMB runs, and the cover canvas is not blank
+ *   keys      (desktop) right after a card is clicked with the pointer, Space plays and pauses the clock instead of
+ *             pressing the card again (pages without a ▶ button in footer.rail, or none a card enables, skip it)
  *   motion    under prefers-reduced-motion the page loads and a card still applies
  * and no page error, console error or failed request anywhere.
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
- *       rail (true; a page without footer.rail is not checked), settle (ms to wait after a click).
+ *       rail (true; a page without footer.rail is not checked), keys (true; false for a page that does not bind
+ *       Space to its clock), settle (ms to wait after a click).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
-  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, settle: 120, ...opts };
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
   const { check } = T;
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
   const runCards = async (page, tag) => {
@@ -361,6 +398,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
     check('desktop: Escape closes the drawer', await page.evaluate(() => document.getElementById('drawer').hidden));
   }
   if (o.evidence) await evidenceChecks(T, slug, id, page);
+  if (o.cards && o.keys) await spaceAfterCard(T, page, o.settle);
 
   // English
   await page.click('[data-lang-set="en"]'); await settle(page, 150);
