@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "b4ddac05d9576cffdc878e1b206f6dc82b36302c2ba65fdcce26d216143e1334",
+      "sha256": "d489e084c7fe5bd99ad0b582ab07cb4c97477f74630a55da8fbeca20b1aa4365",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -80,7 +80,7 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "9ac93788334ff1d8077410091c2f8e1a144e9ee59b9d63316801c52893da2e8d",
+      "sha256": "8152fcce48d9706859bf7c23df85ed9fc1878c7ecb741e2db4e7480ec7dd63b6",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -464,7 +464,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "a1884eb193ba72ca1615f2d95220fce26fcdf4deb2d1b156adc1eefebd724da9",
+      "sha256": "0a51cc7b38f13d5358e40ed971da44d9790498522a2d60420902a71f4d01015a",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -536,15 +536,15 @@
       "mode": "100755"
     },
     "tools/filters/tr-book.lua": {
-      "sha256": "3d96b3d710f20734259966780c20b9e553a89be6d487f9933df6e4a41a20db3b",
+      "sha256": "9205df228b09e9bfbc852390879182e7912997b7174ab7417eabd3e6df4b1cbe",
       "mode": "100644"
     },
     "tools/filters/tr-env.lua": {
-      "sha256": "e906c2f802502df6ca69cb19a8fa9ce31fa236fed990c65c703dd320aca01028",
+      "sha256": "b02ad51d627b325f7702611928aaa431d63051e53c9d85b2546fa9318b8bcc9b",
       "mode": "100644"
     },
     "tools/filters/typst-compat.lua": {
-      "sha256": "77cb0ed2fef83146e206962f96cf5ca9c406fc103e13d491d8d1a31a36befdc4",
+      "sha256": "5a236b1bb7d028afb78d09cd37677f31b4b75414efd538404e2d290d07fba0ed",
       "mode": "100644"
     },
     "tools/migrations/README.md": {
@@ -816,15 +816,15 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "4c4e1bbfc83b5c0a934fc686ef0fc729287fd4d624f4950b0fc96bde19f29a91",
+      "sha256": "61f957cbc633ed934b13c5766f62716a9a968a4f224b8e11871da47e4e5dcc5a",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "910203daa13bb95cc423b8e183a59fc54f1f2f7a037278013add5ea2391a2f1d",
+      "sha256": "e45f71a8f47314b5df97cf34fd1343beac3e8a596e4bd08f93ab3f916436808a",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {
-      "sha256": "5c7651acccbb922bbe9340a6b6ccc928a44ec792fc7571262cb5b4e113cff8e4",
+      "sha256": "fcbd918aadb95f6f4dabf3f7613aa5dc4ff2dad05e343251dd1cb81f9a761fa0",
       "mode": "100644"
     },
     "tools/tests/test_pin_sources.py": {

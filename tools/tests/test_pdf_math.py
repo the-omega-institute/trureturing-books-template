@@ -33,7 +33,8 @@ def typst_code(formulas: list[str], display: bool = False) -> list[str]:
     out = subprocess.run(args, input=md + "\n", capture_output=True, text=True, check=True).stdout
     parts = re.split(r"FORMULA(\d{4})", out)
     codes = {int(parts[k]): parts[k + 1].strip() for k in range(1, len(parts), 2)}
-    return [codes[i] for i in range(len(formulas))]
+    # Document identities belong to layout, not to the expression measured below.
+    return [re.sub(r"^#\[(.*)<tr-inline-[^>]+>\]$", r"\1", codes[i], flags=re.S) for i in range(len(formulas))]
 
 
 @unittest.skipUnless(have_pandoc() and have_typst(), "pandoc and typst are required")

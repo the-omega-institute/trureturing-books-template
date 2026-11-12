@@ -159,15 +159,26 @@ Body text.
 #show: tr-book
 #pagebreak()
 #set page(width: 360pt, height: 480pt, margin: 30pt, header: none, footer: none)
+#set par(first-line-indent: (amount: 10pt, all: false))
 #let mark(name) = context metadata((name: name,
-  x: here().position().x.pt(), y: here().position().y.pt()))
+  x: here().position().x.pt(), y: here().position().y.pt(), same_width: measure([Same]).width.pt()))
 #block(width: 180pt)[
-  Before #mark("prefix")$#mark("short-start") x = y #mark("short-end")$ after#mark("suffix").
+  Same#mark("indent-first") beginning.
 
-  Evaluator $#mark("long-start") "interpret" : "InterpretationContext"
+  Before #mark("prefix")$#mark("short-start") x = y #mark("short-end")$<tr-inline-short>#mark("after-short") after#mark("suffix").
+
+  Prefix#h(120pt) evaluator $#mark("long-start") "interpret" : "InterpretationContext"
     "Text" "ReaderAdmission" "Background" "EvaluationGoal" "Rule"
-    arrow.r "Concept" arrow.r "Meaning" #mark("long-end")$ continues.
+    arrow.r "Concept" arrow.r "Meaning" #mark("long-end")$<tr-inline-long> continues.
+
+  Same#mark("indent-next") paragraph follows.
 ]
+#block(width: 100pt, inset: (x: 10pt))[
+  Single $#mark("nested-start") "InterpretationContextTextReaderAdmissionBackgroundEvaluationGoalRuleConceptMeaning" #mark("nested-end")$<tr-inline-nested>#mark("nested-after").
+]
+#let reused = [$#mark("reused-start") "InterpretationContextTextReaderAdmissionBackgroundEvaluationGoalRuleConceptMeaning" #mark("reused-end")$<tr-inline-reused>]
+#block(width: 180pt)[#reused]
+#block(width: 80pt)[#reused]
 ''', encoding="utf-8")
         for cjk in (False, True):
             with self.subTest(cjk=cjk):
@@ -181,4 +192,14 @@ Body text.
                 self.assertLessEqual(marks["long-end"]["x"], 210.1)
                 self.assertAlmostEqual(marks["long-start"]["y"], marks["long-end"]["y"], places=2)
                 self.assertAlmostEqual(marks["prefix"]["y"], marks["suffix"]["y"], places=2)
+                self.assertGreaterEqual(marks["after-short"]["x"], marks["short-end"]["x"] - 0.1)
+                self.assertAlmostEqual(marks["indent-first"]["x"], 30 + marks["indent-first"]["same_width"], places=2)
+                self.assertAlmostEqual(marks["indent-next"]["x"], 40 + marks["indent-next"]["same_width"], places=2)
+                self.assertGreaterEqual(marks["nested-start"]["x"], 39.9)
+                self.assertLessEqual(marks["nested-end"]["x"], 120.1)
+                self.assertGreaterEqual(marks["nested-after"]["x"], marks["nested-end"]["x"] - 0.1)
+                reused = [v for v in values if isinstance(v, dict) and v.get("name") == "reused-end"]
+                self.assertEqual(len(reused), 2)
+                self.assertAlmostEqual(reused[0]["x"], 210, places=2)
+                self.assertAlmostEqual(reused[1]["x"], 110, places=2)
                 self.assertGreater(marks["short-end"]["x"] - marks["short-start"]["x"], 15)

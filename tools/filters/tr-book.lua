@@ -46,7 +46,7 @@ end
 
 local function typst_content(inlines)
   local out = pandoc.write(pandoc.Pandoc({ pandoc.Plain(compat.inlines(inlines)) }), "typst")
-  out = out:gsub("%s+$", "")
+  out = out:gsub("[ \t\r\n]+$", "")
   return "[" .. out .. "]"
 end
 

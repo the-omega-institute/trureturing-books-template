@@ -247,7 +247,20 @@
   set math.mat(column-gap: 1em)
   show math.equation.where(block: true): set block(above: 0.8em, below: 0.8em)
   show math.equation.where(block: true): it => layout(size => fit-width(it, size.width))
-  show math.equation.where(block: false): it => box(layout(size => fit-width(it, size.width)))
+  // Give the paragraph the fitted box width before it chooses line breaks.
+  // Pandoc supplies stable identities; a precise selector avoids a quadratic width lookup.
+  show math.equation.where(block: false): equation => if not equation.has("label") { equation } else { context {
+    let loc = equation.location()
+    let width-label = label("tr-academic-inline-measure-" + str(equation.label))
+    let entry = query(width-label).find(item => item.value.loc == loc)
+    let width = if entry == none { none } else { entry.value.width }
+    if width != none and measure(equation).width > width { linebreak(justify: false) }
+    box(width: if width == none { auto } else { width }, layout(size => {
+      let target = calc.min(measure(equation).width, size.width)
+      [#metadata((loc: loc, width: target))#width-label]
+      fit-width(equation, target)
+    }))
+  } }
   show link: set text(fill: ink)
   set footnote.entry(separator: line(length: 25%, stroke: 0.4pt + rule), gap: 0.5em, indent: 0em)
   show footnote.entry: set text(size: 8pt)
