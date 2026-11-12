@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, resolveBook, readRegistry, chromiumOptions, loadChromium, rel } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
-import { routeLocalFonts } from './viz-testkit.mjs';
+import { routeLocalFonts, settle } from './viz-testkit.mjs';
 
 const VIEWS = {
   desk: { width: 1440, height: 900, query: '' },
@@ -99,7 +99,7 @@ try {
       page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
       await page.goto(vizUrl(origin, book.slug, id, `?${query}`), { waitUntil: 'load' });
       await page.evaluate(() => document.fonts && document.fonts.ready);
-      await page.waitForTimeout(500);
+      await settle(page);
       if (view === 'thumb') {
         await page.evaluate(() => {
           if (!document.querySelector('[data-thumb]')) { const s = document.querySelector('.stage'); if (s) s.setAttribute('data-thumb', ''); }
@@ -109,7 +109,7 @@ try {
       } else if (opt.do) {
         try { await page.evaluate(opt.do); } catch (e) { errors.push(`--do: ${e.message}`); }
       }
-      await page.waitForTimeout(opt.wait);
+      await settle(page, opt.wait);
       await page.screenshot({ path: file, fullPage });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       const notes = [];

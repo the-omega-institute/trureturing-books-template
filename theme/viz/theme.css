@@ -443,3 +443,11 @@ dl.ro .ok dd, .okmark { color: var(--ok); }
 @media (max-width: 520px) {
   .logo { font-size: 21px; }
 }
+
+/* Solid labels can use a backing while keeping their semantic colour. */
+.tag.backed { background: color-mix(in srgb, var(--stage-bg) 88%, transparent); padding: 2px 4px; border-radius: 2px; }
+.tag.num.c-cy { color: var(--cyan); } .tag.num.c-mg { color: var(--magenta); }
+.tag.num.c-am { color: var(--amber); } .tag.num.c-ok { color: var(--ok); }
+.tag.num.c-wn { color: var(--warn); } .tag.num.c-vi { color: var(--violet); }
+
+.stage > canvas.solid-overlay { z-index: 1; pointer-events: none; }

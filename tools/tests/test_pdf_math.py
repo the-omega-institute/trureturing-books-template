@@ -94,6 +94,30 @@ class PdfMathTest(unittest.TestCase):
             with self.subTest(space=tex):
                 self.assertAlmostEqual(w[tex] - w["none"], mu * MU, delta=0.01)
 
+    def test_tokens_after_scripts_remain_separate(self):
+        # These unchanged downstream expressions used to produce kfrac and nthin. Compile the actual
+        # export chain, and compare grouped scripts so a compiling but misplaced fraction/space fails too.
+        pairs = [
+            (r"T_{2N}(\theta) = \sum_{k=0}^N (-1)^k \frac{\theta^{2k}}{(2k)!}",
+             r"T_{2N}(\theta) = \sum_{k=0}^N (-1)^{k} \frac{\theta^{2k}}{(2k)!}"),
+            (r"(\operatorname{monitoredStep}\ U\ v)^n\, v",
+             r"(\operatorname{monitoredStep}\ U\ v)^{n}\, v"),
+            (r"x_i\frac{a}{b}", r"x_{i}\frac{a}{b}"),
+            (r"x^n\thinspace v", r"x^{n}\thinspace v"),
+            (r"x^n\longrightarrow y", r"x^{n}\longrightarrow y"),
+            (r"(-1)^s e^{-i\alpha}", r"(-1)^s{}e^{-i\alpha}"),
+            (r"(-1)^s\alpha", r"(-1)^s{}\alpha"),
+        ]
+        for display in (False, True):
+            formulas = {f"{k}-{side}": tex for k, pair in enumerate(pairs)
+                        for side, tex in enumerate(pair)}
+            with self.subTest(display=display):
+                w = self.widths(formulas, display=display)
+                for k, pair in enumerate(pairs):
+                    with self.subTest(formula=pair[0]):
+                        self.assertGreater(w[f"{k}-0"], 0)
+                        self.assertAlmostEqual(w[f"{k}-0"], w[f"{k}-1"], delta=0.005)
+
     def test_explicit_space_adds_to_the_automatic_space(self):
         # In Typst h() replaces the space of a relation, an operator or a comma next to it.
         pairs = {
@@ -192,7 +216,7 @@ class PdfMathTest(unittest.TestCase):
         self.assertAlmostEqual(w["middle"], w["bra-ket"], delta=0.05)            # no space around \middle|
         codes = typst_code([r"\left. \frac{df}{dt} \right|_{t=0}", r"\left\{ \frac{a}{b} \right.",
                             r"a \overset{x}{B} c", r"\{ \frac{a}{b} \}"])
-        self.assertIn("lr(frac(d f, d t) bar.v)_(t = 0)", codes[0])
+        self.assertRegex(codes[0], r"lr\(frac\(d f, d t\)\s*bar\.v\)_\(t = 0\)")
         self.assertIn("lr(brace.l frac(a , b))", codes[1])
         self.assertIn("limits(B)^x", codes[2])
         self.assertIn("brace.l frac(a , b) brace.r", codes[3])                   # not sized like \left\{…\right\}

@@ -94,11 +94,19 @@ const h = sc.hit(ev);                            // { id, u, v, point, normal, f
 
 `surface` 的 `value(u, v)` 配 `colors`、`range` 给沿标量的渐变；`back` 给背面另一种颜色（默认同色更暗）。没有渲染循环：画面只在 `paint()` 时画。书内（`TRV.embed`）的实体在进入视口时才建 WebGL 上下文，静止约 1.6 秒后把这一帧留在页面的二维画布上并释放上下文，读者一碰、或时钟走一帧再取回——一章里嵌十几张卡也不会超过浏览器的上下文上限。`kit.ready()` 在 three.js 到位后兑现，测试工具的 `settle(page)` 会等它。
 
-**测试**：`stageFirstChecks(T, book, id, { solid: true })` 另加实体检查（舞台上确有受光实体：不透明像素占比、明暗有起伏、转动相机后明暗分布改变；被挡住的标记点不到、看得见的点得到；书内静止后释放上下文、一碰取回），也可单独调用 `solidChecks(T, book, id, page, opts)`。页面声称的几何性质照样用测试里另写的算法核对（例如沿中线搬运法向，一圈反向、两圈复原）。本机无头 Chromium 用 SwiftShader 软件渲染，`viz-shots`、`viz-thumbs` 截到的就是实体画面。
+**混合舞台与透明度**：同一页只有个别卡画实体时，每帧先 `sc.active(是否实体卡)`。二维卡随后用原来的 `canvas` 调用 `kit.plot`；运行时交还画布并隐藏实体标签。实体上叠二维读数时，用 `const overlay = sc.overlay()` 取得独立画布，再用 `kit.plot(overlay, …)`；不要在 WebGL 的画布上取二维上下文。
+
+`surface`、`poly`、`tube` 的半透明对象默认不挡标签与标记，`pick: false` 让拾取射线穿过它；需要覆盖默认遮挡语义时显式写 `occlude: true|false`。曲面可传 `alpha: (u, v) => …`，管子可传 `alpha: t => …`（`t` 是沿管长归一化的弧长，范围 0–1），例如 `alpha: t => Math.min(1, t / 0.1, (1 - t) / 0.1)` 让两端渐隐。`sc.circle(c, normal, r, s)` 画大圆或纬线，背半球默认变淡；`fade: false` 保留普通深度遮挡，`back` 调后半圈透明度。实体和 `stage3` 的虚线均按投影弧长连续，增加采样点不会把虚线变成实线。
+
+标签需要衬底时加 `.backed`，例如 `sc.tag('delta', p, 'δ', 'num c-cy backed')`；数值标签的 `c-cy` 等颜色类不会被 `.num` 覆盖。
+
+首帧异步准备着色器（浏览器支持并行编译时使用它），舞台显示准备状态；`await kit.ready()` 等待准备工作，测试用 `await settle(page)` 等到真正出图。点卡时，即使控件把舞台滚出了视口，仍更新这一帧并停放为图片；重新进入视口时再取上下文。
+
+**测试**：`stageFirstChecks(T, book, id, { solid: true })` 另加实体检查（舞台上确有受光实体：不透明像素占比、明暗有起伏、转动相机后明暗分布改变；被挡住的标记点不到、看得见的点得到；书内静止后释放上下文、一碰取回），也可单独调用 `solidChecks(T, book, id, page, opts)`。混合页面用 `{ solid: { preset: "torus" } }` 指定实体卡；未指定时检查打开页面的初始卡，不受遍历卡片后停在哪张影响。转动默认分别尝试左右、上下，取明暗变化较大的方向；`turn(page)` 可覆盖。静止检查在同一张卡上用 `kit.pause()` 暂停共享时钟，不等故事播完。完全球形且颜色均匀的对象在相机坐标光照下旋转不改变画面，应选有可见结构的实体卡来核对转动。页面声称的几何性质照样用测试里另写的算法核对（例如沿中线搬运法向，一圈反向、两圈复原）。本机无头 Chromium 用 SwiftShader 软件渲染，`viz-shots`、`viz-thumbs` 截到的就是实体画面。
 
 视频也能画同一个实体（`skills/book-film`、`templates/film/README.md` 的“实体镜头”）：把对象的造型与画法写成 `viz/<id>/model.js`（经典脚本，只用两边同名的图元，颜色由调用方传入），页面在 `main.js` 之前加载它，视频在 `film.json` 的 `scripts` 里列出它，改一处两边都变。
 
-成品示例：`books/example-monograph/viz/phase-torus/`（把相位正方形粘成环面：时间轴就是粘合，颜色是相位判据的三块，珠子可点），第一章按卡引用它的 `torus`。
+成品示例：[上游模板的 phase-torus 源码](https://github.com/the-omega-institute/trureturing-books-template/tree/main/books/example-monograph/viz/phase-torus)（`books/` 归书库所有，此示例不会随模板升级下发）（把相位正方形粘成环面：时间轴就是粘合，颜色是相位判据的三块，珠子可点），第一章按卡引用它的 `torus`。
 
 ### 2. 用共享的实验室版式
 
@@ -212,7 +220,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | --- | --- |
 | 重绘 | `const paint = kit.painter(draw, [要监听尺寸的元素])`；`paint()` 请求一帧，`kit.flush()` 走完进行中的过渡并立即重绘（测试用） |
 | 三维舞台（二维画布上） | `const st = kit.stage3(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `st.begin()` … `st.sphere()`、`st.arc(u, v)`、`st.arrow(a, b)`、`st.path(pts)`、`st.poly(pts)`、`st.dot(p)`、`st.circle(c, n, r)`、`st.tag(key, p, html, cls)` … `st.end()`；`st.pick(ev)` 取指针下的球面点，`st.view('iso' \| 'front' \| 'top')`。虚线 `{ dash: [on, off] }`（像素）沿整条投影后的路径连续，采样疏密画出来一样，不必自己按弧长切段 |
-| 受光的实体（three.js，首次调用才加载） | `const sc = kit.solid(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `sc.begin()` … `sc.surface(key, f, s)`、`sc.glass(key, c, r)`、`sc.poly(key, { vertices, faces })`、`sc.tube(key, pts)`、`sc.line(pts)`、`sc.arrow(a, b)`、`sc.ring(p)`、`sc.bead(p)`、`sc.fan(pts)`、`sc.tag(…)` … `sc.end()`；`sc.hit(ev)`、`sc.nearest(ev, pts, px)`、`sc.occluded(p)`、`sc.view(…)`；`kit.ready()` |
+| 受光的实体（three.js，首次调用才加载） | `const sc = kit.solid(el, { canvas, onChange: paint, onPick, onDrag })`；每帧 `sc.begin()` … `sc.surface(key, f, s)`、`sc.glass(key, c, r)`、`sc.poly(key, { vertices, faces })`、`sc.tube(key, pts)`、`sc.line(pts)`、`sc.circle(c, normal, r, s)`、`sc.arrow(a, b)`、`sc.ring(p)`、`sc.bead(p)`、`sc.fan(pts)`、`sc.tag(…)` … `sc.end()`；`sc.hit(ev)`、`sc.nearest(ev, pts, px)`、`sc.occluded(p)`、`sc.view(…)`；`kit.ready()` |
 | 二维舞台与小图 | `const g = kit.plot(canvas, { x, y, pad, equal, logY })`；`g.axes()`、`g.line()`、`g.area()`、`g.rect()`、`g.poly()`、`g.dot()`、`g.arrow([x0, y0], [x1, y1], { color, width, dash, head, headSize, glow, alpha })`（数据坐标，用法同 `st.arrow`）、`g.vline()`、`g.hline()`、`g.text()`、`g.legend()`（文字可写 `_{…}`、`^{…}` 或片段数组）；`g.invX/invY` 把指针换回数据坐标 |
 | 同一页既有二维又有三维场景 | 共用一块画布和一个 `kit.stage3`：二维场景里先 `st.begin(); st.end();` 再 `kit.plot(canvas, …)`；`onPick` 在二维场景返回 `true` 接管拖动（否则拖动会悄悄转动相机），并随场景切换舞台的 `still` 类 |
 | 时间轴 | `kit.clock({ range, play, label, speeds, max, rate, step, format, onChange })` → `set`、`setMax`、`play`、`pause`、`stepBy`；键盘 Space / ← → / Home / End 已绑定（用指针点过卡或 `kit.chips` 的按钮后焦点在舞台上，空格即播放）。`format(t, max)` 在构造时就被调用一次：只用这两个参数与页面状态，不引用时钟变量本身 |
