@@ -238,8 +238,8 @@ class WrittenProofEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence.doi_url(doi), 'https://doi.org/10.1002/%28SICI%291097-4571%3B2-0%3Fx%23y%25z')
         for value in (None, True, '10.1000/a\u200bb', '10.1000/a\nb'):
             self.assertEqual(evidence.doi_url(value), '')
-        self.assertIsNotNone(evidence.parse_request_title(evidence.request_title('结果', DOI, SOURCE)))
-        for title in ('结果', f'[形式化]  | DOI:{DOI} | {SOURCE}', '[形式化] X | DOI:not-a-doi | Theorem 1'):
+        self.assertIsNotNone(evidence.parse_request_title(evidence.request_title('A result', DOI, SOURCE)))
+        for title in ('A result', '[形式化] X | DOI:10.1000/a | Theorem 1', f'[Formalization]  | DOI:{DOI} | {SOURCE}', '[Formalization] X | DOI:not-a-doi | Theorem 1'):
             self.assertIsNone(evidence.parse_request_title(title))
 
     def test_existing_issue_requires_registration_of_this_book_and_source(self):
@@ -248,14 +248,14 @@ class WrittenProofEvidenceTests(unittest.TestCase):
             site_config = config.load_site()
             use = requests.marker(site_config.repo, edition.edition.book.slug, 'thm-a')
             source = requests.registration(DOI, SOURCE)
-            issue = {'title':evidence.request_title('结果', DOI, SOURCE), 'body':use + '\n' + source, 'comments':0}
+            issue = {'title':evidence.request_title('A result', DOI, SOURCE), 'body':use + '\n' + source, 'comments':0}
             with mock.patch.object(requests, '_api', return_value=issue):
                 self.assertEqual(requests.check([edition], site_config), [])
             issue['body'] = 'Another book uses this result.'
             with mock.patch.object(requests, '_api', return_value=issue):
                 self.assertTrue(any('register every book/result' in i.message for i in requests.check([edition], site_config)))
             # Reuse the same mathematical request even when another DOI proves the result.
-            issue['title'] = evidence.request_title('同一结果', '10.1000/another.source', 'Lemma 3')
+            issue['title'] = evidence.request_title('The same result', '10.1000/another.source', 'Lemma 3')
             issue['comments'] = 1
             with mock.patch.object(requests, '_api', side_effect=[issue, [{'body':use + '\n' + source}]]):
                 self.assertEqual(requests.check([edition], site_config), [])
@@ -293,6 +293,18 @@ class WrittenProofEvidenceTests(unittest.TestCase):
             with mock.patch.object(requests, '_api', side_effect=[[{'body':'other'}] * 100, [{'body':'marker\nsource'}]]) as api:
                 self.assertTrue(requests.registered({'body':'', 'comments':101}, 1, {'marker':'source'}))
                 self.assertEqual(api.call_count, 2)
+
+    def test_request_title_uses_english_edition_name(self):
+        with CoreRepo() as repo:
+            book = WrittenProofTests().book(repo)
+            for lang, title in [('zh', '中文结果'), ('en', 'A result in English')]:
+                p = book.edition(lang).dir / 'ch01.md'
+                p.write_text(p.read_text().replace('#thm-a ', f'#thm-a title="{title}" '))
+            editions = list(model.load_book_models(book).values())
+            group, = requests.collect(iter(editions))
+            self.assertEqual(group['suggested_title'], evidence.request_title('A result in English', DOI, SOURCE))
+            group, = requests.collect(ed for ed in editions if ed.lang == 'zh')
+            self.assertTrue(group['suggested_title'].startswith('[Formalization] thm-a |'))
 
     def test_shared_request_counts_books_and_results_once(self):
         with CoreRepo() as repo:

@@ -7,6 +7,7 @@ import unicodedata
 from urllib.parse import quote
 
 REQUEST_REPO = "the-omega-institute/trureturing-requests"
+REQUEST_TITLE_PREFIX = "[Formalization] "
 REQUEST_PREFIX = f"https://github.com/{REQUEST_REPO}/issues/"
 
 
@@ -17,7 +18,7 @@ def request_number(value: str | None) -> int | None:
 
 
 def request_title(name: str, doi: str, source: str) -> str:
-    return f"[形式化] {name} | DOI:{doi} | {source}"
+    return f"{REQUEST_TITLE_PREFIX}{name} | DOI:{doi} | {source}"
 
 
 def source_location(value: str | None) -> bool:
@@ -27,8 +28,8 @@ def source_location(value: str | None) -> bool:
 
 def parse_request_title(title: str) -> tuple[str, str] | None:
     parts = title.split(" | ")
-    if (len(title) <= 256 and len(parts) == 3 and parts[0].startswith("[形式化] ")
-            and bool(parts[0][6:].strip()) and parts[1].startswith("DOI:")
+    if (len(title) <= 256 and len(parts) == 3 and parts[0].startswith(REQUEST_TITLE_PREFIX)
+            and bool(parts[0][len(REQUEST_TITLE_PREFIX):].strip()) and parts[1].startswith("DOI:")
             and doi_url(parts[1][4:]) and source_location(parts[2])):
         return parts[1][4:], parts[2]
     return None

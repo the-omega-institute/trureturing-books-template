@@ -27,7 +27,7 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 3. 找到但陈述不同 → 判断书中陈述能否作为它的忠实特例或推论；能，就在 trureturing 里补一条小定理（仍走下面的流程），不要在书里“近似地”引用。
 
 源文已有证明且能引用 DOI、只是尚无匹配 Lean 验证时，先按 `skills/book-write` 保留显式书面证明状态。
-按 `docs/FORMALIZATION-REQUESTS.md` 搜索并复用已有 issue，在正文或评论登记本书用途，没有匹配项才新建；这不自动授权上游 Lean 工作；需要形式化且已获授权时才继续。冻结了陈述同一结果的声明后，
+按 `docs/FORMALIZATION-REQUESTS.md` 搜索并复用已有 issue，用英文正文或评论登记本书用途，标题也用英文，没有匹配项才新建；这不自动授权上游 Lean 工作；需要形式化且已获授权时才继续。冻结了陈述同一结果的声明后，
 在所有语言同步删掉 status、proof、doi、source 与 request 属性、添加 `lean` 并复核原书面论证。
 
 ### 1. 在 trureturing 中形式化

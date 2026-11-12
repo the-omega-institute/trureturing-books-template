@@ -30,13 +30,16 @@ def entries(editions):
 
 
 def collect(editions) -> list[dict]:
+    editions = list(editions)
+    english_names = {(ed.edition.book.slug, env.id): env.title for ed in editions if ed.lang == "en"
+                     for env in ed.formal_envs() if env.title}
     groups = {}
     for edition, env in entries(editions):
         url = env.attrs.get("request") or ""
         key = url or f"{edition.edition.book.slug}#{env.id}"
         group = groups.setdefault(key, {
             "request": url, "sources": [],
-            "suggested_title": evidence.request_title(env.title or env.id, env.attrs.get("doi") or "", env.attrs.get("source") or ""),
+            "suggested_title": evidence.request_title(english_names.get((edition.edition.book.slug, env.id)) or env.id, env.attrs.get("doi") or "", env.attrs.get("source") or ""),
             "uses": [],
         })
         group["uses"].append({"book": edition.edition.book.slug, "id": env.id,
@@ -107,7 +110,7 @@ def check(editions, site: config.Site, *, offline=False) -> list[model.Issue]:
                 report("error", "the URL names a pull request, not a formalization issue")
                 continue
             if not evidence.parse_request_title(issue.get("title", "")):
-                report("error", "title must be [形式化] <结果名称> | DOI:<bare DOI> | <original source location>")
+                report("error", "title must be [Formalization] <Result name> | DOI:<bare DOI> | <Source location>")
             markers = {marker(site.repo, ed.edition.book.slug, e.id): registration(e.attrs.get("doi"), e.attrs.get("source")) for ed, e in uses}
             if not site.repo or not registered(issue, number, markers):
                 report("error", "register every book/result in the issue body or a comment with " + ", ".join(sorted(markers)))

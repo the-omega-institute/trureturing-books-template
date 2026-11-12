@@ -22,7 +22,7 @@ description: 撰写或修改 books/<slug>/<lang>/ 下的章节时使用：定理
 
 ## 硬规则
 
-1. **显式区分验证状态。** `theorem / lemma / proposition / corollary` 默认带 `lean="<GID>"`，且锁文件解析为 Lean `theorem`。先检索并优先引用匹配的冻结 Lean 声明。仅在没有匹配验证、源文有书面证明且能引用 DOI 时，用 `status="written-proof" proof="<proof-id>" doi="<裸 DOI>" source="<原文定位>" request="<issue URL>"`，不得带 `lean`，每个语言版本必须有同 id 的非空 proof 块（可跨章）。只有真正开放的结果才用 `conjecture/problem`。书面证明由作者评审负责，工具不检查数学正确性或自动判定是否已有匹配 Lean 证明。必须在 trureturing-requests 搜索复用或新建 issue，并登记书籍用途，标题与标记见 `docs/FORMALIZATION-REQUESTS.md`。见 AUTHORING §2。
+1. **显式区分验证状态。** `theorem / lemma / proposition / corollary` 默认带 `lean="<GID>"`，且锁文件解析为 Lean `theorem`。先检索并优先引用匹配的冻结 Lean 声明。仅在没有匹配验证、源文有书面证明且能引用 DOI 时，用 `status="written-proof" proof="<proof-id>" doi="<裸 DOI>" source="<原文定位>" request="<issue URL>"`，不得带 `lean`，每个语言版本必须有同 id 的非空 proof 块（可跨章）。只有真正开放的结果才用 `conjecture/problem`。书面证明由作者评审负责，工具不检查数学正确性或自动判定是否已有匹配 Lean 证明。必须在 trureturing-requests 搜索复用或新建 issue，并用英文标题、正文与评论登记书籍用途，标题与标记见 `docs/FORMALIZATION-REQUESTS.md`。见 AUTHORING §2。
 2. **陈述要忠实。** Lean 验证结果的书面陈述必须与 Lean 声明一致；written-proof 结果必须忠实于源文的陈述与论证（改写须保持同一结果；特例或变体只作明确比较，不当作该结果的验证）。引用 Lean 前先读源文件（锁文件里有行号：`./tbook check` 通过后，链接指向 `blob/<commit>/<module>.lean#L<line>`）和 trureturing 的 `Blueprint/<module>.md`。不夸大：存在性定理不写成算法，反例不写成“最小反例”。
 3. **证明块按证据负责。** Lean 结果的 proof 用于解释，可指向完整内核证明。written-proof 的关联 proof 必须忠实给出源文论证并注明出处，由作者与评审核对；不得声称由 Lean 检查。
 4. **多语言逐条对齐。** 每个语言版本的章节文件名、顺序相同；每章的环境序列（种类、`#id`、`lean`、`status`、`proof`、`doi`、`source`、`request`）与媒体序列完全相同。先改权威版本（`editions` 的第一个，默认中文），再同步其他版本。英文要自然、准确，不逐字硬译。

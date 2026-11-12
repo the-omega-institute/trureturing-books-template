@@ -60,7 +60,7 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "e557b3cdcca66a704cb917e5c1bb3fef78e4786b58c157640c93537fa837ff2d",
+      "sha256": "c51667e20517a1cfb060c8e514a587242f658debe8991d141b5f8c3de4c83985",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
@@ -80,7 +80,7 @@
       "mode": "100644"
     },
     "docs/FORMALIZATION-REQUESTS.md": {
-      "sha256": "2d92cdd89576e2dee36eef085de5fe0662749a961235f040cc8cd44ece930776",
+      "sha256": "8353b039d060daf098d4e1cb1574447487848ef638c696c8326f3f99014dfcf3",
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
@@ -140,7 +140,7 @@
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "3439b10eb4b413cb3f70331014d9b93f6f45fc986a2bfae0bd6a60502b45f069",
+      "sha256": "46edf129495bf04e2f1205deded65a8ce365e8cab29ce70e772fd9c072cd1bbd",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
@@ -148,7 +148,7 @@
       "mode": "100644"
     },
     "skills/theorem-formalize/SKILL.md": {
-      "sha256": "487263c0d961d6cd506f88e3ce40e38d873f26506774d24ed666cc547c65b6e9",
+      "sha256": "c6967b45fbace864a1d215dedb865a24d8707821106dfe97fe664d32f3d82537",
       "mode": "100644"
     },
     "skills/trureturing-pin/SKILL.md": {
@@ -704,7 +704,7 @@
       "mode": "100644"
     },
     "tools/tbook/evidence.py": {
-      "sha256": "0ecd8d3a99f4def76020148b91ac8a055c7cc49be6ee6bbfe3c9db5953afd3c0",
+      "sha256": "003f2db5ba284ef997172ae95bf5df5375263cb5d17428fcef3d5a55d4878dbb",
       "mode": "100644"
     },
     "tools/tbook/figkit.py": {
@@ -768,7 +768,7 @@
       "mode": "100644"
     },
     "tools/tbook/requests.py": {
-      "sha256": "211c10879b819cd33dc6735e9544abe0ffe8bb6d5bc1ef5b91811da015edaa0c",
+      "sha256": "a848ca610919a288f55d3cc25403448932c5b256c31def6e89077086f88a3bcf",
       "mode": "100644"
     },
     "tools/tbook/serve.py": {
@@ -960,7 +960,7 @@
       "mode": "100644"
     },
     "tools/tests/test_written_proof.py": {
-      "sha256": "2b35254ce19b8b3deb9efa5a5afd136ebafc950c638665a7110fe244146c8d97",
+      "sha256": "7c8625ada5b7d40a088e68b58092f36200d0da9349973ce3e60f8d546c9e697c",
       "mode": "100644"
     },
     "tools/tests/viz_runtime_harness.mjs": {
