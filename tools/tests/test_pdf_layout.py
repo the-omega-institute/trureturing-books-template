@@ -88,6 +88,33 @@ class PdfLayoutTest(unittest.TestCase):
         self.assertNotIn(b"linearGradient", svg)
         self.assertNotIn(b"radialGradient", svg)
 
+    def test_academic_blank_versos_have_no_folio(self):
+        import typst
+
+        main = self.stage / "blank.typ"
+        main.write_text(r'''#import "/_theme/typst/book.typ": *
+#show: tr-book
+#tr-chapter(id: "preface", section: "prefix", title: [Preface])
+#context metadata((role: "preface", folio: counter(page).get().first()))
+Preface text.
+#tr-chapter(id: "chapter", section: "numbered", title: [Chapter])
+#context metadata((role: "chapter", folio: counter(page).get().first()))
+Body text.
+''', encoding="utf-8")
+        meta = dict(self.meta, description="", cjk=False, lang="en")
+        target = self.stage / "blank-meta.json"
+        target.write_text(json.dumps(meta), encoding="utf-8")
+        pages = typst.compile(str(main), format="svg", root=str(self.stage),
+                              font_paths=[str(p) for p in tp.font_dirs()],
+                              sys_inputs={"tr-variant": "academic", "tr-meta": "/blank-meta.json"})
+        self.assertNotIn(b"<use ", pages[3], "inserted verso must contain no text glyphs")
+        values = json.loads(typst.query(str(main), "metadata", field="value", root=str(self.stage),
+                              font_paths=[str(p) for p in tp.font_dirs()],
+                              sys_inputs={"tr-variant": "academic", "tr-meta": "/blank-meta.json"}))
+        folios = {v["role"]: v["folio"] for v in values if isinstance(v, dict) and "folio" in v}
+        self.assertGreater(folios["preface"], 1)
+        self.assertEqual(folios["chapter"], 1)
+
     def test_formulas_and_code_stay_inside_their_containers(self):
         import typst
 

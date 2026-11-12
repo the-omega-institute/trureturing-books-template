@@ -80,7 +80,7 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "6a25d97d5187c10da53fcd3d95d370df61d7064a6ada9528857eccb9be4ec4e7",
+      "sha256": "72c023a69e42e85419ecf3ea736610913bf7246a7abc29876bd0aac894e98bf3",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -464,7 +464,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "3849823aee33ec5e392ab5a7361811ebf918bd37c95166535e6c8ac86c598d07",
+      "sha256": "6bcccd0618fbf5edd32b467782bf5e379a8d0e623e8a7bdb1ba3e81d64fca110",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -816,7 +816,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "b10630804250a7d077481ed421ea6abe538119afa1e6ac9c293418bb31de46e2",
+      "sha256": "9e7914168f4e23410e403f8dadd9d29393a0eeddf226fc49fe35d165cf688405",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {

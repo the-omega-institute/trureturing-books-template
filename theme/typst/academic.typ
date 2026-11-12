@@ -19,6 +19,18 @@
 #let tr-fig-ext = ".print.svg"
 #let chapter-start = <tr-academic-chapter-start>
 #let chapter-end = <tr-academic-chapter-end>
+#let main-start = <tr-academic-main-start>
+#let in-main() = {
+  let starts = query(main-start)
+  starts.len() > 0 and here().page() >= starts.first().location().page()
+}
+#let folio-numbering(n) = context numbering(if in-main() { "1" } else { "i" }, n)
+#let main-boundary() = {
+  [#metadata("main")#main-start]
+  context {
+    if query(main-start).first().location().page() == here().page() { counter(page).update(1) }
+  }
+}
 
 #let fit-width(body, width) = {
   let natural = measure(body)
@@ -55,7 +67,7 @@
 }
 
 #let running-header = context {
-  if on-opener-page() or on-blank-page() { return }
+  if not in-main() or on-opener-page() or on-blank-page() { return }
   let before = query(heading.where(level: 1).before(here()))
   let chapter = if before.len() > 0 { before.last().body } else { [] }
   let folio = text(size: 8.5pt, counter(page).display(here().page-numbering()))
@@ -70,12 +82,16 @@
 }
 
 #let opening-footer = context {
-  if on-opener-page() and not on-blank-page() {
+  if not on-blank-page() and (not in-main() or on-opener-page()) {
     align(center, text(size: 9pt, counter(page).display(here().page-numbering())))
   }
 }
 
-#let front-footer = context align(center, text(size: 9pt, counter(page).display(here().page-numbering())))
+#let front-footer = context {
+  if not on-blank-page() {
+    align(center, text(size: 9pt, counter(page).display(here().page-numbering())))
+  }
+}
 
 #let title-page() = page(header: none, footer: none, {
   set par(first-line-indent: 0pt, justify: false, leading: 0.45em)
@@ -135,6 +151,7 @@
 #let tr-chapter(id: "", kicker: "", section: "", outlined: true, title: []) = {
   new-recto()
   [#metadata(section)#chapter-start]
+  if section != "prefix" { main-boundary() }
   v(10mm)
   let hd = heading(level: 1, outlined: outlined, bookmarked: outlined, title)
   if id != "" [#hd#label(id)] else { hd }
@@ -144,6 +161,7 @@
 #let tr-part(id: "", kicker: "", section: "", outlined: true, title: []) = {
   new-recto()
   [#metadata("part")#chapter-start]
+  main-boundary()
   v(1fr)
   let hd = heading(level: 1, outlined: outlined, bookmarked: outlined, title)
   align(center, if id != "" [#hd#label(id)] else { hd })
@@ -193,7 +211,7 @@
 
 #let tr-media(kind: "media", body) = block(width: 100%, above: 1.2em, below: 1.2em, breakable: true, {
   set par(first-line-indent: 0pt, justify: false, leading: 0.45em, spacing: 0.5em)
-  set text(size: 9pt)
+  set text(size: if kind == "figure" { 8.5pt } else { 9pt })
   show link: it => if type(it.dest) == str and it.body == text(it.dest) {
     text(size: 7.5pt, fill: secondary, it)
   } else { it }
@@ -301,7 +319,6 @@
   contents-page()
   [#metadata("end")#chapter-end]
   pagebreak(weak: true, to: "odd")
-  set page(numbering: "1", header: running-header, footer: opening-footer)
-  counter(page).update(1)
+  set page(numbering: folio-numbering, header: running-header, footer: opening-footer)
   doc
 }
