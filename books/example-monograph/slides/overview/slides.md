@@ -10,13 +10,13 @@ deck:
   book: "黄金整数与可观测性"
   title: "概览"
   version: "0.1.0"
-  blurb: "模板的保证、第一章与第二章的主要定理、一个开放问题与全部输出：十页看懂这本示例专著。"
+  blurb: "模板的保证、第一章与第二章的主要定理、一个开放问题与全部输出。"
 layout: cover
 ---
 
 <p class="kicker">示例专著 · 演示文稿</p>
 <h1 class="display">黄金整数<br>与<em>可观测性</em></h1>
-<p class="lead">一本每条定理都经 Lean 内核验证的示例专著。书负责解释，Lean 负责成立：每条定理都对应 trureturing 中一条已冻结的声明。</p>
+<p class="lead">区分 Lean 验证、书面证明与开放问题的示例专著。已有匹配的冻结 Lean 验证时必须引用；书面证明附 DOI 与形式化请求。</p>
 
 ---
 # 02 模板的保证
@@ -25,18 +25,18 @@ section: "模板的保证"
 
 <div class="body">
   <p class="kicker">What the template guarantees</p>
-  <h2 class="t">每条定理都对应一条<em>冻结的 Lean 声明</em></h2>
-  <p class="lead">书中的定理、引理、命题与推论都写明 trureturing 中的声明；构建在所钉的提交上逐条核对，缺一条就不发布。</p>
+  <h2 class="t">优先引用<em>冻结的 Lean 声明</em></h2>
+  <p class="lead">Lean 结果在所钉提交上逐条核对；只有没有匹配验证时，才允许有 DOI、关联证明与请求登记的书面证明。</p>
   <div class="flow mt-l">
-    <div class="step"><span class="i">01 · 书</span><b>写明 GID</b><p>每条形式结论带 <code>lean="…"</code>，至少一条。</p></div>
+    <div class="step"><span class="i">01 · 书</span><b>写明 GID</b><p>Lean 验证结果带 <code>lean="…"</code>，至少一条。</p></div>
     <div class="step"><span class="i">02 · 锁文件</span><b>钉住提交</b><p><code>trureturing.lock.json</code> 记录提交与解析结果。</p></div>
     <div class="step"><span class="i">03 · 冻结</span><b>只引冻结声明</b><p>列在 <code>Golden/Frozen/state</code> 中，种类为 theorem。</p></div>
     <div class="step ok"><span class="i">04 · 内核</span><b><LeanBadge gid="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" /></b><p>徽章链接到所钉提交上的 Lean 源码。</p></div>
   </div>
   <div class="g3 mt-l">
-    <Stat value="33" label="条形式结论（全书），全部经 Lean 内核验证" tone="ok" />
+    <Stat value="33" label="条 Lean 验证结论（全书）" tone="ok" />
     <Stat value="3" label="个开放问题与猜想（全书），标为 OPEN" tone="warn" />
-    <Stat value="0" label="条未验证的引用：./tbook check 拒绝发布" />
+    <Stat value="1" label="条书面证明，附 DOI 与形式化请求" />
   </div>
 </div>
 <Source>docs/ARCHITECTURE.md §1、§4；trureturing.lock.json</Source>
@@ -97,6 +97,24 @@ section: "第一章 · 亏量"
   </div>
 </div>
 <Source>D5/S1/Deficit/DeficitInteger.lean · 第一章 定理1.2 与定理1.3 的证明</Source>
+
+---
+section: "第一章 · 书面证明"
+---
+
+<div class="body">
+  <p class="kicker">Written proof · 命题 1.12</p>
+  <h2 class="t">从相位面积到<em>数对的极限频率</em></h2>
+<TheoremCard class="mt-s" label="命题1.12" title="亏量的极限频率" status="written-proof" cite="rem-areas-not-frequencies" doi="10.1007/BF01475864" source="pp.313-352 (equidistribution; derived result)" request="https://github.com/the-omega-institute/trureturing-requests/issues/1">
+
+令 $a_n^+$、$a_n^-$ 为 $0\le v_1,v_2<n$ 中亏量取 $+1$、$-1$ 的比例。
+
+$$\lim_{n\to\infty}a_n^+=\frac{1}{2\varphi^2},\qquad \lim_{n\to\infty}a_n^-=\frac{1}{2\varphi^4}.$$
+
+</TheoremCard>
+  <p class="lead mt">Weyl 等分布定理给出一维区间比例；矩形计数的乘积与网格夹逼把它推广到两个相位三角形。该推导尚无匹配的冻结 Lean 验证，已登记形式化请求。</p>
+</div>
+<Source>书面论证 · pf-deficit-frequencies · trureturing-requests#1</Source>
 
 ---
 # 06 第二章
@@ -168,7 +186,7 @@ section: "输出"
 <div class="body">
   <p class="kicker">One source, every format</p>
   <h2 class="t">一份 Markdown，<em>六种输出</em></h2>
-  <p class="lead">编号、徽章与 Lean 链接在各端一致；中文为权威版本，英文逐条对齐。</p>
+  <p class="lead">编号、证据徽章与来源链接在各端一致；中文为权威版本，英文逐条对齐。</p>
   <div class="g3 mt">
     <div class="tile"><i>MDBOOK</i><b>HTML</b><span>在线阅读：KaTeX 数学、中英文切换，定理链接到 Lean 源码。</span></div>
     <div class="tile"><i>TYPST</i><b>PDF</b><span>屏幕版深色、印刷版白底，同一套编号与徽章。</span></div>

@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from . import config, lean
+from . import config, lean, render
 from .model import FORMAL, OPEN, EditionModel, Env
 
 LEDGER_FILE = "verification-ledger.md"
@@ -83,7 +83,7 @@ def ledger_markdown(model: EditionModel, lock: lean.Lock | None,
         proof = model.envs.get(env.attrs.get("proof"))
         proof_link = f" · [{s('env.proof')}]({href(proof)})" if proof and proof.kind == "proof" else ""
         title = f" — {model.title_markdown(env, link)}" if env.title else ""
-        out.append(f"- [{env.ref_text(lang)}]({href(env)}){title}{proof_link}")
+        out.append(f"- [{env.ref_text(lang)}]({href(env)}){title}{proof_link} · {render.source_markdown(env)}")
     if not written:
         out.append(s("ledger.none"))
     out.append("")

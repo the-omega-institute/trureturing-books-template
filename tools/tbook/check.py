@@ -17,7 +17,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from . import config, lean, mdscan, paths, render
+from . import config, evidence, lean, mdscan, paths, render
 from .model import (DEFINITION, FORMAL, MEDIA, NUMBERED, OPEN, PROOF, WRITTEN_PROOF, EditionModel, Issue, load_book_models, kind_of,
                     media_cited_gids)
 from .summary import Chapter, Summary, chapter_prefix
@@ -53,6 +53,12 @@ def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
             if "status" in env.attrs.kv and status != WRITTEN_PROOF:
                 _err(issues, *where, f'unknown result status {status!r}; use status="written-proof" or omit status')
             if status == WRITTEN_PROOF:
+                if not evidence.doi_url(env.attrs.get("doi")):
+                    _err(issues, *where, 'a written-proof result requires doi="10.<registrant>/<suffix>" citing its source proof (a bare DOI, not a URL)')
+                if not evidence.source_location(env.attrs.get("source")):
+                    _err(issues, *where, 'a written-proof result requires source="<original theorem number or section/page>"')
+                if evidence.request_number(env.attrs.get("request")) is None:
+                    _err(issues, *where, 'a written-proof result requires request="' + evidence.REQUEST_PREFIX + '<number>"; reuse an existing issue or create one')
                 if env.kind not in FORMAL:
                     _err(issues, *where, 'status="written-proof" is only for theorem/lemma/proposition/corollary, not open items or other environments')
                 if "lean" in env.attrs.kv:
@@ -355,7 +361,8 @@ def check_footnotes(model: EditionModel, issues: list[Issue]) -> None:
 def _env_signature(model: EditionModel) -> list:
     sig = []
     for ch in model.chapters:
-        items = [(e.kind, e.id, tuple(e.lean), e.attrs.get("status"), e.attrs.get("proof"))
+        items = [(e.kind, e.id, tuple(e.lean), e.attrs.get("status"), e.attrs.get("proof"),
+                  e.attrs.get("doi"), e.attrs.get("source"), e.attrs.get("request"))
                  for e in ch.envs if e.kind in NUMBERED + PROOF]
         # a cited card (viz preset=…) is part of the citation: every edition cites the same card at the same place
         items += [(e.kind, e.attrs.get("src"), (e.attrs.get("preset"),) if e.attrs.get("preset") else ()) for e in ch.media]
@@ -618,6 +625,8 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
             except NotImplementedError:
                 pass
     extra = [c for book in books for c in media_cited_gids(book)]
+    from . import requests
+    issues.extend(requests.check((m for editions in models_by_book.values() for m in editions.values()), site, offline=offline))
     check_cache(issues)
     check_lean(models_by_book, lock, site, issues, offline=offline, extra_cited=extra,
                cited_elsewhere=_cited_by_other_books(books))

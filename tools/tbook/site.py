@@ -76,7 +76,7 @@ KATEX_CSS = "katex/katex.min.css"  # below assets/, with its fonts in assets/kat
 SITE_I18N: dict[str, dict[str, str]] = {
     "zh": {
         "skip": "跳到正文",
-        "lede": "书中每一条定理都引用 trureturing 中一条已由 Lean 内核验证并冻结的声明：文字负责解释，Lean 负责成立。",
+        "lede": "本书库区分 Lean 内核验证、书面证明与开放问题；只有 LEAN ✓ 表示陈述同一结果的冻结声明。",
         "nav_site": "站点信息",
         "lang_group": "界面语言",
         "source": "源码",
@@ -113,8 +113,7 @@ SITE_I18N: dict[str, dict[str, str]] = {
     },
     "en": {
         "skip": "Skip to content",
-        "lede": "Every theorem in these books cites a declaration in trureturing that the Lean kernel has verified "
-                "and that is frozen: the text explains, Lean establishes.",
+        "lede": "These books distinguish kernel-verified Lean results, written proofs and open questions. Only LEAN ✓ marks a matching frozen declaration.",
         "nav_site": "Site status",
         "lang_group": "Interface language",
         "source": "Source",
@@ -1079,6 +1078,8 @@ def verification_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str
             code = f"<code>{wbr(lv['name'] or gid)}</code>"
             decls.append(f'<a href="{esc(lv["url"])}" rel="noopener" title="{esc(gid)}">{code}</a>'
                          if lv["url"] else code)
+        if env.status == "written-proof":
+            decls.append(render.source_html(render.source_view(env)))
         return f"<li>{ref(env)}{title(env, chip)}" + (f'<span class="decls">{"".join(decls)}</span>' if decls else "") + "</li>"
 
     formal = render.verified_envs(model.formal_envs(), lock)
@@ -1472,6 +1473,7 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
             "media": {part: [str(i.get("id", "")) for i in v.media.get(part, [])] for part in MEDIA_PARTS},
             "files": files,
         })
+    from . import requests
     return {
         "schema": SCHEMA,
         "generated_at": _generated_at(),
@@ -1480,6 +1482,7 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
         "template": {"name": name or None, "version": version or None},
         "trureturing": {"repo": lock.repo, "commit": lock.commit, "branch": lock.branch or None} if lock else None,
         "books": books,
+        "formalization_requests": requests.collect(m for view in views for m in view.models.values()),
     }
 
 

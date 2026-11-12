@@ -15,9 +15,9 @@
 | 视觉 | trureturing 赛博朋克风，配色唯一来源 `theme/tokens.json` |
 
 源文有书面证明但没有匹配冻结声明时，保留形式结论种类，使用
-`status="written-proof" proof="<proof-id>"` 且不带 `lean`；每版要有对应的非空 proof 块。
+`status="written-proof" proof="<proof-id>"`，并填写 DOI、原文定位和 trureturing-requests issue；不得带 `lean`，每版要有对应的非空 proof 块。已有匹配 Lean 验证时必须优先使用 Lean。
 各端显示紫色“书面证明 / WRITTEN PROOF”，不带验证链接、不计入 Lean 数量，
-账本单列；真正开放才用 conjecture/problem。见 [写作手册](docs/AUTHORING.md)。
+账本单列；真正开放才用 conjecture/problem。见 [写作手册](docs/AUTHORING.md) 与 [形式化请求规范](docs/FORMALIZATION-REQUESTS.md)。
 
 传统学术报告也可用 Beamer：`./tbook slides new <book> <deck> "<title>" --academic --editions en`。白底 4:3（可选 16:9）、定理与 Lean 链接由书和锁生成，输出听众 PDF 与演讲备注 PDF，可使用书库自有主题。见 [theme/beamer/README.md](theme/beamer/README.md)。Slidev 继续提供现有的在线演示。
 
@@ -31,9 +31,9 @@
 :::
 ```
 
-`./tbook check` 在所钉的 trureturing 提交上读取 `Golden/Frozen/state/<module>.lean.json`——trureturing 冻结律下“已被内核验证并冻结”的唯一判据——确认该声明存在且是 `theorem`；缺少 Lean 引用的定理、引用了 Lean 的开放问题、过期或被手改的锁文件、中英版本不一致，都会让 CI 失败。`lean-verify` 工作流再生成一个依赖所钉 trureturing 的 Lake 工程，逐条检查公理闭包。详见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
+`./tbook check` 在所钉的 trureturing 提交上读取 `Golden/Frozen/state/<module>.lean.json`——trureturing 冻结律下“已被内核验证并冻结”的唯一判据——确认该声明存在且是 `theorem`；既无 Lean 引用又不满足书面证明要求的定理、引用了 Lean 的开放问题、过期或被手改的锁文件、中英版本不一致，都会让 CI 失败。`lean-verify` 工作流再生成一个依赖所钉 trureturing 的 Lake 工程，逐条检查公理闭包。详见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
 
-渲染后，每个定理框带绿色 `LEAN ✓` 徽章与指向所钉提交上 Lean 源（含行号）的链接，书末自动生成“形式化验证账本”；锁文件不能确认的形式结论显示红色 `UNVERIFIED`，徽章不是链接，锁文件没有的声明也不给链接（`./tbook check` 会报错，不能发布）。
+渲染后，Lean 验证定理框带绿色 `LEAN ✓` 徽章与指向所钉提交上 Lean 源（含行号）的链接，书末自动生成“形式化验证账本”；未按规定声明书面证明、锁文件也不能确认的形式结论显示红色 `UNVERIFIED`，徽章不是链接，锁文件没有的声明也不给链接（`./tbook check` 会报错，不能发布）。
 
 ## 快速开始
 

@@ -110,7 +110,7 @@ $$
 **The skeleton of the proof.** The dashed box is the starting point, the neutral boxes are the steps of the proof (in grey monospace, the trureturing lemma that does the step), and the two branches give the upper and the lower bound, meeting in the green [@thm-factor-complexity].
 :::
 
-[^sturm]: M. Morse, G. A. Hedlund, Symbolic dynamics, *Amer. J. Math.* 60 (1938), 815–866; for Sturmian words see their Symbolic dynamics II. Sturmian trajectories, *Amer. J. Math.* 62 (1940), 1–42. This is a result from the literature, not formalized in this book: the cited Lean declaration only counts the factors of the golden word and does not contain this periodicity theorem. The other direction is elementary: an eventually periodic word has only boundedly many distinct factors, while $n + 1$ is unbounded, so the golden word is not eventually periodic.
+[^sturm]: M. Morse, G. A. Hedlund, Symbolic dynamics, *Amer. J. Math.* 60 (1938), 815–866; for Sturmian words see their Symbolic dynamics II. Sturmian trajectories, *Amer. J. Math.* 62 (1940), 1–42. The low-complexity implication of eventual periodicity has a frozen Lean theorem at the pinned commit, [`eventuallyPeriodic_of_factor_complexity_le`](lean:D5/S1/Words/Complexity/MorseHedlund.eventuallyPeriodic_of_factor_complexity_le), for one-sided infinite words over a finite alphabet. The separate golden-word factor-counting declaration does not include this general result. The other direction is elementary: an eventually periodic word has only boundedly many distinct factors, while $n + 1$ is unbounded, so the golden word is not eventually periodic.
 
 ## Returns {#sec-returns}
 

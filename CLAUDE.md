@@ -15,9 +15,9 @@
 
 ## 规则
 
-1. **定理必须声明证据。** `theorem / lemma / proposition / corollary` 默认必须带 `lean="<GID>"`，GID 在所钉提交上必须存在于 trureturing 的 `Golden/Frozen/state/<module>.lean.json` 且种类为 `theorem`。源文有证明但没有匹配冻结声明时，用 `status="written-proof" proof="<proof-id>"` 且不带 `lean`，每版提供同 id 的非空 proof 块；紫色“书面证明”不计入 Lean 验证。真正未证结论只能写成 `conjecture` 或 `problem`。需要新定理时，先在 trureturing 中形式化并冻结（`skills/theorem-formalize`）。
+1. **定理必须声明证据。** `theorem / lemma / proposition / corollary` 默认必须带 `lean="<GID>"`，GID 在所钉提交上必须存在于 trureturing 的 `Golden/Frozen/state/<module>.lean.json` 且种类为 `theorem`。必须先检索匹配的冻结声明；已有匹配 Lean 验证时必须引用 Lean。仅在没有匹配验证、源文已有证明且能引用 DOI 时，用 `status="written-proof" proof="<proof-id>" doi="<裸 DOI>" source="<原文定位>" request="<issue URL>"` 且不带 `lean`，每版提供同 id 的非空 proof 块；DOI 必须支持同一陈述，issue 指向 trureturing-requests，先搜索并复用已有问题，在正文或评论登记本书用途，没有才新建。标题统一为 `[形式化] <结果名称> | DOI:<裸 DOI> | <原文定位>`，登记方式见 `docs/FORMALIZATION-REQUESTS.md`；紫色“书面证明”不计入 Lean 验证。真正未证结论只能写成 `conjecture` 或 `problem`。需要新定理时，先在 trureturing 中形式化并冻结（`skills/theorem-formalize`）。
 2. **陈述忠实。** Lean 验证结果的书面陈述与 Lean 陈述一致，书面证明结果忠实于源文；不夸大（存在性 ≠ 算法，反例 ≠ 最小反例）。Lean 结果的 `proof` 用于解释；书面证明结果的 proof 是作者与评审负责的论证。颜色有语义：绿色只给 Lean 已验证，琥珀色只给“现在/当前选择”，红色标开放问题，紫色标书面证明。
-3. **多语言逐条对齐。** 各语言版本章节文件名与顺序相同，每章环境序列（种类、`#id`、`lean`、`status`、`proof`）与媒体序列相同。先改权威版本，再同步其他版本；英文自然准确，不逐字硬译。
+3. **多语言逐条对齐。** 各语言版本章节文件名与顺序相同，每章环境序列（种类、`#id`、`lean`、`status`、`proof`、`doi`、`source`、`request`）与媒体序列相同。先改权威版本，再同步其他版本；英文自然准确，不逐字硬译。
 4. **锁文件只由工具写。** `./tbook pin` 更新所钉提交；`./tbook pin --refresh` 解析新增引用。升级提交时复核“陈述摘要变化”的定理（`skills/trureturing-pin`）。所钉提交必须在 `site.toml` 的 trureturing 分支（默认 `dev`）上，`./tbook pin` 与 `./tbook check` 都会核对；不要钉未合入的 PR 提交。
 5. **托管文件不在书库里改。** `template.toml` 的 `[managed].paths` 下的文件归模板所有；改进请回馈模板仓库（`skills/template-update`）。书库自己的 skill 放 `skills/local-<name>/`，自己的文档放 `docs/project/`。
 6. **版式服从内容，契约不可改。** 交互可视化按 `skills/book-viz` 的方法做：舞台就是页面，每张实验卡都是正文可以单独引用的图（`::: {.viz src=… preset=…}`）；按对象选舞台，不把所有主题套进同一副骨架。共享运行时（`theme/viz/`）、页面契约、依据标注类名与质量门（`stageFirstChecks`）是硬约束，不自造私有运行时或非标徽章。静态图按 `skills/book-figure` 由脚本生成（`books/<slug>/figures/`），只写颜色角色、不写色值，在讲到它的那句话旁用 `::: {.figure src=…}` 引用。视频与演示文稿对齐 `books/example-monograph/` 的示例（`films/001-golden-deficit/`、`slides/overview/`）与 `templates/`。
@@ -30,7 +30,8 @@
 
 ```bash
 ./tbook doctor                      # 工具链体检
-./tbook check                       # 结构、多语言对齐、Lean 引用
+./tbook check                       # 结构、多语言对齐、Lean 引用与形式化请求
+./tbook requests [--json]            # 按 issue 汇总书面证明的形式化需求
 ./tbook pin [--refresh|<sha>|<branch>|<tag>]  # 钉 trureturing 提交并解析声明
 ./tbook new-book <slug> --title zh=… --title en=…
 ./tbook new-chapter <slug> <name> --title zh=… --title en=…

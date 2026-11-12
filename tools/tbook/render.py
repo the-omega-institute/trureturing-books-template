@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from . import config, lean, mdscan
+from . import config, evidence, lean, mdscan
 from .model import FORMAL, MEDIA, ChapterDoc, EditionModel, Env
 
 # Inline links/images and link reference definitions, as every reader of links sees them (tbook.mdscan).
@@ -262,6 +262,7 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
         "badge_title": badge_title,
         "badge_url": badge_url,
         "lean": leans,
+        **source_view(env),
         "attrs": dict(env.attrs.kv),
     }
 
@@ -460,6 +461,8 @@ def mdbook_env(env: Env, view: dict, inner: str) -> str:
     parts = [f'<section class="{classes}" id="{esc(env.id)}" data-kind="{env.kind}">' if env.id
              else f'<section class="{classes}" data-kind="{env.kind}">',
              f'<header class="tr-env-head">{"".join(head)}</header>', "", inner.strip("\n"), ""]
+    if view.get("doi_url"):
+        parts.append('<footer class="tr-env-lean">' + source_html(view) + '</footer>')
     if view["lean"]:
         links = []
         for lv in view["lean"]:
@@ -477,6 +480,41 @@ def mdbook_env(env: Env, view: dict, inner: str) -> str:
 
 def env_lang(view: dict) -> str:
     return view.get("_lang", "en")
+
+
+def source_view(env: Env) -> dict:
+    written = env.status == "written-proof"
+    return {
+        "doi": env.attrs.get("doi") if written else "",
+        "doi_url": evidence.doi_url(env.attrs.get("doi")) if written else "",
+        "source": env.attrs.get("source") if written else "",
+        "request": env.attrs.get("request") if written and evidence.request_number(env.attrs.get("request")) else "",
+    }
+
+
+def source_html(view: dict) -> str:
+    """Written-proof provenance, kept separate from the non-link verification badge."""
+    if not view.get("doi_url"):
+        return ""
+    out = f'DOI: <a href="{esc(view["doi_url"])}">{esc(view["doi"])}</a>'
+    if view.get("source"):
+        out += " · " + esc(view["source"])
+    if view.get("request"):
+        out += f' · <a href="{esc(view["request"])}">trureturing-requests#{evidence.request_number(view["request"])}</a>'
+    return out
+
+
+def source_markdown(env: Env) -> str:
+    url = evidence.doi_url(env.attrs.get("doi")) if env.status == "written-proof" else ""
+    if not url:
+        return ""
+    text = f'DOI: [{mdscan.escape_markdown(env.attrs.get("doi"))}]({url})'
+    if env.attrs.get("source"):
+        text += " · " + mdscan.escape_markdown(env.attrs.get("source"))
+    number = evidence.request_number(env.attrs.get("request"))
+    if number:
+        text += f' · [trureturing-requests#{number}]({env.attrs.get("request")})'
+    return text
 
 
 def pandoc_env(env: Env, view: dict, inner: str) -> str:
@@ -502,6 +540,8 @@ def pandoc_env(env: Env, view: dict, inner: str) -> str:
         kv["tr-lean-name"] = " ".join(lv["name"] or lv["gid"] for lv in view["lean"])
         kv["tr-lean-url"] = " ".join(lv["url"] or "-" for lv in view["lean"])
     fence = ":" * 6
+    if source := source_markdown(env):
+        inner = inner.rstrip("\n") + "\n\n" + source + "\n"
     return f"{fence} {attrs.to_pandoc()}\n{inner.strip(chr(10))}\n{fence}"
 
 

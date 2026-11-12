@@ -10,13 +10,13 @@ deck:
   book: "Golden Integers and Observability"
   title: "Overview"
   version: "0.1.0"
-  blurb: "The template's guarantees, the main theorems of Chapters 1 and 2, one open problem and every output: the sample monograph in ten slides."
+  blurb: "The template's guarantees, the main theorems of Chapters 1 and 2, one open problem and every output."
 layout: cover
 ---
 
 <p class="kicker">Sample monograph · Slides</p>
 <h1 class="display">Golden Integers<br>and <em>Observability</em></h1>
-<p class="lead">A sample monograph whose every theorem is kernel-verified in Lean. The book explains, Lean decides: each theorem corresponds to a declaration frozen in trureturing.</p>
+<p class="lead">A sample monograph distinguishing Lean verification, written proofs and open questions. Matching frozen Lean results take priority; written proofs include a DOI and formalization request.</p>
 
 ---
 # 02 What the template guarantees
@@ -25,18 +25,18 @@ section: "Guarantees"
 
 <div class="body">
   <p class="kicker">What the template guarantees</p>
-  <h2 class="t">Every theorem cites a <em>frozen Lean declaration</em></h2>
-  <p class="lead">Each theorem, lemma, proposition and corollary names its declaration in trureturing; the build checks every one at the pinned commit and publishes nothing if one is missing.</p>
+  <h2 class="t">Give priority to <em>frozen Lean declarations</em></h2>
+  <p class="lead">Lean results are checked at the pinned commit. Only without matching verification may a written proof be used, with a DOI, associated argument and registered request.</p>
   <div class="flow mt-l">
-    <div class="step"><span class="i">01 · Book</span><b>Name the GID</b><p>Every formal result carries <code>lean="…"</code>, at least one.</p></div>
+    <div class="step"><span class="i">01 · Book</span><b>Name the GID</b><p>Lean results carry <code>lean="…"</code>, at least one.</p></div>
     <div class="step"><span class="i">02 · Lock</span><b>Pin a commit</b><p><code>trureturing.lock.json</code> records the commit and what it resolved.</p></div>
     <div class="step"><span class="i">03 · Frozen</span><b>Frozen only</b><p>Listed in <code>Golden/Frozen/state</code>, of kind theorem.</p></div>
     <div class="step ok"><span class="i">04 · Kernel</span><b><LeanBadge gid="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued" /></b><p>The badge links to the Lean source at the pinned commit.</p></div>
   </div>
   <div class="g3 mt-l">
-    <Stat value="33" label="formal results in the whole book, all kernel-verified in Lean" tone="ok" />
+    <Stat value="33" label="Lean-verified results in the whole book" tone="ok" />
     <Stat value="3" label="open problems and conjectures in the whole book, marked OPEN" tone="warn" />
-    <Stat value="0" label="unverified citations: ./tbook check refuses to publish" />
+    <Stat value="1" label="written proof, with a DOI and formalization request" />
   </div>
 </div>
 <Source>docs/ARCHITECTURE.md §1, §4; trureturing.lock.json</Source>
@@ -97,6 +97,24 @@ For all natural numbers $v_1, v_2$, the deficit $c(v_1, v_2)$ equals its reading
   </div>
 </div>
 <Source>D5/S1/Deficit/DeficitInteger.lean · Chapter 1, Theorem 1.2 and the proof of Theorem 1.3</Source>
+
+---
+section: "Chapter 1 · Written proof"
+---
+
+<div class="body">
+  <p class="kicker">Written proof · Proposition 1.12</p>
+  <h2 class="t">From phase areas to <em>limiting pair frequencies</em></h2>
+<TheoremCard class="mt-s" label="Proposition 1.12" title="Limiting frequencies of the deficit" status="written-proof" cite="rem-areas-not-frequencies" doi="10.1007/BF01475864" source="pp.313-352 (equidistribution; derived result)" request="https://github.com/the-omega-institute/trureturing-requests/issues/1">
+
+Let $a_n^+$ and $a_n^-$ be the proportions of $0\le v_1,v_2<n$ with deficit $+1$ and $-1$.
+
+$$\lim_{n\to\infty}a_n^+=\frac{1}{2\varphi^2},\qquad \lim_{n\to\infty}a_n^-=\frac{1}{2\varphi^4}.$$
+
+</TheoremCard>
+  <p class="lead mt">Weyl equidistribution gives interval proportions; products of rectangle counts and grid approximations extend this to the two phase triangles. This argument has no matching frozen Lean verification and has a registered request.</p>
+</div>
+<Source>Written argument · pf-deficit-frequencies · trureturing-requests#1</Source>
 
 ---
 # 06 Chapter 2
@@ -168,7 +186,7 @@ section: "Outputs"
 <div class="body">
   <p class="kicker">One source, every format</p>
   <h2 class="t">One Markdown source, <em>six outputs</em></h2>
-  <p class="lead">Numbers, badges and Lean links agree everywhere; Chinese is authoritative and English is aligned item by item.</p>
+  <p class="lead">Numbers, evidence badges and source links agree everywhere; Chinese is authoritative and English is aligned item by item.</p>
   <div class="g3 mt">
     <div class="tile"><i>MDBOOK</i><b>HTML</b><span>Read online: KaTeX math, a language switch, theorems linked to their Lean source.</span></div>
     <div class="tile"><i>TYPST</i><b>PDF</b><span>A dark screen edition and a white print edition, with the same numbers and badges.</span></div>

@@ -137,6 +137,12 @@ for (const book of books) {
         for (const c of ed.cites[i]) {
           if (c.attrs.status === 'written-proof' && c.attrs.kind != null && !['theorem', 'lemma', 'proposition', 'corollary'].includes(c.attrs.kind)) fail(`${here}: written-proof is only for formal results`);
           if (c.attrs.status === 'written-proof' && Object.hasOwn(c.attrs, 'gid')) fail(`${here}: written-proof must not have gid`);
+          if (c.attrs.status === 'written-proof') {
+            if (c.tag !== 'TheoremCard' || !c.attrs.cite) fail(`${here}: written-proof needs a TheoremCard with cite="<book-result-id>"`);
+            if (!/^10\.[0-9]{4,9}\/\S+$/u.test(c.attrs.doi ?? '') || /\p{C}/u.test(c.attrs.doi ?? '')) fail(`${here}: written-proof requires a bare DOI`);
+            if (typeof c.attrs.source !== 'string' || !c.attrs.source || c.attrs.source.trim() !== c.attrs.source || /[|\r\n]|\p{C}/u.test(c.attrs.source)) fail(`${here}: written-proof requires the original source location`);
+            if (!/^https:\/\/github\.com\/the-omega-institute\/trureturing-requests\/issues\/[1-9][0-9]*$/.test(c.attrs.request ?? '')) fail(`${here}: written-proof requires a trureturing-requests issue URL`);
+          }
           if (c.attrs.status != null && !['open', 'argued', 'written-proof'].includes(c.attrs.status)) fail(`${here}: unknown result status ${c.attrs.status}`);
           if (c.attrs.status === 'open' && c.gid) fail(`${here}: <${c.tag} status="open"> must not cite Lean (open problems have no proof); drop gid`);
           if (!c.gid) {
@@ -166,8 +172,9 @@ for (const book of books) {
           if (String(a[key] ?? '') !== String(b[key] ?? '')) fail(`${ed.rel} slide ${i + 1}: ${key} is ${JSON.stringify(b[key] ?? null)}, ${main.rel} has ${JSON.stringify(a[key] ?? null)}`);
         }
         if (!!a.section !== !!b.section) fail(`${ed.rel} slide ${i + 1}: section ${b.section ? 'present' : 'missing'}, unlike ${main.rel}`);
-        const ga = main.cites[i].map((c) => c.gid || `(${c.attrs.status})`).join(' ');
-        const gb = ed.cites[i].map((c) => c.gid || `(${c.attrs.status})`).join(' ');
+        const citationKey = (c) => (c.gid || `(${c.attrs.status})`) + (c.attrs.status === 'written-proof' ? JSON.stringify(['cite', 'doi', 'source', 'request'].map(k => c.attrs[k] ?? null)) : '');
+        const ga = main.cites[i].map(citationKey).join(' ');
+        const gb = ed.cites[i].map(citationKey).join(' ');
         if (ga !== gb) fail(`${ed.rel} slide ${i + 1}: cites [${gb}], ${main.rel} cites [${ga}]`);
       }
     }

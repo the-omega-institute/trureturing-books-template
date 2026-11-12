@@ -195,10 +195,26 @@ $$
 
 $P$ is the area of the lower triangle $\{p_1 + p_2 < 1/\varphi\}$ of the figure, integrated by vertical cross-sections: at abscissa $x$ the cross-section has length $1/\varphi - x$. $N$ is the area of the upper triangle $\{p_1 + p_2 \ge \varphi\}$, whose legs have length $2 - \varphi = 1/\varphi^2$; the integral is taken over its mirror image through the centre of the square. Numerically $P \approx 0.1910$, $N \approx 0.0729$ and $P - N \approx 0.1180$, so the band in the middle has area $1 - P - N = \sqrt5 - 3/2 \approx 0.7361$. Reading the integrals as areas, and this last subtraction, are the book's commentary; the cited declaration computes the two integrals only.
 
-::: {.remark #rem-areas-not-frequencies title="Areas are not yet frequencies"}
 If $(p(v_1), p(v_2))$ is replaced by a random point distributed uniformly on the unit square, each region of [@thm-golden-phase] has probability equal to its area: $P$ and $N$ are the probabilities of $+1$ and $-1$, and $P - N$ is the expected value. That is why the two integrals are called `positiveFrequency` and `negativeFrequency` in Lean, and why the trureturing Blueprint page `Blueprint/D5/S1/Deficit/GoldenPhaseDistribution.md` writes the three numbers as freq(+1), freq(−1) and E(c).
 
-But [@prop-phase-areas] only computes areas. The statement about integers, namely that among the $n^2$ pairs with $0 \le v_1, v_2 < n$ the proportions with $c = 1$ and with $c = -1$ tend to $P$ and $N$ as $n \to \infty$, is not part of the cited declaration, and trureturing has not frozen it. It follows from the equidistribution of the phases[^equi]. The one-dimensional equidistribution has a counterpart in trureturing (`irrational_rotation_interval_sampling` in the module `D5/S1/Phase/IntervalSampling`), which this book does not cite; the classical argument from one dimension to pairs of phases and on to the deficit proportions is not formalized in this book. So the statement is not an open problem; it simply has no Lean proof yet.
+::: {.proposition #rem-areas-not-frequencies title="Limiting frequencies of the deficit" status="written-proof" proof="pf-deficit-frequencies" doi="10.1007/BF01475864" source="pp.313-352 (equidistribution; derived result)" request="https://github.com/the-omega-institute/trureturing-requests/issues/1"}
+For $n\ge1$, let $a_n^+$ and $a_n^-$ be the proportions of the $n^2$ pairs with $0\le v_1,v_2<n$ for which $c(v_1,v_2)=+1$ and $c(v_1,v_2)=-1$, respectively. Then
+
+$$
+\lim_{n\to\infty}a_n^+=P=\frac{1}{2\varphi^2},\qquad
+\lim_{n\to\infty}a_n^-=N=\frac{1}{2\varphi^4}.
+$$
+
+This is a written consequence of Weyl's equidistribution theorem; the cited paper does not use the book's deficit notation. The Lean declaration behind [@prop-phase-areas] computes the two integrals only and does not state these limits of integer sample proportions. No matching frozen declaration for these limits has been found.
+:::
+
+::: {.proof #pf-deficit-frequencies}
+Since $\varphi$ is irrational, Weyl's equidistribution theorem[^equi] makes $p(v)=\{(v+1)\varphi\}$ equidistributed in $[0,1)$. For a half-open rectangle $R=I\times J$, the number of phase pairs in $R$ is the product of the numbers of indices whose phases lie in $I$ and in $J$. After division by $n^2$, the two one-dimensional proportions tend to the interval lengths, so the proportion in the rectangle tends to its area.
+
+Fix an integer $q\ge1$ and divide the unit square into half-open cells of side $1/q$. The cells contained in a phase triangle form an inner approximation; the cells intersecting it form an outer approximation. Both are finite unions of rectangles, whose sample proportions tend to their areas by the preceding paragraph. Their difference is confined to cells meeting the boundary. The sloping edge meets at most $4q+4$ cells, each of area $1/q^2$, so this area difference tends to zero. First let $n\to\infty$, then let $q\to\infty$; squeezing gives convergence of the proportion in each triangle to its area.
+
+First [@thm-beatty-deficit] gives $c=B$. Then, by [@thm-golden-phase], $c=+1$ corresponds to $p_1+p_2<1/\varphi$ and $c=-1$ to $p_1+p_2\ge\varphi$. By [@prop-phase-areas], the triangle areas are $P$ and $N$, proving the limits. The passage from one-dimensional equidistribution to pairs and triangles is a written argument for which the author and reviewers are responsible; it has not been checked by the Lean kernel.
+:::
 
 The proportions below are a computation and only show that the numbers are close:
 
@@ -208,13 +224,12 @@ The proportions below are a computation and only show that the numbers are close
 | 100 | 0.1885 | 0.0719 |
 | 1000 | 0.1910 | 0.0729 |
 | 10000 | 0.1910 | 0.0729 |
-:::
 
 ::: {.viz src="golden-carry" preset="fill" height="500"}
 The phase square: each point is a pair $(p(v_1), p(v_2))$, with $v_1, v_2$ running through the natural numbers below $n$, and $n$ is written in the title of the figure. Cyan points have $c = +1$, magenta points $c = -1$ and grey points $c = 0$, and two lines separate the three colours; the line under the title gives the shares of the two colours and the areas of the two triangles.
 :::
 
-[^equi]: This is a special case of Weyl's equidistribution theorem: for irrational $\alpha$ the sequence $\{n\alpha\}$, $n = 1, 2, 3, \dots$, is equidistributed in $[0, 1)$: for all $0 \le a < b \le 1$, the proportion of $n \le m$ with $\{n\alpha\} \in [a, b)$ tends to $b - a$ as $m \to \infty$ (H. Weyl, Über die Gleichverteilung von Zahlen mod. Eins, *Math. Ann.* 77 (1916), 313–352). With $\alpha = \varphi$ and the index shifted by one, $p(v) = \{(v+1)\varphi\}$ is equidistributed as well. When $v_1$ and $v_2$ each run through $0, \dots, n-1$, the empirical distribution of the phase pairs is the product of two one-dimensional empirical distributions, so it tends to the uniform distribution on the square; the boundaries of the two triangles have area zero, so the proportions tend to the areas.
+[^equi]: This is a special case of Weyl's equidistribution theorem: for irrational $\alpha$ the sequence $\{n\alpha\}$, $n = 1, 2, 3, \dots$, is equidistributed in $[0, 1)$: for all $0 \le a < b \le 1$, the proportion of $n \le m$ with $\{n\alpha\} \in [a, b)$ tends to $b - a$ as $m \to \infty$ (H. Weyl, Über die Gleichverteilung von Zahlen mod. Eins, *Math. Ann.* 77 (1916), 313–352, DOI: [10.1007/BF01475864](https://doi.org/10.1007/BF01475864)). With $\alpha = \varphi$ and the index shifted by one, $p(v) = \{(v+1)\varphi\}$ is equidistributed as well. When $v_1$ and $v_2$ each run through $0, \dots, n-1$, the empirical distribution of the phase pairs is the product of two one-dimensional empirical distributions, so it tends to the uniform distribution on the square; the boundaries of the two triangles have area zero, so the proportions tend to the areas.
 
 ## See it for yourself
 

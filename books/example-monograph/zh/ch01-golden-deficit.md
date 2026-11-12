@@ -195,10 +195,26 @@ $$
 
 $P$ 是图中左下三角形 $\{p_1 + p_2 < 1/\varphi\}$ 的面积，按竖直截面积分：横坐标为 $x$ 处的截面长 $1/\varphi - x$。$N$ 是右上三角形 $\{p_1 + p_2 \ge \varphi\}$ 的面积；它的两条直角边长 $2 - \varphi = 1/\varphi^2$，积分是对它关于正方形中心翻转后的三角形做的。数值上 $P \approx 0.1910$，$N \approx 0.0729$，$P - N \approx 0.1180$；于是中间带状区域的面积是 $1 - P - N = \sqrt5 - 3/2 \approx 0.7361$。把积分读成面积，以及最后这一步减法，是本书的说明；所引声明只计算这两个积分。
 
-::: {.remark #rem-areas-not-frequencies title="面积还不是频率"}
 若把 $(p(v_1), p(v_2))$ 换成单位正方形中均匀分布的随机点，[@thm-golden-phase] 中每块区域的概率就是它的面积：$P$、$N$ 分别是取 $+1$、$-1$ 的概率，$P - N$ 是期望。Lean 中两个积分因此名为 `positiveFrequency` 与 `negativeFrequency`，trureturing 的 Blueprint 页面 `Blueprint/D5/S1/Deficit/GoldenPhaseDistribution.md` 也把这三个数写成 freq(+1)、freq(−1) 与 E(c)。
 
-但 [@prop-phase-areas] 只计算面积。关于整数的频率说法，即在 $0 \le v_1, v_2 < n$ 的 $n^2$ 对中，$c = 1$ 与 $c = -1$ 所占的比例当 $n \to \infty$ 时分别趋于 $P$ 与 $N$，并不在所引声明之中，trureturing 也没有冻结这一结论。它可以由相位的等分布推出[^equi]。一维的等分布在 trureturing 中有对应的声明（模块 `D5/S1/Phase/IntervalSampling` 中的 `irrational_rotation_interval_sampling`），本书没有引用它；从一维推到相位对、再推到亏量比例的经典论证未在本书形式化。所以这一结论不是开放问题，只是还没有 Lean 证明。
+::: {.proposition #rem-areas-not-frequencies title="亏量的极限频率" status="written-proof" proof="pf-deficit-frequencies" doi="10.1007/BF01475864" source="pp.313-352 (equidistribution; derived result)" request="https://github.com/the-omega-institute/trureturing-requests/issues/1"}
+对 $n\ge1$，记 $a_n^+$、$a_n^-$ 分别为 $0\le v_1,v_2<n$ 的 $n^2$ 个数对中，$c(v_1,v_2)=+1$、$c(v_1,v_2)=-1$ 的比例。则
+
+$$
+\lim_{n\to\infty}a_n^+=P=\frac{1}{2\varphi^2},\qquad
+\lim_{n\to\infty}a_n^-=N=\frac{1}{2\varphi^4}.
+$$
+
+这是由 Weyl 等分布定理推导的书面结论；所引论文没有使用本书的亏量记号。[@prop-phase-areas] 的 Lean 声明只计算两个积分，不包含这里的整数样本比例极限；这一极限尚无匹配的冻结声明。
+:::
+
+::: {.proof #pf-deficit-frequencies}
+因为 $\varphi$ 无理，Weyl 等分布定理[^equi] 给出 $p(v)=\{(v+1)\varphi\}$ 在 $[0,1)$ 中等分布。对半开矩形 $R=I\times J$，相位对落入 $R$ 的数对数等于落入 $I$ 的下标数与落入 $J$ 的下标数之积。除以 $n^2$，两个一维比例分别趋于区间长度，所以矩形内的比例趋于矩形面积。
+
+固定整数 $q\ge1$，用边长 $1/q$ 的半开网格分割单位正方形。完全落在相位三角形内的网格并给出内逼近，与它相交的网格并给出外逼近。两个并都只含有限个矩形，其样本比例由上一段趋于各自面积；内外逼近的差只在与边界相交的网格中。三角形的斜边与至多 $4q+4$ 个网格相交，每格面积 $1/q^2$，故面积差趋于零。先令 $n\to\infty$，再令 $q\to\infty$，夹逼得到每个三角形中的比例趋于面积。
+
+先由 [@thm-beatty-deficit] 得 $c=B$，再由 [@thm-golden-phase]，$c=+1$ 对应 $p_1+p_2<1/\varphi$，$c=-1$ 对应 $p_1+p_2\ge\varphi$；由 [@prop-phase-areas]，两块三角形的面积为 $P$、$N$，得到所述极限。这里从一维等分布推到数对与三角形的论证由作者和评审负责，尚未经过 Lean 内核检查。
+:::
 
 下表的比例是计算，只说明数值上很接近：
 
@@ -208,13 +224,12 @@ $P$ 是图中左下三角形 $\{p_1 + p_2 < 1/\varphi\}$ 的面积，按竖直�
 | 100 | 0.1885 | 0.0719 |
 | 1000 | 0.1910 | 0.0729 |
 | 10000 | 0.1910 | 0.0729 |
-:::
 
 ::: {.viz src="golden-carry" preset="fill" height="500"}
 相位正方形：每个点是一对 $(p(v_1), p(v_2))$，$v_1, v_2$ 取遍小于 $n$ 的自然数，$n$ 写在图的标题里。青色点 $c = +1$，品红点 $c = -1$，灰点 $c = 0$，三种颜色被两条斜线分开；标题下一行给出两种颜色所占的比例与两块三角形的面积。
 :::
 
-[^equi]: 这是 Weyl 等分布定理的特例：$\alpha$ 为无理数时，序列 $\{n\alpha\}$（$n = 1, 2, 3, \dots$）在 $[0, 1)$ 中等分布，即对任意 $0 \le a < b \le 1$，满足 $\{n\alpha\} \in [a, b)$ 的 $n \le m$ 所占的比例当 $m \to \infty$ 时趋于 $b - a$（H. Weyl, Über die Gleichverteilung von Zahlen mod. Eins, *Math. Ann.* 77 (1916), 313–352）。取 $\alpha = \varphi$ 并把下标平移一位，$p(v) = \{(v+1)\varphi\}$ 也等分布。$v_1$ 与 $v_2$ 各自取遍 $0, \dots, n-1$ 时，相位对的经验分布是两个一维经验分布的乘积，因而趋于正方形上的均匀分布；两个三角形的边界面积为零，所以比例趋于面积。
+[^equi]: 这是 Weyl 等分布定理的特例：$\alpha$ 为无理数时，序列 $\{n\alpha\}$（$n = 1, 2, 3, \dots$）在 $[0, 1)$ 中等分布，即对任意 $0 \le a < b \le 1$，满足 $\{n\alpha\} \in [a, b)$ 的 $n \le m$ 所占的比例当 $m \to \infty$ 时趋于 $b - a$（H. Weyl, Über die Gleichverteilung von Zahlen mod. Eins, *Math. Ann.* 77 (1916), 313–352，DOI: [10.1007/BF01475864](https://doi.org/10.1007/BF01475864)）。取 $\alpha = \varphi$ 并把下标平移一位，$p(v) = \{(v+1)\varphi\}$ 也等分布。$v_1$ 与 $v_2$ 各自取遍 $0, \dots, n-1$ 时，相位对的经验分布是两个一维经验分布的乘积，因而趋于正方形上的均匀分布；两个三角形的边界面积为零，所以比例趋于面积。
 
 ## 动手看一看
 

@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import quote
 
-from . import config, figure, lean, model, paths, viz
+from . import config, evidence, figure, lean, model, paths, viz
 
 ENGINE_VERSION = "0.16.9"
 BUNDLE = "https://relay.fullyjustified.net/default_bundle_v33.tar"
@@ -253,7 +253,13 @@ def validate_source(book, lang, source, lock) -> list[model.Issue]:
                 err(c, f"#{env.id} is a {env.kind}; bookresult cites formal results, definitions or open problems")
             if env.kind in model.OPEN and env.lean:
                 err(c, f"open problem #{env.id} must not have a GID")
-            if env.kind in model.FORMAL and not env.lean:
+            if env.status == "written-proof":
+                from . import check
+                policy = []
+                check.check_env_policy(edition, policy)
+                doc = next(d for d in edition.chapters if d.chapter is env.chapter)
+                issues.extend(i for i in policy if i.path == doc.path and i.line == env.line)
+            if env.kind in model.FORMAL and not env.lean and env.status != "written-proof":
                 err(c, f"#{env.id}: unverified result has no GID")
             for gid in env.lean:
                 res = lock.get(gid) if lock else None
@@ -355,6 +361,12 @@ def url_tex(url):
     return url.replace("%", r"\%").replace("#", r"\#")
 
 
+def doi_link(doi):
+    # DOI punctuation is data, never TeX; allow long identifiers to wrap in the ledger.
+    display = r"\allowbreak{}".join(tex(c) for c in doi)
+    return r"\href{" + url_tex(evidence.doi_url(doi)) + r"}{\texttt{" + display + "}}"
+
+
 def snapshot_path(book, vid, preset, lang):
     return book.viz_dir / vid / f"fig-{preset}.{lang}.paper.png"
 
@@ -364,6 +376,7 @@ def generate_package(book, lang, source, lock, dest):
     edition = model.load_edition(book.edition(lang))
     tokens = json.loads(paths.TOKENS.read_text(encoding="utf-8"))
     colours = {"Lean": tokens["paper"][tokens["semantic"]["lean"]],
+               "Written": tokens["paper"][tokens["semantic"]["argued"]],
                "Open": tokens["paper"][tokens["semantic"]["open"]], "Neutral": tokens["paper"]["dim"]}
     lines = [r"\ProvidesPackage{tbook-lean}[Generated from the book and trureturing lock]",
              r"\RequirePackage{amssymb}", r"\RequirePackage{xurl}", r"\RequirePackage{array}",
@@ -381,7 +394,9 @@ def generate_package(book, lang, source, lock, dest):
             if env.title:
                 heading += " (" + title_tex(edition.title_markdown(env)) + ")"
             resolutions = [lock.get(gid) for gid in env.lean]
-            if env.kind in model.OPEN:
+            if env.status == "written-proof":
+                badge = r"\TBookBadge{TBookWritten}{" + tex(config.s(lang, "badge.written_proof")) + "}"
+            elif env.kind in model.OPEN:
                 badge = r"\TBookBadge{TBookOpen}{OPEN}"
             elif env.kind == "definition" and all(resolutions) and env.lean:
                 badge = r"\TBookBadge{TBookNeutral}{LEAN DEF}"
@@ -393,7 +408,14 @@ def generate_package(book, lang, source, lock, dest):
                 badge = r"\TBookBadge{TBookOpen}{UNVERIFIED}"
         badges[ident] = badge
         block = "alertblock" if env and env.kind in model.OPEN else "block"
-        lines += [rf"\expandafter\def\csname tbook@{ident}\endcsname{{{heading}\quad{{\scriptsize {badge}}}}}",
+        provenance = ""
+        if env and env.status == "written-proof" and evidence.doi_url(env.attrs.get("doi")):
+            provenance = (r"\par{\tiny DOI: " + doi_link(env.attrs.get("doi"))
+                          + "; " + tex(env.attrs.get("source") or ""))
+            if evidence.request_number(env.attrs.get("request")):
+                provenance += r"; \href{" + url_tex(env.attrs.get("request")) + r"}{trureturing-requests\#" + str(evidence.request_number(env.attrs.get("request"))) + "}"
+            provenance += "}"
+        lines += [rf"\expandafter\def\csname tbook@{ident}\endcsname{{{heading}\quad{{\scriptsize {badge}}}{provenance}}}",
                   rf"\expandafter\def\csname tbook@env@{ident}\endcsname{{{block}}}"]
     lines += [r"\newenvironment{bookresult}[1]{\edef\TBookResultEnvironment{\csname tbook@env@#1\endcsname}\begin{\TBookResultEnvironment}{\csname tbook@#1\endcsname}}{\end{\TBookResultEnvironment}}"]
     lines += [r"\newsavebox{\TBookLedgerTable}"]
@@ -404,11 +426,16 @@ def generate_package(book, lang, source, lock, dest):
                    r"\fontsize{6.4}{7.4}\selectfont",
                    r"\begin{lrbox}{\TBookLedgerTable}",
                    r"\begin{tabular}{@{}>{\raggedright\arraybackslash}p{.26\linewidth}>{\raggedright\arraybackslash}p{.54\linewidth}>{\raggedright\arraybackslash}p{.16\linewidth}@{}}",
-                   r"\textbf{Result} & \textbf{GID (pinned Lean source)} & \textbf{Status} \\\hline"]
+                   r"\textbf{Result} & \textbf{Source (Lean / DOI / request)} & \textbf{Status} \\\hline"]
         for ident in ids[start:start + 12]:
             env = edition.envs.get(ident)
             gids = []
-            if env and env.lean:
+            if env and env.status == "written-proof":
+                doi = env.attrs.get("doi") or ""
+                gids = ["DOI: " + doi_link(doi) + "; " + tex(env.attrs.get("source") or "")]
+                if evidence.request_number(env.attrs.get("request")):
+                    gids.append(r"\href{" + url_tex(env.attrs.get("request")) + r"}{trureturing-requests\#" + str(evidence.request_number(env.attrs.get("request"))) + "}")
+            elif env and env.lean:
                 for gid in env.lean:
                     label = rf"\nolinkurl{{{gid}}}"
                     gids.append(rf"\href{{{url_tex(lock.source_url(gid))}}}{{{label}}}" if lock.get(gid) else label)

@@ -110,7 +110,7 @@ $$
 **证明的骨架。** 虚线框是出发点，中性的方框是证明的步骤（灰色等宽字是 trureturing 中做这一步的引理），两支分别给出上界与下界，汇入绿色的 [@thm-factor-complexity]。
 :::
 
-[^sturm]: M. Morse, G. A. Hedlund, Symbolic dynamics, *Amer. J. Math.* 60 (1938), 815–866；Sturm 词见二人的 Symbolic dynamics II. Sturmian trajectories, *Amer. J. Math.* 62 (1940), 1–42。这是文献结果，未在本书形式化：所引的 Lean 声明只计算黄金词的因子个数，不含这条周期性定理。反方向是初等的：最终周期的词只有有界多个不同的因子，而 $n + 1$ 无界，所以黄金词不是最终周期的。
+[^sturm]: M. Morse, G. A. Hedlund, Symbolic dynamics, *Amer. J. Math.* 60 (1938), 815–866；Sturm 词见二人的 Symbolic dynamics II. Sturmian trajectories, *Amer. J. Math.* 62 (1940), 1–42。上述低复杂度推出最终周期性的结论，在所钉提交上已有冻结的 Lean 定理 [`eventuallyPeriodic_of_factor_complexity_le`](lean:D5/S1/Words/Complexity/MorseHedlund.eventuallyPeriodic_of_factor_complexity_le)，适用于有限字母表上的单侧无穷词；黄金词自己的因子计数声明不包含这一泛化。反方向是初等的：最终周期的词只有有界多个不同的因子，而 $n + 1$ 无界，所以黄金词不是最终周期的。
 
 ## 回归 {#sec-returns}
 

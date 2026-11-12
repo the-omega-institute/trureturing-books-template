@@ -30,7 +30,7 @@ trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片
 
 | 检查 | 失败时 |
 | --- | --- |
-| 形式结论默认必须有 `lean`；显式 `status="written-proof"` 必须无 `lean`，并用 `proof="id"` 指向每版非空证明；开放条目不能用该状态或 `lean` | 错误 |
+| 形式结论默认必须有 `lean`；显式 `status="written-proof"` 必须无 `lean`，并用 `proof="id"` 指向每版非空证明，填写 DOI、原文定位与已登记的形式化请求；开放条目不能用该状态或 `lean` | 错误 |
 | 所钉提交可从 `site.toml` 的 trureturing 分支到达，且该分支存在（§1） | 错误，报在锁文件上，提示 `./tbook pin`；GitHub 回答没有这个分支时报在 `site.toml` 上，提示改成现有分支（§1）；无法判定时：GitHub Actions 中为错误，本地或 `--offline` 下为警告 |
 | 锁文件的 `branch` 与 `site.toml` 的 trureturing 分支相同；该分支是合法的分支名（`git check-ref-format --branch` 接受，且不是 `@`、SHA、`refs/…`，见 §1） | 错误，提示 `./tbook pin`；分支名不合法时指出原因 |
 | GID 语法（与 trureturing Blueprint 相同的地址格式；声明名是 Lean 名，分量可含希腊字母等类字母符号、下标与 `'` `!` `?`，其他分量写成 `«…»`；不得含空白或逗号） | 错误 |
@@ -81,7 +81,7 @@ trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片
 ## 5. 不由机器保证、需要人工负责的部分
 
 - **书面陈述与 Lean 陈述一致。** 工具能保证“引用的声明存在且已验证”，不能保证“书中的话说的就是那条声明”。写作与评审时必须对照 Lean 源（链接带行号）和 trureturing 的 Blueprint 说明。
-- **书面证明的责任。** `status="written-proof"` 只检查每版具有关联的非空 proof 块，不能保证论证正确或完整。作者与评审必须检查源文证明、假设、量词、边界情况与出处；不因缺少 Lean 形式化把已证明结果称作开放问题，也不把变体当成同一结果。该状态的紫色徽章不带链接，不计入 Lean 数量，账本单列并链接书内证明。
+- **书面证明的责任。** `status="written-proof"` 检查 DOI、原文定位、请求 URL、issue 标题与书籍登记，以及每版关联的非空 proof 块；不自动判定冻结库中是否已有同一陈述，不能保证论证正确或完整。作者与评审必须检查源文证明、假设、量词、边界情况与出处；不因缺少 Lean 形式化把已证明结果称作开放问题，也不把变体当成同一结果。该状态的紫色徽章不带链接，不计入 Lean 数量，账本单列并链接书内证明、DOI 与形式化请求。已有匹配 Lean 验证时不得继续用书面证明状态。请求规范与统计见 [FORMALIZATION-REQUESTS.md](FORMALIZATION-REQUESTS.md)。
 - **解释与图示。** Lean 结果的 `proof` 块用于解释；书面证明结果的 `proof` 是作者承担责任的论证。可视化与视频只是解释或示意，必须声明哪些是示意模型。
 - **trureturing 自身的正确性**由它的 CI、Lean 内核与评审流程负责；本书库信任其冻结账本，并通过深度验证独立复核公理闭包。
 

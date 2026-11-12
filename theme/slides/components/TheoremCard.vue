@@ -19,10 +19,11 @@ import LeanBadge from './LeanBadge.vue'
 import { leanInfo, leanState } from '../lean'
 import { t } from '../i18n'
 
-const props = defineProps<{ label?: string, title?: string, gid?: string, status?: 'open' | 'argued' | 'written-proof', kind?: string, cite?: string }>()
+const props = defineProps<{ label?: string, title?: string, gid?: string, status?: 'open' | 'argued' | 'written-proof', kind?: string, cite?: string, doi?: string, source?: string, request?: string }>()
 const info = computed(() => leanInfo(props.gid))
 const state = computed(() => leanState(info.value, props.status, props.kind))
 const kindClass = computed(() => props.kind === 'definition' ? 'tr-thm-def' : '')
+const doiURL = computed(() => props.doi ? 'https://doi.org/' + props.doi.split('/').map(encodeURIComponent).join('/') : '')
 </script>
 
 <template>
@@ -34,7 +35,10 @@ const kindClass = computed(() => props.kind === 'definition' ? 'tr-thm-def' : ''
     </header>
     <div class="tr-thm-body"><slot /></div>
     <footer class="tr-thm-decl">
-      <template v-if="props.gid && state !== 'written-proof'">
+      <template v-if="state === 'written-proof'">
+        <span>DOI: <a :href="doiURL" target="_blank" rel="noopener">{{ props.doi }}</a> · {{ props.source }} · <a :href="props.request" target="_blank" rel="noopener">trureturing-requests</a></span>
+      </template>
+      <template v-else-if="props.gid">
         <span class="tr-thm-glyph" aria-hidden="true">λ</span>
         <a v-if="info.url" :href="info.url" target="_blank" rel="noopener"><code>{{ info.name }}</code></a>
         <code v-else>{{ info.name }}</code>

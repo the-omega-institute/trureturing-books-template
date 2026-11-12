@@ -60,7 +60,7 @@ generated_note = "本页由构建自动生成，请勿手改。"
 
 [ledger]
 written_title = "书面证明"
-written_intro = "以下结果有书面证明，可由下方链接查阅；未经 Lean 内核验证，不计入 LEAN ✓ 数量。"
+written_intro = "以下结果有 DOI 来源和书内证明，并已登记形式化请求；未经 Lean 内核验证，不计入 LEAN ✓ 数量。"
 title = "形式化验证账本"
 intro = "Lean 验证结果对应 trureturing 中已由内核验证并冻结的声明；书面证明与开放条目在下方单列。下表列出 Lean 对应关系；链接固定到所钉的提交，内容不会随上游变化而漂移。"
 col_item = "条目"

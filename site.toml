@@ -14,11 +14,11 @@ zh = "trureturing 书库"
 en = "trureturing Books"
 
 [site.tagline]
-zh = "每一条定理都经 Lean 内核验证的专著"
-en = "Monographs whose every theorem is kernel-verified in Lean"
+zh = "明确区分 Lean 验证、书面证明与开放问题的专著"
+en = "Monographs distinguishing Lean verification, written proofs and open questions"
 
 [trureturing]
-# 形式化代码所在仓库。书中所有定理都必须引用这里已冻结的 Lean 声明。
+# 形式化代码所在仓库。Lean 验证结果必须引用这里已冻结的声明；书面证明另有 DOI 与形式化请求。
 repo = "the-omega-institute/trureturing"
 # `./tbook pin` 不带参数时跟随的分支。所钉的确切提交记录在 trureturing.lock.json。
 branch = "dev"
