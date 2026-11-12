@@ -10,7 +10,7 @@
 // The suite reuses the server started by tools/node/viz-test.mjs (env VIZ_ORIGIN) or starts its own, so a suite also
 // runs alone:  node books/<slug>/viz/tests/<id>.test.mjs.  Chromium honours PW_CHROMIUM_PATH. Google Fonts requests are
 // answered with the local @fontsource files, so pages render with their real fonts offline.
-import { FORMAL_KINDS, chromiumOptions, leanUrl, loadChromium, localFontsCss, readLock, readRegistry, resolveBook } from './viz-common.mjs';
+import { FORMAL_KINDS, chromiumOptions, leanUrl, loadChromium, localFontsCss, readLock, readRegistry, resolveBook, vizCitations } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
 
 /** Route Google Fonts to the local @fontsource copies served by the viz server at `origin`. */
@@ -83,6 +83,112 @@ export const labelOverlaps = (page, selector = '.stage .tag', share = 0.5) => pa
   }
   return bad;
 }, [selector, share]);
+
+/**
+ * What a reader can see of the stage and of the middle column around it, on the page as it is laid out now (see
+ * stageFirstChecks, "layout" and "title"): { layout, hud, room, least }, where layout and hud list what is wrong
+ * (empty when nothing is), room is the free height between the band of the title and buttons and a legend along the
+ * bottom, and least the frame height at which that band and the legend would just fit. null when there is no stage.
+ * figure: a cited figure, which shows everything without scrolling.
+ *   layout  the stage, the tour bar and the strip that are rendered in the middle column do not overlap; what is
+ *           painted near each corner of each of them, and of the rail, is that element (so nothing paints over it),
+ *           once it is brought into view by scrolling the page the way a reader can (not at all in a figure)
+ *   hud     the visible text of the title (.hud-tl) runs under no scene button (.hud-tr); no title text, button or
+ *           legend entry (.hud-bl) is cut off by the stage or by a box inside it; the title and the buttons overlap
+ *           no legend entry and their band ends above a legend along the bottom; each button is rendered, named,
+ *           visible and on top where it is drawn; a title with text is not hidden
+ */
+const stageView = (page, sel, figure = false) => page.evaluate(([sel, figure]) => {
+  const stage = document.querySelector(sel); if (!stage) return null;
+  const css = (el) => getComputedStyle(el), root = document.documentElement;
+  const shown = (el) => { if (!el || !el.getClientRects().length || css(el).visibility === 'hidden') return false; for (let a = el; a; a = a.parentElement) if (css(a).opacity === '0') return false; return true; };
+  const box = (r) => ({ l: r.left, t: r.top, r: r.right, b: r.bottom });
+  const meet = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 0.5 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 0.5;
+  const within = (a, c) => a.l >= c.l - 0.5 && a.r <= c.r + 0.5 && a.t >= c.t - 0.5 && a.b <= c.b + 0.5;
+  const at = (a) => `${Math.round(a.l)},${Math.round(a.t)}–${Math.round(a.r)},${Math.round(a.b)}`;
+  const who = (el) => (!el ? 'nothing' : el === stage ? 'the stage' : el.id ? `#${el.id}` : el.tagName.toLowerCase() + [...el.classList].map((c) => `.${c}`).join(''));
+  const padding = (el) => { const r = el.getBoundingClientRect(), s = css(el); return { l: r.left + parseFloat(s.borderLeftWidth), t: r.top + parseFloat(s.borderTopWidth), r: r.right - parseFloat(s.borderRightWidth), b: r.bottom - parseFloat(s.borderBottomWidth) }; };
+  // the first box from `from` up to the stage that clips its overflow and does not hold the rectangle
+  const cutBy = (r, from) => { for (let a = from; a && a !== stage.parentElement; a = a.parentElement) { const s = css(a); if ((s.overflowX !== 'visible' || s.overflowY !== 'visible') && !within(r, padding(a))) return a; } return null; };
+  const texts = (el) => {
+    const out = []; if (!shown(el)) return out;
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) {
+      if (!n.textContent.trim() || !shown(n.parentElement)) continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      for (const q of rg.getClientRects()) if (q.width > 0.5 && q.height > 0.5) out.push({ ...box(q), el: n.parentElement, what: `title "${n.textContent.trim().slice(0, 24)}"` });
+    }
+    return out;
+  };
+  const sx = scrollX, sy = scrollY, rv = css(root).overflowY, scroller = rv !== 'visible' ? rv : css(document.body).overflowY;
+  const scrolls = !figure && scroller !== 'hidden' && scroller !== 'clip';
+  // what is hit at a point inside el, brought into view as a reader would; undefined when it cannot be
+  const look = (el, fx, fy) => {
+    const pt = () => { const r = el.getBoundingClientRect(); return [r.left + Math.min(Math.max(r.width * fx, 3), r.width - 3), r.top + Math.min(Math.max(r.height * fy, 3), r.height - 3)]; };
+    let [x, y] = pt();
+    if ((y < 0 || y >= innerHeight) && scrolls) { window.scrollBy(0, y - innerHeight / 2); [x, y] = pt(); }
+    return x >= 0 && x < innerWidth && y >= 0 && y < innerHeight ? document.elementFromPoint(x, y) : undefined;
+  };
+  const layout = [], hud = [];
+
+  const center = stage.parentElement && stage.parentElement.matches('.center') ? stage.parentElement : null;
+  const flow = center ? [...center.children].filter((el) => shown(el) && !/^(absolute|fixed)$/.test(css(el).position)) : [];
+  for (let i = 0; i < flow.length; i++) for (let j = i + 1; j < flow.length; j++) {
+    const a = box(flow[i].getBoundingClientRect()), b = box(flow[j].getBoundingClientRect());
+    if (meet(a, b)) layout.push(`${who(flow[i])} ${at(a)} overlaps ${who(flow[j])} ${at(b)}`);
+  }
+  const rail = document.querySelector('footer.rail');
+  for (const el of [...flow, ...(shown(rail) ? [rail] : [])]) for (const [fx, fy] of [[0.1, 0], [0.9, 0], [0.1, 1], [0.9, 1]]) {
+    const hit = look(el, fx, fy), where = `${fy ? 'bottom' : 'top'} ${fx < 0.5 ? 'left' : 'right'}`;
+    if (hit === undefined) layout.push(`${who(el)} (${where}) cannot be ${figure ? 'seen in the frame' : 'scrolled into view'}`);
+    else if (!hit || (hit !== el && !el.contains(hit))) layout.push(`${who(el)} (${where}) is painted over by ${who(hit)}`);
+  }
+  if (figure && root.scrollHeight > innerHeight) layout.push(`the frame scrolls by ${root.scrollHeight - innerHeight}px`);
+  window.scrollTo(sx, sy);
+
+  const part = (cls) => stage.querySelector(`:scope > .${cls}`), tl = part('hud-tl'), tr = part('hud-tr'), bl = part('hud-bl');
+  if (tl && tl.textContent.trim() && !shown(tl) && !('thumbMode' in root.dataset)) hud.push('the title is hidden');
+  const title = texts(tl);
+  const rendered = tr && shown(tr) ? [...tr.querySelectorAll('button, a[href], input, select, [role="button"]')].filter((b) => b.getClientRects().length) : [];
+  const buttons = rendered.map((b) => ({ ...box(b.getBoundingClientRect()), el: b, name: (b.getAttribute('aria-label') || b.textContent).trim() }))
+    .map((b) => ({ ...b, what: `button "${b.name.slice(0, 24)}"` }));
+  const legend = shown(bl) ? [...bl.children].filter(shown).map((el) => ({ ...box(el.getBoundingClientRect()), el, what: `legend "${el.textContent.trim().slice(0, 24)}"` })) : [];
+  for (const b of buttons) {
+    if (!shown(b.el)) hud.push(`${b.what} is invisible`);
+    if (b.r - b.l < 1 || b.b - b.t < 1 || !b.name) hud.push(`${b.what} is collapsed or has no name`);
+  }
+  for (const t of title) for (const b of buttons) if (meet(t, b)) hud.push(`${t.what} ${at(t)} runs under ${b.what} ${at(b)}`);
+  for (const a of [...title, ...buttons]) for (const g of legend) if (meet(a, g)) hud.push(`${a.what} ${at(a)} overlaps ${g.what} ${at(g)}`);
+  for (const t of title) { const c = cutBy(t, t.el); if (c) hud.push(`${t.what} ${at(t)} is cut off by ${who(c)}`); }
+  for (const x of [...buttons, ...legend]) { const c = cutBy(x, x.el.parentElement); if (c) hud.push(`${x.what} ${at(x)} is cut off by ${who(c)}`); }
+  const clip = padding(stage), band = Math.max(clip.t, ...title.map((t) => t.b), ...buttons.map((b) => b.b));
+  const floor = legend.length ? Math.min(...legend.map((g) => g.t)) : clip.b, low = floor > (clip.t + clip.b) / 2;
+  if ((title.length || buttons.length) && legend.length && low && band > floor + 0.5) hud.push(`the band of the title and buttons ends at ${Math.round(band)}, below the top of the legend at ${Math.round(floor)}`);
+  for (const b of buttons) {
+    const hit = look(b.el, 0.5, 0.5);
+    if (hit === undefined) hud.push(`${b.what} cannot be brought into view`);
+    else if (!hit || !b.el.contains(hit)) hud.push(`${b.what} is covered by ${who(hit)}`);
+  }
+  window.scrollTo(sx, sy);
+  const room = Math.round((low ? floor : clip.b) - band);
+  return { layout, hud, room, least: Math.ceil(innerHeight - (clip.b - clip.t) + (band - clip.t) + (low ? clip.b - floor : 0)) };
+}, [sel, figure]);
+
+/** The layout and title checks of stageView on `page` as it is now, named `tag`. */
+async function viewChecks(T, page, o, tag, figure = false, layout = true) {
+  const v = await stageView(page, o.stage, figure);
+  if (!v) return T.check(`${tag}: there is a stage (${o.stage})`, false);
+  if (layout) T.check(`${tag}: the stage, the tour bar and the strip keep their own regions${figure ? ' inside the frame' : ' and can be scrolled into view'}`, v.layout.length === 0, v.layout.slice(0, 4).join(' | '));
+  T.check(`${tag}: the title, the scene buttons and the legend are whole and clear of each other`, v.hud.length === 0,
+    `${v.hud.slice(0, 4).join(' | ')}${figure ? ` (the band and the legend need a frame of at least ${v.least}px)` : ''}`);
+  return v;
+}
+
+/** Desktop widths of the whole lab for short screens: a wide screen, and the narrowest that still lays the lab out in
+    three columns (theme.css switches to one column at 1080px), where the middle column is narrowest. */
+const LAB_WIDTHS = [1440, 1081];
+/** Widths of a frame that holds a cited card: a phone (a 390px page leaves 334px) and a desktop page of the book. */
+const FIGURE_WIDTHS = [334, 740];
 
 /**
  * Open a browser session. Options: viewport, locale, reducedMotion ('reduce' | 'no-preference').
@@ -320,6 +426,17 @@ async function railChecks(T, slug, id, lang, wait = 120) {
  *   phone     (390 × 844) nothing scrolls sideways and the stage comes before the control deck
  *   cover     (?thumb=1) [data-thumb] fills 1280 × 720, window.TRV_THUMB runs, and the cover canvas is not blank
  *   motion    under prefers-reduced-motion the page loads and a card still applies
+ *   layout    in every state below: the stage, the tour bar and the strip that the middle column renders do not
+ *   + title   overlap, nothing else is painted over them, and each of them and the rail can be scrolled into view (a
+ *             cited figure: is in its frame); the visible title text (.hud-tl) runs under no scene button (.hud-tr),
+ *             and no title text, button or legend entry (.hud-bl) is cut off, covered or overlapping another; the
+ *             band of title and buttons ends above a legend along the bottom (see stageView). States: desktop as it
+ *             opens and after every card (Chinese, English) and scene button (English); short screens, the whole lab
+ *             at 1440 and 1081 wide one pixel shorter and taller than the height it needs (measured on the page) and
+ *             500 tall, and 1080 × 480, in both languages; embed; the whole lab in a chapter's frame 320 … 601 wide,
+ *             through every card and scene, in both languages; every card a chapter cites, in its language and at its
+ *             frame height, 334 and 740 wide and back, then every scene and the tour through every card (a page no
+ *             chapter cites: its second card at 500 in both languages); the still; phone after every card
  * and no page error, console error or failed request anywhere.
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
@@ -328,6 +445,7 @@ async function railChecks(T, slug, id, lang, wait = 120) {
 export async function stageFirstChecks(T, slug, id, opts = {}) {
   const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, settle: 120, ...opts };
   const { check } = T;
+  const locale = (lang) => (lang === 'zh' ? 'zh-CN' : 'en-US');
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
   const runCards = async (page, tag) => {
     for (const c of await cardIds(page)) {
@@ -337,6 +455,31 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
         return { pressed: b.getAttribute('aria-pressed'), note: note ? note.textContent.trim().length : -1 };
       }, c);
       check(`${tag}: card ${c} applies and explains itself`, state.pressed === 'true' && state.note !== 0, JSON.stringify(state));
+      await viewChecks(T, page, o, `${tag}: card ${c}`);
+    }
+  };
+  // the scene buttons on the stage, pressed in turn as a reader does
+  const scenes = `${o.stage} > .hud-tr :is(button, [role="button"])`;
+  const runScenes = async (page, tag, figure = false) => {
+    const n = await page.locator(scenes).count();
+    for (let i = 0; i < n; i++) {
+      const b = page.locator(scenes).nth(i);
+      if (!(await b.isVisible()) || !(await b.isEnabled())) continue;
+      const name = ((await b.getAttribute('aria-label')) || (await b.innerText()) || `${i + 1}`).trim();
+      const why = await b.click({ timeout: 5000 }).then(() => '', (e) => String(e.message).split('\n')[0]);
+      if (why) { check(`${tag}, scene ${name}: the scene button can be pressed`, false, why); break; }
+      await settle(page, o.settle);
+      await viewChecks(T, page, o, `${tag}, scene ${name}`, figure);
+    }
+  };
+  // the tour bar's ▶ through every card, as a reader of a chapter does
+  const runTour = async (page, tag, figure = false) => {
+    const n = (await cardIds(page)).length, next = '.tour [data-tour="next"]';
+    for (let i = 0; i < n; i++) {
+      if (!(await page.locator(next).isVisible()) || !(await page.locator(next).isEnabled())) break;
+      await page.click(next); await settle(page, o.settle);
+      const now = await page.evaluate(() => (document.querySelector('[data-preset][aria-pressed="true"]') || {}).dataset?.preset || '?');
+      await viewChecks(T, page, o, `${tag}, ▶ card ${now}`, figure);
     }
   };
 
@@ -346,6 +489,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   const share = await viewportShare(page, o.stage);
   check(`desktop: the stage holds ≥ ${Math.round(o.minShare * 100)}% of the viewport`, share >= o.minShare, `${(share * 100).toFixed(1)}%`);
   check('desktop: no sideways scrolling', (await overflowX(page)) <= 0);
+  await viewChecks(T, page, o, 'desktop');
   if (o.cards) {
     const n = (await cardIds(page)).length;
     check('desktop: at least four experiment cards', n >= 4, `${n}`);
@@ -364,14 +508,39 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
 
   // English
   await page.click('[data-lang-set="en"]'); await settle(page, 150);
-  if (o.cards) for (const c of await cardIds(page)) { await page.click(`[data-preset="${c}"]`); await settle(page, o.settle); const left = await cjkLeftovers(page); check(`English: no Chinese left with card ${c}`, left.length === 0, left.slice(0, 3).join(' | ')); }
+  await viewChecks(T, page, o, 'English');
+  if (o.cards) for (const c of await cardIds(page)) {
+    await page.click(`[data-preset="${c}"]`); await settle(page, o.settle);
+    const left = await cjkLeftovers(page); check(`English: no Chinese left with card ${c}`, left.length === 0, left.slice(0, 3).join(' | '));
+    await viewChecks(T, page, o, `English: card ${c}`);
+  }
   else { const left = await cjkLeftovers(page); check('English: no Chinese left on screen', left.length === 0, left.slice(0, 3).join(' | ')); }
+  await runScenes(page, 'English');
   if (await page.$('#infoBtn')) {
     await page.click('#infoBtn'); const left = await cjkLeftovers(page);
     check('English: no Chinese left in the theory drawer', left.length === 0, left.slice(0, 3).join(' | '));
     await page.keyboard.press('Escape');
   }
   await page.click('[data-lang-set="zh"]');
+
+  // short screens: the whole lab where its middle column needs more height than the screen gives it. The height the
+  // lab needs is read off the page laid out on a very short screen (it scrolls by the rest), then the lab is checked
+  // one pixel either side of it, at 500px, and on the one-column layout just below the breakpoint
+  for (const lang of ['zh', 'en']) {
+    const lab = await T.open(slug, id, `?lang=${lang}`, { locale: locale(lang) });
+    await settle(lab, 400);
+    for (const w of LAB_WIDTHS) {
+      await lab.setViewportSize({ width: w, height: 320 }); await settle(lab, 60);
+      const need = await lab.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
+      for (const h of [...new Set([need - 1, need + 1, 500])].filter((x) => x >= 320)) {
+        await lab.setViewportSize({ width: w, height: h }); await settle(lab, 60);
+        await viewChecks(T, lab, o, `short screen (${lang}, ${w} × ${h}, needs ${need})`);
+      }
+    }
+    await lab.setViewportSize({ width: LAB_WIDTHS[1] - 1, height: 480 }); await settle(lab, 60);
+    await viewChecks(T, lab, o, `short screen (${lang}, ${LAB_WIDTHS[1] - 1} × 480)`);
+    await lab.context().close();
+  }
 
   // embed: the first screen of the iframe inside a chapter
   const embed = await T.open(slug, id, '?embed=1&lang=zh', { viewport: { width: 740, height: 620 } });
@@ -387,17 +556,33 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   check(`embed: the stage fills ≥ ${Math.round(o.minEmbedShare * 100)}% of the first screen`, eshare >= o.minEmbedShare, `${(eshare * 100).toFixed(1)}%`);
   if (o.tour) check('embed: the tour bar is on the first screen', e.tourBottom != null && e.tourBottom <= e.vh + 1, `bottom ${e.tourBottom} of ${e.vh}`);
   check('embed: no sideways scrolling', (await overflowX(embed)) <= 0);
+  await viewChecks(T, embed, o, 'embed');
   if (o.tour && e.tourBottom != null) {
     const before = await embed.evaluate(() => (document.querySelector('[data-preset][aria-pressed="true"]') || {}).dataset?.preset || null);
     await embed.click('.tour [data-tour="next"]'); await settle(embed, o.settle);
     const after = await embed.evaluate(() => (document.querySelector('[data-preset][aria-pressed="true"]') || {}).dataset?.preset || null);
     check('embed: the tour bar steps to the next experiment', after && after !== before, `${before} → ${after}`);
     check('embed: the tour bar names the experiment', (await embed.textContent('.tour .what')).trim().length > 8);
+    await viewChecks(T, embed, o, `embed: card ${after}`);
   }
   await embed.context().close();
 
   // rail: the whole lab in the narrow frame of a chapter read on a phone
   if (o.rail) for (const lang of ['zh', 'en']) await railChecks(T, slug, id, lang, o.settle);
+
+  // frames: the whole lab in the frame of a chapter on a phone, across the narrow widths and through every card
+  for (const lang of ['zh', 'en']) {
+    const frame = await T.open(slug, id, `?embed=1&lang=${lang}`, { viewport: { width: 334, height: 620 }, locale: locale(lang) });
+    await settle(frame, 400);
+    for (const w of RAIL_WIDTHS) {
+      await frame.setViewportSize({ width: w, height: 620 }); await settle(frame, 60);
+      await viewChecks(T, frame, o, `frame (${lang}, ${w} × 620)`);
+    }
+    await frame.setViewportSize({ width: 334, height: 620 }); await settle(frame, 60);
+    if (o.tour) await runTour(frame, `frame (${lang}, 334 × 620)`);
+    await runScenes(frame, `frame (${lang}, 334 × 620)`);
+    await frame.context().close();
+  }
 
   // cited figure: a chapter cites one card with `::: {.viz src=… preset=…}`
   if (o.cards) {
@@ -425,13 +610,39 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
     check('still for PDF/EPUB: ?shot=1 fills the frame on the cited card, with its title kept', sh.fills && sh.pressed && sh.title && sh.still, JSON.stringify(sh));
     const leftovers = await cjkLeftovers(shot);
     check('still for PDF/EPUB: the English still carries no Chinese', leftovers.length === 0, leftovers.slice(0, 3).join(' | '));
+    await viewChecks(T, shot, o, 'still for PDF/EPUB', true, false);
     await shot.context().close();
+
+    // every card that a chapter cites, in its language and at the height the chapter gives its frame (a page no
+    // chapter cites: the card above in both languages at 500px), on a phone and on a desktop page, then each scene;
+    // once per language and height, the tour bar through every card. A frame too short for the band of the title and
+    // the legend fails with the height it would need.
+    const seen = new Set(), cited = [];
+    for (const c of vizCitations(resolveBook(slug), id)) {
+      const key = `${c.lang}.${c.preset}.${c.height}`;
+      if (c.preset && cards.includes(c.preset) && !seen.has(key)) { seen.add(key); cited.push(c); }
+    }
+    if (!cited.length) for (const lang of ['zh', 'en']) cited.push({ lang, preset: cite, height: 500 });
+    const toured = new Set();
+    for (const c of cited) {
+      const card = await T.open(slug, id, `?embed=1&lang=${c.lang}&preset=${c.preset}`, { viewport: { width: FIGURE_WIDTHS[0], height: c.height }, locale: locale(c.lang) });
+      await settle(card, 400);
+      const tag = (w) => `cited figure (${c.lang}, ${c.preset}, ${w} × ${c.height})`;
+      for (const w of [...FIGURE_WIDTHS, FIGURE_WIDTHS[0]]) {
+        await card.setViewportSize({ width: w, height: c.height }); await settle(card, 60);
+        await viewChecks(T, card, o, tag(w), true);
+      }
+      await runScenes(card, tag(FIGURE_WIDTHS[0]), true);
+      if (o.tour && !toured.has(`${c.lang}.${c.height}`)) { toured.add(`${c.lang}.${c.height}`); await runTour(card, tag(FIGURE_WIDTHS[0]), true); }
+      await card.context().close();
+    }
   }
 
   // phone
   const phone = await T.open(slug, id, '?lang=zh', { viewport: { width: 390, height: 844 } });
   await settle(phone, 400);
   check('phone: no sideways scrolling', (await overflowX(phone)) <= 0, `${await overflowX(phone)}px`);
+  await viewChecks(T, phone, o, 'phone');
   const order = await phone.evaluate((sel) => { const s = document.querySelector(sel), d = document.querySelector('.deck'); return { stage: s.getBoundingClientRect().top, deck: d ? d.getBoundingClientRect().top : Infinity }; }, o.stage);
   check('phone: the stage comes before the controls', order.stage < order.deck, JSON.stringify(order));
   if (o.cards) await runCards(phone, 'phone');

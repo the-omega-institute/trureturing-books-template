@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "f50335d0de74a0e3b9efe3a889945baa375e67251764750aa8b8719ca2bce4d1",
+      "sha256": "2a893ba6ddf31bf42cb45a3f9b412c0f11ba01673f96685d7f1ad0c2ea9ce539",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -496,7 +496,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "8924e09ae6ab420f3eaaf090fb6fd7de64901296de197b83881b93a97ce9ba0a",
+      "sha256": "addfcfdb504e821371aa0ec84fc1a715b3f5a8c9146e5ab4e275b75fd400111a",
       "mode": "100644"
     },
     "tools/ci/films.py": {
@@ -580,7 +580,7 @@
       "mode": "100644"
     },
     "tools/node/viz-common.mjs": {
-      "sha256": "7df2a2dbbbfae85270cf7da8fdcd62b478315b96f4e0a96db78310cf368c8af4",
+      "sha256": "c5aa5f37c76278d706b99b8a186eff35ad4acad47c88f0b56e3658ae43a598e6",
       "mode": "100644"
     },
     "tools/node/viz-new.mjs": {
@@ -600,11 +600,11 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "9e5793f683aca38118233f260f1d3fdff8c08d5aedae4cc33767962a36d4d392",
+      "sha256": "4d7cbf0e72ade580211805f9b470b1c4f4b88c4c476ecbe3bd72361c30b48caa",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
-      "sha256": "f3b8ea90c773851751866e4701c932dd1085497bd99559a6a1729f05a203073b",
+      "sha256": "b6c7f2e2f642311399e1d326c7a6974afd17081073cd6837bd0fc67f9ab6e0d0",
       "mode": "100644"
     },
     "tools/node/viz-validate.mjs": {
@@ -836,7 +836,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "7aac09c6a0857d0637ae23b4c3ae3123acc0bd5c1a1d70cdc97f31a09b58b670",
+      "sha256": "9fbf830f9c7fd035e23037d2a4348aafa39885bb58a187a98ddfec3350768def",
       "mode": "100644"
     }
   }

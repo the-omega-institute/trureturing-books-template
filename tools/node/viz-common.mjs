@@ -131,6 +131,41 @@ export function resolveHref(href, lock) {
   return href;
 }
 
+/* ---------- chapter citations: `::: {.viz src="<id>" preset="<card>" height="<px>"}` ---------- */
+const VIZ_BLOCK = /^:::+\s*\{([^}]*\.viz\b[^}]*)\}/gm;
+const vizAttr = (text, name) => { const m = new RegExp(`\\b${name}="([^"]*)"`).exec(text); return m ? m[1] : null; };
+/** Frame height of an embed when a chapter gives none or an unusable one, and the accepted range (tools/tbook/viz.py). */
+export const EMBED_HEIGHT = 560, EMBED_HEIGHTS = [160, 2400];
+/** Every embed of `vizId` in the chapters of `book`, from every language directory (one with a SUMMARY.md):
+    [{ lang, preset, height }] in file order; preset is null for the whole lab, height is the frame height in pixels. */
+export function vizCitations(book, vizId) {
+  const out = [];
+  const langs = fs.readdirSync(book.dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && fs.existsSync(path.join(book.dir, d.name, 'SUMMARY.md'))).map((d) => d.name).sort();
+  for (const lang of langs) {
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        const f = path.join(dir, e.name);
+        if (e.isDirectory()) walk(f);
+        else if (e.name.endsWith('.md')) for (const m of fs.readFileSync(f, 'utf8').matchAll(VIZ_BLOCK)) {
+          if (vizAttr(m[1], 'src') !== vizId) continue;
+          const preset = vizAttr(m[1], 'preset'), h = Number(String(vizAttr(m[1], 'height') ?? EMBED_HEIGHT).trim().replace(/px$/, ''));
+          out.push({ lang, preset: preset && /^[A-Za-z0-9][\w-]*$/.test(preset) ? preset : null,
+            height: Number.isInteger(h) && h >= EMBED_HEIGHTS[0] && h <= EMBED_HEIGHTS[1] ? h : EMBED_HEIGHT });
+        }
+      }
+    };
+    walk(path.join(book.dir, lang));
+  }
+  return out;
+}
+/** The cards of `vizId` that the chapters of `book` cite: [{ preset, lang }], one per card and language. */
+export function citedCards(book, vizId) {
+  const out = new Map();
+  for (const { preset, lang } of vizCitations(book, vizId)) if (preset) out.set(`${preset}.${lang}`, { preset, lang });
+  return [...out.values()];
+}
+
 /** theme/viz/favicon.svg with its @@colour@@ placeholders filled from the screen palette. */
 export function favicon() {
   const tokens = JSON.parse(fs.readFileSync(TOKENS_JSON, 'utf8'));
