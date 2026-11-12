@@ -880,7 +880,7 @@
       "mode": "100644"
     },
     "tools/tests/test_html.py": {
-      "sha256": "4be882eff5298930b8aa4d2dd322120fa3008fdd146d8fa5a1a4ee90d2be4e73",
+      "sha256": "078c0c6d71f0067bd3613032d32e3446db09e062dc76e86f7db6a0b227343e54",
       "mode": "100644"
     },
     "tools/tests/test_links.py": {
@@ -928,7 +928,7 @@
       "mode": "100644"
     },
     "tools/tests/test_slides.py": {
-      "sha256": "431916cae588bed59d826474ceed2e3d8f4bfa834c66673177eed75a9ed65ad7",
+      "sha256": "722a6d99863cb2fbbfabbb7ba69b9cbd8485ff7ff745d450b6452f2e1f45077b",
       "mode": "100644"
     },
     "tools/tests/test_template.py": {

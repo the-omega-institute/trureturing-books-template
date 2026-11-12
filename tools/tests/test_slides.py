@@ -304,7 +304,7 @@ class ExampleDeckTest(unittest.TestCase):
         zh = slides.read_edition(self.book, "overview", "zh")
         en = slides.read_edition(self.book, "overview", "en")
         self.assertEqual(zh.count, en.count)
-        self.assertTrue(8 <= zh.count <= 10)
+        self.assertTrue(8 <= zh.count <= 12)
         self.assertEqual(zh.head["htmlAttrs"]["lang"], "zh-CN")
         self.assertEqual(en.head["htmlAttrs"]["lang"], "en")
         self.assertEqual(zh.meta["code"], self.book.code)

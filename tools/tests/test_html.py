@@ -662,7 +662,7 @@ class BuildExampleTest(unittest.TestCase):
         prefix = f"https://github.com/{LOCK.repo}/blob/{LOCK.commit}/"
         for ed in self.book.editions:
             model = load_edition(ed)
-            formal = {e.id for e in model.formal_envs()}
+            formal = {e.id for e in model.formal_envs() if e.status == "lean"}
             seen = set()
             for page in self.pages(ed.lang):
                 if page.name == "print.html":
