@@ -90,6 +90,23 @@ def cmd_build(args) -> int:
     return 1 if result.failures else 0
 
 
+def cmd_requests(args) -> int:
+    from . import model, requests
+
+    groups = requests.collect(m for book in _books(args) for m in model.load_book_models(book).values())
+    if args.json:
+        print(json.dumps(groups, ensure_ascii=False, indent=2))
+    else:
+        for group in groups:
+            print(f'{group["book_count"]} book(s), {group["result_count"]} result(s): {group["request"] or "MISSING ISSUE"}')
+            for source in group["sources"]:
+                print(f'  DOI:{source["doi"]} | {source["source"]}')
+            for use in group["uses"]:
+                print(f'  {use["book"]}/{use["chapter"]}#{use["id"]}')
+        print(f'{len(groups)} formalization request(s)')
+    return 0
+
+
 def cmd_cache(args) -> int:
     """./tbook cache status|key|prune|export: the build cache (tools/tbook/buildcache.py,
     docs/ARCHITECTURE.md)."""
@@ -248,6 +265,11 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--offline", action="store_true", help="do not fetch trureturing state over the network")
     c.add_argument("--strict", action="store_true", help="fail on warnings too")
     c.set_defaults(fn=cmd_check)
+
+    c = sub.add_parser("requests", help="list formalization requests, grouped by issue and counted once per book/result")
+    c.add_argument("--book", action="append")
+    c.add_argument("--json", action="store_true", help="emit DOI, source, issue and book/result usage counts as JSON")
+    c.set_defaults(fn=cmd_requests)
 
     c = sub.add_parser("pin", help="pin a trureturing commit and resolve cited declarations")
     c.add_argument("ref", nargs="?", help="commit SHA (full or abbreviated), branch or tag; it must be on the "

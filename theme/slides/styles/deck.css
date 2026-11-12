@@ -264,7 +264,7 @@ ul.plain.tight li { margin-bottom: 8px; }
 .tr-badge-lean { --c: var(--tr-sem-lean); box-shadow: var(--tr-fx-glow-ok); }
 .tr-badge-defined { --c: var(--tr-sem-theory); } /* a Lean definition: neutral, never the verified green */
 .tr-badge-open { --c: var(--tr-sem-open); }
-.tr-badge-argued { --c: var(--tr-sem-argued); }
+.tr-badge-argued, .tr-badge-written-proof { --c: var(--tr-sem-argued); }
 .tr-badge-unverified { --c: var(--tr-sem-open); background: color-mix(in srgb, var(--tr-sem-open) 24%, transparent); border-style: dashed; }
 
 /* ---------- theorem card (components/TheoremCard.vue) ---------- */
@@ -274,7 +274,7 @@ ul.plain.tight li { margin-bottom: 8px; }
   padding: 34px 46px 30px 52px;
 }
 .tr-thm-open, .tr-thm-unverified { --c: var(--tr-sem-open); }
-.tr-thm-argued { --c: var(--tr-sem-argued); }
+.tr-thm-argued, .tr-thm-written-proof { --c: var(--tr-sem-argued); }
 .tr-thm-defined { --c: var(--tr-sem-theory); }
 .tr-thm > .tr-thm-head::before {
   content: "";
@@ -288,7 +288,7 @@ ul.plain.tight li { margin-bottom: 8px; }
 .tr-thm-head { display: flex; align-items: center; gap: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--tr-panel-edge); }
 .tr-thm-label { font-family: var(--display); font-weight: 700; font-size: 32px; letter-spacing: .04em; color: var(--tr-sem-theory); white-space: nowrap; }
 .tr-thm-open .tr-thm-label { color: var(--tr-sem-open); }
-.tr-thm-argued .tr-thm-label { color: var(--tr-sem-argued); }
+.tr-thm-argued .tr-thm-label, .tr-thm-written-proof .tr-thm-label { color: var(--tr-sem-argued); }
 .tr-thm-title { font-family: var(--display); font-weight: 600; font-size: 32px; color: var(--tr-ink); flex: 1; min-width: 0; line-height: 1.3; }
 .tr-thm-head .tr-badge { margin-left: auto; }
 .tr-thm-body { padding: 26px 0 22px; font-size: 34px; line-height: 1.55; color: var(--tr-ink); }

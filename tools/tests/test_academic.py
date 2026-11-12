@@ -90,7 +90,7 @@ class AcademicTests(unittest.TestCase):
                 self.assertEqual(generated.count('Pinned source:'), pages)
                 self.assertEqual(generated.count(r'\rule{0pt}{8pt}'), size)
                 self.assertEqual(generated.count(r'\begin{tabular}'), pages)
-                self.assertIn('GID (pinned Lean source)', generated)
+                self.assertIn('Source (Lean / DOI / request)', generated)
 
     def test_tex_comments_verbatim_escapes_and_optional_arguments(self):
         text = r'''

@@ -1,7 +1,7 @@
 """The generated "verification ledger" chapter appended to every edition.
 
-It lists each formal environment with its Lean declaration(s), each linked at the
-pinned commit, followed by the explicitly open items. The output is plain Markdown
+It lists Lean-backed formal environments with their declaration(s), linked at the
+pinned commit, then written proofs with book proof links and explicitly open items. The output is plain Markdown
 (pipe tables), rendered by every target.
 
 The ledger never claims more than the lock backs: a declaration the lock does not resolve
@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from . import config, lean
+from . import config, lean, render
 from .model import FORMAL, OPEN, EditionModel, Env
 
 LEDGER_FILE = "verification-ledger.md"
@@ -50,7 +50,7 @@ def ledger_markdown(model: EditionModel, lock: lean.Lock | None,
     out = [f"# {s('ledger.title')} {{#{LEDGER_ID} .unnumbered}}", "", s("ledger.intro"), ""]
     if lock:
         out += [f"{s('ui.pinned_at')} [`{lock.commit[:12]}`]({lock.tree_url}) · `{lock.repo}`", ""]
-    formal = [e for e in model.all_envs() if e.kind in FORMAL]
+    formal = [e for e in model.all_envs() if e.kind in FORMAL and e.status != "written-proof"]
     unverified = s("badge.unverified") or s("slides.badge_unverified") or "UNVERIFIED"
     if formal:
         out += [f"| {s('ledger.col_item')} | {s('ledger.col_title')} | {s('ledger.col_decl')} | {s('ledger.col_state')} |",
@@ -77,6 +77,16 @@ def ledger_markdown(model: EditionModel, lock: lean.Lock | None,
         out.append("")
     else:
         out += [s("ledger.none"), ""]
+    written = [e for e in model.all_envs() if e.status == "written-proof"]
+    out += [f"## {s('ledger.written_title')} {{.unnumbered}}", "", s("ledger.written_intro"), ""]
+    for env in written:
+        proof = model.envs.get(env.attrs.get("proof"))
+        proof_link = f" · [{s('env.proof')}]({href(proof)})" if proof and proof.kind == "proof" else ""
+        title = f" — {model.title_markdown(env, link)}" if env.title else ""
+        out.append(f"- [{env.ref_text(lang)}]({href(env)}){title}{proof_link} · {render.source_markdown(env)}")
+    if not written:
+        out.append(s("ledger.none"))
+    out.append("")
     open_items = [e for e in model.all_envs() if e.kind in OPEN]
     out += [f"## {s('ledger.open_title')} {{.unnumbered}}", "", s("ledger.open_intro"), ""]
     if open_items:

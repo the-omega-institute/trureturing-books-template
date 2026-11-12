@@ -14,7 +14,7 @@
 % Manuscript: Contents, Chapters 1 and 2
 \begin{frame}{Outline}
   \tableofcontents[hideallsubsections]
-  \note{The main talk has seven frames. Optional technical material and the verification ledger follow the appendix marker.}
+  \note{The main talk distinguishes Lean verification, a written proof and an open question. Optional technical material and the verification ledger follow the appendix marker.}
 \end{frame}
 \section{Golden integers}
 \subsection{The carry deficit}
@@ -28,6 +28,18 @@
   \end{bookresult}
   The bound holds for arbitrarily large inputs.
   \note{Recall that the deficit measures the failure of the golden-integer embedding to preserve addition. The green tag links to the pinned Lean source.}
+\end{frame}
+% Manuscript: Chapter 1, Proposition 1.12 and proof pf-deficit-frequencies
+\begin{frame}{Limiting frequencies: a written proof}
+  \begin{bookresult}{rem-areas-not-frequencies}
+    For $0\le v_1,v_2<n$, let $a_n^\pm$ be the proportions with deficit $\pm1$. Then
+    \[
+      \lim_{n\to\infty}a_n^+=\frac{1}{2\varphi^2},\qquad
+      \lim_{n\to\infty}a_n^-=\frac{1}{2\varphi^4}.
+    \]
+  \end{bookresult}
+  Weyl equidistribution, rectangle products and grid approximations give the limits.
+  \note{This is the book's written argument, derived from Weyl's theorem. It has no matching frozen Lean verification. The source DOI and formalization request appear automatically; the purple badge does not count as Lean verification.}
 \end{frame}
 \section{Refutation}
 \subsection{A floor formula}
@@ -71,11 +83,11 @@
 \subsection{Verification scope}
 % Manuscript: Preface, verification model
 \begin{frame}{The scope of verification}
-  Each cited result resolves through the book to a frozen declaration.
+  Each cited result inherits its evidence from the book.
   \begin{itemize}
     \item The speaker writes the block's mathematical explanation.
     \item The book supplies its kind, number and title.
-    \item The lock supplies the pinned source and verification status.
+    \item The lock supplies Lean sources; written proofs supply a DOI and request.
   \end{itemize}
   Pinned source: \PinnedCommit
   \note{The identity chain is checked mechanically; fidelity of the speaker's prose to the cited statement remains an author and reviewer responsibility.}

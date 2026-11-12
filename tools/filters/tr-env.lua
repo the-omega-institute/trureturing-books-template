@@ -212,10 +212,10 @@ local function render_html(div, a)
   local leans = lean_entries(a)
   local badge = a["tr-badge"] or ""
   if badge ~= "" then
-    local classes = { "tr-badge", status == "lean" and "tr-badge-lean" or "tr-badge-open" }
+    local classes = { "tr-badge", "tr-badge-" .. status }
     if unverified then classes[#classes + 1] = "tr-badge-unverified" end
     local tip = a["tr-badge-title"] or (status == "lean" and META.badge_lean_title or META.badge_open_title)
-    local url = a["tr-badge-url"] or ""  -- only a LEAN ✓ badge links; UNVERIFIED never does
+    local url = status == "lean" and (a["tr-badge-url"] or "") or ""  -- only a LEAN ✓ badge links; UNVERIFIED never does
     head:insert(pandoc.Space())
     if url ~= "" then
       head:insert(pandoc.Link({ pandoc.Str(badge) }, url, tip, pandoc.Attr("", classes)))

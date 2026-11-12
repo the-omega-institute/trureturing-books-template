@@ -75,3 +75,11 @@ GID 只能引用锁文件中已有的声明，且必须是 Lean `theorem`，除�
 ## 界面文字
 
 徽章、页脚标签与站点按钮的文字取自 `theme/i18n/<lang>.toml` 的 `[slides]` 表（书库可在 `i18n/<lang>.toml` 覆盖）；`i18n.ts` 中的默认值只作后备。
+
+### 书面证明
+
+书面证明使用 `<TheoremCard status="written-proof" cite="书中结果 id" label="…" doi="…" source="…" request="…">`，显示紫色“书面证明 / WRITTEN PROOF”。来源字段与书中一致，不得有 `gid`（空值也不行）；被引用的结果须关联本语言的非空证明。徽章本身不带链接，来源与形式化请求在卡片页脚提供链接，不计入 Lean 数量。独立 LeanBadge 不能代替带证明关联的定理卡。
+
+`argued` 保留给非正式论证；不能用它代替书中明确的书面证明状态，或把书面已证结果当作开放问题。
+
+状态及来源属性只用单个字面值，不使用动态绑定或重复属性。见 [形式化请求规范](../../docs/FORMALIZATION-REQUESTS.md)。

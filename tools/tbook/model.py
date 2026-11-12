@@ -3,9 +3,10 @@
 Environment kinds and their verification policy:
 
 =============  ==================================================================
-formal         theorem, lemma, proposition, corollary — MUST cite >=1 Lean GID
+formal         theorem, lemma, proposition, corollary — by default cite >=1 Lean GID
                (``lean="…"``); every cited declaration must be frozen and of kind
-               ``theorem``. Rendered with the green LEAN ✓ badge.
+               ``theorem``. Rendered with the green LEAN ✓ badge. Explicit
+               status="written-proof" instead requires a proof block and forbids lean; violet badge.
 definition     definition — ``lean`` optional; when given it must resolve (any kind).
 open           conjecture, problem — MUST NOT cite Lean; rendered with the OPEN badge.
 informal       example, remark — ``lean`` optional; when given it must resolve.
@@ -26,6 +27,8 @@ from . import config, lean, mdscan
 from .summary import Chapter, Summary, SummaryError, chapter_prefix, parse_summary
 
 FORMAL = ("theorem", "lemma", "proposition", "corollary")
+# Public capability used by template layers; this status never asserts kernel verification.
+WRITTEN_PROOF = "written-proof"
 DEFINITION = ("definition",)
 OPEN = ("conjecture", "problem")
 INFORMAL = ("example", "remark")
@@ -100,6 +103,8 @@ class Env:
 
     @property
     def status(self) -> str:
+        if self.kind in FORMAL and self.attrs.get("status") == WRITTEN_PROOF:
+            return WRITTEN_PROOF
         return status_of(self.kind)
 
     def label(self, lang: str) -> str:

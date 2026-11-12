@@ -469,6 +469,8 @@ html.light a.tr-badge-lean:hover, html.rust a.tr-badge-lean:hover, html.coal a.t
   font-family: var(--tr-font-data);
   font-size: 0.74em;
   line-height: 1.55;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .tr-env-lean .tr-lean-decl, .tr-env-lean a.tr-lean-decl:link, .tr-env-lean a.tr-lean-decl:visited { color: var(--tr-dim); border-bottom: 0; overflow-wrap: anywhere; min-width: 0; }
 .tr-env-lean a.tr-lean-decl::before { content: "⌁\00a0"; color: var(--tr-env-accent); }
@@ -673,3 +675,8 @@ figure.tr-film.tr-film-unbuilt .tr-film-files { display: none; }
   color: var(--tr-dim);
   align-self: center;
 }
+
+/* Written argument: the same violet semantic as Slidev ARGUED. */
+.tr-env.tr-status-written-proof { --tr-env-accent: var(--tr-violet); }
+.tr-status-written-proof .tr-env-label { color: var(--tr-violet); }
+.tr-badge-written-proof { color: var(--tr-violet) !important; background: color-mix(in srgb, var(--tr-violet) 9%, transparent); }

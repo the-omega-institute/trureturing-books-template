@@ -19,7 +19,7 @@ export interface LeanInfo {
  * (neutral) for a locked definition or other non-theorem, and for anything marked kind="definition";
  * 'unverified' (red) for a GID the lock does not resolve; 'open' / 'argued' as the status says.
  */
-export type LeanState = 'lean' | 'defined' | 'unverified' | 'open' | 'argued'
+export type LeanState = 'lean' | 'defined' | 'unverified' | 'open' | 'argued' | 'written-proof'
 
 const GID_RE = /^(D[0-9]+\/S[0-9]+\/(?:[A-Za-z_][A-Za-z0-9_]*\/)*[A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][\w']*(?:\.[A-Za-z_][\w']*)*)$/
 
@@ -36,7 +36,7 @@ export function leanInfo(gid: string | undefined): LeanInfo {
 }
 
 export function leanState(info: LeanInfo, status?: string, kind?: string): LeanState {
-  if (status === 'open' || status === 'argued')
+  if (status === 'open' || status === 'argued' || status === 'written-proof')
     return status
   if (!info.locked)
     return 'unverified'

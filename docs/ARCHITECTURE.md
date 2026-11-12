@@ -4,10 +4,10 @@
 
 ## 1. 原则
 
-1. **真值只在 trureturing。** 书中每条 `theorem / lemma / proposition / corollary` 都必须引用 trureturing 中已被 Lean 内核验证并冻结的声明。冻结成员身份的唯一判据是所钉提交上存在 `Golden/Frozen/state/<module>.lean.json` 且其中列有该声明（trureturing CLAUDE.md §1.3 冻结律）。Lean 代码只写在 trureturing，本仓库不含 `.lean` 文件。
-2. **书是投影，不是真源。** 书的文字解释定理；定理的成立由 Lean 声明决定。未证结论只能写成 `conjecture` 或 `problem`。
+1. **Lean 验证只来自 trureturing。** 书中 `theorem / lemma / proposition / corollary` 默认引用 trureturing 中已被 Lean 内核验证并冻结的声明；源文有证明但无匹配声明时必须显式标为 `status="written-proof" proof="id"` 且不带 `lean`，每版关联非空书面证明，并提供 DOI、原文定位与 trureturing-requests issue，见 [形式化请求规范](FORMALIZATION-REQUESTS.md)。已有匹配 Lean 验证时必须引用 Lean。冻结成员身份的唯一判据是所钉提交上存在 `Golden/Frozen/state/<module>.lean.json` 且其中列有该声明（trureturing CLAUDE.md §1.3 冻结律）。Lean 代码只写在 trureturing，本仓库不含 `.lean` 文件。
+2. **证据状态不可混淆。** Lean 结果由冻结声明支撑；书面证明由作者与评审负责，紫色徽章不带验证链接、不计入 Lean 数量。真正开放的结论用 `conjecture` 或 `problem`。
 3. **一次编写，多端导出。** 同一份 Markdown 生成 HTML（mdBook）、PDF（Typst，屏幕版与印刷版）、EPUB 3（Apple Books）。编号、标签、徽章与 Lean 链接由 `tools/tbook/render.py` 统一计算，各端一致。
-4. **多语言，默认中文与英文。** 每本书有若干语言版本（edition），第一个为权威版本；`./tbook check` 要求各版本的章节文件、环境序列（种类、id、Lean 引用）逐条一致。
+4. **多语言，默认中文与英文。** 每本书有若干语言版本（edition），第一个为权威版本；`./tbook check` 要求各版本的章节文件、环境序列（种类、id、Lean 引用、证据状态、证明关联与来源字段）逐条一致。
 5. **配色单一来源。** 赛博朋克配色只在 `theme/tokens.json` 定义，`./tbook theme` 派生出各端使用的 CSS / Typst / JS（幻灯片的打印背景图由 Chromium 按派生的 CSS 渲染，见 §2 的 `slides/`）。绿色只留给 Lean 已验证，琥珀色只留给“现在/当前选择”，红色标开放问题。
 6. **模板可升级。** `template.toml` 列出模板托管的路径；下游只改自己的路径（`books/`、`site.toml`、`trureturing.lock.json`、`i18n/`、`PROJECT.md`、`README.md`）。`./tbook template update` 把托管路径同步到模板的新版本。
 
@@ -84,7 +84,8 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 
 | 种类 | 类名 | Lean 引用 | 编号 | 徽章 |
 | --- | --- | --- | --- | --- |
-| 形式结论 | `theorem` `lemma` `proposition` `corollary` | **必须**，且解析为 Lean `theorem` | 是 | `LEAN ✓`（绿，链接到第一条声明）；所引 GID 不能全部经锁文件解析为 Lean `theorem` 时，构建显示红色 `UNVERIFIED`，各端徽章都不是链接，页脚与账本只链接锁文件解析了的声明（`./tbook check` 报错） |
+| 形式结论 | `theorem` `lemma` `proposition` `corollary` | 默认**必须**，且解析为 Lean `theorem` | 是 | `LEAN ✓`（绿，链接到第一条声明）；所引 GID 不能全部经锁文件解析为 Lean `theorem` 时，构建显示红色 `UNVERIFIED`，各端徽章都不是链接，页脚与账本只链接锁文件解析了的声明（`./tbook check` 报错） |
+| 书面证明 | 上述形式结论 + `status="written-proof" proof="id"` | **禁止**，每版关联非空 proof，必须有 DOI、原文定位和已登记的请求 issue | 是 | `书面证明 / WRITTEN PROOF`（紫，无链接，不计入 Lean 数量） |
 | 定义 | `definition` | 可选；给出则必须解析 | 是 | — |
 | 开放 | `conjecture` `problem` | **禁止** | 是 | `OPEN`（红） |
 | 非形式 | `example` `remark` | 可选；给出则必须解析 | 是 | — |
@@ -168,7 +169,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 2. 结构：SUMMARY 可解析、章节文件存在、未列入 SUMMARY 的 `.md`（警告）、fenced div 与 HTML 注释块闭合、无法解析的 div 开头行（报错）；行内 `<!--` 未在所在段落内闭合而后文另有 `-->`，围栏代码块随容器结束或从未闭合，mdBook 与 Pandoc 读法不同的定义，围栏代码块前未闭合、Pandoc 跨过围栏配对的 `$`（警告）；章节中链接或嵌入的本地文件（图片、`../assets/…`、引用式链接定义）不存在、或链接离开书目录，引用式定义的地址写在标签的下一行（警告）。
 3. 环境规则（见 §3.1 表）。
 4. 交叉引用 `[@id]`（正文与环境标题中）指向本版本存在的编号环境。
-5. 多语言对齐：各版本章节文件与顺序相同；每章环境序列（种类、id、Lean 引用）与媒体序列逐条相同；SUMMARY 结构（前言/编号/附录章节、嵌套、草稿条目）一致，使同一章在各语言中编号相同。
+5. 多语言对齐：各版本章节文件与顺序相同；每章环境序列（种类、id、Lean 引用、证据状态、证明关联与来源字段）与媒体序列逐条相同；SUMMARY 结构（前言/编号/附录章节、嵌套、草稿条目）一致，使同一章在各语言中编号相同。
 6. Lean：每个被引用的 GID 都在锁文件中；形式结论引用的必须是 `theorem`；在锁定提交上重新读取冻结状态片，名称、种类、模块、`statement_id` 与锁文件一致（防止锁文件过期或被手改）；所钉提交可从 `site.toml` 的 trureturing 分支到达（本地 checkout 用 `git merge-base --is-ancestor`，否则用 GitHub compare API；无法判定时 GitHub Actions 中为错误，本地或 `--offline` 下为警告）；锁文件的 `branch` 与该分支相同，且该分支是分支名而不是 SHA 或 `refs/…`（错误）；未被引用的锁条目（警告；`--book` 时也计入其他书的引用）。
 7. 媒体：`tbook.viz/film/slides/figure.check(book)` 与 `check_ref(book, src)`。静态图：脚本不能运行、提交的 `figures/<name>.<lang>.svg` 与脚本现在画出的不一致或缺失（错误，`./tbook fig build`）；没有脚本的 `figures/*.svg`、没有任何章节引用的图（`check.check_unused_figures`）（警告）；`.figure` 块没有图注，或图注、图片说明（`![…](x.svg)`）只是编号（`figure.caption_problem`，错误）；`assets/` 下没有被任何语言的章节链接、文件名也不出现在本书幻灯片、视频、可视化源文件中的文件（`check.check_unused_assets`，警告）；各语言版本同一章的图片（`![…](…)`）张数不同（`check.check_image_parity`，警告；图片可以是各语言自己的文件，所以只比张数，`.figure` 块则逐条比对）；用图片语法引用、位于 `assets/`、写死颜色（有 `fill`/`stroke`/`stop-color`/`color` 的色值，却既没有 `ts-`/`tf-` 角色类也没有 `prefers-color-scheme`）的 SVG，以及被两种以上语言的章节共用、含 `<text>` 的 SVG（`check.check_drawn_images`，警告；位图不报）；图在手机上的最小标签：取提交的各语言 SVG 中最小的数值 `font-size`（上下标的 `72%` 随所在标签，不另计），乘以 `min(1, 358 / 宽度)`（`WRAP = True` 的分栏图取最宽一栏），低于 10 px（`figure.phone_problem`，默认警告，`[figures] phone_labels` 可升为错误；`./tbook fig build` 同样报出，`./tbook fig list` 列出该值）；两块 `.figure`/`.viz`/`.film`/`.slides` 在同一层只隔着空行或 HTML 注释相邻（`check.check_media_runs`，警告，每一对报在第二块，点名两块的种类、`src`、`preset` 与行号；完整实验室紧跟同一页面的卡时另给隔开的办法）。
 8. 主题：`theme/generated/*` 与 `tokens.json` 同步（`./tbook theme --check`）；幻灯片的打印背景图 `theme/slides/styles/backdrop.jpg` 与 `backdrop.css`、`tokens.css` 同步（`./tbook theme --check` 与 `slides-check` 核对指纹）。
@@ -297,7 +298,7 @@ manifest.json              机器可读清单（schema trureturing-books.site.v1
                            <deck>/<slug>-<deck>-<lang>.pdf
 ```
 
-`manifest.json` 字段：`generated_at`、`site{title,languages,base_url,repo}`、`template{name,version}`、`trureturing{repo,commit,branch}`、`books[{slug, version, code, title{lang}, editions[{lang,bcp47,primary,html}], landing, verified, open, declarations[], media{viz,films,slides}, files[{path,size,sha256,kind(pdf|epub|cover|slides-pdf),lang,variant}]}]`。设置 `SOURCE_DATE_EPOCH` 可使 `generated_at` 可复现。
+`manifest.json` 字段：`generated_at`、`site{title,languages,base_url,repo}`、`template{name,version}`、`trureturing{repo,commit,branch}`、`formalization_requests`（按 issue 汇总 DOI、定位、书籍/结果及去重计数）、`books[{slug, version, code, title{lang}, editions[{lang,bcp47,primary,html}], landing, verified, open, declarations[], media{viz,films,slides}, files[{path,size,sha256,kind(pdf|epub|cover|slides-pdf),lang,variant}]}]`。设置 `SOURCE_DATE_EPOCH` 可使 `generated_at` 可复现。
 
 站点品牌：`site.toml` 可选 `[site] logo = "TRURETURING//BOOKS"`；缺省时用英文站名生成 `FIRST//REST`。
 

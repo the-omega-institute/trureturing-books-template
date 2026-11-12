@@ -7,7 +7,7 @@
     </TheoremCard>
   Props: label (kind and number, as the book prints it), title, gid (Lean GID; must be in
   trureturing.lock.json and name a Lean theorem), status ('open' for an open problem, 'argued' for an
-  unverified argument), kind ('definition' for a definition card: neutral cyan rule and LEAN DEF badge,
+  unverified argument, 'written-proof' for a source proof without a matching Lean declaration; no gid), kind ('definition' for a definition card: neutral cyan rule and LEAN DEF badge,
   never the green LEAN ✓; the GID may name a Lean def and the footer links it), cite (the id of the
   matching environment in the book, e.g. thm-deficit; ./tbook check then verifies that label and GID
   agree with the book). The statement goes in the default slot (Markdown and KaTeX work when it is
@@ -19,10 +19,11 @@ import LeanBadge from './LeanBadge.vue'
 import { leanInfo, leanState } from '../lean'
 import { t } from '../i18n'
 
-const props = defineProps<{ label?: string, title?: string, gid?: string, status?: 'open' | 'argued', kind?: string, cite?: string }>()
+const props = defineProps<{ label?: string, title?: string, gid?: string, status?: 'open' | 'argued' | 'written-proof', kind?: string, cite?: string, doi?: string, source?: string, request?: string }>()
 const info = computed(() => leanInfo(props.gid))
 const state = computed(() => leanState(info.value, props.status, props.kind))
 const kindClass = computed(() => props.kind === 'definition' ? 'tr-thm-def' : '')
+const doiURL = computed(() => props.doi ? 'https://doi.org/' + props.doi.split('/').map(encodeURIComponent).join('/') : '')
 </script>
 
 <template>
@@ -34,12 +35,15 @@ const kindClass = computed(() => props.kind === 'definition' ? 'tr-thm-def' : ''
     </header>
     <div class="tr-thm-body"><slot /></div>
     <footer class="tr-thm-decl">
-      <template v-if="props.gid">
+      <template v-if="state === 'written-proof'">
+        <span>DOI: <a :href="doiURL" target="_blank" rel="noopener">{{ props.doi }}</a> · {{ props.source }} · <a :href="props.request" target="_blank" rel="noopener">trureturing-requests</a></span>
+      </template>
+      <template v-else-if="props.gid">
         <span class="tr-thm-glyph" aria-hidden="true">λ</span>
         <a v-if="info.url" :href="info.url" target="_blank" rel="noopener"><code>{{ info.name }}</code></a>
         <code v-else>{{ info.name }}</code>
       </template>
-      <span v-else class="tr-thm-none">{{ props.status === 'argued' ? t('slides.badge_argued_title') : t('slides.no_lean') }}</span>
+      <span v-else class="tr-thm-none">{{ props.status === 'written-proof' ? t('badge.written_proof_title') : props.status === 'argued' ? t('slides.badge_argued_title') : t('slides.no_lean') }}</span>
     </footer>
   </section>
 </template>

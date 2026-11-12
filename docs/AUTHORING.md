@@ -66,7 +66,7 @@ $$
 
 | 种类 | 用途 | `lean` |
 | --- | --- | --- |
-| `theorem` `lemma` `proposition` `corollary` | 已在 Lean 中证明的结论 | 必须 |
+| `theorem` `lemma` `proposition` `corollary` | Lean 验证或显式书面证明的结论 | 默认必须；`status="written-proof"` 时禁止 |
 | `definition` | 定义 | 建议（指向 Lean `def`） |
 | `conjecture` `problem` | 猜想、开放问题 | 禁止 |
 | `example` `remark` | 例子、注记 | 可选 |
@@ -77,6 +77,35 @@ $$
 - 标题的显示规则（环境标题与 SUMMARY 中的章节标题相同）：`$…$` 内是 TeX，原样保留；`$…$` 外，反斜杠加 ASCII 标点是 Markdown 转义，各端（HTML 页头、侧栏、页面 `<title>`、站点目录、PDF、EPUB、账本）都只显示标点本身：`C\*-代数` 显示为 C*-代数，`snake\_case` 显示为 snake_case，`\$5` 显示为 $5 且不会成为公式。除行内数学与 `[@id]` 外，不要在标题里用强调、行内代码等格式：HTML 页头、侧栏与站点把它们当作纯文字，PDF/EPUB 却会排版，两端不一致。
 - `title` 中可以引用别的条目：`title="[@thm-deficit-three-valued] 的推广"` 显示为“定理1.3 的推广”（PDF/EPUB 中带链接）。id 不存在时 `./tbook check` 报错。
 - 环境可以嵌套（例如 `remark` 里放 `example`），但不要把 `proof` 放进定理内部——写在定理之后。
+
+### 源文有书面证明，尚无匹配的 Lean 声明
+
+书面证明与开放问题是两种状态。必须先搜索冻结库；已有陈述匹配的 Lean 验证时引用 Lean。只有尚无匹配验证、源文已有证明且有 DOI 来源时，才可使用书面证明状态。以下为语法示意，DOI、定位和 issue 必须替换为真实来源：
+
+```markdown
+::: {.theorem #thm-written status="written-proof" proof="pf-written" doi="<裸 DOI>" source="Theorem 2.1" request="https://github.com/the-omega-institute/trureturing-requests/issues/<编号>" title="源文结果"}
+忠实转述源文的陈述，并给出来源与适用范围。
+:::
+
+::: {.proof #pf-written}
+源文的书面论证，或忠实、完整的解释；注明出处。
+:::
+```
+
+`status="written-proof"` 只用于 `theorem/lemma/proposition/corollary`，不能同时有
+`lean`（空值也不行）。`proof="id"` 必须指向同一语言版本里非空的 `proof` 块，
+可跨章节。`doi` 必须是一个裸 DOI（`10.<注册者>/<后缀>`，不填 URL），`source` 是源文定理编号或章节页码，`request` 是共享请求仓库的 issue URL。各语言的状态、proof id、DOI、原文定位和 issue 必须相同，且每版都要有论证；注释或代码围栏
+不算书面证明内容。工具只检查结构，证明是否正确、完整、忠实于来源由作者与评审负责。
+
+所有输出显示紫色 **书面证明 / WRITTEN PROOF**，徽章不带链接，不计入 `LEAN ✓ n`；
+账本单列，并链接书内证明、DOI 和形式化请求。Slidev 必须用 `<TheoremCard status="written-proof" cite="thm-written" doi="…" source="…" request="…" …>`，来源字段与书中一致，不得给 `gid`；不能用独立 LeanBadge 代替有关联证明的定理卡。Beamer 的 `bookresult` 自动继承书中的状态和来源。开放问题仍用 conjecture/problem。
+
+先搜索并复用已有形式化请求；没有匹配项才新建。在 issue 正文或评论登记本书引用，标题、登记标记和去重规则见 [形式化请求规范](FORMALIZATION-REQUESTS.md)。`./tbook check` 核对 issue 存在、标题和登记；`--offline` 对未联网核验给出警告。DOI 是否真实、是否支持这条陈述，以及是否已有匹配 Lean 验证，须由作者与评审核对；语法校验不能替代这一步。
+未经证实却遗漏状态的形式结论仍报错并显示 UNVERIFIED。
+
+这里不提供“最近 Lean 声明”的环境属性：特例或变体不能作为本结果的验证引用。
+如需比较，在正文明确说明关系与差异，使用普通来源链接；不得给书面证明结果添加
+`lean` 或绿色徽章。模板层可在独立的比较记录中保存特例/变体关系，用于后续形式化。
 
 ### 选择正确的 GID
 
@@ -183,10 +212,10 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 
 ## 7. 诚实标注
 
-- 只有 `LEAN ✓` 的条目是已验证结论；正文中不要手写“已证明”“已验证”来修饰未引用 Lean 的命题。
+- 只有 `LEAN ✓` 表示 Lean 内核验证；书面已证结果必须明确其 DOI 来源、证明责任和形式化请求，不得称为 Lean 已验证。
 - 构建只在锁文件确认每条 GID 都是已冻结的 Lean 定理时显示 `LEAN ✓`；否则显示红色 `UNVERIFIED`（徽章在各端都不是链接），也不计入“LEAN ✓ n”等统计（`./tbook check` 会报错，不能发布）。页脚与账本只给锁文件解析了的声明链接（例如误引的 Lean 定义，链接到它的源码），锁文件没有的 GID 显示为不带链接的文字。
 - 不把存在性写成可构造，不把一个反例写成最小反例，不把示意图的数值写成实验或模拟结果。
-- 引用文献中的结论而 trureturing 尚未形式化时，写成 `remark` 并注明“文献结果，未在本书形式化”，不要用 `theorem`。
+- 引用尚未形式化的文献结果时，可保留注明来源与边界的 `remark`；若要使用定理类环境和书面证明徽章，必须满足本节的 DOI、证明和请求登记要求。缺少 DOI 时不得用书面证明状态，也不要把已证结果误写成开放问题。
 
 ## 8. `./tbook check` 常见报错
 

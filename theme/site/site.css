@@ -461,3 +461,6 @@ details.more-items > summary { cursor: pointer; color: var(--tr-cyan); font-fami
   body::after, .hero-fx, .langs { display: none; }
   .panel { clip-path: none; }
 }
+
+.k.written-proof { color: var(--tr-violet); border-color: var(--tr-violet); }
+ul.vlist.written-proof .ref { color: var(--tr-violet); }
