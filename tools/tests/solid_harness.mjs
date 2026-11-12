@@ -144,6 +144,7 @@ await page.evaluate(() => SC.park());
 const parked = await page.evaluate(() => ({ parked: SC.parked(), gl: !!SC.el.querySelector('canvas.solid-gl'), still: getComputedStyle(document.getElementById('cv')).visibility }));
 const still = await grab();
 await page.evaluate(() => PAINT.now());
+await settle(page);
 const again = await grab();
 const md = (a, b) => a.reduce((s, x, i) => s + Math.abs(x - b[i]), 0) / a.length;
 out('parking gives the WebGL context back and leaves the frame on the 2D canvas', parked.parked && !parked.gl && parked.still === 'visible' && md(before, still) < 2, `${JSON.stringify(parked)}, mean |Δ| ${md(before, still).toFixed(2)}`);
@@ -175,6 +176,28 @@ out('core: the same state drawn twice gives the same pixels, another view differ
   const { R, U } = basis(1.3, 0.4), u = 360 * 0.3, want = [320 + u * dot([0, 0, 1.2], R), 180 - u * dot([0, 0, 1.2], U)];
   out('core: the projection of an anchor agrees with the camera basis, and says which anchors a solid hides', Math.hypot(core.q[0] - want[0], core.q[1] - want[1]) < 1e-9 && core.hidden && !core.shown, JSON.stringify(core));
 }
+
+/* a dashed line of the core (kit.solid's sc.line, the film engine's solid shots) is cut along its whole length: the
+   same dashes whether the curve is sampled with 2 points or 400, and about half its length inked */
+const dashes = await page.evaluate(async () => {
+  const mod = await import(new URL('../assets/solid-core.js', location.href).href);
+  const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360;
+  const r = mod.createRenderer(cv, { pixelRatio: 1 }), sc = mod.createScene({ palette: { stage: '#000000', cyan: '#ffffff' } });
+  const line = (n) => Array.from({ length: n }, (_, i) => [-1.4 + 2.8 * i / (n - 1), 0, 0]);
+  const draw = (pts, dash) => {
+    sc.camera({ W: 640, H: 360, yaw: 0, pitch: 0, zoom: 1, radius: 0.3 });
+    sc.begin(); sc.line(pts, { color: '#ffffff', width: 3, dash }); sc.end(); sc.render(r);
+    const c = document.createElement('canvas'); c.width = 640; c.height = 360; c.getContext('2d').drawImage(cv, 0, 0);
+    const d = c.getContext('2d').getImageData(0, 180, 640, 1).data, ink = [];
+    for (let x = 0; x < 640; x++) ink.push(d[x * 4] > 128 ? 1 : 0);
+    return ink;
+  };
+  const sparse = draw(line(2), [6, 6]), dense = draw(line(400), [6, 6]), solid = draw(line(2), null);
+  const n = solid.reduce((s, x) => s + x, 0), d = sparse.reduce((s, x, i) => s + (x !== dense[i]), 0);
+  return { solid: n, sparse: sparse.reduce((s, x) => s + x, 0), dense: dense.reduce((s, x) => s + x, 0), differ: d };
+});
+out('core: a dashed line looks the same sampled with 2 and with 400 points, about half of it inked',
+  dashes.solid > 300 && dashes.differ <= dashes.solid * 0.03 && Math.abs(dashes.dense / dashes.solid - 0.5) < 0.15, JSON.stringify(dashes));
 
 /* frame time with tens of thousands of faces (software rendering in headless Chromium) */
 const perf = await page.evaluate(() => {

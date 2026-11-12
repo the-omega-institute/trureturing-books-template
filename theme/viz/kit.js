@@ -12,7 +12,7 @@
                                   arcs, arrows, polygons, DOM labels, picking on the unit sphere
      kit.solid(el, opts)          lit solids, glass shells, polyhedra, tubes and marks with occlusion and picking: the shell
                                   of the modelling core solid-core.js (three.js), both fetched on the first call only
-     kit.plot(canvas, opts)       a 2D chart or equal-aspect 2D stage: scales, axes, lines, areas, bars, dots, labels
+     kit.plot(canvas, opts)       a 2D chart or equal-aspect 2D stage: scales, axes, lines, areas, bars, dots, arrows, labels
      kit.clock(opts)              the bottom rail: play / pause / speed / scrub over t in [0, max], with keyboard
      kit.autoplay(clock, el)      start playing when the reader can see it (in a book: when el scrolls into view)
      kit.cards(el, opts)          experiment cards (one click = one named scenario with a one-line explanation),
@@ -21,6 +21,7 @@
      kit.field(input, opts)       a range input bound to its <output>
      kit.keys(map)                keyboard shortcuts that stay out of the way of form controls and the drawer
      kit.fix(x, d) kit.sgn(x, d)  number formatting without "-0.00" (U+2212 minus)
+     kit.setTag(el, html, cls)    write a stage label (class, HTML when changed, TRV.keepCase): what st.tag and sc.tag use
 
    Colours come from TRV.palette (the design tokens); nothing here hard-codes one. */
 (function () {
@@ -86,7 +87,10 @@
       kit.ready() resolves once all of it is in; the suites' settle() waits for it before calling flush(). */
   const waits = [];
   const pending = (promise) => { waits.push(promise); return promise; };
-  const ready = () => Promise.all(waits.map((w) => w.catch(() => null))).then(() => undefined);
+  const ready = async () => {
+    let n;
+    do { n = waits.length; await Promise.all(waits.slice(0, n).map((w) => w.catch(() => null))); } while (waits.length !== n);
+  };
   /** step(e) with e eased from 0 to 1 over ms; done() at the end. Under reduced motion: step(1) at once. */
   function tween(ms, step, done) {
     let live = true;
@@ -103,6 +107,15 @@
     tweens.add(finish);
     requestAnimationFrame(tick);
     return { cancel() { live = false; tweens.delete(finish); } };
+  }
+
+  /** Write a stage label: its class and its HTML (only when changed). The theme sets labels in capitals; TRV.keepCase
+      keeps the Greek letters and one-letter variables of the text as written (δ stays δ, u stays u). */
+  function setTag(t, html, cls) {
+    const c = 'tag ' + (cls || '');
+    if (t.className !== c) { t.className = c; t._case = null; }
+    if (t._html !== html) { t.innerHTML = html; t._html = html; t._case = null; }
+    if (t._case == null && TRV.keepCase) { TRV.keepCase(t); t._case = true; }
   }
 
   /* ---------- 3D stage on a 2D canvas ----------
@@ -146,12 +159,31 @@
     st.facing = () => D.slice();
 
     const style = (s, a) => { ctx.strokeStyle = s.color || P().cyan; ctx.lineWidth = (s.width || 1.2) * st.lw; ctx.globalAlpha = (s.alpha == null ? 1 : s.alpha) * a; ctx.setLineDash(s.dash || []); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; };
-    /** A polyline through world points. With fade (default) the part behind the centre plane is drawn dimmer. */
+    /** A polyline through world points. With fade (default) the part behind the centre plane is drawn dimmer.
+        A dash ([on, off] in pixels) runs on along the whole projected path, however finely it is sampled: the canvas
+        starts its dash pattern afresh at every subpath, so each run of segments on one side of the centre plane is
+        one subpath whose dash phase (lineDashOffset) is the projected length of the path before it. */
     st.path = (pts, s) => {
       s = s || {};
       const q = pts.map(st.p), back = s.back == null ? 0.28 : s.back;
       if (s.fade === false) {
         style(s, 1); ctx.beginPath(); q.forEach((a, i) => (i ? ctx.lineTo(a[0], a[1]) : ctx.moveTo(a[0], a[1]))); if (s.close) ctx.closePath(); ctx.stroke();
+      } else if (s.dash && s.dash.length) {
+        const runs = [], n = q.length + (s.close ? 1 : 0);
+        let at = 0, run = null;
+        for (let i = 1; i < n; i++) {
+          const a = q[i - 1], b = q[i % q.length], front = (a[2] + b[2]) / 2 >= 0;
+          if (!run || run.front !== front) { run = { front, off: at, pts: [a] }; runs.push(run); }
+          run.pts.push(b); at += Math.hypot(b[0] - a[0], b[1] - a[1]);
+        }
+        for (const front of [false, true]) {   // the part behind first, as for a solid line
+          for (const r of runs) {
+            if (r.front !== front) continue;
+            style(s, front ? 1 : back); ctx.lineDashOffset = r.off; ctx.beginPath();
+            r.pts.forEach((a, i) => (i ? ctx.lineTo(a[0], a[1]) : ctx.moveTo(a[0], a[1]))); ctx.stroke();
+          }
+        }
+        ctx.lineDashOffset = 0;
       } else {
         for (const front of [false, true]) {
           style(s, front ? 1 : back); ctx.beginPath();
@@ -242,8 +274,7 @@
       let t = tags.get(key);
       if (!t) { t = document.createElement('div'); tags.set(key, t); tagBox.appendChild(t); }
       const q = s && s.screen ? [v[0], v[1], 1] : st.p(v), dx = (s && s.dx) || 0, dy = (s && s.dy) || 0;
-      t.className = 'tag ' + (cls || '');
-      if (t._html !== html) { t.innerHTML = html; t._html = html; }
+      setTag(t, html, cls);
       t.style.transform = `translate(-50%, -50%) translate(${(q[0] + dx).toFixed(1)}px, ${(q[1] + dy).toFixed(1)}px)`;
       t.style.opacity = q[2] < -0.05 && !(s && s.fade === false) ? '0.45' : '1';
       t.hidden = false; tagsUsed.add(key);
@@ -294,7 +325,7 @@
 
   /* ---------- 2D charts and 2D stages ----------
      const g = kit.plot(canvas, { x: [0, 10], y: [0, 1], pad: [left, right, top, bottom], logX, logY, equal });
-     g.axes({ xTicks, yTicks, xFmt, yFmt, xLabel, yLabel }); g.line(points, color); g.dot(x, y, color); …
+     g.axes({ xTicks, yTicks, xFmt, yFmt, xLabel, yLabel }); g.line(points, color); g.dot(x, y, color); g.arrow([x0, y0], [x1, y1], { color }); …
      `equal: true` gives both axes the same scale (a 2D stage: lattices, circles), widening one range to fit. */
   /* ---------- sub- and superscripts in canvas text ---------- */
   const SCRIPT = 0.72;   // a script's size, of its text's
@@ -397,6 +428,24 @@
       if (s.ring) { ctx.lineWidth = s.width || 1.5; ctx.stroke(); } else { if (s.glow) { ctx.shadowColor = color; ctx.shadowBlur = s.glow; } ctx.fill(); }
       done();
     };
+    /** An arrow from a = [x, y] to b = [x, y] (data coordinates) with a screen-space head, as st.arrow of kit.stage3.
+        s: color, width (2), alpha, dash, glow, head (false: no head), headSize (10 pixels). */
+    g.arrow = (a, b, s) => {
+      s = s || {};
+      const c = s.color || P().cyan, x0 = X(a[0]), y0 = Y(a[1]), x1 = X(b[0]), y1 = Y(b[1]), dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
+      ctx.globalAlpha = s.alpha == null ? 1 : s.alpha; ctx.strokeStyle = ctx.fillStyle = c; ctx.lineWidth = s.width || 2;
+      ctx.setLineDash(s.dash || []); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (s.glow) { ctx.shadowColor = c; ctx.shadowBlur = s.glow; }
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.setLineDash([]);
+      if (L > 6 && s.head !== false) {
+        const h = Math.min(s.headSize || 10, L * 0.6), ux = dx / L, uy = dy / L;
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        ctx.lineTo(x1 - ux * h - uy * h * 0.42, y1 - uy * h + ux * h * 0.42);
+        ctx.lineTo(x1 - ux * h + uy * h * 0.42, y1 - uy * h - ux * h * 0.42);
+        ctx.closePath(); ctx.fill();
+      }
+      done();
+    };
     g.vline = (x, color, s) => { set(color, Object.assign({ width: 1 }, s)); const px = Math.round(X(x)) + 0.5; ctx.beginPath(); ctx.moveTo(px, pt); ctx.lineTo(px, pt + ih); ctx.stroke(); done(); };
     g.hline = (y, color, s) => { set(color, Object.assign({ width: 1 }, s)); const py = Math.round(Y(y)) + 0.5; ctx.beginPath(); ctx.moveTo(pl, py); ctx.lineTo(pl + iw, py); ctx.stroke(); done(); };
     /** A rectangle between data corners (x0, y0) and (x1, y1). */
@@ -445,6 +494,8 @@
      kit.clock({ range, play, label, speeds, max, step, rate, loop, t, format(t, max), onChange(t, clock), keys })
      t runs over [0, max]. rate = units of t per second at 1×. step = the keyboard / reduced-motion increment.
      range: <input type=range>; play: the ▶ button; label: the element showing t; speeds: a container of [data-speed]. */
+  const clocks = new Set();
+  const pause = () => clocks.forEach((c) => c.pause());
   function clock(o) {
     const C = { t: o.t || 0, max: o.max == null ? 1 : o.max, playing: false, speed: 1, rate: o.rate || 1, step: o.step || 1 };
     const fmt = o.format || ((t, max) => `${t.toFixed(2)} <small>/ ${max.toFixed(2)}</small>`);
@@ -478,6 +529,7 @@
     if (o.keys !== false) keys({ ' ': C.toggle, ArrowRight: () => C.stepBy(1), ArrowLeft: () => C.stepBy(-1), Home: () => { C.playing = false; C.set(0); }, End: () => { C.playing = false; C.set(C.max); } });
     TRV.onLang(show);
     show();
+    clocks.add(C);
     return C;
   }
 
@@ -487,6 +539,7 @@
       of pressing that button again. A press from the keyboard (Enter or Space on a focused button: detail 0) keeps the
       focus where the reader put it, so a reader who tabs through the controls is answered by the button. */
   function release(ev) {
+    (TRV.solids || []).forEach((sc) => sc.refresh());
     if (!ev || !(ev.detail > 0)) return;
     const from = document.activeElement;
     if (!from || from === document.body || !from.closest || !from.closest('button')) return;
@@ -602,7 +655,7 @@
   /** As fix, with an explicit sign. */
   function sgn(x, d) { const s = fix(x, d); return s[0] === '−' || Number(s.replace('−', '-')) === 0 ? s : '+' + s; }
 
-  TRV.kit = { v3, painter, flush, ready, pending, src: SRC, tween, stage3, plot, clock, autoplay, chips, cards, field, keys, fix, sgn, clamp, TAU };
+  TRV.kit = { v3, painter, flush, ready, pending, src: SRC, tween, setTag, stage3, plot, clock, pause, autoplay, chips, cards, field, keys, fix, sgn, clamp, TAU };
 })();
 
 /* ---------- kit.solid: the interactive shell of a solid stage (three.js, fetched on first use) ----------
@@ -638,11 +691,12 @@
   let coreP = null;
   /** The modelling core (and with it three.js), fetched once per page, on the first call of kit.solid. */
   const loadCore = () => coreP || (coreP = import(CORE));
-  const PRIMS = ['surface', 'poly', 'glass', 'tube', 'line', 'arrow', 'bead', 'ring', 'fan'];
+  const PRIMS = ['surface', 'poly', 'glass', 'tube', 'line', 'circle', 'arrow', 'bead', 'ring', 'fan'];
 
   function solid(el, opts) {
     const o = opts || {};
     const still = o.canvas || el.querySelector('canvas');     // the page's 2D canvas: shows the frame while the context rests
+    let active = true, overlay = null;
     const cam = { yaw: o.yaw == null ? -0.62 : o.yaw, pitch: o.pitch == null ? 0.34 : o.pitch, zoom: o.zoom || 1 };
     const sc = { el, cam, W: 0, H: 0, cx: 0, cy: 0, unit: 1, lw: o.lineScale || (TRV.thumbMode ? 1.8 : 1), mode: 'loading', faces: 0, frameMs: 0, contexts: 0 };
     let R = [1, 0, 0], U = [0, 0, 1], D = [0, -1, 0];
@@ -651,7 +705,7 @@
       R = [cy, -sy, 0]; U = [sy * sp, cy * sp, cp]; D = [-sy * cp, -cy * cp, sp];
     }
     function box() {
-      sc.W = el.clientWidth || 300; sc.H = el.clientHeight || 150;
+      sc.W = (still ? still.clientWidth : el.clientWidth) || 300; sc.H = (still ? still.clientHeight : el.clientHeight) || 150;
       sc.cx = sc.W * (o.cx == null ? 0.5 : o.cx); sc.cy = sc.H * (o.cy == null ? 0.5 : o.cy);
       sc.unit = Math.min(sc.W, sc.H) * (o.radius || 0.36) * cam.zoom;
     }
@@ -660,16 +714,17 @@
     sc.p = (v) => [sc.cx + sc.unit * v3.dot(v, R), sc.cy - sc.unit * v3.dot(v, U), v3.dot(v, D)];
     sc.facing = () => D.slice();
     /** Distance in CSS pixels from a pointer event to the projection of a world point. */
-    sc.near = (ev, v) => { const b = el.getBoundingClientRect(), q = sc.p(v); return Math.hypot(ev.clientX - b.left - q[0], ev.clientY - b.top - q[1]); };
+    const origin = () => { const b = (still || el).getBoundingClientRect(); return [b.left + (still ? 0 : el.clientLeft), b.top + (still ? 0 : el.clientTop)]; };
+    sc.near = (ev, v) => { const b = origin(), q = sc.p(v); return Math.hypot(ev.clientX - b[0] - q[0], ev.clientY - b[1] - q[1]); };
     /** The point of the unit sphere under a pointer event (front side), as kit.stage3. */
     sc.pick = (ev) => {
-      const b = el.getBoundingClientRect(), x = (ev.clientX - b.left - sc.cx) / sc.unit, y = (sc.cy - (ev.clientY - b.top)) / sc.unit, r2 = x * x + y * y;
+      const b = origin(), x = (ev.clientX - b[0] - sc.cx) / sc.unit, y = (sc.cy - (ev.clientY - b[1])) / sc.unit, r2 = x * x + y * y;
       if (r2 > 1) { const k = 1 / Math.sqrt(r2); return v3.add(v3.scale(R, x * k), v3.scale(U, y * k)); }
       return v3.add(v3.add(v3.scale(R, x), v3.scale(U, y)), v3.scale(D, Math.sqrt(1 - r2)));
     };
 
     /* the core: the scene, built anew by the page each frame; until it is in, the primitives draw nothing */
-    let core = null, scene = null, renderer = null, glCanvas = null, parked = false;
+    let core = null, scene = null, renderer = null, glCanvas = null, parked = false, prepared = false, preparing = null;
     const ready = loadCore().then((mod) => {
       core = mod; scene = mod.createScene({ palette: TRV.palette });
       sc.mode = 'webgl';
@@ -677,13 +732,15 @@
     }, (e) => { sc.mode = 'failed'; throw e; });
     sc.ready = ready;
     if (kit.pending) kit.pending(ready);
-    for (const name of PRIMS) sc[name] = (...a) => (scene ? scene[name](...a) : null);
+    for (const name of PRIMS) sc[name] = (...a) => (scene && !(preparing && !prepared) ? scene[name](...a) : null);
 
     /** The renderer and its canvas, made on demand; inside a book only once the stage is on screen. */
-    let onScreen = !TRV.embed || !window.IntersectionObserver;
+    let onScreen = !TRV.embed || !window.IntersectionObserver, requested = false;
+    /** Render a requested change even when a card's controls have scrolled the stage out of view. */
+    sc.refresh = () => { requested = true; if (o.onChange) o.onChange(); };
     function ensureRenderer() {
       if (renderer) return true;
-      if (!core || !onScreen) return false;
+      if (!core || (!onScreen && !requested)) return false;
       glCanvas = document.createElement('canvas');
       glCanvas.className = 'fill solid-gl';
       glCanvas.style.touchAction = 'none';
@@ -691,28 +748,46 @@
       renderer = core.createRenderer(glCanvas, { pixelRatio: Math.min(2, window.devicePixelRatio || 1) });
       glCanvas.addEventListener('webglcontextlost', (ev) => ev.preventDefault());
       parked = false;
+      prepared = false; preparing = null;
       if (still) still.style.visibility = 'hidden';
       sc.contexts += 1;
       return true;
     }
     /** Keep the last frame as a picture on the 2D canvas and give the WebGL context back. */
     function park() {
-      if (!renderer) return;
-      if (still) {
+      if (!renderer || !prepared) return;       // let an in-flight parallel compile finish before losing its context
+      if (still && active) {
         TRV.fitCanvas(still);
         const c = still.getContext('2d');
         c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, still.width, still.height);
-        c.drawImage(glCanvas, 0, 0, still.width, still.height);
+        if (prepared) c.drawImage(glCanvas, 0, 0, still.width, still.height);
         still.style.visibility = 'visible';
       }
       renderer.forceContextLoss(); renderer.dispose(); renderer = null;
       glCanvas.remove(); glCanvas = null; parked = true;
+      el.removeAttribute('aria-busy');
+      prepared = false; preparing = null;
     }
     sc.park = park;
     sc.parked = () => !renderer;
     let restTimer = 0;
     const restMs = o.park != null ? o.park : TRV.embed ? 1600 : 0;
     const rest = () => { if (!restMs) return; clearTimeout(restTimer); restTimer = setTimeout(park, restMs); };
+    /** Switch between a solid and the page's original 2D canvas; hide only this solid's labels. */
+    sc.active = (value) => {
+      if (value == null) return active;
+      const next = !!value;
+      if (active === next) return active;
+      active = next;
+      if (!active) { clearTimeout(restTimer); park(); if (glCanvas) glCanvas.style.visibility = 'hidden'; tags.forEach((t) => { t.hidden = true; }); if (still) still.style.visibility = 'visible'; el.removeAttribute('aria-busy'); }
+      else { if (glCanvas) glCanvas.style.visibility = 'visible'; if (o.onChange) o.onChange(); }
+      return active;
+    };
+    /** A separate 2D overlay; its context always belongs to the page, including while WebGL rests. */
+    sc.overlay = () => {
+      if (!overlay) { overlay = document.createElement('canvas'); overlay.className = 'fill solid-overlay'; overlay.style.pointerEvents = 'none'; el.appendChild(overlay); }
+      return overlay;
+    };
     if (TRV.embed && window.IntersectionObserver) {
       new IntersectionObserver((entries) => {
         const seen = entries[entries.length - 1].isIntersecting;
@@ -724,20 +799,35 @@
     let t0 = 0;
     sc.begin = () => {
       box(); axes(); tagsUsed.clear(); t0 = performance.now();
-      if (!scene) return;
+      if (!scene || (preparing && !prepared)) return;
       scene.camera({ W: sc.W, H: sc.H, cx: sc.cx, cy: sc.cy, px: true, unit: sc.unit, yaw: cam.yaw, pitch: cam.pitch, lw: sc.lw });
       scene.begin();
     };
     /** Draw the frame. Objects and labels this frame did not place are hidden; labels behind a solid are dimmed. */
     sc.end = () => {
       tags.forEach((t, k) => { if (!tagsUsed.has(k)) { t.hidden = true; tagPts.delete(k); } });
-      if (!scene) return;
+      if (!scene || (preparing && !prepared)) return;
       scene.end(); sc.faces = scene.faces;
+      if (!active) { tags.forEach((t) => { t.hidden = true; }); return; }
       if (ensureRenderer()) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         if (renderer.getPixelRatio() !== dpr) renderer.setPixelRatio(dpr);
+        if (!prepared) {
+          if (!preparing) {
+            const target = renderer;
+            el.setAttribute('aria-busy', 'true');
+            preparing = scene.prepare(target).then(() => {
+              if (renderer !== target) return;
+              prepared = true; el.removeAttribute('aria-busy');
+              if (!active) park(); else if (o.onChange) o.onChange();
+            });
+            kit.pending(preparing);
+          }
+          return;
+        }
         scene.render(renderer);
-        rest();
+        requested = false;
+        if (onScreen) rest(); else park();
       }
       tagPts.forEach(([t, v]) => { if (sc.occluded(v, 0.02)) t.style.opacity = '0.28'; });
       sc.frameMs = performance.now() - t0;
@@ -745,7 +835,7 @@
 
     /* picking, through the core (stage pixels) */
     sc.hitAt = (x, y) => (scene ? scene.hitAt(x, y) : null);
-    sc.hit = (ev) => { const b = el.getBoundingClientRect(); return sc.hitAt(ev.clientX - b.left, ev.clientY - b.top); };
+    sc.hit = (ev) => { const b = origin(); return sc.hitAt(ev.clientX - b[0], ev.clientY - b[1]); };
     /** True when a surface or polyhedron of this frame is in front of the world point p (by more than eps). */
     sc.occluded = (p, eps) => (scene ? scene.occluded(p, eps) : false);
     /** The index of the nearest point of `list` within px CSS pixels of a pointer event that no solid hides, or −1. */
@@ -755,7 +845,7 @@
       return best;
     };
     /** The beads and rings of the frame: { key, kind, p, x, y, hidden } in viewport pixels (for the suites). */
-    sc.marks = () => { if (!scene) return []; const b = el.getBoundingClientRect(); return scene.marks().map((m) => Object.assign(m, { x: b.left + m.x, y: b.top + m.y })); };
+    sc.marks = () => { if (!scene) return []; const b = origin(); return scene.marks().map((m) => Object.assign(m, { x: b[0] + m.x, y: b[1] + m.y })); };
 
     /* labels, as kit.stage3; dimmed where a solid hides their point */
     const tags = new Map(), tagsUsed = new Set(), tagPts = new Map();
@@ -765,8 +855,7 @@
       let t = tags.get(k);
       if (!t) { t = document.createElement('div'); tags.set(k, t); tagBox.appendChild(t); }
       const q = s && s.screen ? [v[0], v[1], 1] : sc.p(v), dx = (s && s.dx) || 0, dy = (s && s.dy) || 0;
-      t.className = 'tag ' + (cls || '');
-      if (t._html !== html) { t.innerHTML = html; t._html = html; }
+      kit.setTag(t, html, cls);
       t.style.transform = `translate(-50%, -50%) translate(${(q[0] + dx).toFixed(1)}px, ${(q[1] + dy).toFixed(1)}px)`;
       t.style.opacity = '1'; t.hidden = false; tagsUsed.add(k);
       if (!(s && s.screen) && !(s && s.occlude === false)) tagPts.set(k, [t, v]); else tagPts.delete(k);

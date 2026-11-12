@@ -116,7 +116,13 @@ export function createScene(o) {
 
   /* buffers */
   const keyed = new Map();
-  let loose = [], pickables = [], marks = [], used = new Set();
+  let loose = [], pickables = [], occluders = [], marks = [], used = new Set();
+  // Picking and hiding are independent: transparent objects do not hide marks; pick:false lets rays pass.
+  function register(mesh, s, extra, opaque) {
+    const p = { mesh, ...extra };
+    if (s.pick !== false) pickables.push(p);
+    if (s.occlude == null ? opaque : s.occlude) occluders.push(p);
+  }
   function setAttr(g, name, arr, size) {
     const a = g.getAttribute(name);
     if (a && a.array.length === arr.length) { a.array.set(arr); a.needsUpdate = true; } else g.setAttribute(name, new T.BufferAttribute(arr, size));
@@ -147,7 +153,7 @@ export function createScene(o) {
   sc.begin = () => {
     used = new Set();
     loose.forEach((x) => { scene.remove(x); if (x.geometry) x.geometry.dispose(); if (x.material) x.material.dispose(); });
-    loose = []; pickables = []; marks = []; sc.faces = 0;
+    loose = []; pickables = []; occluders = []; marks = []; sc.faces = 0;
     lighting();
   };
   function take(k, kind, make) {
@@ -177,7 +183,8 @@ export function createScene(o) {
       obj.add(mesh); obj.add(lines);
       return { obj, mesh, lines, nu: -1, nv: -1 };
     });
-    const geo = it.mesh.geometry, pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), cl = new Float32Array(n * 3);
+    const geo = it.mesh.geometry, pos = new Float32Array(n * 3), uv = new Float32Array(n * 2), cl = new Float32Array(n * 4);
+    let opaque = true;
     const stops = (s.colors || [s.color || pal().cyan || '#19f0ff']).map(col);
     const [lo, hi] = s.range || [0, 1];
     for (let j = 0; j <= g.nv; j++) for (let i = 0; i <= g.nu; i++) {
@@ -185,14 +192,17 @@ export function createScene(o) {
       pos[3 * q] = p[0]; pos[3 * q + 1] = p[1]; pos[3 * q + 2] = p[2];
       uv[2 * q] = g.us[i]; uv[2 * q + 1] = g.vs[j];
       const c = ramp(stops, s.value && hi > lo ? (s.value(g.us[i], g.vs[j]) - lo) / (hi - lo) : 0);
-      cl[3 * q] = c.r; cl[3 * q + 1] = c.g; cl[3 * q + 2] = c.b;
+      const alpha = typeof s.alpha === 'function' ? clamp(s.alpha(g.us[i], g.vs[j]), 0, 1) : 1;
+      cl[4 * q] = c.r; cl[4 * q + 1] = c.g; cl[4 * q + 2] = c.b; cl[4 * q + 3] = alpha;
+      if (alpha < 1) opaque = false;
     }
-    setAttr(geo, 'position', pos, 3); setAttr(geo, 'uv', uv, 2); setAttr(geo, 'color', cl, 3);
+    setAttr(geo, 'position', pos, 3); setAttr(geo, 'uv', uv, 2); setAttr(geo, 'color', cl, 4);
     if (it.nu !== g.nu || it.nv !== g.nv) { geo.setIndex(new T.BufferAttribute(gridIndex(g.nu, g.nv), 1)); it.nu = g.nu; it.nv = g.nv; }
     geo.computeVertexNormals(); geo.computeBoundingSphere(); geo.computeBoundingBox();
     const m = it.mesh.material, bc = s.back ? col(s.back) : new T.Color(0, 0, 0);
     m.userData.back.value.set(bc.r, bc.g, bc.b); m.userData.backMix.value = s.back ? 1 : dark ? 0.5 : 0.35;
-    m.opacity = s.alpha == null ? 1 : s.alpha; m.transparent = m.opacity < 1; m.depthWrite = m.opacity >= 1;
+    m.opacity = typeof s.alpha === 'number' ? s.alpha : 1; opaque = opaque && m.opacity >= 1;
+    m.transparent = !opaque; m.depthWrite = opaque;
     const ln = it.lines, gr = s.grid === true ? {} : s.grid;
     ln.visible = !!gr;
     if (gr) {   // every ku-th u-line and kv-th v-line, kept on top of the faces they bound by the faces' polygon offset
@@ -205,7 +215,7 @@ export function createScene(o) {
       ln.material.opacity = gr.alpha == null ? (dark ? 0.34 : 0.22) : gr.alpha;
     }
     sc.faces += g.nu * g.nv * 2;
-    pickables.push({ mesh: it.mesh, id: s.id || k, grid: g, noPick: s.pick === false });
+    register(it.mesh, s, { id: s.id || k, grid: g }, opaque);
     return it.mesh;
   };
   /** A flat-shaded polyhedron: vertices [[x, y, z], …], faces [[i, j, k, …], …] (convex polygons). s: color, colors
@@ -235,7 +245,7 @@ export function createScene(o) {
     setAttr(it.edges.geometry, 'position', new Float32Array(seg), 3); it.edges.geometry.setDrawRange(0, seg.length / 3); it.edges.geometry.computeBoundingSphere();
     it.edges.material.color = col(s.edges || pal().ink || '#d4efff'); it.edges.material.opacity = 0.35;
     sc.faces += pos.length / 9;
-    pickables.push({ mesh: it.mesh, id: s.id || k, faceOf });
+    register(it.mesh, s, { id: s.id || k, faceOf }, mat.opacity >= 1);
     return it.mesh;
   };
   /** A glass shell, centre c and radius r: faint where it faces the viewer and brighter towards the rim, so that what
@@ -267,10 +277,12 @@ export function createScene(o) {
 
   /* tubes and lines: a parallel-transported frame, which does not flip on straight runs */
   function tubeGeo(pts, rad, sides) {
-    const n = pts.length, pos = [], nor = [], idx = [];
+    const n = pts.length, pos = [], nor = [], idx = [], uv = [];
     if (n < 2) return null;
     const tan = pts.map((p, i) => unit(sub(pts[Math.min(n - 1, i + 1)], pts[Math.max(0, i - 1)])));
     let N = unit(cross(tan[0], Math.abs(tan[0][2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]));
+    const lengths = [0];
+    for (let i = 1; i < n; i++) lengths.push(lengths[i - 1] + len(sub(pts[i], pts[i - 1])));
     for (let i = 0; i < n; i++) {
       if (i > 0) {
         const b = cross(tan[i - 1], tan[i]), sn = len(b);
@@ -281,6 +293,7 @@ export function createScene(o) {
       for (let k = 0; k < sides; k++) {
         const a = TAU * k / sides, d = add(scale(N, Math.cos(a)), scale(B, Math.sin(a)));
         pos.push(pts[i][0] + rad * d[0], pts[i][1] + rad * d[1], pts[i][2] + rad * d[2]); nor.push(d[0], d[1], d[2]);
+        uv.push(lengths[n - 1] > 0 ? lengths[i] / lengths[n - 1] : 0, k / sides);
       }
     }
     for (let i = 0; i + 1 < n; i++) for (let k = 0; k < sides; k++) {
@@ -288,15 +301,17 @@ export function createScene(o) {
       idx.push(a, b, c, b, d, c);   // counter-clockwise seen from outside
     }
     const g = new T.BufferGeometry();
-    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setIndex(idx);
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
     return g;
   }
   /** A polyline cut into dashes of [on, off] pixels. */
   function dashes(pts, dash) {
-    const on = dash[0] / sc.unit, off = (dash[1] == null ? dash[0] : dash[1]) / sc.unit, out = [];
+    const on = dash[0], off = dash[1] == null ? dash[0] : dash[1], out = [];
+    if (!(on > 0 && off > 0)) return [pts];
     let cur = [pts[0]], drawn = true, left = on;
     for (let i = 1; i < pts.length; i++) {
-      let a = pts[i - 1], L = len(sub(pts[i], a));
+      let a = pts[i - 1], A = sc.p(a), B = sc.p(pts[i]), L = Math.hypot(B[0] - A[0], B[1] - A[1]);
       while (L > left) {
         const m = lerp(a, pts[i], left / L);
         L -= left; a = m;
@@ -330,10 +345,37 @@ export function createScene(o) {
     const it = take(k, 'tube', () => ({ obj: new T.Mesh(new T.BufferGeometry(), litMat(c0, 1, 0.2)) }));
     const rad = s.r || (s.width || 3) * sc.lw * 0.5 / sc.unit;
     it.obj.geometry.dispose(); it.obj.geometry = tubeGeo(pts, rad, s.sides || 10);
-    const c = col(c0), a = s.alpha == null ? 1 : s.alpha;
+    const c = col(c0), a = typeof s.alpha === 'number' ? s.alpha : 1;
+    const rgba = [], uv = it.obj.geometry.getAttribute('uv');
+    let opaque = a >= 1;
+    for (let i = 0; i < uv.count; i++) {
+      const alpha = typeof s.alpha === 'function' ? clamp(s.alpha(uv.getX(i)), 0, 1) : 1;
+      rgba.push(1, 1, 1, alpha); if (alpha < 1) opaque = false;
+    }
+    it.obj.geometry.setAttribute('color', new T.Float32BufferAttribute(rgba, 4));
+    it.obj.material.vertexColors = true;
     it.obj.material.color = c; it.obj.material.emissive = c.clone(); it.obj.material.emissiveIntensity = s.glow == null ? 0.2 : s.glow;
-    it.obj.material.opacity = a; it.obj.material.transparent = a < 1;
+    it.obj.material.opacity = a; it.obj.material.transparent = !opaque; it.obj.material.depthWrite = opaque;
+    register(it.obj, s, { id: s.id || k }, opaque);
     return it.obj;
+  };
+  /** A circle (or latitude) on a sphere. Hidden hemisphere segments are dim, with continuous dash phase.
+      s: n (samples, 96), fade (true), back (0.28), and line styles. centre and normal set any spherical circle. */
+  sc.circle = (c, normal, r, s) => {
+    s = s || {};
+    const n = unit(normal), e1 = unit(cross(n, Math.abs(n[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0])), e2 = cross(n, e1);
+    const pts = [], N = s.n || 96;
+    for (let i = 0; i <= N; i++) { const a = TAU * i / N; pts.push(add(c, add(scale(e1, r * Math.cos(a)), scale(e2, r * Math.sin(a))))); }
+    if (s.fade === false) return sc.line(pts, s);
+    const runs = s.dash && s.dash.length ? dashes(pts, s.dash) : [pts];
+    for (const run of runs) for (let i = 1; i < run.length; i++) {
+      const back = dot(sub(lerp(run[i - 1], run[i], 0.5), c), D) < 0;
+      const g = tubeGeo([run[i - 1], run[i]], (s.width || 1.2) * sc.lw * 0.5 / sc.unit, 6);
+      const a = (s.alpha == null ? 1 : s.alpha) * (back ? (s.back == null ? 0.28 : s.back) : 1);
+      const mat = flatMat(s.color || pal().cyan || '#19f0ff', a);
+      if (back) { mat.depthTest = false; mat.depthWrite = false; }
+      addLoose(new T.Mesh(g, mat)).renderOrder = back ? 4 : 0;
+    }
   };
   /** An arrow from a to b: a shaft and a lit cone; width and headSize in pixels; dash; alpha. */
   sc.arrow = (a, b, s) => {
@@ -378,6 +420,8 @@ export function createScene(o) {
   };
   /** End the frame: keyed objects this frame did not place are hidden. */
   sc.end = () => { keyed.forEach((it, k) => { if (!used.has(k)) it.obj.visible = false; }); };
+  /** Prepare shaders without blocking on compilation when KHR_parallel_shader_compile is available. */
+  sc.prepare = (renderer) => renderer.compileAsync(scene, camera);
   /** Draw the frame now into `renderer` (from createRenderer), at W × H. */
   sc.render = (renderer) => {
     const sz = renderer.getSize(new T.Vector2());
@@ -391,6 +435,7 @@ export function createScene(o) {
     if (!list.length) return null;
     if (!ray) ray = new T.Raycaster();
     ray.setFromCamera(new T.Vector2(x / sc.W * 2 - 1, -(y / sc.H) * 2 + 1), camera);
+    scene.updateMatrixWorld(true);
     const hits = ray.intersectObjects(list.map((p) => p.mesh), false);
     for (const h of hits) { const p = list.find((q) => q.mesh === h.object); if (p) return { h, p }; }
     return null;
@@ -400,7 +445,7 @@ export function createScene(o) {
       projection), so it agrees with the surface rather than with its flat faces. */
   sc.hitAt = (x, y) => {
     const r = cast(x, y, pickables);
-    if (!r || r.p.noPick) return null;
+    if (!r) return null;
     const { h, p } = r, pt = [h.point.x, h.point.y, h.point.z];
     const n = h.face ? unit([h.face.normal.x, h.face.normal.y, h.face.normal.z]) : D;
     const out = { id: p.id, point: pt, normal: n, front: dot(n, D) >= 0, depth: dot(pt, D) };
@@ -430,7 +475,7 @@ export function createScene(o) {
   };
   /** True when a surface or polyhedron of this frame is in front of the world point p (by more than eps). */
   sc.occluded = (p, eps) => {
-    const q = sc.p(p), r = cast(q[0], q[1], pickables);
+    const q = sc.p(p), r = cast(q[0], q[1], occluders);
     return !!r && dot([r.h.point.x, r.h.point.y, r.h.point.z], D) > q[2] + (eps == null ? 1e-3 : eps);
   };
   /** The beads and rings of the frame: { key, kind, p, x, y, hidden } (x, y in canvas pixels). */

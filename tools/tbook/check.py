@@ -17,7 +17,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from . import config, evidence, lean, mdscan, paths, render
+from . import config, evidence, lean, mdscan, paths, render, viz
 from .model import (DEFINITION, FORMAL, MEDIA, NUMBERED, OPEN, PROOF, WRITTEN_PROOF, EditionModel, Issue, load_book_models, kind_of,
                     media_cited_gids)
 from .summary import Chapter, Summary, chapter_prefix
@@ -618,6 +618,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         check_drawn_images(book, models, issues)
         check_unused_figures(book, models, issues)
         check_unused_assets(book, models, site, issues)
+        issues.extend(viz.check_frozen(book, models))
         for kind in MEDIA:
             try:
                 mod = importlib.import_module(f"tbook.{kind}")
