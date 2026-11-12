@@ -384,7 +384,13 @@ def validate_claims(root: Path, candidate: TemplateConfig | None = None) -> None
     """
     if (root / LAYER_DIR).is_symlink():
         raise TemplateError("template.d must be a real downstream-owned directory")
-    upstream = candidate if candidate is not None and not candidate.layer else TemplateConfig.load(root)
+    # A standalone layer source has no upstream config. Its manifest can still be
+    # generated; ownership against the consumer's upstream is checked at install.
+    upstream = candidate if candidate is not None and not candidate.layer else (
+        TemplateConfig.load(root) if (root / TEMPLATE_TOML).is_file() else None)
+    upstream_owned = upstream.owned if upstream else []
+    upstream_exclude = upstream.exclude if upstream else []
+    upstream_managed = upstream.managed if upstream else []
     layers = {c.layer: c for c in layer_configs(root)}
     if candidate is not None and candidate.layer:
         layers[candidate.layer] = candidate
@@ -399,17 +405,17 @@ def validate_claims(root: Path, candidate: TemplateConfig | None = None) -> None
             clean = entry.rstrip("/")
             if not _safe_relpath(clean) or "\\" in clean or "." in clean.split("/") or any(c in clean for c in "*?["):
                 raise TemplateError(f"layer {name}: invalid managed path {entry!r}")
-            if any(_overlap(entry, p) for p in [*SELF_FILES, LAYER_DIR + "/", *upstream.owned]):
+            if any(_overlap(entry, p) for p in [*SELF_FILES, LAYER_DIR + "/", *upstream_owned]):
                 raise TemplateError(f"layer {name}: cannot claim repository-owned path {entry!r}")
-            if any(entry.startswith(p) for p in upstream.exclude if p not in LAYER_PREFIXES):
+            if any(entry.startswith(p) for p in upstream_exclude if p not in LAYER_PREFIXES):
                 raise TemplateError(f"layer {name}: cannot claim repository-owned path {entry!r}")
             for prefix, own in [("docs/layer-", f"docs/layer-{name}/"),
                                 ("skills/layer-", f"skills/layer-{name}-"),
                                 (".github/workflows/layer-", f".github/workflows/layer-{name}-")]:
                 if clean.startswith(prefix) and not (entry.startswith(own) or entry == own):
                     raise TemplateError(f"layer {name}: path {entry!r} belongs to another layer namespace")
-            if any(_overlap(entry, p) for p in upstream.managed):
-                if not any(entry.startswith(e) for e in upstream.exclude):
+            if any(_overlap(entry, p) for p in upstream_managed):
+                if not any(entry.startswith(e) for e in upstream_exclude):
                     raise TemplateError(f"layer {name}: upstream manages {entry!r}")
             for other, path in claimed:
                 if other != name and _overlap(entry, path):

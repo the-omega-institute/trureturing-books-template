@@ -6,11 +6,11 @@
 
 ### 新增
 
-- 独立模板层：下游 `template.d/<name>.toml` 与清单、保留的文档/skill/工作流前缀，沿用同一升级命令、三方冲突、迁移、版本与 git 历史规则；安装前拒绝路径认领重叠。每周 `template-sync` 按来源独立开 PR。来源：第二个出版模板需叠加领域规则而不分叉上游。
-- Academic Beamer decks alongside Slidev: edition subsets, 4:3/16:9 descriptors, an original Apache-2.0 white seminar theme and optional deck-owned themes/graphics. Book result blocks, pinned commits and deck verification ledgers derive from the book model and lock; TeX citations are checked with comments/verbatim/argument handling.
-- Original seminar theme with solid structure-colour navigation/title/footer bands, white block titles over 12% body tints, red open-problem blocks, an even title-box shadow and optional coauthor metadata. Compact verification tables paginate at twelve results, high-resolution paper stills fill the slide width, and navigation symbols are opt-in.
-- Paper visualization snapshots linked to the live page, canonical figure materialization, hidden audience notes and separate notes PDFs. Both PDFs join slides cache/publication, chapter cards, site manifests and book Release attachments. An English example talk demonstrates the source format.
-- Tectonic 0.16.9 with checksum-verified Linux binaries and a versioned TeX bundle, fixed epoch and deterministic mode; doctor, hosted setup and the optional container support academic decks. See theme/beamer/README.md for the source contract and reproducibility settings.
+- 独立模板层：下游 `template.d/<name>.toml` 与清单、保留的文档/skill/工作流前缀，沿用同一升级命令、三方冲突、迁移、版本与 git 历史规则；安装前拒绝路径认领重叠及认领下游专属排除路径，独立源仓库无需上游配置即可生成层清单。每周 `template-sync` 按来源独立开 PR。来源：第二个出版模板需叠加领域规则而不分叉上游。
+- 在 Slidev 之外支持学术 Beamer 演示稿：可选书中语言版本的子集、4:3/16:9 画布、原创 Apache-2.0 白底讨论班主题及演示稿自有主题和图片。结果块、所钉提交与验证账本均从书模型和锁文件生成；TeX 引用检查处理注释、原样文本与嵌套参数。
+- 原创讨论班主题提供实色导航、标题与页脚条带，块标题为白字、块正文用 12% 浅色底，开放问题用红色，标题框有均匀阴影，可声明合作者。验证表每帧最多十二条结果，高分辨率纸面静态图占满正文宽度，导航按钮按需启用。
+- 纸面可视化静态图链接在线页面，规范图件由现有脚本生成；听众版隐藏备注，另导出备注版 PDF。两种 PDF 均进入幻灯片缓存与发布、章节卡片、站点清单及书籍 Release 附件，附英文报告示例。
+- 固定 Tectonic 0.16.9、校验哈希的 Linux 二进制、带版本的 TeX 资源包、时间基准与确定性模式；工具链体检、托管运行器与可选容器支持学术演示稿。源码契约及可复现设置见 `theme/beamer/README.md`。
 - 被引用卡的停帧成为契约：会自己播放的卡在页面的卡片表里写 `still`（时间轴上的值或 `'end'`），把表交给 `kit.cards(el, { presets })`，它把声明写到卡上的 `data-still`（也可直接写在 HTML 里），`cards.still(id)` 读回；`TRV.still` 时页面把时钟放到那里。`stageFirstChecks` 对点了之后时间轴在走、却没有 `data-still` 的卡给出警告（`T.warn`：打印 `WARN`、计数，不算失败；`{ still: false }` 关掉）。`viz-testkit.mjs` 新增 `openStill(T, book, id, preset, lang)`（按 `viz-thumbs.mjs` 出图的方式打开那张卡的静止帧，测试里核对停帧读数 = 图注里的数）与共用的 `STILL`、`stillQuery`、`prepareStill`（`viz-thumbs.mjs` 改用它们）。示例页 `golden-carry`、`phase-torus` 与起始页面补了声明，测试核对 CANCEL、FILL、TORUS 的停帧。
 - `playsAfter(page, action, read)`（`viz-testkit.mjs`）：先把观察器装进页面再做动作，页面在每一帧与每次 DOM 变化时取样 `{ playing, t }`（默认读时间轴的 ▶ 与滑块），记下“开始播放并越过起点”；只播零点几秒的卡也不会漏。`stageFirstChecks` 的停帧检查用同一观察器，示例测试里 ZOOM-OUT、FILL、SWEEP 改用它。`skills/book-viz` 写明短于一两秒的自动播放一律这样测。
 - 画图库：`Axes.xaxis`/`yaxis` 不传 `size` 时刻度字号按画布宽度取手机上不低于 10 px 的值（`Canvas.label_floor`：429 宽以内 12，480 宽 13.5，716 宽 20；`WRAP` 图按最宽一栏），显式传了 `size` 的照旧，示例与已有的图逐字节不变；`fig.overline(x, y, "*c*")` 与 `fig.hat(…)` 在字上画横线与尖帽，取代定位不稳的组合附加符；`mono=True` 文字与 `fig.chip` 里的减号“−”改用正文字体（`tr-fig-sans`，`tr-book.css` 同步；**含这种减号的已有图会被 `./tbook check` 判为过期，升级后运行 `./tbook fig build` 重新生成并提交**）；球的明暗 `sp.shade(role)` / `sp.outline(shade=role)`（受光一点最浓、向边缘变淡，用同心圆盘画成，只用颜色角色）、球冠 `sp.cap(轴, 角, role)` 与 `sp.patch(…, front=True)` 只填朝向读者的部分。示例 `golden-rotation` 的球加了明暗。
@@ -26,6 +26,7 @@
 
 ### 修复
 
+- 文档语言与原文件保持一致：学术演示稿、站点构建后命令与模板层说明沿用中文；仓库守则明确现有文档、新文档及多语言文档的语言约定。
 - 实体舞台的浏览器单元测试（`tools/tests/solid_harness.mjs`）不再把测试页写死挂在 `example-monograph` 下：改为挂在第一本可见、且有 `viz/` 的书下。下游书库用 `site.toml` 的 `hide = ["example-*"]` 隐藏示例书，可视化服务器只服务可见的书，原写法在下游会因取不到运行时而失败；没有可用的书时这组测试跳过。
 - 图例（`.hud-bl`）里的 `<sub>`、`<sup>` 贴着前一个字：每一项改为色块加一行行内文字，不再是带间距的 flex 项（下游不必再用 `<bdi>` 包裹）。
 - 视频的 LEAN 清单按完整 GID 解析：`DATA.lean` 每条新增 `label`，`leanList` 与视频页显示它——Lean 全名，命名空间不在模块路径上时改显示 GID（下游 `…/Bloch/QubitBloch.B_formula_core` 的 Lean 全名在命名空间 `…Measurement.FourQubitParentConstruction` 里，原样显示会被读成另一个模块的同名声明）；`short` 取自所引 GID 的名字。引擎新增 `leanCite(gid)`，示例片改为按 GID 查引用，不再按短名取第一个匹配。

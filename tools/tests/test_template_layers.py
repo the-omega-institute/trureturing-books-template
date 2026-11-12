@@ -89,6 +89,20 @@ paths = {claims or [f"docs/layer-{name}/", f"skills/layer-{name}-task/", f".gith
         changed = {p for p in before.keys() | after.keys() if before.get(p) != after.get(p)}
         self.assertEqual(changed, {"docs/layer-alpha/guide.md", "template.d/alpha.toml", "template.d/alpha.manifest.json"})
 
+    def test_standalone_layer_source_manifest_and_install(self):
+        source = self.root / "standalone"
+        source.mkdir()
+        cfg = t.TemplateConfig.load(self.layer, "alpha")
+        for name in [cfg.config_path, *t.build_manifest(self.layer, cfg).files]:
+            dest = source / name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(self.layer / name, dest)
+        self.assertFalse((source / "template.toml").exists())
+        self.assertEqual(t.cmd_manifest(source, layer="alpha", out=lambda _: None), 0)
+        self.assertEqual(t.cmd_manifest(source, layer="alpha", check=True, out=lambda _: None), 0)
+        self.assertEqual(self.install(source=source).exit_code, 0)
+        self.assertEqual((self.down / "docs/layer-alpha/guide.md").read_text(), "layer one\n")
+
     def test_conflict_dry_run_and_force(self):
         self.install()
         target = self.down / "docs/layer-alpha/guide.md"

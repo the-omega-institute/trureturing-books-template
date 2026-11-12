@@ -102,7 +102,7 @@ hide = ["example-*"]
 可选的内容迁移：按 `docs/AUTHORING.md` 把当前版本与审计表的行号、摘要改为保留链接标签；幻灯片用 `<PinnedCommit />`。视频若此前每次 pin 都复制 `subject_commit`，核对历史后改用 `publication_basis: "pinned"`；真正记录制作历史的 `subject_commit` 保留。可视化生成器只提交书的拓扑与引用关系，当前 repo/commit/line/kind 由生成的 `assets/trureturing.json` 解析。所有格式的精确提交仍进入构建输出，历史比较不迁移。
 
 
-## 模板层 · Layers
+## 模板层
 
 第二个模板不必分叉上游。下游自有的 `template.d/<name>.toml` 使用与
 `template.toml` 相同的 `[template]`（`name`、`repo`、`version`、可选 `tag_prefix`）
@@ -111,7 +111,7 @@ hide = ["example-*"]
 层的源仓库可以是从上游模板创建的仓库，也可以仅包含该层的文件与配置。
 
 ```toml
-# template.d/example.toml — in the layer's source repository
+# template.d/example.toml：位于模板层的源仓库
 [template]
 name = "example"
 repo = "owner/example-layer"
@@ -124,22 +124,24 @@ paths = ["docs/layer-example/", "skills/layer-example-write/",
 上游为层预留 `docs/layer-<name>/`、`skills/layer-<name>-*`、
 `.github/workflows/layer-<name>-*`；它们不进入上游清单，也不由上游升级写入或删除。
 层还可以认领未被上游或其他层使用的路径，但不能认领上游托管路径、书库自有路径
-（包括 `books/`、`site.toml`、`PROJECT.md` 与 `template.d/`），或另一层的命名空间。
+（包括 `books/`、`site.toml`、`PROJECT.md`、`template.d/`，以及排除路径 `docs/project/` 与 `skills/local-*`），或另一层的命名空间。
 路径认领按整个目录检查，即使尚无文件也会拒绝重叠；`--force` 不绕过此边界。
 层配置及清单是命令单独管理的元数据，不列进层的 `[managed].paths`。
 
 ```bash
-# Source maintainer, in a repository containing tbook:
+# 源仓库维护者：在含 tbook 的仓库中生成并检查清单
 ./tbook template manifest --layer example
 ./tbook template manifest --layer example --check
-# Consumer (local git sources and plain directories are also supported):
+# 若层的源仓库不含 tbook，可指定该目录并调用已有工具
+TBOOK_ROOT=/path/to/layer-source /path/to/tbook template manifest --layer example
+# 下游使用者：也支持本地 git 仓库与普通目录作为来源
 ./tbook template install example --source https://github.com/owner/example-layer.git
-./tbook template status                         # upstream + all installed layers
-./tbook template update --dry-run               # each source's latest stable release
-./tbook template update                         # upstream, then each installed layer
+./tbook template status                         # 上游与所有已安装层
+./tbook template update --dry-run               # 各来源最新稳定版的升级预览
+./tbook template update                         # 先升级上游，再升级各层
 ./tbook template update --layer example --to v1.1.0
 ./tbook template update --layer upstream --source ../upstream
-./tbook template list --json                    # workflow discovery
+./tbook template list --json                    # 供工作流发现各来源
 ```
 
 有多层时，`--source`、`--to` 必须同时用 `--layer upstream|<name>`，以免把一个来源用到所有层。

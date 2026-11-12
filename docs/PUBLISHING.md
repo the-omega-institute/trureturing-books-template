@@ -138,18 +138,15 @@ tag（标签）是给某一个提交起的固定名字。分支（如 `main`）�
 
 ## 7. 学术报告 PDF
 
-`./tbook build slides --book <slug>` 同时构建 Slidev 与 academic decks。后者用固定 **Tectonic 0.16.9** 与 `default_bundle_v33.tar`，输出 `build/slides/<slug>/<deck>-<lang>.pdf`（听众版，隐藏备注）和 `<deck>-<lang>-notes.pdf`（报告页与演讲备注）。站点在 `<slug>/slides/<deck>/` 下发布两个下载文件与按语言的 PDF 入口页；幻灯片索引、书的落地页与章节卡片包含两种链接，书库 Release 附上两种 PDF。`TBOOK_SLIDES_NO_PDF`/`NO_CHECK` 仍只控制 Slidev 的浏览器导出。
+`./tbook build slides --book <slug>` 同时构建 Slidev 与学术演示稿。后者用固定 **Tectonic 0.16.9** 与 `default_bundle_v33.tar`，输出 `build/slides/<slug>/<deck>-<lang>.pdf`（听众版，隐藏备注）和 `<deck>-<lang>-notes.pdf`（报告页与演讲备注）。站点在 `<slug>/slides/<deck>/` 下发布两个下载文件与按语言的 PDF 入口页；幻灯片索引、书的落地页与章节卡片包含两种链接，书库 Release 附上两种 PDF。`TBOOK_SLIDES_NO_PDF`/`NO_CHECK` 仍只控制 Slidev 的浏览器导出。
 
-引擎由 `./tbook doctor` 核对精确版本，Linux 安装脚本 `tools/install-tectonic.sh DESTINATION` 校验发布包 SHA-256；容器预装引擎与需要的 TeX 资源，普通 hosted runner 只在有 academic descriptor 的媒体/浏览器作业中安装到本地缓存目录。没有更换默认 runner 或现有必需检查。引擎、bundle、固定 epoch、书的章节/图件/可视化、主题与自有主题文件均进入幻灯片缓存键。构建的可复现设置和冷启动联网要求见 [Beamer 说明](../theme/beamer/README.md)。本地可以用 `TECTONIC` 指向已有的同版本引擎。
+引擎由 `./tbook doctor` 核对精确版本，Linux 安装脚本 `tools/install-tectonic.sh DESTINATION` 校验发布包 SHA-256；容器预装引擎与需要的 TeX 资源，普通托管运行器只在包含学术稿配置的媒体/浏览器作业中安装到本地缓存目录。默认运行器与现有必需检查保持不变。引擎、资源包、固定时间基准、书的章节/图件/可视化、主题与自有主题文件均进入幻灯片缓存键。构建的可复现设置和冷启动联网要求见 [Beamer 说明](../theme/beamer/README.md)。本地可以用 `TECTONIC` 指向已有的同版本引擎。
 
+## 8. 站点构建后命令
 
-## Site post-build command
-
-A repository may set `[site].post_build = ["python3", "docs/project/site.py"]`
-in its owned `site.toml`. After a successful site assembly (including media-only
-updates), the builder executes this argument array without a shell, from the
-repository root. `TBOOK_SITE_OUT` names the absolute assembled output directory.
-A nonzero exit fails the build, so the Pages artifact is not deployed. The command
-is trusted repository code, like the build itself. It can add a repository-specific
-manifest or replace the library index with a redirect; book directories and their
-existing URLs need not change. No command runs unless explicitly configured.
+书库可在自有的 `site.toml` 中设置 `[site].post_build = ["python3", "docs/project/site.py"]`。
+站点成功组装后（包括只更新媒体的情况），构建工具在仓库根目录直接执行这个参数数组，
+不经过 shell。环境变量 `TBOOK_SITE_OUT` 指向已组装输出目录的绝对路径。
+命令以非零状态退出时构建失败，Pages 不会部署这份产物。
+该命令与构建过程一样，属于受信任的仓库代码，可以生成书库特有的清单，
+或把书库索引替换为跳转页，同时保留各书的目录与现有 URL。仅在显式配置时执行。
