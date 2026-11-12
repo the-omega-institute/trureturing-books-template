@@ -150,6 +150,12 @@ By [@thm-beatty-deficit], $B(v_1, v_2) = c(v_1, v_2)$, so this is also a criteri
 
 The horizontal axis is $p(v_1)$ and the vertical axis $p(v_2)$. The line $p_1 + p_2 = 1/\varphi$ joins the two $1/\varphi$ marks on the axes; in the triangle below it the deficit is $+1$. The line $p_1 + p_2 = \varphi$ joins $(1/\varphi, 1)$ and $(1, 1/\varphi)$; in the small triangle above it, the line included, the deficit is $-1$. In the band between the two lines, the lower line included, the deficit is $0$. The 64 dots are the phase pairs $(p(v_1), p(v_2))$ for $0 \le v_1, v_2 \le 7$, plotted from computed values; they match the table of [@ex-small-deficits]: 10 dots lie in the lower triangle and 6 in the upper one.
 
+A phase only sees the fractional part: $p = 0$ and $p = 1$ are the same phase, so the left and right edges of the square are the same line, and so are the top and the bottom. Glue them, and the square becomes a torus. The two diagonal lines then join into one closed curve: since $\varphi = 1 + 1/\varphi$, the line $p_1 + p_2 = \varphi$ is $p_1 + p_2 \equiv 1/\varphi \ (\mathrm{mod}\ 1)$.
+
+::: {.viz src="phase-torus" preset="torus" height="500"}
+**The phase square glued into a torus.** First the top is glued to the bottom into a tube, then the two ends of the tube are joined: the cyan triangle ($c = +1$) and the magenta triangle ($c = -1$) face each other across one violet closed curve on the torus. The beads are the phase pairs with $0 \le v_1, v_2 \le 7$, coloured by their deficit. The colours follow [@thm-golden-phase]; gluing only says which edges are the same line and changes no phase.
+:::
+
 ::: {.example #ex-small-deficits title="A table of small values"}
 The table lists $c(v_1, v_2)$ for $0 \le v_1, v_2 \le 7$; rows are $v_1$, columns are $v_2$.
 

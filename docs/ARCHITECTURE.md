@@ -37,7 +37,7 @@ theme/
   typst/                  PDF 模板（book.typ、cover.typ）
   epub/                   EPUB 样式
   site/                   书库首页与每本书落地页的样式/脚本
-  viz/                    可视化共享运行时（theme.css、shell.js）
+  viz/                    可视化共享运行时（theme.css、shell.js、kit.js；solid-core.js 是实体的造型核心，与 vendor/ 里钉版的 three.js 一起只在 kit.solid 首次调用时动态加载）
   slides/                 Slidev 主题；styles/backdrop.css 是每页的背景层（底色、极光、扫描线、四角折角框、暗角），
                           导出 PDF 时换成 styles/backdrop.jpg 一张图（整页半透明渐变在 PDF 阅读器里每页要合成约两秒），
                           由 tools/node/slides-backdrop.mjs 按 backdrop.css 与 tokens.css 渲染，指纹记在 backdrop.json

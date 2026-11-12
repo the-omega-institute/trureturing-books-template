@@ -44,7 +44,12 @@ export const overflowX = (page) => page.evaluate(() => document.documentElement.
     few frames per second, so a suite should settle the page rather than hope that a frame has passed. */
 export async function settle(page, ms = 0) {
   if (ms) await page.waitForTimeout(ms);
-  await page.evaluate(() => { if (window.TRV && window.TRV.kit && window.TRV.kit.flush) window.TRV.kit.flush(); });
+  await page.evaluate(async () => {
+    const kit = window.TRV && window.TRV.kit;
+    if (!kit) return;
+    if (kit.ready) await kit.ready();          // three.js for kit.solid, fetched on its first call
+    if (kit.flush) kit.flush();
+  });
 }
 
 /** Wait until `fn`, evaluated in the page with `arg`, returns something truthy: resolves true as soon as it does and
@@ -65,7 +70,12 @@ export const viewportShare = (page, selector) => page.evaluate((sel) => {
 /** The fraction of a 2D canvas that is drawn on (sampled pixels with non-zero alpha): 0 for a blank canvas. */
 export const inkShare = (page, selector) => page.evaluate((sel) => {
   const cv = document.querySelector(sel); if (!cv || !cv.width || !cv.height) return 0;
-  const data = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  let c2 = cv.getContext('2d');
+  if (!c2) {   // a WebGL canvas (kit.solid draws with preserveDrawingBuffer): read it through a 2D copy
+    const cp = document.createElement('canvas'); cp.width = cv.width; cp.height = cv.height;
+    c2 = cp.getContext('2d'); c2.drawImage(cv, 0, 0);
+  }
+  const data = c2.getImageData(0, 0, cv.width, cv.height).data;
   let drawn = 0, total = 0;
   for (let i = 3; i < data.length; i += 4 * 5) { total++; if (data[i] > 8) drawn++; }
   return total ? drawn / total : 0;
@@ -154,6 +164,82 @@ export async function session(opts = {}) {
     process.exit(failed || !results.length ? 1 : 0);
   }
   return { page, context, browser, origin, errors, results, check, goto, url, newPage, open, finish };
+}
+
+/** Pixel statistics of the WebGL canvas of the first kit.solid stage on the page: the share of drawn (opaque) pixels,
+    the spread of their luminance, and a 16-bin luminance histogram (for comparing two views). */
+export const solidPixels = (page) => page.evaluate(async () => {
+  const sc = window.TRV && window.TRV.solids && window.TRV.solids[0];
+  if (!sc) return null;
+  await sc.ready; window.TRV.kit.flush();
+  const cv = sc.el.querySelector('canvas.solid-gl');
+  if (!cv) return { share: 0, spread: 0, hist: [] };
+  const cp = document.createElement('canvas'); cp.width = cv.width; cp.height = cv.height;
+  const c = cp.getContext('2d'); c.drawImage(cv, 0, 0);
+  const d = c.getImageData(0, 0, cp.width, cp.height).data, hist = new Array(16).fill(0);
+  let n = 0, all = 0, s1 = 0, s2 = 0;
+  for (let i = 0; i < d.length; i += 4 * 3) {
+    all++;
+    if (d[i + 3] < 250) continue;
+    const y = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+    n++; s1 += y; s2 += y * y; hist[Math.min(15, Math.floor(y * 16))]++;
+  }
+  const mean = n ? s1 / n : 0;
+  return { share: all ? n / all : 0, spread: n ? Math.sqrt(Math.max(0, s2 / n - mean * mean)) : 0, hist: hist.map((h) => (n ? h / n : 0)) };
+});
+
+/**
+ * The checks of a page that draws a lit solid with kit.solid (stageFirstChecks runs them with { solid: true } or
+ * { solid: { … } }). `page` is open on the visualization.
+ *   lit solid   the stage's WebGL canvas is drawn on over ≥ minShare (0.12) of its pixels, opaquely, and their
+ *               luminance spreads (σ ≥ minSpread, 0.04): a shaded body, not a flat silhouette or a wireframe
+ *   turning     after the camera turns (drag across the stage, or opts.turn(page)) the distribution of light and
+ *               shade changes (histogram distance ≥ 0.05)
+ *   hidden mark a mark (bead or ring) that a solid hides cannot be picked, a visible one can (skipped when the frame
+ *               has no hidden mark, or no visible one)
+ *   resting     inside a book the WebGL context is given back after a rest, the frame stays on the 2D canvas, and a
+ *               touch takes it back (skipped with { rest: false })
+ */
+export async function solidChecks(T, slug, id, page, opts = {}) {
+  const o = { minShare: 0.12, minSpread: 0.04, rest: true, ...opts };
+  const { check } = T;
+  await settle(page);
+  const a = await solidPixels(page);
+  check('solid: the stage draws a solid (kit.solid)', !!a, 'no kit.solid stage on the page');
+  if (!a) return;
+  check(`solid: an opaque body covers ≥ ${Math.round(o.minShare * 100)}% of the stage`, a.share >= o.minShare, `${(a.share * 100).toFixed(1)}%`);
+  check('solid: light and shade spread across the body', a.spread >= o.minSpread, `σ = ${a.spread.toFixed(3)}`);
+  if (o.turn) await o.turn(page);
+  else {
+    const b = await page.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+    const y = b[1] + b[3] * 0.08;
+    await page.mouse.move(b[0] + b[2] * 0.06, y); await page.mouse.down();
+    for (let k = 1; k <= 6; k++) await page.mouse.move(b[0] + b[2] * (0.06 + 0.05 * k), y);
+    await page.mouse.up();
+  }
+  const c = await solidPixels(page);
+  const dist = c.hist.reduce((s, h, k) => s + Math.abs(h - a.hist[k]), 0) / 2;
+  check('solid: turning the camera changes light and shade', dist >= 0.05, `histogram distance ${dist.toFixed(3)}`);
+  const pick = await page.evaluate(() => {
+    const sc = window.TRV.solids[0], ms = sc.marks(), hid = ms.find((m) => m.hidden), vis = ms.find((m) => !m.hidden);
+    const at = (m) => sc.nearest({ clientX: m.x, clientY: m.y }, [m.p], 6);
+    return { hidden: hid ? at(hid) : null, visible: vis ? at(vis) : null };
+  });
+  if (pick.hidden != null) check('solid: a mark behind the solid cannot be picked', pick.hidden === -1);
+  if (pick.visible != null) check('solid: a visible mark can be picked', pick.visible === 0);
+  if (o.rest) {
+    const em = await T.open(slug, id, '?embed=1&lang=zh', { viewport: { width: 740, height: 620 } });
+    await settle(em);
+    // a card that plays when it scrolls into view keeps the context until it stops: allow for slow frames
+    const parked = await until(em, () => window.TRV.solids && window.TRV.solids[0] && window.TRV.solids[0].parked(), null, 120000);
+    const shown = await em.evaluate(() => { const sc = window.TRV.solids[0], st = sc.el.querySelector('canvas:not(.solid-gl)'); return { gl: !!sc.el.querySelector('canvas.solid-gl'), still: !!st && st.style.visibility === 'visible' }; });
+    check('solid: inside a book the WebGL context is given back after a rest, the frame stays as a picture', parked && !shown.gl && shown.still, JSON.stringify(shown));
+    const box = await em.evaluate(() => { const r = window.TRV.solids[0].el.getBoundingClientRect(); return [r.left + 8, r.top + r.height - 8]; });
+    await em.mouse.move(box[0], box[1]); await em.mouse.down(); await em.mouse.up();
+    await settle(em);
+    check('solid: a touch takes the context back', await em.evaluate(() => !window.TRV.solids[0].parked()));
+    await em.context().close();
+  }
 }
 
 /**
@@ -360,10 +446,11 @@ export async function spaceAfterCard(T, page, wait = 120) {
  * opts: stage ('.stage'), cover (selector of the canvas the cover draws on; default '[data-thumb] canvas'),
  *       minShare (0.28), minEmbedShare (0.4), cards (true), tour (true), labels (true), evidence (true),
  *       rail (true; a page without footer.rail is not checked), keys (true; false for a page that does not bind
- *       Space to its clock), settle (ms to wait after a click).
+ *       Space to its clock), settle (ms to wait after a click), solid (false; true or the options of solidChecks for a
+ *       page that draws a lit solid with kit.solid).
  */
 export async function stageFirstChecks(T, slug, id, opts = {}) {
-  const o = { stage: '.stage', cover: '[data-thumb] canvas', minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
+  const o = { stage: '.stage', cover: '[data-thumb] canvas', solid: false, minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
   const { check } = T;
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
   const runCards = async (page, tag) => {
@@ -398,6 +485,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
     check('desktop: Escape closes the drawer', await page.evaluate(() => document.getElementById('drawer').hidden));
   }
   if (o.evidence) await evidenceChecks(T, slug, id, page);
+  if (o.solid) await solidChecks(T, slug, id, page, o.solid === true ? {} : o.solid);
   if (o.cards && o.keys) await spaceAfterCard(T, page, o.settle);
 
   // English

@@ -23,6 +23,12 @@ The generated page runs as it is and passes its own test: a point on the unit ci
 
 The finished example is `books/example-monograph/viz/golden-carry/`: the same layout and kit, four scenes on one rail, ten experiment cards, four of them cited from chapter 1, and a suite that runs the quality gates and then checks every claim independently. The starter is its smallest form.
 
+## 实体舞台 · Lit solids
+
+对象本身是面或体、画成受光的实体确实更清楚时（带、环面、多面体、可行域、球里有东西的布洛赫球），在舞台上调用 `TRV.kit.solid(stage, { canvas, onChange: paint, … })`；它不是统一风格，曲线、格点、矩阵、记号串照旧。页面不多加载任何脚本：`kit.js` 在第一次调用时才取造型核心 `assets/solid-core.js` 与它导入的、`assets/vendor/` 里钉版的 three.js，所以页面契约不变（两者都是运行时自己的文件，`vendor/` 不做语法检查）。用法、取舍与测试（`stageFirstChecks(…, { solid: true })`）见 `skills/book-viz/SKILL.md` 的“具象”一节；成品示例是 `books/example-monograph/viz/phase-torus/`。
+
+When the object itself is a surface or a body and a lit solid makes it clearer, call `TRV.kit.solid(stage, { canvas, onChange: paint, … })` on the stage; it is one more option, not a house style. The page loads no extra script: `kit.js` fetches the modelling core `assets/solid-core.js`, and with it the pinned three.js from `assets/vendor/`, on the first call, so the page contract is unchanged. See the section on solids in `skills/book-viz/SKILL.md`; the finished example is `books/example-monograph/viz/phase-torus/`.
+
 ## 注册表 · Registry (`books/<book>/viz/visualizations.json`)
 
 ```json

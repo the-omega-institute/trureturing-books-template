@@ -10,7 +10,7 @@ Source layout of a book (``books/<slug>/``)::
 
 Published layout (:func:`build`, into ``_site/<slug>/viz/``)::
 
-    assets/{theme.css,shell.js,hub.css,hub.js,favicon.svg}   the shared runtime (theme/viz/)
+    assets/{theme.css,shell.js,kit.js,solid-core.js,…}   the shared runtime (theme/viz/; vendor/ is pinned three.js)
     assets/tokens.css                                        theme/generated/tokens.css
     <id>/…                                                   every *live* entry; Lean links pinned to the lock
     index.html                                               the hub: this book's live visualizations, bilingual
@@ -81,7 +81,7 @@ ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STATUSES = ("live", "draft")
 RESERVED = ("tests", "assets")
-RUNTIME_FILES = ("theme.css", "shell.js", "kit.js", "hub.css", "hub.js", "favicon.svg")
+RUNTIME_FILES = ("theme.css", "shell.js", "kit.js", "solid-core.js", "hub.css", "hub.js", "favicon.svg")
 THUMB_EXT = (".jpg", ".jpeg", ".png", ".webp")
 PRESET_RE = re.compile(r"^[A-Za-z0-9][\w-]*$")
 _PRESET_ATTR_RE = re.compile(r'\bdata-preset="([^"]+)"')

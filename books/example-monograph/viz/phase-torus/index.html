@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN" data-title-en="PHASE//TORUS · Phase torus · the phase square glued into a torus">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PHASE//TORUS 相位环面 · 把相位正方形粘成环面</title>
+<meta name="description" content="相位只看小数部分，所以相位正方形的对边是同一条线；把它粘成环面，两条斜线 p₁ + p₂ = 1/φ 与 p₁ + p₂ = φ 接成同一条闭曲线（因为 φ = 1 + 1/φ），亏量 +1 与 −1 的两块三角形在环面上隔着它相对。Phases only see fractional parts, so opposite edges of the phase square are the same line; glued into a torus, the two lines p₁ + p₂ = 1/φ and p₁ + p₂ = φ join into one closed curve (since φ = 1 + 1/φ), with the deficit +1 and −1 triangles facing each other across it.">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&family=Source+Sans+3:ital,wght@0,400..700;1,400..700&display=swap">
+<link rel="stylesheet" href="../assets/theme.css">
+<link rel="stylesheet" href="style.css">
+<script src="../assets/shell.js"></script>
+<script src="../assets/kit.js"></script>
+</head>
+<body data-viz-id="phase-torus">
+<div class="app lab" id="app">
+  <header class="top">
+    <div class="brand">
+      <a class="crumb" href="../"><span class="zh">◂ 可视化索引</span><span class="en">◂ Visualizations</span></a>
+      <h1 class="logo" data-text="PHASE//TORUS">PHASE<b>//</b>TORUS</h1>
+      <div class="tagline">
+        <span class="zh">相位环面 · <em>把相位正方形的对边粘起来，两条斜线接成同一条闭曲线</em></span>
+        <span class="en">Phase torus · <em>glue opposite edges of the phase square and the two diagonal lines join into one closed curve</em></span>
+      </div>
+    </div>
+    <div class="status" aria-live="polite">
+      <span class="pill hot" id="pillGlue"><span class="zh">粘合</span><span class="en">GLUE</span> <strong>—</strong></span>
+      <span class="pill" id="pillPair"><span class="zh">当前一对</span><span class="en">PAIR</span> <strong>—</strong></span>
+      <div class="langs" role="group" aria-label="语言 Language"><button data-lang-set="zh" aria-pressed="true">中</button><button data-lang-set="en" aria-pressed="false">EN</button></div>
+    </div>
+  </header>
+
+  <aside class="col deck" aria-label="实验控制" data-aria-en="Experiment controls">
+    <section class="panel sec">
+      <h2><span class="zh">实验卡带</span><span class="en">Experiments</span><span class="aside">PRESETS</span></h2>
+      <!-- one card = one named situation with one sentence of explanation; a chapter cites it with preset="<id>" -->
+      <div class="presets cards" id="presets">
+        <button class="preset" data-preset="square" aria-pressed="false"><span class="code">SQUARE</span><span class="cn zh">平铺的相位正方形</span><span class="cn en">The phase square, flat</span></button>
+        <button class="preset" data-preset="tube" aria-pressed="false"><span class="code">TUBE</span><span class="cn zh">先粘上下两边：一根管子</span><span class="cn en">Glue top to bottom: a tube</span></button>
+        <button class="preset" data-preset="torus" aria-pressed="false"><span class="code">TORUS</span><span class="cn zh">再粘左右两边：两条斜线成了一条</span><span class="cn en">Then left to right: the two lines are one</span></button>
+        <button class="preset" data-preset="pair" aria-pressed="false"><span class="code">PAIR 2, 2</span><span class="cn zh">c(2, 2) = −1 落在环面上的哪里</span><span class="cn en">Where c(2, 2) = −1 sits on the torus</span></button>
+      </div>
+      <p class="note" id="presetNote"></p>
+    </section>
+    <section class="panel sec">
+      <h2><span class="zh">粘合</span><span class="en">Gluing</span><span class="aside"><span class="zh">点环面上的珠子选一对数</span><span class="en">click a bead to pick a pair</span></span></h2>
+      <div class="field">
+        <label for="glue"><span class="zh">粘合程度</span><span class="en">How far it is glued</span><small class="zh">0 平铺 · 1 管子 · 2 环面</small><small class="en">0 flat · 1 tube · 2 torus</small></label><output id="oGlue" for="glue">2.00</output>
+        <input type="range" id="glue" min="0" max="2" step="0.01" value="2">
+      </div>
+    </section>
+  </aside>
+
+  <main class="center">
+    <div class="stage" id="stage" data-thumb aria-label="相位正方形，按亏量着色，可以粘成环面；珠子是 0 ≤ v₁, v₂ ≤ 7 的相位对" data-aria-en="The phase square coloured by the deficit, which can be glued into a torus; the beads are the phase pairs with 0 ≤ v₁, v₂ ≤ 7">
+      <canvas class="fill" id="cv"></canvas>
+      <div class="scan"></div><div class="vig"></div>
+      <span class="bracket tl"></span><span class="bracket tr"></span><span class="bracket bl"></span><span class="bracket br"></span>
+      <div class="hud-tl"><span class="big" id="hudBig"></span><span class="sub" id="hudSub"></span></div>
+      <div class="hud-bl">
+        <span><i class="sw cy"></i><span class="zh">c = +1：p₁ + p₂ &lt; 1/φ</span><span class="en">c = +1: p₁ + p₂ &lt; 1/φ</span></span>
+        <span><i class="sw mg"></i><span class="zh">c = −1：p₁ + p₂ ≥ φ</span><span class="en">c = −1: p₁ + p₂ ≥ φ</span></span>
+        <span><i class="sw dm"></i><span class="zh">c = 0</span><span class="en">c = 0</span></span>
+        <span><i class="sw vi"></i><span class="zh">两条斜线</span><span class="en">the two lines</span></span>
+        <span><i class="sw am"></i><span class="zh">当前一对</span><span class="en">the current pair</span></span>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <div class="tour" id="tour">
+      <button class="tbtn" data-tour="prev" aria-label="上一个实验" data-aria-en="Previous experiment">◀</button>
+      <div class="what"></div>
+      <button class="tbtn" data-tour="next" aria-label="下一个实验" data-aria-en="Next experiment">▶</button>
+    </div>
+    <div class="strip">
+      <section class="panel">
+        <div class="head"><h2><span class="zh">展开图：正方形与它的对边</span><span class="en">The net: the square and its opposite edges</span></h2><span id="plotMeta"></span></div>
+        <canvas id="plot" aria-label="相位正方形的平面展开图，箭头标出粘在一起的对边" data-aria-en="The flat net of the phase square, with arrows on the edges that are glued together"></canvas>
+      </section>
+    </div>
+  </main>
+
+  <aside class="col side" aria-label="读数与依据" data-aria-en="Readouts and evidence">
+    <section class="panel sec" id="readouts" aria-live="polite">
+      <h2><span class="zh">读数</span><span class="en">Readouts</span><span class="aside">c(v₁, v₂)</span></h2>
+      <dl class="ro">
+        <div class="key"><dt><span class="zh">当前一对的亏量</span><span class="en">deficit of the current pair</span></dt><dd><b id="roC">—</b><span id="roCSub"></span></dd></div>
+        <div><dt><span class="zh">相位 p(v₁), p(v₂)</span><span class="en">phases p(v₁), p(v₂)</span></dt><dd id="roP">—</dd></div>
+        <div class="c"><dt><span class="zh">c = +1 的面积</span><span class="en">area where c = +1</span></dt><dd id="roPlus">—</dd></div>
+        <div class="m"><dt><span class="zh">c = −1 的面积</span><span class="en">area where c = −1</span></dt><dd id="roMinus">—</dd></div>
+      </dl>
+      <p class="note" id="roNote"></p>
+    </section>
+    <section class="panel sec" id="evidence">
+      <h2><span class="zh">依据</span><span class="en">Evidence</span><span class="aside">trureturing</span></h2>
+      <div class="lean"><span class="ok">LEAN ✓</span><span><span class="zh">相位判据。记 p(v) = {(v + 1)φ}，B = s(v₁) + s(v₂) − s(v₁ + v₂)，s(v) = ⌊(v + 1)φ⌋ − 1：B = 1 当且仅当 p(v₁) + p(v₂) &lt; 1/φ；B = −1 当且仅当 p(v₁) + p(v₂) ≥ φ；其余情形 B = 0。环面的颜色就是这三块。已冻结：</span><span class="en">The phase criterion. With p(v) = {(v + 1)φ}, B = s(v₁) + s(v₂) − s(v₁ + v₂) and s(v) = ⌊(v + 1)φ⌋ − 1: B = 1 iff p(v₁) + p(v₂) &lt; 1/φ; B = −1 iff p(v₁) + p(v₂) ≥ φ; otherwise B = 0. These three regions are the colours of the torus. Frozen: </span><a class="leanref" data-lean-gid="D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit" href="#" target="_blank" rel="noopener"><code>golden_phase_deficit</code></a></span></div>
+      <div class="lean num"><span class="ok">NUM</span><span><span class="zh">两条斜线在环面上接成一条闭曲线，是 φ = 1 + 1/φ 的直接推论（页面画出并核对，不是 Lean 定理）；面积 (1/φ)²/2 与 (2 − φ)²/2、珠子的相位都由页面以双精度算出。这是数值演示，不是证明。</span><span class="en">That the two lines join into one closed curve on the torus follows at once from φ = 1 + 1/φ (the page draws and checks it; it is not a Lean theorem); the areas (1/φ)²/2 and (2 − φ)²/2 and the phases of the beads are computed by the page in double precision. This is a numerical illustration, not a proof.</span></span></div>
+      <div class="lean model"><span class="ok">MODEL</span><span><span class="zh">管子与环面的形状（粗细、比例）是为了画面选的；粘合只说明哪些边是同一条线，不改变任何相位或亏量。</span><span class="en">The shape of the tube and the torus (thickness, proportions) is chosen for the picture; gluing only says which edges are the same line and changes no phase or deficit.</span></span></div>
+      <button class="chip" id="infoBtn"><span class="zh">理论接口 DATA SHARD</span><span class="en">DATA SHARD · theory</span></button>
+    </section>
+  </aside>
+
+  <footer class="rail" id="rail">
+    <div class="transport">
+      <button class="tbtn" id="rew" aria-label="回到起点" data-aria-en="Back to the start">⏮</button>
+      <button class="tbtn" id="play" aria-label="播放 / 暂停" data-aria-en="Play / pause" aria-pressed="false">▶</button>
+      <span class="chips" id="speedChips" role="group" aria-label="播放速度" data-aria-en="Playback speed">
+        <button class="chip" data-speed="0.35" aria-pressed="false">0.35×</button><button class="chip" data-speed="1" aria-pressed="true">1×</button><button class="chip" data-speed="2.5" aria-pressed="false">2.5×</button>
+      </span>
+    </div>
+    <div class="clock">
+      <span class="tau" id="tau"></span>
+      <input type="range" id="now" min="0" max="2" step="any" value="2" aria-label="时间轴：粘合程度" data-aria-en="Rail: how far it is glued">
+    </div>
+    <div class="keys">
+      <kbd>Space</kbd> <span class="zh">播放</span><span class="en">play</span> · <kbd>←</kbd><kbd>→</kbd> <span class="zh">每次 0.25</span><span class="en">0.25 at a time</span>
+    </div>
+  </footer>
+</div>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="row"><h2 id="drawerTitle"><span class="zh">理论接口 · 这个页面在演示什么</span><span class="en">Theory interface · what this page shows</span></h2><button class="chip" id="drawerClose"><span class="zh">关闭 Esc</span><span class="en">Close Esc</span></button></div>
+    <div class="zh">
+      <p class="lede">相位 p(v) = {(v + 1)φ} 只看小数部分，取值在 [0, 1) 里，0 与 1 是同一个相位。所以相位正方形的左边与右边是同一条线，上边与下边也是；把它们粘起来，正方形成了环面。本页是数值演示，不是证明。</p>
+      <ol>
+        <li><b>依据的章节。</b><a href="../../zh/ch01-golden-deficit.html#thm-golden-phase" target="_top">第一章 · 相位判据</a>：亏量 c = B 由两个相位之和决定（<a class="leanref" data-lean-gid="D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit" href="#" target="_blank" rel="noopener"><code>golden_phase_deficit</code></a>，LEAN ✓）。</li>
+        <li><b>两条斜线是一条。</b>因为 φ = 1 + 1/φ，p₁ + p₂ = φ 就是 p₁ + p₂ ≡ 1/φ（mod 1），和 p₁ + p₂ = 1/φ 是环面上同一条闭曲线的两段。页面把它画成一条紫色的管子，并核对两段在粘合处首尾相接（NUM）。</li>
+        <li><b>示意与简化。</b>管子与环面的粗细、比例是画面的选择（MODEL）；珠子是 0 ≤ v₁, v₂ ≤ 7 的 64 对相位，按页面算出的 c 着色。</li>
+      </ol>
+    </div>
+    <div class="en">
+      <p class="lede">A phase p(v) = {(v + 1)φ} only sees the fractional part: it lies in [0, 1), and 0 and 1 are the same phase. So the left and right edges of the phase square are the same line, and so are the top and the bottom; glue them and the square becomes a torus. The page is a numerical illustration, not a proof.</p>
+      <ol>
+        <li><b>The chapter behind it.</b> <a href="../../en/ch01-golden-deficit.html#thm-golden-phase" target="_top">Chapter 1 · the phase criterion</a>: the deficit c = B is decided by the sum of the two phases (<a class="leanref" data-lean-gid="D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit" href="#" target="_blank" rel="noopener"><code>golden_phase_deficit</code></a>, LEAN ✓).</li>
+        <li><b>The two lines are one.</b> Since φ = 1 + 1/φ, the line p₁ + p₂ = φ is p₁ + p₂ ≡ 1/φ (mod 1), so it and the line p₁ + p₂ = 1/φ are two pieces of one closed curve on the torus. The page draws it as one violet tube and checks that the two pieces meet end to end across the glued edges (NUM).</li>
+        <li><b>Models and simplifications.</b> The thickness and proportions of the tube and the torus are choices of the picture (MODEL); the beads are the 64 phase pairs with 0 ≤ v₁, v₂ ≤ 7, coloured by the deficit the page computes.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+<script src="main.js"></script>
+</body>
+</html>

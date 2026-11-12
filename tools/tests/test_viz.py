@@ -87,6 +87,7 @@ def copy_golden_carry(book) -> None:
     (book.viz_dir / "tests" / "golden-carry.test.mjs").write_text(
         "// Registry fixture: browser behaviour is checked separately.\nexport {};\n", encoding="utf-8")
     reg = json.loads((src / "visualizations.json").read_text(encoding="utf-8"))
+    reg["visualizations"] = [v for v in reg["visualizations"] if v["id"] == "golden-carry"]   # the one page copied
     # the chapter link of the example points into its own editions; keep the fixture self-contained
     for ref in reg["visualizations"][0]["theory"]:
         if not ref["href"].startswith("{trureturing}"):
@@ -687,8 +688,10 @@ class Embeds(unittest.TestCase):
                 model = load_edition(book.edition(lang))
                 doc = next(d for d in model.chapters if d.chapter.path == "ch01-golden-deficit.md")
                 cited = [(m.attrs.get("src"), m.attrs.get("preset")) for m in doc.media if m.kind == "viz"]
-                # four cards cited where the text talks about them, then the whole lab at the end of the chapter
-                self.assertEqual(cited, [("golden-carry", c) for c in ("window", "cancel", "map", "fill", "")])
+                # cards cited where the text talks about them (the phase torus after the phase square), then the
+                # whole lab at the end of the chapter
+                self.assertEqual(cited, [("golden-carry", "window"), ("golden-carry", "cancel"), ("phase-torus", "torus"),
+                                         ("golden-carry", "map"), ("golden-carry", "fill"), ("golden-carry", "")])
                 ctx = render.RenderContext(config.load_site(), book, book.edition(lang), model, lean.Lock.load(), "mdbook",
                                            env_href=render.mdbook_env_href(model))
                 html_md = render.chapter_markdown(doc, ctx)
@@ -760,7 +763,7 @@ class Publish(unittest.TestCase):
                          len(re.findall(r'class="(?:[^"]*\s)?en(?:\s[^"]*)?"', hub)))
         self.assertIn('data-title-en="GOLDEN//OBSERVE', hub)
         reg = json.loads((out / "visualizations.json").read_text(encoding="utf-8"))
-        self.assertEqual([v["id"] for v in reg["visualizations"]], ["golden-carry"])
+        self.assertEqual([v["id"] for v in reg["visualizations"]], ["golden-carry", "phase-torus"])
         self.assertEqual(reg["visualizations"][0]["lean"][0]["href"], lean.Lock.load().source_url(GID3))
         self.assertTrue(reg["visualizations"][0]["theory"][1]["href"].startswith("https://github.com/"))
 
@@ -814,7 +817,7 @@ class Publish(unittest.TestCase):
     @needs_listed_example
     def test_items(self):
         items = viz.items(example_book())
-        self.assertEqual(len(items), 1)
+        self.assertEqual([it["id"] for it in items], ["golden-carry", "phase-torus"])
         it = items[0]
         self.assertEqual((it["id"], it["href"], it["thumb"], it["hub"]),
                          ("golden-carry", "viz/golden-carry/", "viz/golden-carry/thumb.jpg", "viz/"))

@@ -6,9 +6,12 @@
      kit.v3                       vector algebra on [x, y, z]: add sub scale dot cross len unit lerp rot slerp sph
      kit.painter(draw, [els])     coalesced redraw: paint() asks for one frame; repaints on resize, fonts and language
      kit.flush()                  finish running transitions and draw every painter now (browser suites use it instead of waiting)
+     kit.ready()                  a promise: resolves once the work the page waits for (three.js for kit.solid) is in
      kit.tween(ms, step, done)    eased 0 → 1 animation (one jump under prefers-reduced-motion); returns { cancel }
      kit.stage3(el, opts)         a 3D scene on a 2D canvas: orbit camera (drag, wheel, pinch), depth-cued lines, sphere,
                                   arcs, arrows, polygons, DOM labels, picking on the unit sphere
+     kit.solid(el, opts)          lit solids, glass shells, polyhedra, tubes and marks with occlusion and picking: the shell
+                                  of the modelling core solid-core.js (three.js), both fetched on the first call only
      kit.plot(canvas, opts)       a 2D chart or equal-aspect 2D stage: scales, axes, lines, areas, bars, dots, labels
      kit.clock(opts)              the bottom rail: play / pause / speed / scrub over t in [0, max], with keyboard
      kit.autoplay(clock, el)      start playing when the reader can see it (in a book: when el scrolls into view)
@@ -27,6 +30,7 @@
   const TAU = Math.PI * 2;
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
   const P = () => TRV.palette;
+  const SRC = document.currentScript && document.currentScript.src;   // kit.solid finds solid-core.js next to this file
 
   /* ---------- vectors ---------- */
   const v3 = {
@@ -78,6 +82,11 @@
       deliver the frame that ends it long after its nominal duration. */
   const tweens = new Set();
   function flush() { [...tweens].forEach((finish) => finish()); painters.forEach((p) => p.now()); }
+  /** Work the page is waiting for before its first true frame (kit.solid registers the loading of three.js):
+      kit.ready() resolves once all of it is in; the suites' settle() waits for it before calling flush(). */
+  const waits = [];
+  const pending = (promise) => { waits.push(promise); return promise; };
+  const ready = () => Promise.all(waits.map((w) => w.catch(() => null))).then(() => undefined);
   /** step(e) with e eased from 0 to 1 over ms; done() at the end. Under reduced motion: step(1) at once. */
   function tween(ms, step, done) {
     let live = true;
@@ -536,5 +545,216 @@
   /** As fix, with an explicit sign. */
   function sgn(x, d) { const s = fix(x, d); return s[0] === '−' || Number(s.replace('−', '-')) === 0 ? s : '+' + s; }
 
-  TRV.kit = { v3, painter, flush, tween, stage3, plot, clock, autoplay, chips, cards, field, keys, fix, sgn, clamp, TAU };
+  TRV.kit = { v3, painter, flush, ready, pending, src: SRC, tween, stage3, plot, clock, autoplay, chips, cards, field, keys, fix, sgn, clamp, TAU };
+})();
+
+/* ---------- kit.solid: the interactive shell of a solid stage (three.js, fetched on first use) ----------
+   const sc = TRV.kit.solid(stageEl, { canvas, onChange: paint, onPick, onDrag, onDrop, yaw, pitch, zoom, radius, cx, cy });
+   Every page may call it; the modelling core (theme/viz/solid-core.js, an ES module) and the pinned three.js it imports
+   (theme/viz/vendor/, see vendor/README.md) are fetched by the first call only, so a page that draws no solid downloads
+   nothing more. The core builds and draws the objects and knows nothing of the page (the film engine uses it too); this
+   shell puts it on the stage: camera, pointer handling, labels and projection as in kit.stage3 (x right, z up,
+   orthographic orbit), a WebGL context made when the stage is on screen and given back after a rest. Draw in the
+   painter as with stage3:
+     sc.begin();
+     sc.surface('band', (u, v) => [x, y, z], { u: [0, 1], v: [0, 1], nu: 96, nv: 20, value: (u, v) => s,
+                                              colors: [P.magenta, P.violet, P.cyan], range: [-1, 1], grid: { every: [4, 2] } });
+     sc.glass('ball', [0, 0, 0], 1);                         a glass shell: what is inside stays visible
+     sc.poly('ico', { vertices, faces }, { color });         a flat-shaded polyhedron from a vertex and face list
+     sc.tube('path', points, { width, color, glow });        a tube along a curve (parallel-transported frame)
+     sc.line(points, { color, width, dash, alpha, close })   a line: a thin unlit tube, hidden by what is in front of it
+     sc.arrow(a, b, s)  sc.ring(p, s)  sc.bead(p, s)  sc.fan(points, s)    marks on and around the solid
+     sc.tag(key, p, html, cls, s)                            a DOM label, dimmed where a solid hides its point
+     sc.end();                                               draws the frame (no render loop: frames come from paint())
+   sc.hit(ev) → { id, u, v, point, normal, front } | null;  sc.nearest(ev, points, px);  sc.occluded(p);  sc.view(…).
+   Surfaces, glass shells, polyhedra and tubes take a key and keep their buffers from frame to frame; lines, arrows,
+   beads, rings and fans are made for one frame. Inside a book (TRV.embed) the WebGL context is made only once the stage
+   is on screen and is given back after a short rest (the frame stays on the page's 2D canvas as a picture); a touch or
+   a new frame takes it back. sc.ready resolves once the core is in; kit.ready() waits for every stage, and the suites'
+   settle() waits for kit.ready(). */
+(function () {
+  'use strict';
+  const TRV = window.TRV;
+  if (!TRV || !TRV.kit) return;
+  const kit = TRV.kit, v3 = kit.v3, clamp = kit.clamp;
+  const CORE = new URL('solid-core.js', kit.src || location.href).href;
+  let coreP = null;
+  /** The modelling core (and with it three.js), fetched once per page, on the first call of kit.solid. */
+  const loadCore = () => coreP || (coreP = import(CORE));
+  const PRIMS = ['surface', 'poly', 'glass', 'tube', 'line', 'arrow', 'bead', 'ring', 'fan'];
+
+  function solid(el, opts) {
+    const o = opts || {};
+    const still = o.canvas || el.querySelector('canvas');     // the page's 2D canvas: shows the frame while the context rests
+    const cam = { yaw: o.yaw == null ? -0.62 : o.yaw, pitch: o.pitch == null ? 0.34 : o.pitch, zoom: o.zoom || 1 };
+    const sc = { el, cam, W: 0, H: 0, cx: 0, cy: 0, unit: 1, lw: o.lineScale || (TRV.thumbMode ? 1.8 : 1), mode: 'loading', faces: 0, frameMs: 0, contexts: 0 };
+    let R = [1, 0, 0], U = [0, 0, 1], D = [0, -1, 0];
+    function axes() {
+      const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      R = [cy, -sy, 0]; U = [sy * sp, cy * sp, cp]; D = [-sy * cp, -cy * cp, sp];
+    }
+    function box() {
+      sc.W = el.clientWidth || 300; sc.H = el.clientHeight || 150;
+      sc.cx = sc.W * (o.cx == null ? 0.5 : o.cx); sc.cy = sc.H * (o.cy == null ? 0.5 : o.cy);
+      sc.unit = Math.min(sc.W, sc.H) * (o.radius || 0.36) * cam.zoom;
+    }
+    axes(); box();
+    /** World point → [screen x, screen y, depth] in CSS pixels (depth > 0 faces the viewer), as kit.stage3. */
+    sc.p = (v) => [sc.cx + sc.unit * v3.dot(v, R), sc.cy - sc.unit * v3.dot(v, U), v3.dot(v, D)];
+    sc.facing = () => D.slice();
+    /** Distance in CSS pixels from a pointer event to the projection of a world point. */
+    sc.near = (ev, v) => { const b = el.getBoundingClientRect(), q = sc.p(v); return Math.hypot(ev.clientX - b.left - q[0], ev.clientY - b.top - q[1]); };
+    /** The point of the unit sphere under a pointer event (front side), as kit.stage3. */
+    sc.pick = (ev) => {
+      const b = el.getBoundingClientRect(), x = (ev.clientX - b.left - sc.cx) / sc.unit, y = (sc.cy - (ev.clientY - b.top)) / sc.unit, r2 = x * x + y * y;
+      if (r2 > 1) { const k = 1 / Math.sqrt(r2); return v3.add(v3.scale(R, x * k), v3.scale(U, y * k)); }
+      return v3.add(v3.add(v3.scale(R, x), v3.scale(U, y)), v3.scale(D, Math.sqrt(1 - r2)));
+    };
+
+    /* the core: the scene, built anew by the page each frame; until it is in, the primitives draw nothing */
+    let core = null, scene = null, renderer = null, glCanvas = null, parked = false;
+    const ready = loadCore().then((mod) => {
+      core = mod; scene = mod.createScene({ palette: TRV.palette });
+      sc.mode = 'webgl';
+      if (o.onChange) o.onChange();
+    }, (e) => { sc.mode = 'failed'; throw e; });
+    sc.ready = ready;
+    if (kit.pending) kit.pending(ready);
+    for (const name of PRIMS) sc[name] = (...a) => (scene ? scene[name](...a) : null);
+
+    /** The renderer and its canvas, made on demand; inside a book only once the stage is on screen. */
+    let onScreen = !TRV.embed || !window.IntersectionObserver;
+    function ensureRenderer() {
+      if (renderer) return true;
+      if (!core || !onScreen) return false;
+      glCanvas = document.createElement('canvas');
+      glCanvas.className = 'fill solid-gl';
+      glCanvas.style.touchAction = 'none';
+      el.insertBefore(glCanvas, el.firstChild);
+      renderer = core.createRenderer(glCanvas, { pixelRatio: Math.min(2, window.devicePixelRatio || 1) });
+      glCanvas.addEventListener('webglcontextlost', (ev) => ev.preventDefault());
+      parked = false;
+      if (still) still.style.visibility = 'hidden';
+      sc.contexts += 1;
+      return true;
+    }
+    /** Keep the last frame as a picture on the 2D canvas and give the WebGL context back. */
+    function park() {
+      if (!renderer) return;
+      if (still) {
+        TRV.fitCanvas(still);
+        const c = still.getContext('2d');
+        c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, still.width, still.height);
+        c.drawImage(glCanvas, 0, 0, still.width, still.height);
+        still.style.visibility = 'visible';
+      }
+      renderer.forceContextLoss(); renderer.dispose(); renderer = null;
+      glCanvas.remove(); glCanvas = null; parked = true;
+    }
+    sc.park = park;
+    sc.parked = () => !renderer;
+    let restTimer = 0;
+    const restMs = o.park != null ? o.park : TRV.embed ? 1600 : 0;
+    const rest = () => { if (!restMs) return; clearTimeout(restTimer); restTimer = setTimeout(park, restMs); };
+    if (TRV.embed && window.IntersectionObserver) {
+      new IntersectionObserver((entries) => {
+        const seen = entries[entries.length - 1].isIntersecting;
+        if (seen && !onScreen) { onScreen = true; if (o.onChange) o.onChange(); } else if (!seen && onScreen) { onScreen = false; park(); }
+      }).observe(el);
+    }
+
+    /* the frame */
+    let t0 = 0;
+    sc.begin = () => {
+      box(); axes(); tagsUsed.clear(); t0 = performance.now();
+      if (!scene) return;
+      scene.camera({ W: sc.W, H: sc.H, cx: sc.cx, cy: sc.cy, px: true, unit: sc.unit, yaw: cam.yaw, pitch: cam.pitch, lw: sc.lw });
+      scene.begin();
+    };
+    /** Draw the frame. Objects and labels this frame did not place are hidden; labels behind a solid are dimmed. */
+    sc.end = () => {
+      tags.forEach((t, k) => { if (!tagsUsed.has(k)) { t.hidden = true; tagPts.delete(k); } });
+      if (!scene) return;
+      scene.end(); sc.faces = scene.faces;
+      if (ensureRenderer()) {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (renderer.getPixelRatio() !== dpr) renderer.setPixelRatio(dpr);
+        scene.render(renderer);
+        rest();
+      }
+      tagPts.forEach(([t, v]) => { if (sc.occluded(v, 0.02)) t.style.opacity = '0.28'; });
+      sc.frameMs = performance.now() - t0;
+    };
+
+    /* picking, through the core (stage pixels) */
+    sc.hitAt = (x, y) => (scene ? scene.hitAt(x, y) : null);
+    sc.hit = (ev) => { const b = el.getBoundingClientRect(); return sc.hitAt(ev.clientX - b.left, ev.clientY - b.top); };
+    /** True when a surface or polyhedron of this frame is in front of the world point p (by more than eps). */
+    sc.occluded = (p, eps) => (scene ? scene.occluded(p, eps) : false);
+    /** The index of the nearest point of `list` within px CSS pixels of a pointer event that no solid hides, or −1. */
+    sc.nearest = (ev, list, px) => {
+      let best = -1, bd = px == null ? 16 : px;
+      list.forEach((v, k) => { const d = sc.near(ev, v); if (d <= bd && !sc.occluded(v, 0.02)) { bd = d; best = k; } });
+      return best;
+    };
+    /** The beads and rings of the frame: { key, kind, p, x, y, hidden } in viewport pixels (for the suites). */
+    sc.marks = () => { if (!scene) return []; const b = el.getBoundingClientRect(); return scene.marks().map((m) => Object.assign(m, { x: b.left + m.x, y: b.top + m.y })); };
+
+    /* labels, as kit.stage3; dimmed where a solid hides their point */
+    const tags = new Map(), tagsUsed = new Set(), tagPts = new Map();
+    let tagBox = el.querySelector('.tags');
+    sc.tag = (k, v, html, cls, s) => {
+      if (!tagBox) { tagBox = document.createElement('div'); tagBox.className = 'tags'; el.appendChild(tagBox); }
+      let t = tags.get(k);
+      if (!t) { t = document.createElement('div'); tags.set(k, t); tagBox.appendChild(t); }
+      const q = s && s.screen ? [v[0], v[1], 1] : sc.p(v), dx = (s && s.dx) || 0, dy = (s && s.dy) || 0;
+      t.className = 'tag ' + (cls || '');
+      if (t._html !== html) { t.innerHTML = html; t._html = html; }
+      t.style.transform = `translate(-50%, -50%) translate(${(q[0] + dx).toFixed(1)}px, ${(q[1] + dy).toFixed(1)}px)`;
+      t.style.opacity = '1'; t.hidden = false; tagsUsed.add(k);
+      if (!(s && s.screen) && !(s && s.occlude === false)) tagPts.set(k, [t, v]); else tagPts.delete(k);
+    };
+
+    /* camera: named views, drag to orbit, wheel and pinch to zoom (as kit.stage3) */
+    const VIEWS = { iso: [-0.62, 0.34], front: [0, 0], top: [0, Math.PI / 2 - 0.001], side: [-Math.PI / 2, 0] };
+    let camTween = null;
+    sc.view = (name, ms) => {
+      const v = Array.isArray(name) ? name : VIEWS[name] || VIEWS.iso, y0 = cam.yaw, p0 = cam.pitch, z0 = cam.zoom;
+      if (camTween) camTween.cancel();
+      camTween = kit.tween(ms == null ? 600 : ms, (e) => { cam.yaw = y0 + (v[0] - y0) * e; cam.pitch = p0 + (v[1] - p0) * e; cam.zoom = z0 + ((v[2] || 1) - z0) * e; if (o.onChange) o.onChange(); });
+    };
+    const ptrs = new Map();
+    let mode = null, pinch = 0;
+    const changed = () => { if (camTween) { camTween.cancel(); camTween = null; } if (o.onChange) o.onChange(); };
+    el.addEventListener('pointerdown', (ev) => {
+      if (ev.target.closest('button, a, input, .chip')) return;
+      if (parked && o.onChange) o.onChange();                   // a touch takes the context back
+      ptrs.set(ev.pointerId, [ev.clientX, ev.clientY]);
+      try { el.setPointerCapture(ev.pointerId); } catch (e) { /* synthetic events have no capture */ }
+      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); mode = 'pinch'; return; }
+      mode = o.onPick && o.onPick(ev, sc) ? 'drag' : (o.rotate === false ? null : 'orbit');
+      if (mode === 'drag' && o.onDrag) o.onDrag(ev, sc);
+    });
+    el.addEventListener('pointermove', (ev) => {
+      const last = ptrs.get(ev.pointerId);
+      if (!last) return;
+      const dx = ev.clientX - last[0], dy = ev.clientY - last[1];
+      ptrs.set(ev.pointerId, [ev.clientX, ev.clientY]);
+      if (mode === 'pinch' && ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (pinch > 0) { cam.zoom = clamp(cam.zoom * d / pinch, 0.6, 2.6); changed(); }
+        pinch = d;
+      } else if (mode === 'drag') { if (o.onDrag) o.onDrag(ev, sc); } else if (mode === 'orbit') {
+        cam.yaw -= dx * 0.008; cam.pitch = clamp(cam.pitch + dy * 0.008, -1.5, 1.5); changed();
+      }
+    });
+    const up = (ev) => { ptrs.delete(ev.pointerId); if (mode === 'drag' && o.onDrop) o.onDrop(ev, sc); if (!ptrs.size) mode = null; };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    if (o.rotate !== false && o.wheel !== false) {
+      el.addEventListener('wheel', (ev) => { ev.preventDefault(); cam.zoom = clamp(cam.zoom * Math.exp(-ev.deltaY * 0.0012), 0.6, 2.6); changed(); }, { passive: false });
+    }
+    (TRV.solids || (TRV.solids = [])).push(sc);
+    return sc;
+  }
+  kit.solid = solid;
 })();

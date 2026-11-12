@@ -17,6 +17,11 @@
 
 - PDF 静态图使用覆盖数学与组合标记的字体栈，编译时排除 macOS LastResort 占位字体并保留真正的系统字体，修复带帽的 n、带波浪号的 R 及 ket 标签等符号缺字；保留图源标签与字符，不改 HTML、EPUB 或幻灯片副本。
 - 工具生成的标题属性在含星号的标题中通过前置空 Span 传给过滤器，防止未闭合的指针星号让 `{#…}` 锚点串印入 PDF/EPUB；标题正文、强调、代码与数学的解析结果保持不变。
+### 新增
+
+- 可视化：受光的实体 `kit.solid(el, opts)`（`theme/viz/kit.js`）。任何页面都可以直接调用，页面契约不变：第一次调用时才用 `import()` 取造型核心 `theme/viz/solid-core.js`（不依赖 DOM、事件与动画循环，给定状态同步画一帧，供视频引擎复用；`createScene`、`createRenderer`、`p`、`occluded`）与它导入的、`theme/viz/vendor/` 里钉版的 three.js（three@0.183.2 的 `three.module.min.js` 与 `three.core.min.js`，原样复制，MIT，gzip 约 185 KB；`vendor/README.md` 记来源与校验和），不画实体的页面一个字节都不多下载。图元按本书的语汇：参数曲面或点阵（逐顶点光照、正背面可区分、网格线、令牌色或沿标量渐变）、平面着色多面体（顶点/面表）、玻璃球壳、沿曲线的管（平行移动标架）、线、箭头、环、珠、平面多边形、DOM 标签（被实体挡住时变淡）；一盏固定在相机坐标里的主光加环境光；相机、拖动、滚轮、捏合与投影同 `kit.stage3`。拾取 `sc.hit(ev)` 返回曲面上的参数点（在精确曲面上用牛顿法细化），`sc.nearest`、`sc.occluded` 跳过被挡住的标记。没有渲染循环；书内嵌入时进入视口才建 WebGL 上下文，静止约 1.6 秒后把画面留在页面的二维画布上并释放上下文，读者一碰再取回。`kit.ready()` 在 three.js 到位后兑现，测试工具的 `settle(page)` 会等它；`inkShare` 能读 WebGL 画布。
+- `stageFirstChecks(…, { solid: true })` 与单独导出的 `solidChecks`、`solidPixels`：舞台上确有受光实体（不透明像素占比、明暗起伏）、转动相机后明暗分布改变、被挡住的标记点不到、书内静止后释放上下文且一碰取回。已有页面不传这个选项，检查不变。
+- 示例专著新增可视化 `phase-torus`（把相位正方形粘成环面：颜色是相位判据的三块，两条斜线在环面上接成一条闭曲线，珠子可点），第一章按卡引用 `torus`，配浏览器测试。`skills/book-viz` 新增“具象”一节：实体舞台是多出来的一种能力，不是统一风格，何时用、何时不硬套、怎么做。`tools/tests/test_viz_solid.py` 在 Chromium 里核对拾取（球与环面对解析解）、遮挡随相机翻转、正背面、主光、上下文释放与取回、three.js 只在首次调用时下载。来源：下游 trureturing-books#158（具象可视化），#42。
 
 ## [0.6.1] - 2026-11-12
 
