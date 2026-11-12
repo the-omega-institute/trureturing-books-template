@@ -138,6 +138,11 @@ class SolidInTheBrowser(unittest.TestCase):
         self.expect("core: the same state drawn twice gives the same pixels, another view different ones")
         self.expect("core: the projection of an anchor agrees with the camera basis, and says which anchors a solid hides")
 
+    def test_dashed_lines_keep_their_dash_however_finely_sampled(self):
+        """sc.line(pts, { dash }) of the core (kit.solid, the film engine's solid shots) cuts dashes along the whole
+        polyline: a densely sampled curve stays dashed (regression check of the dense-sampling case)."""
+        self.expect("core: a dashed line looks the same sampled with 2 and with 400 points, about half of it inked")
+
     def test_no_errors(self):
         self.expect("no page error, console error or failed request")
 

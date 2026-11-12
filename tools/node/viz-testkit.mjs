@@ -179,6 +179,21 @@ export const labelOverlaps = (page, selector = '.stage .tag', share = 0.5) => pa
   return bad;
 }, [selector, share]);
 
+/** Lowercase Greek letters the page sets in capitals: [text, …] of rendered text nodes that hold a lowercase Greek
+    letter inside an element whose computed text-transform is uppercase (δ shown as Δ, φ as Φ). The theme sets labels,
+    headings, card codes and chips in capitals, and shell.js (TRV.keepCase) keeps Greek letters and one-letter
+    variables as written; a leftover means that guard was bypassed (a page's own style or script). */
+export const capitalGreek = (page) => page.evaluate(() => {
+  const lower = /(?=\p{Script=Greek})\p{Ll}/u, out = [];
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let t = w.nextNode(); t; t = w.nextNode()) {
+    const el = t.parentElement;
+    if (!el || !lower.test(t.nodeValue) || !el.getClientRects().length) continue;
+    if (getComputedStyle(el).textTransform === 'uppercase') out.push(t.nodeValue.trim().slice(0, 40));
+  }
+  return [...new Set(out)];
+});
+
 /**
  * Open a browser session. Options: viewport, locale, reducedMotion ('reduce' | 'no-preference').
  * Returns { page, context, browser, origin, errors, check, goto, url, newPage, finish }.
@@ -333,22 +348,26 @@ export async function solidChecks(T, slug, id, page, opts = {}) {
 /**
  * Honest labels (skills/book-viz, "如实标注"), checked on the page as served. `page` is open on the visualization.
  *   every Lean link names a theorem of trureturing.lock.json and points at its pinned commit, file and line;
- *   the registry entry lists exactly the theorems the page cites;
- *   green boxes (.lean without .num / .model / .argued / .open) are exactly the boxes that cite a Lean theorem;
+ *   the registry entry lists exactly the theorems the page cites outside .lean.frozen boxes;
+ *   green boxes (.lean without .num / .model / .argued / .open / .frozen) are exactly the boxes, other than the
+ *   neutral .lean.frozen ones, that cite a Lean theorem; every .lean.frozen box cites one (a theorem frozen in
+ *   trureturing that no theorem environment of the text cites: shown, not green, not in the registry's lean);
  *   the theory drawer says in both languages that the page is not a proof.
  */
 export async function evidenceChecks(T, slug, id, page) {
   const { check } = T, lock = readLock();
   const entry = (readRegistry(resolveBook(slug)).visualizations || []).find((v) => v.id === id) || {};
-  const links = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => [a.dataset.leanGid, a.href]));
+  const links = await page.$$eval('a[data-lean-gid]', (as) => as.map((a) => [a.dataset.leanGid, a.href, !!a.closest('.lean.frozen')]));
   const bad = links.find(([gid, href]) => { const d = lock && (lock.declarations || {})[gid]; return !d || !FORMAL_KINDS.includes(d.kind) || href !== leanUrl(lock, gid); });
-  check('evidence: every Lean link names a frozen theorem and points at its pinned commit, file and line', !bad, bad ? bad.join(' → ') : '');
-  const cited = [...new Set(links.map(([g]) => g))].sort(), listed = (entry.lean || []).map((l) => l.gid).sort();
+  check('evidence: every Lean link names a frozen theorem and points at its pinned commit, file and line', !bad, bad ? bad.slice(0, 2).join(' → ') : '');
+  // .lean.frozen boxes show theorems no theorem environment of the text cites: they are not the page's LEAN ✓ list
+  const cited = [...new Set(links.filter((l) => !l[2]).map(([g]) => g))].sort(), listed = (entry.lean || []).map((l) => l.gid).sort();
   const diff = [...cited.filter((g) => !listed.includes(g)).map((g) => `page only: ${g}`), ...listed.filter((g) => !cited.includes(g)).map((g) => `registry only: ${g}`)];
   check('evidence: the registry lists exactly the theorems the page cites', diff.length === 0, diff.slice(0, 3).join(' | '));
-  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open)(\s|$)/.test(b.className), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
-  const wrong = boxes.find((b) => b.green !== b.link);
-  check('evidence: green boxes are exactly the boxes that cite a Lean theorem', !wrong, wrong ? `${wrong.green ? 'green without a Lean link' : 'Lean link in a box of another colour'}: ${wrong.text}` : '');
+  const boxes = await page.$$eval('.lean', (els) => els.map((b) => ({ green: !/(^|\s)(num|model|argued|open|frozen)(\s|$)/.test(b.className), frozen: b.classList.contains('frozen'), link: !!b.querySelector('a[data-lean-gid]'), text: b.textContent.trim().slice(0, 48) })));
+  const wrong = boxes.find((b) => (b.frozen ? !b.link : b.green !== b.link));
+  check('evidence: green boxes are exactly the boxes that cite a Lean theorem', !wrong,
+    wrong ? `${wrong.frozen ? 'FROZEN box without a Lean link' : wrong.green ? 'green without a Lean link' : 'Lean link in a box of another colour'}: ${wrong.text}` : '');
   const drawer = await page.$eval('#drawer', (d) => d.textContent).catch(() => null);
   if (drawer != null) check('evidence: the drawer says in both languages that the page is not a proof', /不是证明/.test(drawer) && /not a proof/.test(drawer));
 }
@@ -530,6 +549,8 @@ export async function spaceAfterCard(T, page, wait = 120) {
  *   keys      (desktop) right after a card is clicked with the pointer, Space plays and pauses the clock instead of
  *             pressing the card again (pages without a ▶ button in footer.rail, or none a card enables, skip it)
  *   motion    under prefers-reduced-motion the page loads and a card still applies
+ *   capitals  (desktop, both languages, every card; a warning, not a failure) no lowercase Greek letter is set in
+ *             capitals (capitalGreek): δ must not show as Δ
  *   still     (desktop, a warning, not a failure) a card whose click starts the clock (seen by a watcher armed before
  *             the click, so a sweep of a fifth of a second counts) declares its still frame: data-still on the card,
  *             written by kit.cards({ presets }) from the `still` of the page's table of cards
@@ -544,7 +565,7 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   const o = { stage: '.stage', cover: '[data-thumb] canvas', solid: false, still: true, minShare: 0.28, minEmbedShare: 0.4, cards: true, tour: true, labels: true, evidence: true, rail: true, keys: true, settle: 120, ...opts };
   const { check } = T;
   const cardIds = (page) => page.$$eval('[data-preset]', (els) => els.map((e) => e.dataset.preset));
-  const runCards = async (page, tag, played) => {
+  const runCards = async (page, tag, played, caps) => {
     for (const c of await cardIds(page)) {
       const key = played ? await armPlayWatch(page, railClock) : null;   // armed before the click: a short sweep counts
       await page.click(`[data-preset="${c}"]`); await settle(page, o.settle);
@@ -554,7 +575,13 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
       }, c);
       check(`${tag}: card ${c} applies and explains itself`, state.pressed === 'true' && state.note !== 0, JSON.stringify(state));
       if (played) { const r = await playRecord(page, key); if (r && r.started) played.push({ card: c, still: state.still }); }
+      if (caps) for (const x of await capitalGreek(page)) caps.add(x);
     }
+  };
+  const capsWarning = (caps, where) => {
+    if (caps.size) T.warn(`capitals: lowercase Greek letters are set in capitals (${where})`,
+      `${[...caps].slice(0, 4).join(' | ')} — text-transform: uppercase turns δ into Δ; the theme keeps Greek letters and one-letter ` +
+      'variables as written (shell.js, TRV.keepCase): do not override .keepcase or set capitals on text the page writes outside the DOM');
   };
 
   // desktop
@@ -566,8 +593,9 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
   if (o.cards) {
     const n = (await cardIds(page)).length;
     check('desktop: at least four experiment cards', n >= 4, `${n}`);
-    const playing = [];
-    await runCards(page, 'desktop', o.still ? playing : null);
+    const playing = [], caps = new Set(await capitalGreek(page));
+    await runCards(page, 'desktop', o.still ? playing : null, caps);
+    capsWarning(caps, 'zh, every card');
     // a card that plays by itself declares the frame its still shows (kit.cards({ presets }) writes data-still)
     for (const { card } of playing.filter((x) => x.still == null || x.still === '')) {
       T.warn(`still: card ${card} plays by itself but declares no still frame`,
@@ -591,8 +619,10 @@ export async function stageFirstChecks(T, slug, id, opts = {}) {
 
   // English
   await page.click('[data-lang-set="en"]'); await settle(page, 150);
-  if (o.cards) for (const c of await cardIds(page)) { await page.click(`[data-preset="${c}"]`); await settle(page, o.settle); const left = await cjkLeftovers(page); check(`English: no Chinese left with card ${c}`, left.length === 0, left.slice(0, 3).join(' | ')); }
-  else { const left = await cjkLeftovers(page); check('English: no Chinese left on screen', left.length === 0, left.slice(0, 3).join(' | ')); }
+  const capsEn = new Set();
+  if (o.cards) for (const c of await cardIds(page)) { await page.click(`[data-preset="${c}"]`); await settle(page, o.settle); const left = await cjkLeftovers(page); check(`English: no Chinese left with card ${c}`, left.length === 0, left.slice(0, 3).join(' | ')); for (const x of await capitalGreek(page)) capsEn.add(x); }
+  else { const left = await cjkLeftovers(page); check('English: no Chinese left on screen', left.length === 0, left.slice(0, 3).join(' | ')); for (const x of await capitalGreek(page)) capsEn.add(x); }
+  capsWarning(capsEn, 'en');
   if (await page.$('#infoBtn')) {
     await page.click('#infoBtn'); const left = await cjkLeftovers(page);
     check('English: no Chinese left in the theory drawer', left.length === 0, left.slice(0, 3).join(' | '));

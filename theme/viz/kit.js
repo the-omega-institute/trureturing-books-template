@@ -12,7 +12,7 @@
                                   arcs, arrows, polygons, DOM labels, picking on the unit sphere
      kit.solid(el, opts)          lit solids, glass shells, polyhedra, tubes and marks with occlusion and picking: the shell
                                   of the modelling core solid-core.js (three.js), both fetched on the first call only
-     kit.plot(canvas, opts)       a 2D chart or equal-aspect 2D stage: scales, axes, lines, areas, bars, dots, labels
+     kit.plot(canvas, opts)       a 2D chart or equal-aspect 2D stage: scales, axes, lines, areas, bars, dots, arrows, labels
      kit.clock(opts)              the bottom rail: play / pause / speed / scrub over t in [0, max], with keyboard
      kit.autoplay(clock, el)      start playing when the reader can see it (in a book: when el scrolls into view)
      kit.cards(el, opts)          experiment cards (one click = one named scenario with a one-line explanation),
@@ -21,6 +21,7 @@
      kit.field(input, opts)       a range input bound to its <output>
      kit.keys(map)                keyboard shortcuts that stay out of the way of form controls and the drawer
      kit.fix(x, d) kit.sgn(x, d)  number formatting without "-0.00" (U+2212 minus)
+     kit.setTag(el, html, cls)    write a stage label (class, HTML when changed, TRV.keepCase): what st.tag and sc.tag use
 
    Colours come from TRV.palette (the design tokens); nothing here hard-codes one. */
 (function () {
@@ -105,6 +106,15 @@
     return { cancel() { live = false; tweens.delete(finish); } };
   }
 
+  /** Write a stage label: its class and its HTML (only when changed). The theme sets labels in capitals; TRV.keepCase
+      keeps the Greek letters and one-letter variables of the text as written (δ stays δ, u stays u). */
+  function setTag(t, html, cls) {
+    const c = 'tag ' + (cls || '');
+    if (t.className !== c) { t.className = c; t._case = null; }
+    if (t._html !== html) { t.innerHTML = html; t._html = html; t._case = null; }
+    if (t._case == null && TRV.keepCase) { TRV.keepCase(t); t._case = true; }
+  }
+
   /* ---------- 3D stage on a 2D canvas ----------
      World axes: x right, y into the screen at yaw 0, z up. The camera orbits the origin: yaw about z, pitch above
      the horizon, orthographic, so a unit sphere is always a circle of `radius × min(width, height) × zoom` pixels.
@@ -146,12 +156,31 @@
     st.facing = () => D.slice();
 
     const style = (s, a) => { ctx.strokeStyle = s.color || P().cyan; ctx.lineWidth = (s.width || 1.2) * st.lw; ctx.globalAlpha = (s.alpha == null ? 1 : s.alpha) * a; ctx.setLineDash(s.dash || []); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; };
-    /** A polyline through world points. With fade (default) the part behind the centre plane is drawn dimmer. */
+    /** A polyline through world points. With fade (default) the part behind the centre plane is drawn dimmer.
+        A dash ([on, off] in pixels) runs on along the whole projected path, however finely it is sampled: the canvas
+        starts its dash pattern afresh at every subpath, so each run of segments on one side of the centre plane is
+        one subpath whose dash phase (lineDashOffset) is the projected length of the path before it. */
     st.path = (pts, s) => {
       s = s || {};
       const q = pts.map(st.p), back = s.back == null ? 0.28 : s.back;
       if (s.fade === false) {
         style(s, 1); ctx.beginPath(); q.forEach((a, i) => (i ? ctx.lineTo(a[0], a[1]) : ctx.moveTo(a[0], a[1]))); if (s.close) ctx.closePath(); ctx.stroke();
+      } else if (s.dash && s.dash.length) {
+        const runs = [], n = q.length + (s.close ? 1 : 0);
+        let at = 0, run = null;
+        for (let i = 1; i < n; i++) {
+          const a = q[i - 1], b = q[i % q.length], front = (a[2] + b[2]) / 2 >= 0;
+          if (!run || run.front !== front) { run = { front, off: at, pts: [a] }; runs.push(run); }
+          run.pts.push(b); at += Math.hypot(b[0] - a[0], b[1] - a[1]);
+        }
+        for (const front of [false, true]) {   // the part behind first, as for a solid line
+          for (const r of runs) {
+            if (r.front !== front) continue;
+            style(s, front ? 1 : back); ctx.lineDashOffset = r.off; ctx.beginPath();
+            r.pts.forEach((a, i) => (i ? ctx.lineTo(a[0], a[1]) : ctx.moveTo(a[0], a[1]))); ctx.stroke();
+          }
+        }
+        ctx.lineDashOffset = 0;
       } else {
         for (const front of [false, true]) {
           style(s, front ? 1 : back); ctx.beginPath();
@@ -242,8 +271,7 @@
       let t = tags.get(key);
       if (!t) { t = document.createElement('div'); tags.set(key, t); tagBox.appendChild(t); }
       const q = s && s.screen ? [v[0], v[1], 1] : st.p(v), dx = (s && s.dx) || 0, dy = (s && s.dy) || 0;
-      t.className = 'tag ' + (cls || '');
-      if (t._html !== html) { t.innerHTML = html; t._html = html; }
+      setTag(t, html, cls);
       t.style.transform = `translate(-50%, -50%) translate(${(q[0] + dx).toFixed(1)}px, ${(q[1] + dy).toFixed(1)}px)`;
       t.style.opacity = q[2] < -0.05 && !(s && s.fade === false) ? '0.45' : '1';
       t.hidden = false; tagsUsed.add(key);
@@ -294,7 +322,7 @@
 
   /* ---------- 2D charts and 2D stages ----------
      const g = kit.plot(canvas, { x: [0, 10], y: [0, 1], pad: [left, right, top, bottom], logX, logY, equal });
-     g.axes({ xTicks, yTicks, xFmt, yFmt, xLabel, yLabel }); g.line(points, color); g.dot(x, y, color); …
+     g.axes({ xTicks, yTicks, xFmt, yFmt, xLabel, yLabel }); g.line(points, color); g.dot(x, y, color); g.arrow([x0, y0], [x1, y1], { color }); …
      `equal: true` gives both axes the same scale (a 2D stage: lattices, circles), widening one range to fit. */
   /* ---------- sub- and superscripts in canvas text ---------- */
   const SCRIPT = 0.72;   // a script's size, of its text's
@@ -395,6 +423,24 @@
     g.dot = (x, y, color, r, s) => {
       s = set(color, s); ctx.beginPath(); ctx.arc(X(x), Y(y), r || 3.5, 0, TAU);
       if (s.ring) { ctx.lineWidth = s.width || 1.5; ctx.stroke(); } else { if (s.glow) { ctx.shadowColor = color; ctx.shadowBlur = s.glow; } ctx.fill(); }
+      done();
+    };
+    /** An arrow from a = [x, y] to b = [x, y] (data coordinates) with a screen-space head, as st.arrow of kit.stage3.
+        s: color, width (2), alpha, dash, glow, head (false: no head), headSize (10 pixels). */
+    g.arrow = (a, b, s) => {
+      s = s || {};
+      const c = s.color || P().cyan, x0 = X(a[0]), y0 = Y(a[1]), x1 = X(b[0]), y1 = Y(b[1]), dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
+      ctx.globalAlpha = s.alpha == null ? 1 : s.alpha; ctx.strokeStyle = ctx.fillStyle = c; ctx.lineWidth = s.width || 2;
+      ctx.setLineDash(s.dash || []); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (s.glow) { ctx.shadowColor = c; ctx.shadowBlur = s.glow; }
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.setLineDash([]);
+      if (L > 6 && s.head !== false) {
+        const h = Math.min(s.headSize || 10, L * 0.6), ux = dx / L, uy = dy / L;
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        ctx.lineTo(x1 - ux * h - uy * h * 0.42, y1 - uy * h + ux * h * 0.42);
+        ctx.lineTo(x1 - ux * h + uy * h * 0.42, y1 - uy * h - ux * h * 0.42);
+        ctx.closePath(); ctx.fill();
+      }
       done();
     };
     g.vline = (x, color, s) => { set(color, Object.assign({ width: 1 }, s)); const px = Math.round(X(x)) + 0.5; ctx.beginPath(); ctx.moveTo(px, pt); ctx.lineTo(px, pt + ih); ctx.stroke(); done(); };
@@ -602,7 +648,7 @@
   /** As fix, with an explicit sign. */
   function sgn(x, d) { const s = fix(x, d); return s[0] === '−' || Number(s.replace('−', '-')) === 0 ? s : '+' + s; }
 
-  TRV.kit = { v3, painter, flush, ready, pending, src: SRC, tween, stage3, plot, clock, autoplay, chips, cards, field, keys, fix, sgn, clamp, TAU };
+  TRV.kit = { v3, painter, flush, ready, pending, src: SRC, tween, setTag, stage3, plot, clock, autoplay, chips, cards, field, keys, fix, sgn, clamp, TAU };
 })();
 
 /* ---------- kit.solid: the interactive shell of a solid stage (three.js, fetched on first use) ----------
@@ -765,8 +811,7 @@
       let t = tags.get(k);
       if (!t) { t = document.createElement('div'); tags.set(k, t); tagBox.appendChild(t); }
       const q = s && s.screen ? [v[0], v[1], 1] : sc.p(v), dx = (s && s.dx) || 0, dy = (s && s.dy) || 0;
-      t.className = 'tag ' + (cls || '');
-      if (t._html !== html) { t.innerHTML = html; t._html = html; }
+      kit.setTag(t, html, cls);
       t.style.transform = `translate(-50%, -50%) translate(${(q[0] + dx).toFixed(1)}px, ${(q[1] + dy).toFixed(1)}px)`;
       t.style.opacity = '1'; t.hidden = false; tagsUsed.add(k);
       if (!(s && s.screen) && !(s && s.occlude === false)) tagPts.set(k, [t, v]); else tagPts.delete(k);
