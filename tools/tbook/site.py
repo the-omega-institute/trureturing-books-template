@@ -44,6 +44,7 @@ import html
 import importlib
 import json
 import os
+import subprocess
 import posixpath
 import re
 import shutil
@@ -1495,6 +1496,19 @@ def _site_books(books: list[config.Book], out: Path) -> list[config.Book]:
     return ordered + list(selected.values())
 
 
+def post_build(site: config.Site, out: Path) -> None:
+    """Run an explicitly configured repository command after successful assembly."""
+    command = site.raw.get("site", {}).get("post_build")
+    if command is not None:
+        if not isinstance(command, list) or not command or not all(isinstance(a, str) and a for a in command):
+            raise SiteError("site.post_build must be a nonempty array of command arguments")
+        env = dict(os.environ, TBOOK_SITE_OUT=str(out.resolve()))
+        try:
+            subprocess.run(command, cwd=site.root, env=env, check=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise SiteError(f"site.post_build failed: {exc}") from exc
+
+
 def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_root: Path | None = None) -> Path:
     """Assemble the site into ``out_dir`` and return it (see the module docstring).
 
@@ -1549,4 +1563,5 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
                                        encoding="utf-8")
     if problems:
         raise SiteError(f"site written to {out} with {len(problems)} problem(s):\n  " + "\n  ".join(problems))
+    post_build(site, out)
     return out
