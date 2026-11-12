@@ -29,10 +29,13 @@
 # the workflows, so one push can save a planted entry in the pull request's cache scope and the next push,
 # with a clean final diff, would restore it (restore looks in that scope first). Runs of other branches and
 # tags read their own scope (which only their own code can write) and then the default branch's.
-# Pull-request runs may still restore from published releases (TBOOK_CACHE_REMOTE=1), which only the
+# Pull-request runs restore the tbook-build-store artifact from a successful default-branch Pages run
+# (tools/ci/trusted_cache.py verifies its workflow ID, repository, branch, event and outcome; requires
+# actions: read). No PR-produced artifact is read. Missing or expired artifacts are cache misses.
+# Pull-request runs may also restore from published releases (TBOOK_CACHE_REMOTE=1), which only the
 # tag workflows (release.yml, template-release.yml; contents: write) create: docs/VERIFICATION.md §2.
 name: tbook build cache
-description: Restore or save the build cache store .cache/artifacts, outside pull-request events.
+description: Restore the build store from Actions caches or trusted Pages artifacts; save on the default branch.
 
 inputs:
   mode:
@@ -84,6 +87,27 @@ runs:
       run: |
         echo "TBOOK_BUILD_CACHE_RESTORED=$MATCHED" >> "$GITHUB_ENV"
         if [ -n "$MATCHED" ]; then echo "restored $MATCHED"; else echo "no build cache restored"; fi
+
+    - name: Find the default branch Pages cache artifact
+      id: trusted
+      if: inputs.mode == 'restore' && startsWith(github.event_name, 'pull_request')
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: python3 tools/ci/trusted_cache.py
+
+    - name: Restore the trusted Pages artifact
+      if: inputs.mode == 'restore' && steps.trusted.outputs.artifact-id != ''
+      continue-on-error: true
+      uses: actions/download-artifact@v7
+      with:
+        artifact-ids: ${{ steps.trusted.outputs.artifact-id }}
+        run-id: ${{ steps.trusted.outputs.run-id }}
+        github-token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        path: .cache/artifacts
+        merge-multiple: true
 
     - name: Prune the build cache
       id: prune

@@ -34,7 +34,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 
 | 工作流 | 触发 | 作用 |
 | --- | --- | --- |
-| `ci.yml` | PR、推送到任意分支、手动、被调用 | `check` 作业：`./tbook check`、`./tbook theme --check`、全部单元测试、可视化登记校验与幻灯片检查（模板仓库另跑 `./tbook template manifest --check`，并在删去示例书的工作树中、以及用 `site.toml` 的 `[books] hide = ["example-*"]` 隐藏示例书的工作树中重跑检查与单元测试：下游书库可以隐藏或删除示例书，甚至暂时没有书，CI 照样通过）；`build` 作业：HTML/PDF/EPUB，产物上传为 artifact；`viz` 作业：可视化浏览器回归测试，分 4 片并行（`node tools/node/viz-test.mjs --shard i/4`；每个页面的测试约一分钟，页面多了串行跑会让后面的每次运行排上大半个小时）；`media` 作业：幻灯片构建与 PDF、视频（`TBOOK_FILMS=require`；推送到默认分支或 tag 时不构建视频，由 `pages.yml` 与发版工作流构建）。`build` 与 `media` 经构建缓存（§5）恢复未变的单元，从不保存；调用者须授予 `contents: read` 与 `pages: read` |
+| `ci.yml` | PR、推送到 main、手动、被调用 | `check` 作业：`./tbook check`、`./tbook theme --check`、全部单元测试、可视化登记校验与幻灯片检查（模板仓库另跑 `./tbook template manifest --check`，并在删去示例书的工作树中、以及用 `site.toml` 的 `[books] hide = ["example-*"]` 隐藏示例书的工作树中重跑检查与单元测试：下游书库可以隐藏或删除示例书，甚至暂时没有书，CI 照样通过）；`build` 作业：HTML、屏幕 PDF、印刷 PDF、EPUB 分 4 个作业并行，产物按 `books-html-html`、`books-dist-pdf-screen`、`books-dist-pdf-print`、`books-dist-epub` 分别上传；`viz` 作业：可视化浏览器回归测试，分 8 片并行（`node tools/node/viz-test.mjs --shard i/8`；每个页面的测试约一分钟，页面多了串行跑会让后面的每次运行排上大半个小时）；`media` 作业：幻灯片构建与 PDF；`films` 作业：视频分 4 片严格构建（`TBOOK_FILMS=require`；默认分支推送与 tag 的被调用运行由 Pages / 发版工作流构建视频）。`build`、`media`、`films` 经构建缓存（§5）恢复未变的单元，从不保存；调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
 | `pages.yml` | 推送到 `main`、手动 | `./tbook check` 后构建全部（含视频，`TBOOK_FILMS=require`）并部署 GitHub Pages；Pages 尚未启用时只构建、不部署，并在作业摘要中提示。唯一保存构建缓存的工作流（§5），同一时间只运行一个 |
 | `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
@@ -56,17 +56,21 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 
 容器运行方式见 [容器工具链](CONTAINERS.md)：上游提供预装全部工具、浏览器、字体与语音模型的镜像，避免每次作业依赖 Ubuntu 软件源。
 
+开发分支在 PR 上运行完整 CI，不再同时因分支 push 重复跑一轮；尚未开 PR 时可手动运行。PR 与 main 上被新提交取代的 CI 会取消，Pages 仍串行保存缓存并部署。默认分支名称若不是 main，需同步调整 `ci.yml` / `pages.yml` 的 push 分支过滤。
+
 ## 5. 构建缓存
 
 构建单元（每个语言版本的 HTML、每种 PDF、EPUB、每本书的幻灯片、每个视频）的输入没有变化时不再构建，而是恢复存下的产物（`tools/tbook/buildcache.py`；键与本地存储见 `docs/ARCHITECTURE.md`）。视频不是特例，与 PDF、幻灯片走同一条路。查找顺序：
 
-1. 本地存储 `.cache/artifacts/`。在 GitHub Actions 中，组合动作 `.github/actions/build-cache` 在构建前恢复它（Actions 缓存，按前缀 `build-cache-v1-` 先找本次运行所在 ref 的最新一份，再找默认分支的），PR 事件中跳过；
+1. 本地存储 `.cache/artifacts/`。在 GitHub Actions 中，组合动作 `.github/actions/build-cache` 在构建前恢复它（Actions 缓存，按前缀 `build-cache-v1-` 先找本次运行所在 ref 的最新一份，再找默认分支的），PR 事件不读 Actions 缓存，改读成功的默认分支 Pages 运行的 `tbook-build-store` 工件；
 2. 设置了 `TBOOK_CACHE_REMOTE=1` 时（构建步骤都设置，并传入 `GITHUB_TOKEN`），查最新的 5 个附有 `build-cache.json` 的已发布 Release（手工发的、没有该文件的 Release 不占名额），下载对应的 `cache-*.tar`，核对 SHA-256 后恢复。没有任何 Actions 缓存的构建（新仓库、缓存被清除、PR）由此从整站 Release 恢复；
 3. 都没有时构建，并存入本地存储。
 
-只有 `pages.yml` 保存 Actions 缓存：在默认分支上（push 或手动运行）构建后执行 `./tbook cache prune`（只留当前输入的条目），再由 `./tbook cache key` 算出存储内容的摘要 `build-cache-v1-<sha256>`。它与恢复到的键去掉运行后缀 `-r…` 后的部分相同时不再上传；不同时以 `build-cache-v1-<sha256>-r<run id>-<run attempt>` 保存。运行后缀使每次保存都得到一个新键，成为最新的一份：缓存键不能覆盖，存储回到早先的内容（例如回滚）时，若沿用早先的键，保存会因键已存在而落空，恢复就仍取那份更新却已过时的存储。每次保存的是整个存储，仓库的 Actions 缓存超过上限（默认 10 GB）时，GitHub 先淘汰最久未用的条目，恢复总是取最新的一份。构建失败时也保存，已完成的单元（例如先渲染好的视频）不必重做；构建步骤自己的时限（210 分钟）短于作业的时限，超时只让这一步失败，保存照常进行，重新运行或下一次推送从已完成处继续（作业超时会被取消，保存也随之跳过）。`pages` 并发组使它同一时间只运行一个，后一次运行恢复前一次保存的结果。`ci.yml` 只恢复、不保存，`media` 作业在默认分支与 tag 的推送上不构建视频（`pages.yml` 与发版工作流会构建）；`release.yml` 不保存 Actions 缓存，而是把缓存附在 Release 上。
+只有 `pages.yml` 保存 Actions 缓存：在默认分支上（push 或手动运行）构建后执行 `./tbook cache prune`（只留当前输入的条目），再由 `./tbook cache key` 算出存储内容的摘要 `build-cache-v1-<sha256>`。它与恢复到的键去掉运行后缀 `-r…` 后的部分相同时不再上传；不同时以 `build-cache-v1-<sha256>-r<run id>-<run attempt>` 保存。运行后缀使每次保存都得到一个新键，成为最新的一份：缓存键不能覆盖，存储回到早先的内容（例如回滚）时，若沿用早先的键，保存会因键已存在而落空，恢复就仍取那份更新却已过时的存储。每次保存的是整个存储，仓库的 Actions 缓存超过上限（默认 10 GB）时，GitHub 先淘汰最久未用的条目，恢复总是取最新的一份。构建失败时也保存，已完成的单元（例如先渲染好的视频）不必重做；构建步骤自己的时限（210 分钟）短于作业的时限，超时只让这一步失败，保存照常进行，重新运行或下一次推送从已完成处继续（作业超时会被取消，保存也随之跳过）。`pages` 并发组使它同一时间只运行一个，后一次运行恢复前一次保存的结果。`ci.yml` 只恢复、不保存，`films` 作业在默认分支与 tag 的推送上不构建视频（`pages.yml` 与发版工作流会构建）；`release.yml` 不保存 Actions 缓存，而是把缓存附在 Release 上。
 
-仍会重复渲染的情形：PR 事件既不恢复也不保存 Actions 缓存（防投毒，见 `docs/VERIFICATION.md` §2），但可以从已发布的 Release 恢复。所以改动了的视频在每次 PR 运行中渲染以验证；分支推送到本仓库时，它的每次 `ci.yml` 推送运行也渲染（`ci.yml` 不保存）；合入后 `pages.yml` 再渲染一次并保存。此后其他分支、默认分支与 tag 上的构建从 Actions 缓存恢复它；PR 运行只读已发布的 Release，在某个 Release（`release.yml`）附上它的键之前，PR 每推送一次就再渲染一次。
+PR 复用 Pages 构建：默认分支成功的 `pages.yml` 在构建后上传 `tbook-build-store`（保留 7 天，含隐藏文件，不压缩已压缩的视频）。PR 用 GitHub API 选择默认分支最近 20 次成功 Pages 运行中仍有工件的一次，核对 workflow ID、源仓库、分支、事件（只允许 push / workflow_dispatch）、完成状态与结果，再按不可混淆的 run ID / artifact ID 下载。需要 `actions: read`；被调用的 CI 的调用者也须授予它。权限不足、工件过期或下载失败时照常构建，仍可从 Release 恢复。PR 自己的 Actions 缓存与工件始终不读；每个构建单元仍按当前输入键与逐文件摘要验证。信任边界见 `docs/VERIFICATION.md` §2。
+
+仍会重复渲染的情形：改动了视频输入的 PR 仍须渲染，视频按完整的影片分成 4 片（`python tools/ci/films.py --shard i/4`），所有未隐藏的书共用有序列表，空分片通过，缺工具链或渲染失败会失败。合入后 Pages 渲染并保存新键，此后 PR 即可复用，无须等待发版。工件超过 7 天、从未成功构建 Pages，或 PR 的输入与默认分支和 Release 都不同，仍会重建。分片减少等待时间，冷构建总计算量不会随之减少；8 片可视化与 4 片影片也会增加工具链安装开销与并发需求。
 
 键中的工具版本：Node 取主版本（Chromium 由 `package-lock.json` 中的 Playwright 决定，不单独计入），Pandoc、Typst 取“主.次”（精确版本钉在 `requirements.txt`），mdBook 取精确版本（CI 安装的正是 0.5.4）；其余精确版本由 `package-lock.json`、`theme/film/requirements.txt` 与 `.github/actions/setup` 钉住。所以运行器镜像更新 Node 补丁版本或 ffmpeg 包修订，不会让缓存与已发布的 Release 失效。视频的键覆盖 git 列出的视频文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python，所以没有视频工具链的构建（`TBOOK_FILMS=auto|skip`）也能恢复视频。
 

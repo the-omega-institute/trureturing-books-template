@@ -9,32 +9,34 @@
 #          repository also the checks and unit tests once more without books/example-monograph, and once
 #          more with the example books hidden (site.toml [books].hide = ["example-*"])
 #   build  HTML (mdBook), PDF (screen + print), EPUB → workflow artifacts
-#   viz    visualization browser tests, in four parallel shards (one browser suite per page takes about a
-#          minute; a book with thirty pages would otherwise hold every later run for most of an hour)
-#   media  slide decks (Slidev + Chromium) and films
+#   viz    visualization browser tests, in eight parallel shards
+#   media  slide decks (Slidev + Chromium)
+#   films  strict film builds, in four parallel shards
 #
 # build and media go through the build cache (docs/PUBLISHING.md §5): outside pull-request events they
-# restore the store that pages.yml saved; in every event they may restore a unit from the newest published
+# restore the store that pages.yml saved; PRs read an artifact from a successful default-branch Pages run.
+# In every event they may restore a unit from the newest published
 # releases (TBOOK_CACHE_REMOTE=1). CI never saves the Actions cache. Both use the Pages URL, as pages.yml
 # does, so that their keys are the site's keys.
 #
 # Also callable from other workflows (workflow_call), e.g. before a release. A caller grants contents: read
-# and pages: read (actions/configure-pages in build and media).
+# actions: read (the trusted Pages artifact) and pages: read (actions/configure-pages).
 name: CI
 
 on:
   pull_request:
   push:
-    branches: ['**']
+    branches: [main]
   workflow_dispatch:
   workflow_call:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch') }}
 
 env:
   PYTHONUNBUFFERED: '1'
@@ -174,12 +176,21 @@ jobs:
           python -m unittest discover -s tools/tests
 
   build:
-    name: Build HTML, PDF and EPUB
+    name: Build books (${{ matrix.name }})
     needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: html, target: html, options: ''}
+          - {name: pdf-screen, target: pdf, options: '--variant screen'}
+          - {name: pdf-print, target: pdf, options: '--variant print'}
+          - {name: epub, target: epub, options: ''}
     permissions:
       contents: read
+      actions: read
       # actions/configure-pages reads the Pages configuration (private repositories refuse it without this).
       pages: read
     steps:
@@ -209,26 +220,28 @@ jobs:
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./tbook build html pdf epub
+        run: ./tbook build ${{ matrix.target }} ${{ matrix.options }}
 
       - name: Upload downloads (PDF, EPUB)
+        if: matrix.target != 'html'
         uses: actions/upload-artifact@v6
         with:
-          name: books-dist
+          name: books-dist-${{ matrix.name }}
           path: build/dist
           if-no-files-found: warn
           retention-days: 14
 
       - name: Upload HTML
+        if: matrix.target == 'html'
         uses: actions/upload-artifact@v6
         with:
-          name: books-html
+          name: books-html-${{ matrix.name }}
           path: build/html
           if-no-files-found: warn
           retention-days: 14
 
   viz:
-    name: Visualization browser tests (${{ matrix.shard }}/4)
+    name: Visualization browser tests (${{ matrix.shard }}/8)
     needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -236,7 +249,7 @@ jobs:
       fail-fast: false
       matrix:
         # tools/node/viz-test.mjs --shard i/n runs every n-th suite of the sorted list; a shard without suites passes.
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -250,16 +263,16 @@ jobs:
 
       - name: Visualization browser tests
         if: hashFiles('tools/node/viz-test.mjs') != ''
-        run: node tools/node/viz-test.mjs --shard ${{ matrix.shard }}/4
+        run: node tools/node/viz-test.mjs --shard ${{ matrix.shard }}/8
 
   media:
-    name: Slides and films
+    name: Slides
     needs: check
     runs-on: ubuntu-24.04
-    # Rendering a film that no cache holds takes long (frames, narration, encoding).
-    timeout-minutes: 180
+    timeout-minutes: 60
     permissions:
       contents: read
+      actions: read
       pages: read
     steps:
       - name: Check out
@@ -271,8 +284,6 @@ jobs:
           browsers: 'true'
           fonts: 'false'
           mdbook: 'false'
-          # Films are rendered here except on pushes to the default branch and to tags (see "Build films").
-          films: ${{ !(github.event_name == 'push' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/'))) }}
 
       - name: Configure Pages
         id: pages
@@ -304,20 +315,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./tbook build slides
 
-      - name: Build films
-        # Not on pushes to the default branch or to tags: pages.yml and the release workflows build the same
-        # films there (and pages.yml stores them); rendering them here as well would render each one twice.
-        if: >-
-          !(github.event_name == 'push' &&
-          (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
-          startsWith(github.ref, 'refs/tags/')))
-        env:
-          TBOOK_CACHE_REMOTE: '1'
-          GITHUB_TOKEN: ${{ github.token }}
-          # A film that no cache holds is rendered; one that cannot be rendered fails the job.
-          TBOOK_FILMS: require
-        run: ./tbook build films
-
       - name: Upload slide PDFs
         if: steps.decks.outputs.present == 'true'
         uses: actions/upload-artifact@v6
@@ -326,3 +323,51 @@ jobs:
           path: build/slides/*/*.pdf
           if-no-files-found: warn
           retention-days: 14
+
+  films:
+    name: Films (${{ matrix.shard }}/4)
+    needs: check
+    # Pages and the release workflows render films on default-branch pushes and tags.
+    if: >-
+      !(github.event_name == 'push' &&
+      (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
+      startsWith(github.ref, 'refs/tags/')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+      pages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+        with:
+          browsers: 'true'
+          fonts: 'false'
+          mdbook: 'false'
+          films: 'true'
+
+      - name: Configure Pages
+        id: pages
+        continue-on-error: true
+        uses: actions/configure-pages@v6
+
+      - name: Restore the build cache (and use the Pages URL)
+        uses: ./.github/actions/build-cache
+        with:
+          mode: restore
+          pages-url: ${{ steps.pages.outputs.base_url }}
+
+      - name: Build film shard
+        env:
+          TBOOK_CACHE_REMOTE: '1'
+          GITHUB_TOKEN: ${{ github.token }}
+          TBOOK_FILMS: require
+        run: python tools/ci/films.py --shard ${{ matrix.shard }}/4

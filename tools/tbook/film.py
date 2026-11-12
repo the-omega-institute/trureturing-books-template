@@ -1511,7 +1511,8 @@ def render_videos(film: Film, dest: Path) -> None:
               f"{format_duration(float(measured))} ({float(measured):.2f} s); update film.json")
 
 
-def build_videos(site: config.Site, book: config.Book, *, mode: str | None = None) -> dict[str, str]:
+def build_videos(site: config.Site, book: config.Book, *, mode: str | None = None,
+                 select: set[str] | None = None) -> dict[str, str]:
     """Render or restore the videos of every film of ``book`` into ``build/films/<slug>/<id>/``.
 
     Each film is a build unit (:func:`video_unit`) run through :func:`tbook.buildcache.run`: restored from the
@@ -1520,7 +1521,7 @@ def build_videos(site: config.Site, book: config.Book, *, mode: str | None = Non
     toolchain is complete (:func:`toolchain_missing`) and otherwise leaves the film out with a warning,
     ``require`` raises :class:`FilmError` instead, ``skip`` never renders. A film left out has no build
     directory, so no video of older inputs is published. Returns {film id: "cached" | "release" | "built" |
-    "skipped"}.
+    "skipped"}. ``select`` limits rendering to film IDs (CI shards); None selects every film.
     """
     mode = mode or films_mode()
     if mode not in FILMS_MODES:
@@ -1528,6 +1529,8 @@ def build_videos(site: config.Site, book: config.Book, *, mode: str | None = Non
     _raise_errors(book)
     status: dict[str, str] = {}
     for film in films(book):
+        if select is not None and film.id not in select:
+            continue
         if film.meta is None:
             continue
         unit = video_unit(site, film)

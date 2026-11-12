@@ -803,6 +803,16 @@ class BuildVideosTest(unittest.TestCase):
             with self.assertRaisesRegex(film.FilmError, "TBOOK_FILMS='always'"):
                 self.run_build()
 
+    def test_shard_selection_skips_unselected_films_and_uses_the_normal_cache(self):
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(film.build_videos(self.sb.site, self.sb.book, mode="require", select=set()), {})
+            self.assertEqual(self.renders, [])
+            status = film.build_videos(self.sb.site, self.sb.book, mode="require", select={"001-golden-deficit"})
+            self.assertEqual(status, {"001-golden-deficit": "built"})
+            status = film.build_videos(self.sb.site, self.sb.book, mode="require")
+            self.assertEqual(status, {"001-golden-deficit": "cached"})
+            self.assertEqual(len(self.renders), 1)
+
     def test_films_with_errors_are_not_rendered(self):
         (self.sb.dir / "film.json").write_text("{}", encoding="utf-8")
         with self.assertRaises(film.FilmError):

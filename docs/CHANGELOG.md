@@ -2,6 +2,14 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [0.5.2] - 2026-11-12
+
+### 修复
+
+- CI 的 PR 构建可以复用默认分支成功 Pages 运行的缓存工件，无须等待 Release。通过 API 核对来源运行的 workflow、仓库、分支、事件和成功状态，按 run ID / artifact ID 下载；不读 PR 的 Actions 缓存或工件，缺权限或工件过期时退回构建。Pages 工件保留 7 天，调用 CI 的工作流增加 `actions: read`。来源：下游《量子计算的几何直觉》一次 PR 的八部视频串行重建耗时 30 分 40 秒，整轮 CI 约 36 分钟。
+- 开发分支只由 PR 触发完整 CI，消除同一提交的 push / PR 重复运行；无 PR 时可手动触发。main 的旧 CI 允许被新提交取消，Pages 保持串行。
+- 视频独立分 4 片严格构建，书籍 HTML、屏幕 PDF、印刷 PDF、EPUB 分格式并行，可视化浏览器测试从 4 片增为 8 片。空书库、隐藏示例书、空分片保持可用，分片复用正常构建缓存键。**需要手动操作（若分支保护要求旧检查名）**：将旧的书籍构建、四片可视化和 “Slides and films” 检查更新为 “Build books (html/pdf-screen/pdf-print/epub)”、八个 “Visualization browser tests (i/8)”、“Slides” 与四个 “Films (i/4)”；CI 下载工件名改为按格式区分（见 `docs/PUBLISHING.md` §3）。
+
 ## [0.5.1] - 2026-11-12
 
 ### 修复
