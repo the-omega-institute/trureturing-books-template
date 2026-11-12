@@ -314,7 +314,7 @@
   set outline.entry(fill: repeat([.], gap: 0.2em))
   show outline.entry: it => context {
     set par(first-line-indent: 0pt, justify: false)
-    set text(size: if it.level == 1 { 10pt } else { 9pt }, weight: if it.level == 1 { "bold" } else { "regular" })
+    set text(size: if it.level == 1 { 10pt } else { 9pt }, weight: if it.level == 1 { "bold" } else { "regular" }, hyphenate: false)
     let target = it.element.location()
     block(above: if it.level == 1 { 0.8em } else { 0pt }, below: 0.3em,
       link(target, it.indented(it.prefix(), [#it.body() #box(width: 1fr, it.fill) #sym.wj#box(page-label-at(target))])))
