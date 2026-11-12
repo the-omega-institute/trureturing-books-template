@@ -14,6 +14,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     FILM_CACHE=/opt/tbook/film \
     TBOOK_TOOLCHAIN=/opt/tbook
 
+ENV TECTONIC_CACHE_DIR=/opt/tbook/tectonic-cache
+
 RUN apt-get -o Acquire::Retries=3 update \
     && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
        python3 python3-venv default-jre-headless ffmpeg fontconfig libsndfile1 \
@@ -34,6 +36,12 @@ RUN python -m pip install --no-cache-dir -r requirements.txt -r theme/film/requi
 
 # Verified release binaries: no Rust compiler is needed in the final image.
 ARG TARGETARCH
+COPY tools/install-tectonic.sh ./tools/
+RUN bash tools/install-tectonic.sh /usr/local/bin
+# Warm the versioned bundle for the academic source contract; runtime smoke uses --only-cached.
+RUN printf '%s\n' '\documentclass{beamer}\usepackage{amssymb,xurl,appendixnumberbeamer}\begin{document}\begin{frame}{Toolchain}Academic slides\note{Speaker notes}\end{frame}\end{document}' > beamer-smoke.tex \
+    && SOURCE_DATE_EPOCH=946684800 tectonic -X compile --bundle https://relay.fullyjustified.net/default_bundle_v33.tar beamer-smoke.tex \
+    && rm beamer-smoke.tex beamer-smoke.pdf
 RUN case "$TARGETARCH" in \
       amd64) archive=x86_64-unknown-linux-musl; sum=5222beabd3e37dc5be0d18ff99b79058469354db5c220153a1b92db5ba12be89 ;; \
       arm64) archive=aarch64-unknown-linux-musl; sum=753e5c5c363ee8a56972344dcf91466f005a51db84a7aeffe427ae3ef83d6d44 ;; \

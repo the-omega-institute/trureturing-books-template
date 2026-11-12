@@ -308,7 +308,7 @@ jobs:
                       else:
                           missing.append(name)
                   slides = build.slides_dir(book.slug)
-                  for pdf in sorted(slides.glob(f"*-{lang}.pdf")) if slides.is_dir() else []:
+                  for pdf in sorted([*slides.glob(f"*-{lang}.pdf"), *slides.glob(f"*-{lang}-notes.pdf")]) if slides.is_dir() else []:
                       name = f"{book.slug}-{pdf.name}"  # = tbook.slides.pdf_name(book, deck, lang)
                       shutil.copy2(pdf, assets / name)
                       row.append(f"{config.s(lang, 'ui.slides')} `{name}`")

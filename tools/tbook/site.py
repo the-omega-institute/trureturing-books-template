@@ -1238,6 +1238,10 @@ def slides_section(bi: Bi, view: BookView) -> str:
                 size = human_size((view.bdir / p).stat().st_size)
                 links.append(f'<a class="chip" href="{esc(p)}" type="application/pdf" hreflang="{esc(config.bcp47(lang))}">'
                              f'PDF <small>{esc(size)}</small></a>')
+            notes = str(it.get("notes_pdf", {}).get(lang) or "")
+            if notes and _exists(view.bdir, notes):
+                from . import slides
+                links.append(f'<a class="chip" href="{esc(notes)}" type="application/pdf">{esc(slides.t(lang, "notes_pdf"))}</a>')
             if links:
                 rows.append(f'<div class="deck-row" data-ed="{esc(lang)}">{"".join(links)}</div>')
         count = it.get("slides")
@@ -1436,6 +1440,12 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
                               "kind": "cover", "lang": ed.lang, "variant": "screen"})
         for it in v.media.get("slides", []):
             pdfs = it.get("pdf") if isinstance(it.get("pdf"), dict) else {}
+            pdfs = dict(pdfs)
+            for lang, rel in sorted(it.get("notes_pdf", {}).items()):
+                f = v.bdir / str(rel)
+                if f.is_file():
+                    files.append({"path": f"{book.slug}/{rel}", "size": f.stat().st_size, "sha256": _sha256(f),
+                                  "kind": "slides-notes-pdf", "lang": lang, "variant": str(it.get("id", "")) or None})
             for lang, rel in sorted(pdfs.items()):
                 f = v.bdir / str(rel)
                 if f.is_file():

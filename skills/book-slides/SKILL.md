@@ -67,3 +67,17 @@ npx slidev books/<book>/slides/<deck>/slides.md                  # 本地预览�
 `slides-check`、`./tbook check`、`./tbook build slides` 全部通过（PDF 页数与幻灯片页数一致）；各语言页数与版式对应；在站点上逐页看过；章节已嵌入。
 
 当前版本来自 `trureturing.lock.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。
+
+## Academic decks (Beamer)
+
+For a conventional seminar, use `./tbook slides new <book> <deck> "<title>" --academic --editions en` (one title per selected edition). This creates `deck.toml` and `slides.tex`; later selected editions use `slides.<lang>.tex`. A deck can cover a subset of book editions. Academic files align only with the other languages of that deck. The existing Slidev path stays available.
+
+Read `theme/beamer/README.md` for the descriptor, literal TeX contract, pinned engine and custom-theme interface. Start with `\documentclass{beamer}` and `\input{tbook-deck}`. Use title/outline frames, sections/subsections, `% Manuscript: ...` comments, `\note{...}`, then `\appendix` for optional technical frames. Set real speaker/coauthor affiliations explicitly; no default institutional logo is supplied.
+
+Use `\begin{bookresult}{<book-id>} ... \end{bookresult}`: the body is the speaker's prose; kind, number, title, GIDs and status come from the book model and lock. Green linked `Lean ✓` requires every GID to resolve as a theorem; definitions use neutral `LEAN DEF`, open problems red `OPEN` without GIDs, unresolved citations red unlinked `UNVERIFIED` and fail checking. Do not type duplicate GIDs or override badges. Use `\PinnedCommit` and end with `\FormalVerification` for the deck's generated ledger.
+
+Use `\BookViz{<viz>}{<card>}` for a paper still linked to the live page. Generate/commit the required `fig-<card>.<lang>.paper.png` with `./tbook slides snapshots <book>` (existing Chromium only; `PW_CHROMIUM_PATH` can select it). Use `\BookFigure{<figure>}` for the canonical figure materialized in its paper palette; run `./tbook fig build --book <book>` for stale figures. Do not copy SVGs into the deck.
+
+Run `./tbook check`, the tool unit suite, and `./tbook build slides --book <book>`. Tectonic 0.16.9 builds both `<deck>-<lang>.pdf` and `<deck>-<lang>-notes.pdf`. Inspect the rendered title, outline, theorem, media and ledger pages, confirm audience PDFs hide notes, and compare two uncached builds for byte identity. The site index/chapter card and book Releases link both PDFs. A deck's licensed custom theme can live in `theme_dir`; never vendor GPL theme files or institutional graphics into the Apache template.
+
+Academic presentation defaults: use the solid structure-colour bands, white block-title text and paper-tint bodies supplied by the original theme. Set the deck’s `short_author`, `institution`, optional `coauthors` and `date`; the original title page prefixes coauthors with “Joint work with …”. Navigation symbols are hidden unless `navigation_symbols = true`. Paper visualization stills are 3200 × 1800 pixels and occupy the slide text width. The verification ledger uses a result/GID/status table with twelve results per frame and a pinned-source footer. Inspect the title, outline, theorem, open problem, snapshot and ledger at 4:3 after building.

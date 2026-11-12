@@ -131,3 +131,5 @@ theme/   tools/   templates/   skills/   docs/   .github/workflows/
 ## 许可
 
 模板代码以 Apache-2.0 发布（见 `LICENSE`）。每本书的文本许可在其 `book.toml` 中声明（示例书为 CC-BY-4.0）。
+
+传统学术报告也可用 Beamer：`./tbook slides new <book> <deck> "<title>" --academic --editions en`。白底 4:3（可选 16:9）、定理与 Lean 链接由书和锁生成，输出听众 PDF 与演讲备注 PDF，可使用书库自有主题。见 [theme/beamer/README.md](theme/beamer/README.md)。Slidev 继续提供现有的在线演示。
