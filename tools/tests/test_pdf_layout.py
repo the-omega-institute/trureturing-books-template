@@ -180,7 +180,7 @@ Body text.
 #let reused = [$#mark("reused-start") "InterpretationContextTextReaderAdmissionBackgroundEvaluationGoalRuleConceptMeaning" #mark("reused-end")$<tr-inline-reused>]
 #block(width: 180pt)[#reused]
 #block(width: 80pt)[#reused]
-#block(width: 180pt)[Label before#mark("wide-prefix") $#mark("wide-start")#box(width: 150pt)[x]#mark("wide-end")$<tr-inline-wide>.]
+#block(width: 180pt)[Label before#mark("wide-prefix") $#mark("wide-start")#box(width: 100pt)[x]#mark("wide-end")$<tr-inline-wide>.]
 ''', encoding="utf-8")
         for cjk in (False, True):
             with self.subTest(cjk=cjk):
@@ -206,5 +206,5 @@ Body text.
                 self.assertAlmostEqual(reused[1]["x"], 110, places=2)
                 self.assertAlmostEqual(marks["wide-prefix"]["x"], 30 + marks["wide-prefix"]["prefix_width"], places=2)
                 self.assertGreater(marks["wide-start"]["y"], marks["wide-prefix"]["y"])
-                self.assertAlmostEqual(marks["wide-end"]["x"] - marks["wide-start"]["x"], 150, places=2)
+                self.assertAlmostEqual(marks["wide-end"]["x"] - marks["wide-start"]["x"], 100, places=2)
                 self.assertGreater(marks["short-end"]["x"] - marks["short-start"]["x"], 15)
