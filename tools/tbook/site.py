@@ -412,7 +412,7 @@ def collect(site: config.Site, book: config.Book, bdir: Path, lock: lean.Lock | 
         if (bdir / cover).is_file():
             view.covers[ed.lang] = cover
         found = []
-        for kind, variant in (("pdf", "screen"), ("pdf", "print"), ("epub", "")):
+        for kind, variant in [("pdf", v) for v in config.PDF_VARIANTS] + [("epub", "")]:
             name = book.artifact(ed.lang, kind, variant)
             f = bdir / "downloads" / name
             if f.is_file():
@@ -794,7 +794,8 @@ def stats_html(bi: Bi, view: BookView, *, extended: bool = False) -> str:
 def editions_html(bi: Bi, view: BookView, prefix: str) -> str:
     """One row per edition: read online + downloads (``prefix`` = path from the page to <slug>/)."""
     rows = []
-    labels = {("pdf", "screen"): "ui.pdf_screen", ("pdf", "print"): "ui.pdf_print", ("epub", ""): "ui.epub"}
+    labels = {("pdf", "screen"): "ui.pdf_screen", ("pdf", "print"): "ui.pdf_print",
+              ("pdf", "academic"): "ui.pdf_academic", ("epub", ""): "ui.epub"}
     for ed in view.book.editions:
         lang = ed.lang
         links = []

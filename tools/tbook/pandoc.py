@@ -50,7 +50,7 @@ The reader is Pandoc Markdown without ``citations``: ``[@id]`` is resolved by
 
 Rendering: ``tools/filters/tr-book.lua`` (book structure) and ``tools/filters/tr-env.lua``
 (environments) run inside Pandoc. The PDF is compiled by the ``typst`` Python module with
-``theme/typst/book.typ`` (``sys.inputs["tr-variant"]`` = ``screen`` | ``print``); the EPUB
+``theme/typst/book.typ`` (``sys.inputs["tr-variant"]`` = ``screen`` | ``print`` | ``academic``); the EPUB
 is written by Pandoc with ``theme/epub/book.css`` and post-processed for Apple Books
 (``META-INF/com.apple.ibooks.display-options.xml``, deterministic zip) and validated with
 epubcheck when Java is available.
@@ -106,6 +106,7 @@ class PandocError(RuntimeError):
 LOCAL_STRINGS: dict[str, dict[str, str]] = {
     "zh": {
         "pdf.colophon": "版权信息",
+        "pdf.abstract": "摘要",
         "pdf.date": "日期",
         "pdf.authors": "作者",
         "pdf.license": "许可",
@@ -114,6 +115,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
         "pdf.edition": "版本说明",
         "pdf.variant_screen": "屏幕版（深色）",
         "pdf.variant_print": "印刷版（浅色）",
+        "pdf.variant_academic": "学术专著版",
         "pdf.typeset": "排版",
         "pdf.typeset_value": "Pandoc 与 Typst，由 trureturing 书籍模板构建",
         "pdf.source": "源文件",
@@ -129,6 +131,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
     },
     "en": {
         "pdf.colophon": "Colophon",
+        "pdf.abstract": "Abstract",
         "pdf.date": "Date",
         "pdf.authors": "Authors",
         "pdf.license": "License",
@@ -137,6 +140,7 @@ LOCAL_STRINGS: dict[str, dict[str, str]] = {
         "pdf.edition": "Edition",
         "pdf.variant_screen": "Screen edition (dark)",
         "pdf.variant_print": "Print edition (light)",
+        "pdf.variant_academic": "Academic edition",
         "pdf.typeset": "Typeset with",
         "pdf.typeset_value": "Pandoc and Typst, built with the trureturing books template",
         "pdf.source": "Source",
@@ -1407,7 +1411,8 @@ def _stage_theme(out_dir: Path) -> None:
     gen.mkdir(parents=True, exist_ok=True)
     shutil.copy2(paths.GENERATED / "tokens.typ", gen / "tokens.typ")
     tokens = json.loads(paths.TOKENS.read_text(encoding="utf-8"))
-    for variant, palette in (("screen", tokens["screen"]), ("print", tokens["paper"])):
+    for variant in config.PDF_VARIANTS:
+        palette = tokens["screen"] if variant == "screen" else tokens["paper"]
         (dst / f"code-{variant}.tmTheme").write_text(code_theme(palette, variant), encoding="utf-8")
 
 
@@ -1514,6 +1519,7 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
         "publisher": site.text(site.title, lang),
         "keywords": _keywords(book, edition),
         "paper": str(book.pdf.get("paper", "a4")),
+        "academic_paper": str(book.pdf.get("academic_paper", "iso-b5")),
         "online_url": online,
         "repo_url": f"https://github.com/{site.repo}" if site.repo else "",
         "formal_count": formal,
@@ -1536,6 +1542,7 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
             "badge_lean": s("badge.lean"),
             "lean_label": t(lang, "pdf.lean_label"),
             "colophon": t(lang, "pdf.colophon"),
+            "abstract": t(lang, "pdf.abstract"),
             "date": t(lang, "pdf.date"),
             "authors": t(lang, "pdf.authors"),
             "license": t(lang, "pdf.license"),
@@ -1544,6 +1551,7 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
             "edition": t(lang, "pdf.edition"),
             "variant_screen": t(lang, "pdf.variant_screen"),
             "variant_print": t(lang, "pdf.variant_print"),
+            "variant_academic": t(lang, "pdf.variant_academic"),
             "typeset": t(lang, "pdf.typeset"),
             "typeset_value": t(lang, "pdf.typeset_value"),
             "source": t(lang, "pdf.source"),
@@ -1640,7 +1648,7 @@ def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", p
 
 def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
               stage_dir: Path | None = None) -> Path:
-    """Build ``out_path`` (PDF, variant ``screen`` = dark neon or ``print`` = white paper).
+    """Build ``out_path`` (PDF: ``screen`` (dark), ``print`` (light), or ``academic`` (scholarly layout)).
 
     ``stage_dir`` overrides build/stage/<slug>/<lang>/pandoc/ (tests).
     """

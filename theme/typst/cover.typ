@@ -1,6 +1,6 @@
 // theme/typst/cover.typ — the trureturing cyberpunk book cover.
 //
-// `tr-cover(meta, variant: "screen" | "print")` fills the current container (use a page
+// `tr-cover(meta, variant: "screen" | "print" | "academic")` fills the current container (use a page
 // with zero margins). Everything is drawn in Typst: void background, aurora glows, a neon
 // perspective grid under a striped horizon sun, scanlines, a cut-corner frame, the book
 // code CODE//NAME with a chromatic glitch, title, subtitle, authors, the edition language
@@ -35,7 +35,7 @@
 #let tr-cover(meta, variant: "screen") = layout(size => {
   let W = size.width
   let H = size.height
-  let dark = variant != "print"
+  let dark = variant == "screen"
   let pal = if dark { tr-screen } else { tr-paper }
   let S = meta.strings
   let cjk = meta.at("cjk", default: false)
@@ -47,6 +47,23 @@
   set par(first-line-indent: 0pt, justify: false, spacing: 0.6em)
   set text(hyphenate: false)
 
+  if variant == "academic" {
+    place(rect(width: W, height: H, fill: pal.void))
+    place(dx: W * 0.13, dy: H * 0.15, block(width: W * 0.75, height: H * 0.72, {
+      set par(first-line-indent: 0pt, justify: false, leading: 0.45em)
+      set text(font: ("Libertinus Serif", "New Computer Modern", "Noto Serif CJK SC", "Noto Serif SC"), fill: pal.ink)
+      block(text(size: W * 0.028, meta.authors.join(", ")))
+      v(H * 0.08)
+      block(text(size: W * 0.056, weight: "bold", meta.title))
+      v(H * 0.035)
+      block(text(size: W * 0.027, meta.subtitle.replace(regex("\\s*=\\s*"), "\u{A0}=\u{A0}")))
+      v(1fr)
+      block(text(size: W * 0.021, meta.publisher))
+      v(H * 0.012)
+      block(text(size: W * 0.018, [#S.lang_name · #meta.date.year]))
+    }))
+    return
+  }
   // ---------------------------------------------------------------- background
   if dark {
     place(rect(width: W, height: H, fill: pal.void-deep))

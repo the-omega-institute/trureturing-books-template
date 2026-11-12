@@ -419,6 +419,18 @@ class ConfigTests(unittest.TestCase):
                             "https://github.com/acme/acme.github.io.git"], check=True)
             self.assertEqual(config._git_remote_repo(root), "acme/acme.github.io")
 
+    def test_academic_pdf_is_opt_in(self):
+        with CoreRepo() as repo:
+            repo.book()
+            p = repo.root / "books" / "demo" / "book.toml"
+            original = p.read_text()
+            for value, expected in (("true", ["screen", "print"]),
+                                    ('["academic"]', ["academic"])):
+                p.write_text(original + "\n[outputs]\npdf = " + value + "\n")
+                book = config.load_book("demo")
+                self.assertEqual(book.outputs_pdf, expected)
+            self.assertEqual(book.artifact("zh", "pdf", "academic"), "demo-1.2.3-zh-academic.pdf")
+
     def test_load_book(self):
         with CoreRepo() as repo:
             book = repo.book()

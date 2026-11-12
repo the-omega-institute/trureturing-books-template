@@ -521,3 +521,19 @@
   counter(page).update(1)
   doc
 }
+
+// The scholarly edition uses the same semantic interface with its own book typography.
+#import "academic.typ" as academic
+#let is-academic = variant == "academic"
+#let tr-book = if is-academic { academic.tr-book } else { tr-book }
+#let tr-chapter = if is-academic { academic.tr-chapter } else { tr-chapter }
+#let tr-part = if is-academic { academic.tr-part } else { tr-part }
+#let tr-env = if is-academic { academic.tr-env } else { tr-env }
+#let tr-proof = if is-academic { academic.tr-proof } else { tr-proof }
+#let tr-proof-label = if is-academic { academic.tr-proof-label } else { tr-proof-label }
+#let tr-qed = if is-academic { academic.tr-qed } else { tr-qed }
+#let tr-media = if is-academic { academic.tr-media } else { tr-media }
+#let horizontalrule = if is-academic { academic.horizontalrule } else { horizontalrule }
+#let tr-fig-ext = if is-academic { ".print.svg" } else { tr-fig-ext }
+#let f-body = if is-academic { academic.f-body } else { f-body }
+#let f-display = if is-academic { academic.f-body } else { f-display }

@@ -18,7 +18,8 @@ from . import paths
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 LANG_RE = re.compile(r"^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$")
-PDF_VARIANTS = ("screen", "print")
+PDF_VARIANTS = ("screen", "print", "academic")
+DEFAULT_PDF_VARIANTS = ("screen", "print")
 
 
 class ConfigError(Exception):
@@ -414,9 +415,9 @@ def load_book(slug_or_dir: str | Path) -> Book:
             raise ConfigError(f"{where}: invalid edition language {lang!r}")
     if duplicates(languages):
         raise ConfigError(f"{where}: book.editions lists {duplicates(languages)[0]!r} twice")
-    pdf_variants = outputs.get("pdf", list(PDF_VARIANTS))
+    pdf_variants = outputs.get("pdf", list(DEFAULT_PDF_VARIANTS))
     if pdf_variants is True:
-        pdf_variants = list(PDF_VARIANTS)
+        pdf_variants = list(DEFAULT_PDF_VARIANTS)
     elif pdf_variants is False:
         pdf_variants = []
     for v in pdf_variants:

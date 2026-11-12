@@ -9,14 +9,14 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 
 **用**：本地构建、检查导出效果、CI 构建失败、PDF/EPUB 排版或字体问题、Apple Books 显示问题。
 
-**权威**：`docs/PUBLISHING.md`、`docs/ARCHITECTURE.md` §5–§8、`./tbook doctor` 的输出。
+**权威**：`docs/PDF-TYPOGRAPHY.md`（学术专著版排印）、`docs/PUBLISHING.md`、`docs/ARCHITECTURE.md` §5–§8、`./tbook doctor` 的输出。
 
 ## 命令
 
 ```bash
 ./tbook doctor                               # 工具链体检（缺什么、怎么装）
 ./tbook build html --book <slug> [--lang zh] # mdBook → build/html/<slug>/<lang>/
-./tbook build pdf  --book <slug> [--variant screen|print]
+./tbook build pdf  --book <slug> [--variant screen|print|academic]
 ./tbook build epub --book <slug>
 ./tbook build all                            # 全部书、全部产物，并组装 _site/
 ./tbook serve                                # 在 Pages 子路径下本地预览 _site/
@@ -24,7 +24,7 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 
 `--book` 与 `--lang` 都可重复；所选的书都没有 `--lang` 指定的语言版本时，构建报错退出，不会静默跳过。
 
-下载文件在 `build/dist/<slug>/`：`<slug>-<version>-<lang>-screen.pdf`、`…-print.pdf`、`<slug>-<version>-<lang>.epub`。
+下载文件在 `build/dist/<slug>/`：`<slug>-<version>-<lang>-screen.pdf`、`…-print.pdf`、可选的 `…-academic.pdf`、`<slug>-<version>-<lang>.epub`。
 
 ## 三种产物
 
@@ -33,6 +33,7 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 | HTML | 章节 → `render`（mdbook target）→ KaTeX 预渲染 → mdBook 0.5.4 | 深色霓虹为默认主题，浅色主题切换为“纸面”配色；菜单栏有语言切换 |
 | PDF screen | 章节 → `render`（pandoc target）→ Pandoc → Typst | 深色整页、霓虹强调色，适合屏幕阅读 |
 | PDF print | 同上，`tr-paper` 配色 | 白纸黑字，深化的强调色，适合打印 |
+| PDF academic | 同上，`tr-paper` 配色与专著版式 | B5 开本、衬线正文、独立标题/版权/内容提要页、对开页眉、传统定理与证明；在 `[outputs] pdf` 中加 `"academic"` 启用 |
 | EPUB | Pandoc EPUB 3，MathML，封面 PNG | 适配 Apple Books 的白/米/灰/夜间主题；`epubcheck` 0 错误 |
 
 ## 排错清单

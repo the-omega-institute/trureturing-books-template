@@ -301,6 +301,21 @@ class SiteBuildTest(SiteCase):
         self.assertIn("test-book/slides/overview/test-book-overview-zh.pdf", files)
         self.assertIn("test-book/cover-zh.png", files)
 
+    def test_academic_pdf_is_downloadable_and_in_manifest(self):
+        book = make_book(self.tmp)
+        fake_build(self.build_root, book)
+        name = book.artifact("zh", "pdf", "academic")
+        (self.build_root / "dist" / book.slug / name).write_bytes(b"%PDF-1.7 academic")
+        out = self.run_build([book])
+        for rel, prefix in (("index.html", "test-book/"), ("test-book/index.html", "")):
+            page = (out / rel).read_text()
+            self.assertIn(f'href="{prefix}downloads/{name}"', page)
+            self.assertIn("PDF · 学术版", page)
+            self.assertIn("PDF · academic", page)
+        manifest = json.loads((out / "manifest.json").read_text())
+        record = next(f for f in manifest["books"][0]["files"] if f["path"].endswith(name))
+        self.assertEqual((record["kind"], record["lang"], record["variant"]), ("pdf", "zh", "academic"))
+
     def test_links_are_relative(self):
         book = make_book(self.tmp)
         fake_build(self.build_root, book)

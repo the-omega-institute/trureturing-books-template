@@ -1053,8 +1053,11 @@ class BuildIntegrationTests(unittest.TestCase):
         first, t_first = build()
         self.assertNotIn("up to date", first)
         built = outputs()
-        units = 8  # zh and en: HTML, screen and print PDF, EPUB
-        self.assertEqual(len([k for k in built if k.startswith("dist/") and k.count("/") == 2]), 6, built.keys())
+        units = 10  # zh and en: HTML, screen/print/academic PDF, EPUB
+        self.assertEqual(len([k for k in built if k.startswith("dist/") and k.count("/") == 2]), 8, built.keys())
+
+        for lang in ("zh", "en"):
+            self.assertTrue(any(k.endswith(f"-{lang}-academic.pdf") for k in built))
 
         second, t_second = build()
         self.assertEqual(second.count("is up to date"), units, second)

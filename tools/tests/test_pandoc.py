@@ -781,7 +781,7 @@ class MetadataTest(unittest.TestCase):
 
 @unittest.skipUnless(have_pandoc() and have_typst(), "pandoc or typst not available")
 class BuildTest(unittest.TestCase):
-    """End-to-end builds of the synthetic book (PDF both variants, EPUB, covers)."""
+    """End-to-end builds of the synthetic book (PDF variants, EPUB, covers)."""
 
     @classmethod
     def setUpClass(cls):
@@ -796,7 +796,7 @@ class BuildTest(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def test_pdf_variants(self):
-        for variant in ("screen", "print"):
+        for variant in config.PDF_VARIANTS:
             out = tp.build_pdf(self.site, self.book, self.ed, self.model, None, variant,
                                self.tmp / f"book-{variant}.pdf", stage_dir=self.tmp / f"stage-{variant}")
             data = out.read_bytes()
@@ -916,6 +916,9 @@ class BuildTest(unittest.TestCase):
         self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
         svg = cover.render_cover(self.site, self.book, self.ed, self.tmp / "c.svg", fmt="svg", model=self.model, lock=None)
         self.assertIn(b"<svg", svg.read_bytes()[:400])
+        academic = cover.render_cover(self.site, self.book, self.ed, self.tmp / "academic.svg", fmt="svg",
+                                      variant="academic", model=self.model, lock=None)
+        self.assertNotIn(b"Gradient", academic.read_bytes())
         with self.assertRaises(ValueError):
             cover.render_cover(self.site, self.book, self.ed, self.tmp / "c.gif", fmt="gif")
 

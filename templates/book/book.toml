@@ -20,7 +20,7 @@ date = "{{DATE}}"
 
 [outputs]
 html = true
-# PDF 版本：screen = 深色霓虹屏幕版；print = 白底印刷版。
+# PDF 版本：screen = 深色霓虹屏幕版；print = 白底印刷版；academic = 学术专著（可选）。
 pdf = ["screen", "print"]
 # EPUB 3（Apple Books 兼容，MathML 数学）。
 epub = true

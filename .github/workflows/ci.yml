@@ -201,6 +201,7 @@ jobs:
           - {name: html, target: html, options: ''}
           - {name: pdf-screen, target: pdf, options: '--variant screen'}
           - {name: pdf-print, target: pdf, options: '--variant print'}
+          - {name: pdf-academic, target: pdf, options: '--variant academic'}
           - {name: epub, target: epub, options: ''}
     permissions:
       contents: read

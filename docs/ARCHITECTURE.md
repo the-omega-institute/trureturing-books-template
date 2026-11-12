@@ -327,7 +327,7 @@ mdBook 的 `<lang>/print.html` 不改写 iframe 的 `src` 与 video 的 `poster`
 # tbook/html.py
 def build_edition(site, book, edition, model, lock, out_dir: Path) -> Path
 # tbook/pandoc.py
-def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *, stage_dir=None) -> Path  # screen | print
+def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *, stage_dir=None) -> Path  # screen | print | academic
 def build_epub(site, book, edition, model, lock, out_path: Path, *, stage_dir=None) -> Path
 # tbook/cover.py
 def render_cover(site, book, edition, out_path: Path, *, fmt: str = "png", variant: str = "screen",
