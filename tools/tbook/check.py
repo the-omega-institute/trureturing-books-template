@@ -245,35 +245,41 @@ def check_drawn_images(book: config.Book, models: dict[str, EditionModel], issue
 
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
-MEDIA_RUN = 3  # this many media blocks in a row with no prose between them are reported
+def _media_label(node: "mdscan.Div") -> str:
+    """How a warning names one media block: its kind, ``src`` and (for a card) ``preset``."""
+    label = f'{kind_of(node)} "{node.attrs.get("src") or "?"}"'
+    if node.attrs.get("preset"):
+        label += f' preset "{node.attrs.get("preset")}"'
+    elif kind_of(node) == "viz":
+        label += " (the full lab)"
+    return label
 
 
 def check_media_runs(model: EditionModel, issues: list[Issue]) -> None:
-    """Three or more media blocks (figure, viz, film, slides) with nothing but blank lines between
-    them (a warning, from the third block on): a reader meets a stack of pictures and cannot tell
-    which sentence each one belongs to. Cite each next to the sentence it shows."""
+    """Two media blocks (figure, viz, film, slides) with nothing but blank lines or HTML comments between
+    them (a warning, on the second block of every such pair): a reader meets a stack of pictures and cannot
+    tell which sentence each one belongs to. Cite each next to the sentence it shows, with prose between."""
     for doc in model.chapters:
         for nodes in [doc.blocks] + [n.children for n in mdscan.walk(doc.blocks) if isinstance(n, mdscan.Div)]:
-            run: list[tuple[str, int]] = []
-
-            def flush() -> None:
-                if len(run) >= MEDIA_RUN:
-                    later = ", ".join(f"line {line}" for _kind, line in run[MEDIA_RUN - 1:])
-                    _warn(issues, doc.path, run[MEDIA_RUN - 1][1],
-                          f"{len(run)} media blocks in a row ({' → '.join(k for k, _l in run)}, from line {run[0][1]}) "
-                          f"with no text between them ({later}): cite each next to the sentence it shows, with "
-                          "prose between them")
-                run.clear()
-
+            prev: "mdscan.Div | None" = None
             for node in nodes:
                 if isinstance(node, mdscan.Div) and kind_of(node) in MEDIA:
-                    run.append((kind_of(node), node.start))
+                    if prev is not None:
+                        msg = (f"{_media_label(prev)} (line {prev.start}) and {_media_label(node)} (line {node.start}) "
+                               "sit next to each other with no text between them: cite each next to the sentence "
+                               "it shows, with prose between the two")
+                        if (kind_of(prev) == kind_of(node) == "viz" and prev.attrs.get("preset")
+                                and not node.attrs.get("preset") and prev.attrs.get("src") == node.attrs.get("src")):
+                            msg += ("; the full lab right after the last card of the same page: move the lab after "
+                                    "the last paragraph at the end of the chapter, or put a sentence between the two "
+                                    "that says what the lab adds")
+                        _warn(issues, doc.path, node.start, msg)
+                    prev = node
                 elif isinstance(node, mdscan.Comment) or (isinstance(node, mdscan.Text) and not _COMMENT_RE.sub(
                         "", "\n".join(node.lines)).strip()):  # blank lines and HTML comments show nothing
                     continue
                 else:
-                    flush()
-            flush()
+                    prev = None
 
 
 def check_unused_figures(book: config.Book, models: dict[str, EditionModel], issues: list[Issue]) -> None:

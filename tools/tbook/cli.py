@@ -83,7 +83,8 @@ def cmd_pin(args) -> int:
 def cmd_build(args) -> int:
     from . import build
 
-    result = build.build(args.targets or ["all"], _books(args), args.lang or None, pdf_variants=args.variant or None)
+    result = build.build(args.targets or ["all"], _books(args), args.lang or None, pdf_variants=args.variant or None,
+                         films=args.film or None)
     for f in result.failures:
         print(f"FAILED {f}", file=sys.stderr)
     return 1 if result.failures else 0
@@ -263,6 +264,9 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--book", action="append")
     c.add_argument("--lang", action="append", help="limit to an edition language (repeatable)")
     c.add_argument("--variant", action="append", choices=list(config.PDF_VARIANTS), help="limit PDF variants")
+    c.add_argument("--film", action="append", metavar="NNN-NAME",
+                   help="with `build films`: render or restore only this film (repeatable); the others are only "
+                        "restored from the build cache")
     c.set_defaults(fn=cmd_build)
 
     c = sub.add_parser("theme", help="regenerate theme/generated/* from theme/tokens.json")

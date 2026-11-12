@@ -82,6 +82,37 @@ export function fixedWaits(text) {
 export const FIXED_WAIT_MESSAGE = (line) => `waitForTimeout(…) at line ${line} waits a fixed time, which passes on a fast machine and fails on a busy runner; `
   + 'wait for what the page reports instead: settle(page) after a click or a transition, until(page, () => …) for playback (skills/book-viz)';
 
+const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+/** Green ticks outside the evidence boxes: [{ where: 'index.html' | 'main.js', line }]. Green (.okmark) belongs to a
+    Lean-verified statement, inside a .lean box; a number the page checked itself is marked .nummark (neutral). In the
+    page, an element with class okmark and no .lean ancestor; in its script, a line that writes okmark unless it names
+    (by $('id'), getElementById or querySelector('#id')) an element of the page that sits in a .lean box.
+    tools/tbook/viz.py applies the same rule. */
+export function okmarksOutsideLean(html, js = '') {
+  const out = [], inLean = new Map(), stack = [];
+  const lineAt = (i) => html.slice(0, i).split('\n').length;
+  const body = html.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' ')).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, (m) => m.replace(/[^\n]/g, ' '));
+  for (const m of body.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const tag = m[2].toLowerCase();
+    if (m[1]) { const k = stack.map((e) => e.tag).lastIndexOf(tag); if (k >= 0) stack.length = k; continue; }
+    const cls = (/\bclass\s*=\s*"([^"]*)"/.exec(m[3]) || [, ''])[1].split(/\s+/).filter(Boolean);
+    const id = (/\bid\s*=\s*"([^"]*)"/.exec(m[3]) || [])[1];
+    const lean = (stack.length && stack[stack.length - 1].lean) || cls.includes('lean');
+    if (cls.includes('okmark') && !lean) out.push({ where: 'index.html', line: lineAt(m.index) });
+    if (id) inLean.set(id, lean);
+    if (!m[4] && !VOID_TAGS.has(tag)) stack.push({ tag, lean });
+  }
+  js.split('\n').forEach((line, k) => {
+    const t = line.trim();
+    if (!/\bokmark\b/.test(line) || t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+    const ids = [...line.matchAll(/\$\(\s*['"]([\w-]+)['"]\s*\)|getElementById\(\s*['"]([\w-]+)['"]|querySelector(?:All)?\(\s*['"]#([\w-]+)/g)].map((x) => x[1] || x[2] || x[3]);
+    if (!ids.some((i) => inLean.get(i))) out.push({ where: 'main.js', line: k + 1 });
+  });
+  return out;
+}
+export const OKMARK_MESSAGE = (where, line) => `.okmark (a green ✓) at ${where} line ${line} is outside a .lean box: green belongs to `
+  + 'Lean-verified statements; mark a number the page checked itself with .nummark (neutral) (skills/book-viz)';
+
 function scriptsOf(dir, out) {
   if (!fs.existsSync(dir)) return out;
   for (const name of fs.readdirSync(dir).sort()) {
@@ -189,6 +220,8 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
       if (zh !== en) err(page, `${zh} .zh fragments but ${en} .en fragments; every text fragment needs both languages`);
     }
     if (on('lean')) {
+      const js = path.join(dir, 'main.js');
+      for (const o of okmarksOutsideLean(html, fs.existsSync(js) ? fs.readFileSync(js, 'utf8') : '')) warn(o.where === 'main.js' ? js : page, OKMARK_MESSAGE(o.where, o.line));
       for (const r of pinnedRefs(html)) {
         if (r.kind === 'gid') {
           if (!parseGid(r.value)) err(page, `data-lean-gid="${r.value}" is not a declaration GID`);

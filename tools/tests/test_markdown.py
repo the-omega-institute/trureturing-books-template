@@ -649,7 +649,8 @@ class TitleEscapeTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 st = pandoc.stage(config.load_site(), repo.book, repo.edition, None, make_lock(), out_dir=Path(tmp))
                 book_md = st.book_md.read_text(encoding="utf-8")
-            self.assertIn(r"# 附录 A：C\*-代数 \$5 $\{x\}$ {#", book_md)
+            self.assertRegex(book_md, r"(?m)^# \[\]\{#ch-appendix-app-a [^\n]+\.tr-heading-meta\} "
+                             + re.escape(r"附录 A：C\*-代数 \$5 $\{x\}$"))
 
 
 # --------------------------------------------------------------------------- re-review 6: lean: link forms

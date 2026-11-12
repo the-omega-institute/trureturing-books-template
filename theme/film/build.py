@@ -9,6 +9,14 @@ and the boot call. Fonts are @fontsource WOFF2 subsets copied to out/fonts/ (onl
 unicode-range subsets the film's text needs) and referenced by relative URL, so the page is
 served over local http (render.js, poster.js and shot.js start their own server).
 
+A film with solid shots (film.json "solid": true) also gets out/solid/: the modelling core theme/viz/solid-core.js
+and the pinned three.js of theme/viz/vendor/, which the page imports before it boots (DATA.solid); a film without
+solid shots loads no three.js. The scripts film.json "scripts" lists (paths relative to the book, e.g. the model of
+a visualization page) are inlined before scenes.js.
+
+Timing calls in scenes.js whose literal phrase is not in the narration of their line (tbook.film.phrase_issues)
+are warnings, and errors under --strict / FILM_STRICT=1.
+
 The timeline is out/timeline.json from tts.py; without it (or when it no longer matches
 script.json) a provisional timeline at a fixed speaking rate is used, unless --strict (or FILM_STRICT=1,
 which the site build sets), which also refuses to fall back to system fonts.
@@ -144,6 +152,35 @@ def _script(text: str, where: str) -> str:
     return text
 
 
+def phrase_check(film, *, strict: bool, quiet: bool = False) -> None:
+    """Report the literal timing phrases of scenes.js that script.json does not have; fail with ``strict``."""
+    path = film.dir / "scenes.js"
+    if not path.is_file():
+        return
+    found = tfilm.phrase_issues(path.read_text(encoding="utf-8"), film.script)
+    if not quiet:
+        for line, msg in found:
+            print(f"{'error' if strict else 'warning'}: {tfilm.paths.rel(path)}:{line}: {msg}", file=sys.stderr)
+    if found and strict:
+        fail(f"{film.id}: {len(found)} timing phrase(s) of scenes.js are not in script.json (FILM_STRICT=1)")
+
+
+def solid_assets(film, out: Path) -> dict | None:
+    """Copy the modelling core and three.js to out/solid/ for a film with solid shots; remove them otherwise."""
+    dst = out / "solid"
+    if dst.exists():
+        shutil.rmtree(dst)
+    if not film.solid:
+        return None
+    if not tfilm.SOLID_CORE.is_file() or not (tfilm.SOLID_VENDOR / "three.module.min.js").is_file():
+        fail(f"{film.id}: solid shots need {tfilm.paths.rel(tfilm.SOLID_CORE)} and the three.js of "
+             f"{tfilm.paths.rel(tfilm.SOLID_VENDOR)}/")
+    dst.mkdir(parents=True)
+    shutil.copyfile(tfilm.SOLID_CORE, dst / "solid-core.js")
+    shutil.copytree(tfilm.SOLID_VENDOR, dst / "vendor", ignore=shutil.ignore_patterns("*.md"))
+    return {"core": "solid/solid-core.js"}
+
+
 def build(film_dir: Path, *, strict: bool = False) -> Path:
     film = load(film_dir)
     issues = tfilm.check_film(film, tfilm._lock())
@@ -151,6 +188,7 @@ def build(film_dir: Path, *, strict: bool = False) -> Path:
         print(i.format(), file=sys.stderr)
     if any(i.severity == "error" for i in issues):
         fail(f"{film.id}: fix the errors above first")
+    phrase_check(film, strict=strict, quiet=True)  # check_film printed them as warnings
     out = out_dir(film_dir)
     tl, provisional = timeline(film, allow_provisional=not strict)
     if provisional:
@@ -162,10 +200,16 @@ def build(film_dir: Path, *, strict: bool = False) -> Path:
     if data_dir.is_dir():
         for p in sorted(data_dir.glob("*.json")):
             data["data"][p.stem] = json.loads(p.read_text(encoding="utf-8"))
+    data["strict"] = strict
+    solid = solid_assets(film, out)
+    if solid:
+        data["solid"] = solid
     tokens = film_tokens()
     engine = _script((HERE / "engine.js").read_text(encoding="utf-8"), "theme/film/engine.js")
+    shared = "".join(f"<script>\n{_script(p.read_text(encoding='utf-8'), tfilm.paths.rel(p))}\n</script>\n"
+                     for p in film.scripts)
     scenes = _script((film_dir / "scenes.js").read_text(encoding="utf-8"), f"{film.id}/scenes.js")
-    corpus = engine + scenes + json.dumps(data, ensure_ascii=False) + "".join(chr(c) for c in range(0x20, 0x7F))
+    corpus = engine + shared + scenes + json.dumps(data, ensure_ascii=False) + "".join(chr(c) for c in range(0x20, 0x7F))
     chars = {ord(ch) for ch in corpus if ord(ch) >= 0x20}
     faces, loaded = font_faces(chars, out, strict=strict)
     data["fonts"] = loaded
@@ -183,7 +227,7 @@ html,body{{margin:0;background:{bg};overflow:hidden}}canvas{{display:block;width
 <script>
 {engine}
 </script>
-<script>
+{shared}<script>
 {scenes}
 </script>
 <script>
@@ -201,7 +245,7 @@ window.ready = boot().then(() => {{
     page.write_text(html, encoding="utf-8")
     kind = "provisional" if provisional else "narrated"
     print(f"film: wrote {page} ({len(html) // 1024} KB, {kind} timeline {tl['duration']:.1f}s, "
-          f"{len(loaded)} font faces)")
+          f"{len(loaded)} font faces{', solid shots' if solid else ''})")
     return page
 
 
@@ -216,6 +260,7 @@ def write_provisional(film_dir: Path) -> Path:
     print(f"film: wrote {path} ({tfilm.format_duration(tl['duration'])} at {tfilm.WORDS_PER_SECOND} words/s)")
     for s in tl["scenes"]:
         print(f"  {s['id']:12s} {s['start']:7.2f} {s['end']:7.2f} {s['end'] - s['start']:6.2f}")
+    phrase_check(film, strict=os.environ.get("FILM_STRICT") == "1")
     return path
 
 

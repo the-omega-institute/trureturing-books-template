@@ -72,6 +72,9 @@ def copy_example(book: config.Book, name: str = "001-golden-deficit", outputs: t
     meta["outputs"] = {k: outs[k] for k in (outputs or meta["outputs"])}
     meta["resolution"] = film.published_size(meta["outputs"]) + "@30"
     (dst / "film.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    for name in meta.get("scripts") or []:  # the book's scripts the film inlines (the phase torus model)
+        (book.dir / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(EXAMPLE / name, book.dir / name)
     return dst
 
 
@@ -578,7 +581,9 @@ class Sandbox:
         (self.book.dir / "zh").mkdir()
         (self.book.dir / "zh" / "ch01.md").write_text("# 第一章\n", encoding="utf-8")
         self.dir = copy_example(self.book)
-        self.site = dataclasses.replace(config.load_site(), repo="acme/books", base_url="")
+        # load_site is cached and may belong to an earlier, already removed sandbox.
+        # Repository hooks must run in this sandbox, just like its build/cache units.
+        self.site = dataclasses.replace(config.load_site(), root=self.root, repo="acme/books", base_url="")
 
     def film(self) -> film.Film:
         return film.get(self.book, self.dir.name)
@@ -1334,3 +1339,232 @@ class DoctorFfmpegTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PhraseTest(unittest.TestCase):
+    """Timing phrases of scenes.js that script.json does not have (tbook.film.phrase_issues)."""
+
+    SCRIPT = {"scenes": [{"id": "a", "lines": [["The first line.", "一"], ["Then the gap appears.", "二"]]},
+                         {"id": "b", "lines": [["Only one line here.", "三"]]}]}
+
+    def issues(self, js: str) -> list[tuple[int, str]]:
+        return film.phrase_issues(js, self.SCRIPT)
+
+    def test_literal_calls_inside_a_scene(self):
+        js = ("SCENES.a = S => {\n"
+              "  const q = Q(S, 1, 'the gap', 0.5) + Q(S, 0, \"first\") + phraseAt(S, 1, 'Then');\n"
+              "  const r = Q(S, 1, 'the gaq', 0.5);\n"
+              "  const s = at(S, 2, 0.6) + Q(S, 0, 'it\\'s');\n"
+              "  badgeQ(S, [[0, null, 'computed'], [1, 'appears', 'lean'], [1, 'vanishes', 'lean']]);\n"
+              "};\n"
+              "function helper(S) { return Q(S, 5, 'nowhere'); }\n"
+              "SCENES.b = S => { Q(S, 0, 'one line'); Q(S, 0, 'two lines'); Q(S, k, 'computed'); Q(S, 0, phrase); };\n")
+        got = self.issues(js)
+        self.assertEqual([line for line, _ in got], [3, 4, 4, 5, 8])
+        msgs = [m for _, m in got]
+        self.assertIn("SCENES.a: Q(S, 1, 'the gaq'): line 1 of scene 'a' does not contain 'the gaq'", msgs[0])
+        self.assertIn("at(S, 2, …): scene 'a' has 2 line(s) in script.json, no line 2", msgs[1])
+        self.assertIn("does not contain \"it's\"", msgs[2])
+        self.assertIn("badgeQ entry [1, 'vanishes', …]", msgs[3])
+        self.assertIn("SCENES.b: Q(S, 0, 'two lines')", msgs[4])
+
+    @needs_listed_example
+    def test_example_has_none(self):
+        f = film.get(example_book(), EXAMPLE_FILM.name)
+        self.assertEqual(film.phrase_issues((f.dir / "scenes.js").read_text(encoding="utf-8"), f.script), [])
+
+    def test_engine_reports_the_missing_phrase(self):
+        engine = (THEME_FILM / "engine.js").read_text(encoding="utf-8")
+        self.assertIn("if (i < 0) phraseMissing(S, k, phrase);", engine)
+        self.assertIn("if (DATA.strict) window.FILM_ERRORS.push(msg); else console.warn(msg);", engine)
+
+    @needs_listed_example
+    def test_check_warns_and_strict_build_fails(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        book = temp_book(tmp)
+        d = copy_example(book)
+        scenes = d / "scenes.js"
+        scenes.write_text(scenes.read_text(encoding="utf-8").replace("'The gap', 0.6)", "'The gaq', 0.6)", 1),
+                          encoding="utf-8")
+        with mock.patch.object(film, "_lock", return_value=fake_lock()):
+            issues = film.check_film(film.get(book, d.name), fake_lock())
+        warn = [i for i in issues if i.severity == "warning" and "The gaq" in i.message]
+        self.assertEqual(len(warn), 1)
+        self.assertGreater(warn[0].line, 0)
+        if not hasattr(PipelineTest, "build"):
+            PipelineTest.setUpClass()  # theme/film/build.py, loaded as PipelineTest does
+        build = PipelineTest.build
+        err = io.StringIO()
+        with mock.patch.object(film, "_lock", return_value=fake_lock()), redirect_stdout(io.StringIO()), \
+                redirect_stderr(err):
+            build.build(d)  # a warning only
+            with self.assertRaises(SystemExit):
+                build.build(d, strict=True)
+        self.assertIn("timing phrase(s) of scenes.js are not in script.json (FILM_STRICT=1)", err.getvalue())
+        # the timeline step reports it too, and fails under FILM_STRICT=1
+        import subprocess
+
+        env = {k: v for k, v in os.environ.items() if k != "FILM_STRICT"}
+        r = subprocess.run([sys.executable, str(THEME_FILM / "build.py"), str(d), "--timeline-only"],
+                           capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("warning: ", r.stderr)
+        self.assertIn("SCENES.beta: Q(S, 1, 'The gaq')", r.stderr)
+        r = subprocess.run([sys.executable, str(THEME_FILM / "build.py"), str(d), "--timeline-only"],
+                           capture_output=True, text=True, env=dict(env, FILM_STRICT="1"))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("error: ", r.stderr)
+
+
+
+class CitedLabelTest(unittest.TestCase):
+    """Citations are resolved by the whole GID; the label shows the GID when the Lean namespace names another module."""
+
+    def test_label(self):
+        g = lean.parse_gid("D5/S1/Deficit/DeficitInteger.deficit_integer")
+        self.assertEqual(film.cited_label(g, "D5.S1.Deficit.deficit_integer"), "D5.S1.Deficit.deficit_integer")
+        self.assertEqual(film.cited_label(g, "D5.S1.Deficit.DeficitInteger.deficit_integer"),
+                         "D5.S1.Deficit.DeficitInteger.deficit_integer")
+        q = lean.parse_gid("D5/S3/Quantum/Measurement/Bloch/QubitBloch.B_formula_core")
+        name = "D5.S3.Quantum.Measurement.FourQubitParentConstruction.B_formula_core"
+        self.assertEqual(film.cited_label(q, name), q.text)
+
+    def test_two_citations_with_one_short_name(self):
+        a = "D5/S3/Quantum/Measurement/Bloch/QubitBloch.B_formula_core"
+        b = "D5/S3/Quantum/Measurement/FourQubitParentConstruction.B_formula_core"
+        lock = lean.Lock(repo="r/r", branch="dev", commit="a" * 40, declarations={
+            a: {"module": a.rsplit(".", 1)[0], "name": "D5.S3.Quantum.Measurement.FourQubitParentConstruction.B_formula_core",
+                "kind": "theorem", "statement_id": "sha256:a", "line": 31},
+            b: {"module": b.rsplit(".", 1)[0], "name": "D5.S3.Quantum.Measurement.FourQubitParentConstruction.B_formula_core2",
+                "kind": "theorem", "statement_id": "sha256:b", "line": 9}})
+        refs = film.lean_refs([a], lock)
+        self.assertEqual([(r["gid"], r["short"], r["label"]) for r in refs], [(a, "B_formula_core", a)])
+        engine = (THEME_FILM / "engine.js").read_text(encoding="utf-8")
+        self.assertIn("function leanCite(gid) { return (DATA.lean || []).find(z => z.gid === gid) || null; }", engine)
+        self.assertIn("const name = r.label || r.name;", engine)
+        if example_shown():  # a books repository may hide (or keep an older copy of) the example
+            self.assertNotIn("z.short ===", (EXAMPLE_FILM / "scenes.js").read_text(encoding="utf-8"))
+
+
+@needs_listed_example
+class SolidMetaTest(unittest.TestCase):
+    """film.json "solid" and "scripts", and what they add to the build unit's key."""
+
+    def setUp(self):
+        self.sb = Sandbox(self)
+
+    def write(self, **changes) -> None:
+        p = self.sb.dir / "film.json"
+        meta = json.loads(p.read_text(encoding="utf-8"))
+        for k, v in changes.items():
+            if v is None:
+                meta.pop(k, None)
+            else:
+                meta[k] = v
+        p.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+
+    def messages(self) -> list[str]:
+        return errors(film.check_film(self.sb.film(), fake_lock()))
+
+    def test_example_is_a_solid_film_with_the_shared_model(self):
+        f = self.sb.film()
+        self.assertTrue(f.solid)
+        self.assertEqual([p.relative_to(self.sb.book.dir).as_posix() for p in f.scripts], ["viz/phase-torus/model.js"])
+        self.assertEqual(self.messages(), [])
+
+    def test_validation(self):
+        self.write(solid="yes")
+        self.assertIn("film.json: solid must be true (the film has solid shots) or false", self.messages())
+        self.write(solid=True, scripts="viz/x.js")
+        self.assertTrue(any("scripts must be a list" in m for m in self.messages()))
+        self.write(scripts=["../outside.js", "/abs.js", "viz/missing.js", "viz/phase-torus/model.js"])
+        msgs = self.messages()
+        self.assertTrue(any("'../outside.js' must be a .js path inside the book" in m for m in msgs))
+        self.assertTrue(any("'/abs.js' must be a .js path inside the book" in m for m in msgs))
+        self.assertTrue(any("books/bk/viz/missing.js does not exist" in m for m in msgs))
+        self.assertEqual(len([m for m in msgs if "scripts" in m]), 3)
+
+    def test_key_covers_the_core_three_and_the_scripts(self):
+        tmp = self.sb.root / "theme-viz"
+        shutil.copytree(film.THEME_VIZ, tmp, ignore=shutil.ignore_patterns("__pycache__"))
+        with mock.patch.object(film, "SOLID_CORE", tmp / "solid-core.js"), \
+                mock.patch.object(film, "SOLID_VENDOR", tmp / "vendor"):
+            key = self.sb.key()
+            (tmp / "solid-core.js").write_text((tmp / "solid-core.js").read_text(encoding="utf-8") + "\n// edit\n",
+                                               encoding="utf-8")
+            key2 = self.sb.key()
+            self.assertNotEqual(key2, key)
+            (tmp / "vendor" / "three.core.min.js").write_bytes(b"// another three.js")
+            key3 = self.sb.key()
+            self.assertNotEqual(key3, key2)
+            model = self.sb.book.dir / "viz" / "phase-torus" / "model.js"
+            model.write_text(model.read_text(encoding="utf-8") + "\n// edit\n", encoding="utf-8")
+            self.assertNotEqual(self.sb.key(), key3)  # the shared model: the page and the film change together
+            # a film without solid shots does not depend on three.js
+            self.write(solid=None, scripts=None)
+            plain = self.sb.key()
+            (tmp / "solid-core.js").write_text("// yet another core\n", encoding="utf-8")
+            (tmp / "vendor" / "three.module.min.js").write_bytes(b"// yet another three.js")
+            self.assertEqual(self.sb.key(), plain)
+
+
+@needs_example
+class FilmSelectionTest(unittest.TestCase):
+    """./tbook build films --film <id>: render or restore that film only."""
+
+    def setUp(self):
+        self.sb = Sandbox(self)
+        copy_example(self.sb.book, "002-second-film")
+        self.renders: list[str] = []
+
+        def fake_render(f: film.Film, dest: Path) -> None:
+            self.renders.append(f.id)
+            dest.mkdir(parents=True, exist_ok=True)
+            for name in f.videos().values():
+                (dest / name).write_bytes(f.id.encode())
+
+        for patch in (mock.patch.object(film, "render_videos", side_effect=fake_render),
+                      mock.patch.object(film, "toolchain_missing", return_value=[])):
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def run_build(self) -> dict:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            return film.build_videos(self.sb.site, self.sb.book)
+
+    def test_only_the_selected_film_renders(self):
+        with film.only(["002-second-film"]):
+            status = self.run_build()
+        self.assertEqual(self.renders, ["002-second-film"])
+        self.assertEqual(status, {"001-golden-deficit": "skipped", "002-second-film": "built"})
+        # the other film is still restored when its key is cached
+        self.run_build()  # no selection: renders 001
+        self.assertEqual(self.renders, ["002-second-film", "001-golden-deficit"])
+        shutil.rmtree(self.sb.film().build_dir)
+        with film.only(["002-second-film"]):
+            status = self.run_build()
+        self.assertEqual(status, {"001-golden-deficit": "cached", "002-second-film": "cached"})
+        self.assertEqual(len(self.renders), 2)
+        self.assertIsNone(film._ONLY)
+
+    def test_build_checks_the_option(self):
+        from tbook import build
+
+        build.check_films(["films"], [self.sb.book], ["001-golden-deficit", "002-second-film"])
+        build.check_films(["all"], [self.sb.book], None)
+        with self.assertRaisesRegex(config.ConfigError, "no such film in bk .*001-golden-deficit, 002-second-film"):
+            build.check_films(["films"], [self.sb.book], ["003-nothing"])
+        for targets in (["site"], ["all"], ["films", "viz"]):
+            with self.assertRaisesRegex(config.ConfigError, "--film limits `./tbook build films`"):
+                build.check_films(targets, [self.sb.book], ["001-golden-deficit"])
+
+    def test_cli(self):
+        from tbook import cli
+
+        args = cli.parser().parse_args(["build", "films", "--book", "x", "--film", "001-a", "--film", "002-b"])
+        self.assertEqual(args.film, ["001-a", "002-b"])
+        with mock.patch("tbook.build.build", return_value=SimpleNamespace(failures=[])) as b, \
+                mock.patch.object(cli, "_books", return_value=[]):
+            self.assertEqual(cli.main(["build", "films", "--film", "001-a"]), 0)
+        self.assertEqual(b.call_args.kwargs["films"], ["001-a"])

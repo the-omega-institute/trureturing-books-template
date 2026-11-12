@@ -59,13 +59,15 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 | 点 | `fig.dot(x, y, 3.6, "cyan", ring="bg")` |
 | 文字 | `fig.text(x, y, "影子 cos θ", size=14, color="line", anchor="middle", middle=True, halo=True)`；`*x*` 斜体，`**b**` 加粗，`_{i}` 下标，`^{2}` 上标；数学写 Unicode 符号（θ、φ、·、∧、√、≤） |
 | 标记 | `fig.angle(cx, cy, r, a0, a1, "θ")`、`fig.right_angle(x, y, 方向)`、`fig.brace(x1, y1, x2, y2, "标签")`、`fig.cross(x, y)`（划掉）、`fig.legend(x, y, [("line", "线"), ("area", "面积")])`、`fig.chip(x, y, "LEAN ✓", "lean")` |
-| 坐标系 | `ax = fig.axes(x, y, w, h, (x0, x1), (y0, y1))`；`ax.frame()`、`ax.xaxis(ticks=…, labels=…, label=…)`、`ax.yaxis(…)`、`ax.grid(…)`、`ax.plot(fn, color="cyan")`、`ax.path(pts)`、`ax.points(pts)`、`ax.area(pts)`、`ax.hline(y)`、`ax.vline(x)`、`ax.text(x, y, …)`、`ax.pt(x, y)` |
-| 球 | `sp = fig.sphere(cx, cy, r)`（+z 向上，+x 朝向读者偏左下，+y 向右）；`sp.outline()`、`sp.great_circle(法向)`、`sp.small_circle(轴, 角)`、`sp.arc(u, v, arrow=True)`、`sp.path([…])`、`sp.arrow(v, "now")`、`sp.dot(v)`、`sp.label(v, "…", dx=…, dy=…)`、`sp.axes(labels=("x", "y", "z"))`、`sp.disc(法向)`、`sp.segment(a, b)`；背面的线自动画成虚线。向量工具：`figkit.sph(θ, φ)`、`slerp`、`rotate`、`cross`、`dot3`、`unit` |
+| 坐标系 | `ax = fig.axes(x, y, w, h, (x0, x1), (y0, y1))`；`ax.frame()`、`ax.xaxis(ticks=…, labels=…, label=…)`、`ax.yaxis(…)`（刻度字号默认 12，画布宽于 429 时自动加大到手机上不低于 10 px：480 宽取 13.5，716 宽取 20；分栏图按最宽一栏；显式传 `size=` 时照传的画）、`ax.grid(…)`、`ax.plot(fn, color="cyan")`、`ax.path(pts)`、`ax.points(pts)`、`ax.area(pts)`、`ax.hline(y)`、`ax.vline(x)`、`ax.text(x, y, …)`、`ax.pt(x, y)` |
+| 球 | `sp = fig.sphere(cx, cy, r)`（+z 向上，+x 朝向读者偏左下，+y 向右）；`sp.outline()`、`sp.great_circle(法向)`、`sp.small_circle(轴, 角)`、`sp.arc(u, v, arrow=True)`、`sp.path([…])`、`sp.arrow(v, "now")`、`sp.dot(v)`、`sp.label(v, "…", dx=…, dy=…)`、`sp.axes(labels=("x", "y", "z"))`、`sp.disc(法向)`、`sp.segment(a, b)`；背面的线自动画成虚线。明暗：`sp.shade("cyan")`（或 `sp.outline(shade="cyan")`），这个颜色角色在受光的一点最浓、向边缘变淡（深色画面上前亮后暗），由一叠同心圆盘画成，各种输出都用自己的配色；`light=` 改光的方向，`rim=`、`peak=` 改边缘与亮点的浓度。向量工具：`figkit.sph(θ, φ)`、`slerp`、`rotate`、`cross`、`dot3`、`unit` |
 | 流程图 | `a = fig.box(x, y, "文字", note="lemma_name")`（`x` 是中心、`y` 是上沿；返回锚点 `a.top`、`a.bottom`、`a.left`、`a.right`、`a.at(fx, fy)`；`wrap=宽` 或 `w=宽` 自动换行，`\n` 强制换行）、`fig.box(…, dashed=True)`（虚线框：前提、输入）、`fig.box(…, "lean", chip="LEAN ✓")`（只给 `lean=` 引用的结论）；`fig.link(a, b)`（按相对位置从相对的两边连箭头，可传点）、`fig.link(a, b, elbow=True)`（先横后竖）、`elbow="vh"`（先竖后横）、`label="…"` |
-| 球上的转动与区域 | `end = sp.turn(轴, 起点, 角度, "now", arrow=True)`（绕任意轴的转动弧，返回终点；起点不是单位向量时画在球外）、`sp.small_circle(轴, 角, start=v, span=90, arrow=True)`（小圆的一段，带箭头）、`sp.sector(轴, 起点, 角度, "area")`（转动扫过的平面扇形，顶点在轴上）、`sp.patch([v1, v2, v3], "cyan", color="cyan")`（球面多边形，`flat=True` 为平面多边形）、`sp.polytope(点集)`（凸包：正面的面淡填，棱前实后虚） |
+| 球上的转动与区域 | `end = sp.turn(轴, 起点, 角度, "now", arrow=True)`（绕任意轴的转动弧，返回终点；起点不是单位向量时画在球外）、`sp.small_circle(轴, 角, start=v, span=90, arrow=True)`（小圆的一段，带箭头）、`sp.sector(轴, 起点, 角度, "area")`（转动扫过的平面扇形，顶点在轴上）、`sp.cap(轴, 角, "magenta", color="magenta")`（球冠：只填朝向读者的部分，背面不涂，边缘前实后虚）、`sp.patch([v1, v2, v3], "cyan", color="cyan")`（球面多边形，`flat=True` 为平面多边形；`front=True` 只填朝向读者的部分，适用于不超过半球的区域）、`sp.polytope(点集)`（凸包：正面的面淡填，棱前实后虚） |
 | 对数坐标、阶梯与柱 | `ax = fig.axes(x, y, w, h, (0.01, 1), (1e-4, 1), logx=True, logy=True)`：数据照原值传，`ax.xaxis()`、`ax.yaxis()` 不给 `ticks` 时自动按十的幂标刻度（0.01–1000 写数字，其余写 `10^{−4}`）并加细刻度，`ax.grid(ys=ax.decades("y"))`；`ax.step(pts, where="post"/"pre"/"mid")`、`ax.bars(pts, "cyan", bar=0.8, base=0)` |
 | 凸包、反射 | `figkit.hull(点)`（平面凸包，按顺序的顶点）、`figkit.hull3(点)`（空间凸包的面：外法向、偏移、顶点序号）；`fig.bounce(a, 镜面点, b, gap=7)`（经镜面一次反射的折线箭头，两端各缩 `gap`） |
 | 文字（续） | `***粗斜体***`、`\bar{z}`（带上划线的字母）；脚本里写 `MARKUP = 2` 后下标、上标里可以再写标记（`*W*_{*i*+1}`），斜体 `*I*` 用衬线字形，不像一条斜线（不写时按旧规则，已有的图不变）；`fig.measure(s, 13, mono=True)` 估计宽度（等宽字每字 0.6 em，组合附加符不计），`fig.wrap_text(s, 宽)` 按宽度断行 |
+| 字母上的横线与尖帽 | `fig.overline(x, y, "*c*")`（c̄）、`fig.hat(x, y, "*n*")`（n̂）：先照 `fig.text` 写字，再由画图库在字上画横线或尖帽，斜体随字右倾；参数同 `fig.text`。不要用组合附加符（`c̄` 是 c 加 U+0304）：它由读者系统回退到的字体定位，常常偏到字旁；有预组合字符的（ā、é）可以直接写，没有的用这两个方法 |
+| 等宽字里的减号 | `mono=True` 的文字与 `fig.chip` 里的“−”（U+2212）自动改用正文字体（`tr-fig-sans`），等宽字体里它与连字符几乎一样；连字符“-”不变 |
 | 分栏 | `left, right = fig.row([220, 220], 240)`：每一栏是一块自己的画布（方法与 `fig` 相同）；脚本里写 `WRAP = True` 时各栏在宽屏并排、在手机上自动上下叠放，此时所有内容都画在栏里；小图集排成几行时多次调用 `fig.row([...], 高, y=这一行的起点)`，宽屏按行排、手机上逐个叠放 |
 
 角色名：`ink`（主线与正文色）、`dim`（次要线与标签）、`faint`（辅助线）、`edge`、`panel`、`bg`，强调色 `cyan`、`magenta`、`amber`、`violet`、`blue`、`orange`、`sigma`，语义名 `lean`、`open`、`argued`、`now`、`model`、`line`、`area`、`axis`。
@@ -101,7 +103,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 
 图注是普通的 Markdown：可以有行内数学、`[@id]` 引用与加粗；必须有，且不能只是编号（“图 13”）。HTML 中图内联在页面里，颜色随主题切换；PDF 的屏幕版与印刷版各用自己的配色；EPUB 用浅色配色。
 
-媒体块不连排：两块 `.figure`、`.viz`、`.film`、`.slides` 之间要有正文。三块以上只隔着空行挨在一起时，读者一次看到一摞图，分不清哪张对应哪句话；`./tbook check` 从第三块起报出位置。把每一块挪到它对应的那句话之后，必要时在两块之间补一句承上启下的话。
+媒体块不连排：相邻两块 `.figure`、`.viz`、`.film`、`.slides` 之间要隔着正文。两块只隔着空行（或 HTML 注释）挨在一起时，读者一次看到一摞图，分不清哪张对应哪句话；`./tbook check` 对每一对给出警告，点名两块各自的种类、`src`（实验卡带 `preset`）与行号。把每一块挪到它对应的那句话之后，必要时在两块之间补一句承上启下的话。
 
 演示文稿要用同一张图时，在 `slides/<deck>/img/` 放同名的 `<name>.<lang>.svg`，由 `./tbook fig build` 写成深色配色版并随图更新（见 `book-slides`），不要手工拷贝。
 
@@ -111,7 +113,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 ./tbook check          # 图注为空或只有编号（错误）；提交的 SVG（含演示文稿 img/ 里的同名副本）与脚本不一致（错误）；各语言的图序列不一致（错误）；
                        # assets/ 里没有被引用的文件、没有脚本的 SVG、没有章节引用的图（警告）；
                        # 手机上最小标签不到 10 px 的图（警告，site.toml 可升为错误）；图片语法引用的手绘 SVG、
-                       # 两种语言共用的带字 SVG、三块以上连排的媒体块（警告）
+                       # 两种语言共用的带字 SVG、只隔着空行相邻的两块媒体（警告）
 ./tbook build html pdf epub --book <book>     # 实际构建，在站点与 PDF 里看一眼
 ```
 
@@ -151,7 +153,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 | `its smallest label (…) is … px on a phone, below 10 px` | 按提示做窄（宽度不超过给出的值）、分栏（`WRAP = True`），或把最小标签加大到给出的字号 |
 | `… is a hand-drawn SVG with its colours written in` | 按“把旧图换成标准图”重画成脚本 |
 | `… has text and is shown by the zh, en editions alike` | 改成图脚本（每种语言一版标签），或给每种语言各放一个文件 |
-| `N media blocks in a row` | 把这几块分到各自对应的句子之后，块与块之间有正文 |
+| `… and … sit next to each other with no text between them` | 把两块分到各自对应的句子之后，块与块之间有正文 |
 | PDF 里中文标签成了方框 | 构建机器缺中文字体：`./tools/fetch-fonts.sh`（见 `book-export`） |
 
 ## 完成标准

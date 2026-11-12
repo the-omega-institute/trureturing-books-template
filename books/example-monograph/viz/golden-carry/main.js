@@ -409,10 +409,10 @@
     $('hudBig').textContent = big; $('hudSub').textContent = hud; $('roNote').textContent = note;
     const leg = LEGEND[S.scene].map(([cl, zh, en]) => `<span><i class="sw ${cl}"></i>${L(zh, en)}</span>`).join('');
     if ($('legend')._h !== leg) { $('legend').innerHTML = leg; $('legend')._h = leg; }
-    $('roC').innerHTML = `<span class="${signCls(c)}">${isInt ? fmtSigned(c) : fmtZphi(D.c)}</span> <span class="okmark">${isInt && Math.abs(c) <= 1 ? '∈ {−1, 0, 1} ✓' : '✗'}</span>`;
+    $('roC').innerHTML = `<span class="${signCls(c)}">${isInt ? fmtSigned(c) : fmtZphi(D.c)}</span> <span class="nummark">${isInt && Math.abs(c) <= 1 ? '∈ {−1, 0, 1} ✓' : '✗'}</span>`;
     $('roCSub').textContent = `= (${fmtZphi({ a: D.b1.a + D.b2.a, b: D.b1.b + D.b2.b })}) − (${fmtZphi(D.b3)})`;
     $('roR0').textContent = String(D.r0); $('roR1').textContent = String(D.r1);
-    $('roCount').innerHTML = `${D.r0} − ${D.r1} = <span class="${signCls(D.count)}">${fmtSigned(D.count)}</span> <span class="okmark">${isInt && D.count === c ? '= c ✓' : '≠ c ✗'}</span>`;
+    $('roCount').innerHTML = `${D.r0} − ${D.r1} = <span class="${signCls(D.count)}">${fmtSigned(D.count)}</span> <span class="nummark">${isInt && D.count === c ? '= c ✓' : '≠ c ✗'}</span>`;
     const three = [BC[S.v1], BC[S.v2], BC[sum]], inWin = three.every((x) => x >= LO - 1e-12 && x <= HI + 1e-12);
     $('roConj').innerHTML = `${three.map((x) => fix(x, 3)).join(' · ')} <small>∈ [−0.382, 0.618] ${inWin ? '✓' : '✗'}</small>`;
     $('pillPair').querySelector('strong').textContent = `${S.v1}, ${S.v2}`;
@@ -507,12 +507,13 @@
   });
 
   /* ---------- experiment cards ---------- */
+  // a card that plays declares its still: the frame of the cover and of the figure a chapter cites ('end': the last pass)
   const PRESETS = {
-    plus: { scene: 'carry', pair: [1, 1], play: true }, minus: { scene: 'carry', pair: [2, 2], play: true },
-    cancel: { scene: 'carry', pair: [6, 6], play: true }, long: { scene: 'carry', pair: [986, 986], play: true },
-    map: { scene: 'map', pair: [17, 17], at: 3 }, zoom: { scene: 'map', pair: [17, 17], at: 7, play: true },
-    phase: { scene: 'phase', pair: [2, 2], at: 8 }, fill: { scene: 'phase', pair: [2, 2], at: 89, play: true, from: 2 },
-    window: { scene: 'window', pair: [2, 2], at: 34 }, sweep: { scene: 'window', pair: [2, 2], at: 144, play: true }
+    plus: { scene: 'carry', pair: [1, 1], play: true, still: 'end' }, minus: { scene: 'carry', pair: [2, 2], play: true, still: 'end' },
+    cancel: { scene: 'carry', pair: [6, 6], play: true, still: 'end' }, long: { scene: 'carry', pair: [986, 986], play: true, still: 'end' },
+    map: { scene: 'map', pair: [17, 17], at: 3 }, zoom: { scene: 'map', pair: [17, 17], at: 7, play: true, still: 7 },
+    phase: { scene: 'phase', pair: [2, 2], at: 8 }, fill: { scene: 'phase', pair: [2, 2], at: 89, play: true, from: 2, still: 89 },
+    window: { scene: 'window', pair: [2, 2], at: 34 }, sweep: { scene: 'window', pair: [2, 2], at: 144, play: true, still: 144 }
   };
   const NOTES = {
     plus: ['1 + 1：两枚筹码挤在权重 1 的格子里，规则 R₀ 把它们换成一枚权重 2 的筹码。数值没变，β 却少了 1：标尺从 +1 走到 0，c(1, 1) = +1。', '1 + 1: two tokens share the cell of weight 1, and rule R₀ trades them for one token of weight 2. The value is the same but β drops by 1: the gauge goes from +1 to 0, and c(1, 1) = +1.'],
@@ -531,13 +532,14 @@
     const p = PRESETS[id];
     S.v1 = p.pair[0]; S.v2 = p.pair[1];
     setScene(p.scene, p.at);
+    if (TRV.still && p.still != null) clock.set(p.still === 'end' ? clock.max : p.still);
     // a still (cover, cited figure for PDF/EPUB) and the opening view of the full page show the telling frame;
     // inside a chapter the card plays once the reader has scrolled it into view; a click plays at once
     if (!p.play || TRV.still || (booting && !TRV.embed)) return;
     clock.set(p.from || 0);
     if (booting) kit.autoplay(clock, $('stage')); else clock.play();
   }
-  const cards = kit.cards($('presets'), { notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
+  const cards = kit.cards($('presets'), { presets: PRESETS, notes: NOTES, noteEl: $('presetNote'), tour: $('tour'), onPick: applyPreset,
     idle: ['自由探索：换一对数、换场景、拖时间轴。随时可以再选一张卡。', 'Free play: change the pair, switch scenes, scrub the rail. Pick a card again at any time.'] });
 
   TRV.drawer({ drawer: $('drawer'), open: $('infoBtn'), close: $('drawerClose') });

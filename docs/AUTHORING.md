@@ -25,8 +25,9 @@ books/<slug>/
 | `book.title` / `subtitle` / `description` | 每种语言一行：`zh = "…"`、`en = "…"` |
 | `book.authors`、`license`、`isbn`（按语言）、`date` | 进入版权页与 EPUB 元数据 |
 | `book.code` | 封面与站点卡片上的代号，形如 `GOLDEN//OBSERVE` |
-| `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]`；可选加 `"academic"` 导出学术专著版，省略配置或 `true` 仍只导出原两版 |
-| `pdf.academic_paper` | 学术专著版开本，默认 `iso-b5`；仅影响 `academic`，排印规范见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md) |
+| `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]`；可选加 `"academic"` 导出学术预印本版，省略配置或 `true` 仍只导出原两版 |
+| `pdf.academic_paper` | 学术预印本开本，默认 `a4`；仅影响 `academic`，排印规范见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md) |
+| `pdf.academic_tags` | 预印本的可选 PDF 结构标签，默认 `false` 以控制文件体积；`true` 时保留结构标签，仍须核对投稿大小 |
 | `pdf.paper` | Typst 纸张名（`a4`、`a5`、`us-letter`、`iso-b5`…） |
 | `epub.embed_fonts` | 是否嵌入标题与等宽字体 |
 
@@ -165,7 +166,7 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 :::
 ```
 
-静态图用 `::: {.figure src="<图名>"}` 引用，图名对应脚本 `books/<slug>/figures/<图名>.py`：一张图只讲一件事，放在讲到它的那句话旁，各语言版本位置与 `src` 相同，只翻译图注。图由脚本生成（`./tbook fig new|build|shots`），每种语言一版标签；HTML 中随深浅主题变化，PDF 的屏幕版与印刷版各用自己的配色。图注必须有，且不能只是编号。标准、画图库的用法与看图的方法见 `skills/book-figure`。图片语法 `![图注](../assets/x.png)` 只用于照片、截图这类不能由脚本画的图片，图注同样不能只是编号；用图片语法引用 `assets/` 里写死颜色的 SVG（没有角色类、没有 `prefers-color-scheme`），或让两种语言共用一个带字的 SVG，`./tbook check` 都给出警告。图在手机上（正文栏宽 358 px，按 `min(1, 358 / 宽度)` 缩小，分栏图按最宽一栏）最小的标签不得小于 10 px，低于时 `./tbook fig build` 与 `./tbook check` 警告，`site.toml` 的 `[figures]` `phone_labels = "error"` 可升为错误。媒体块（`.figure`、`.viz`、`.film`、`.slides`）放在各自对应的那句话之后，彼此之间要有正文：三块以上只隔着空行连排时，`./tbook check` 从第三块起警告。
+静态图用 `::: {.figure src="<图名>"}` 引用，图名对应脚本 `books/<slug>/figures/<图名>.py`：一张图只讲一件事，放在讲到它的那句话旁，各语言版本位置与 `src` 相同，只翻译图注。图由脚本生成（`./tbook fig new|build|shots`），每种语言一版标签；HTML 中随深浅主题变化，PDF 的屏幕版与印刷版各用自己的配色。图注必须有，且不能只是编号。标准、画图库的用法与看图的方法见 `skills/book-figure`。图片语法 `![图注](../assets/x.png)` 只用于照片、截图这类不能由脚本画的图片，图注同样不能只是编号；用图片语法引用 `assets/` 里写死颜色的 SVG（没有角色类、没有 `prefers-color-scheme`），或让两种语言共用一个带字的 SVG，`./tbook check` 都给出警告。图在手机上（正文栏宽 358 px，按 `min(1, 358 / 宽度)` 缩小，分栏图按最宽一栏）最小的标签不得小于 10 px，低于时 `./tbook fig build` 与 `./tbook check` 警告，`site.toml` 的 `[figures]` `phone_labels = "error"` 可升为错误。媒体块（`.figure`、`.viz`、`.film`、`.slides`）放在各自对应的那句话之后，相邻两块之间要隔着正文：两块只隔着空行或 HTML 注释相邻时，`./tbook check` 对这一对给出警告（两块的种类、`src`、实验卡的 `preset` 与行号）。不带 `preset` 的完整实验室紧跟同一页面的最后一张卡最常见：把实验室挪到章末最后一段之后，或在两者之间用一句正文交代。
 
 外部资源：`src="trureturing-visualize:<id>"`、`src="trureturing-film:film-001-v1"`。HTML 中为交互嵌入或播放器；PDF/EPUB 中为缩略图/海报加在线地址。媒体块在各语言版本中也必须一一对应。
 
@@ -216,7 +217,7 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 | `figure …: its smallest label (…) is … px on a phone, below 10 px`（警告，`site.toml` 可升为错误） | 做窄、分栏（`WRAP = True`）或加大最小字号，提示里给了具体数值（见 `skills/book-figure`） |
 | `… is a hand-drawn SVG with its colours written in`（警告） | 改写成图脚本 `figures/<name>.py`，用 `::: {.figure}` 引用；图片语法只留给照片一类 |
 | `… has text and is shown by the zh, en editions alike`（警告） | 每种语言一版标签：改成图脚本，或各语言各用一个文件 |
-| `N media blocks in a row … with no text between them`（警告） | 把每一块挪到它对应的那句话之后，块与块之间有正文 |
+| `… and … sit next to each other with no text between them`（警告） | 把两块各自挪到对应的那句话之后，块与块之间有正文；完整实验室挪到章末最后一段之后 |
 | `no figure books/<slug>/figures/<name>.py` | `.figure` 的 `src` 没有对应脚本：核对图名，或 `./tbook fig new <slug> <name>` |
 | `no chapter, deck, film or visualization of this book uses this file`（警告） | `assets/` 里的遗留文件：删除，或在章节里引用 |
 

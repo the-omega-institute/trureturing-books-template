@@ -23,6 +23,8 @@
     "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued",
     "D5/S1/Deficit/DeficitInteger.deficit_integer"
   ],
+  "solid": true,
+  "scripts": ["viz/phase-torus/model.js"],
   "outputs": {
     "narrated_720p": "example-monograph_001_720p_narrated.mp4",
     "cover": "example-monograph_001_cover.jpg"

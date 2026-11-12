@@ -1,0 +1,3 @@
+/* PHASE//TORUS: the shared lab layout (../assets/theme.css) carries the page. Put here only what belongs to this
+   visualization alone; colours come from the tokens (var(--cyan) …), never from hex values. */
+#cv { cursor: grab; touch-action: none; }

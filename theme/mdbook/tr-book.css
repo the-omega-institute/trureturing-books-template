@@ -519,6 +519,7 @@ figure.tr-figure { margin: 1.8em 0; padding: 0; text-align: center; }
 svg.tr-fig { font-family: var(--tr-font-body); }
 :root:not(:lang(zh), :lang(ja), :lang(ko)) svg.tr-fig { font-family: var(--tr-font-body-latin, var(--tr-font-body)); }
 svg.tr-fig .tr-fig-mono { font-family: var(--tr-font-data); }
+svg.tr-fig .tr-fig-mono .tr-fig-sans { font-family: var(--tr-font-body); }  /* a minus sign: the data face draws it as a hyphen */
 svg.tr-fig text { font-variant-numeric: tabular-nums; }
 figure.tr-figure > figcaption { max-width: 46em; margin: 0.7em auto 0; text-align: center; }
 figure.tr-figure > figcaption strong { color: var(--tr-ink); }
