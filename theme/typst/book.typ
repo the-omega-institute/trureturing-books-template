@@ -348,8 +348,8 @@
   if is-academic {
     set align(center)
     v(8%)
-    block(text(font: f-body, size: 25pt, weight: "bold", meta.title))
-    if meta.subtitle != "" { v(12pt); block(text(size: 13pt, meta.subtitle)) }
+    block(text(font: f-body, size: 25pt, weight: "bold", hyphenate: false, meta.title))
+    if meta.subtitle != "" { v(12pt); block(text(size: 13pt, hyphenate: false, meta.subtitle)) }
     v(18pt)
     block(text(size: 12pt, meta.authors.join(if cjk { "、" } else { ", " })))
     v(8pt)
