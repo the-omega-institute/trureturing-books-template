@@ -426,6 +426,13 @@ dl.ro .ok dd, .okmark { color: var(--ok); }
 :root[data-embed][data-figure] .lab .center > .stage { min-height: max(var(--hud-min-height, 0px), var(--plot-min-height, 0px)); }
 :root[data-embed][data-figure] .app.lab > footer.rail { border-top: 0; padding-top: 0; gap: 10px; }
 :root[data-embed][data-figure] .lab .tour { padding: 5px 8px; }
+/* .what has no box of its own (display: contents), so a bound on it does not reach the note: bound the note itself.
+   The whole note stays in the bar and in the accessibility tree, two lines at a time, and scrolls inside the bar to
+   its last line; ◀ title ▶ keep the row above. The bar stays near 80px and the stage keeps its share of the frame. */
+:root[data-embed][data-figure] .lab .tour .tour-note {
+  max-height: 2.8em; max-height: 2lh; overflow-x: hidden; overflow-y: auto; overflow-wrap: break-word;
+  scrollbar-width: thin; scrollbar-color: var(--line-hot) transparent;
+}
 
 /* ---------- thumbnail mode (?thumb=1, used by tools/node/viz-thumbs.mjs): [data-thumb] fills the viewport, no text ---------- */
 :root[data-thumb-mode] body { overflow: hidden; }

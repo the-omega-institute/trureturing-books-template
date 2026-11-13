@@ -636,18 +636,34 @@ export async function spaceAfterCard(T, page, wait = 120) {
     if (await usable()) { card = c; break; }
   }
   if (!card) return;
-  // the button's state is written synchronously by play() and pause(), so it is read at once after each key: a clock
-  // that runs out by itself turns ▶ off but never on, and pressing the card again leaves both readings alike
-  const run = async () => {
-    await page.click(`[data-preset="${card}"]`); await settle(page, wait);
-    const s0 = await state();
-    await page.keyboard.press(' '); const s1 = await state();
-    await page.keyboard.press(' '); const s2 = await state();
-    return { ok: s0 !== s1 && s1 !== s2, detail: `card ${card}: playing ${s0} → Space → ${s1} → Space → ${s2}` };
-  };
-  let r = await run();
-  if (!r.ok) r = await run();   // once more: a clock may run out between reading it and the key (never twice)
-  check('keyboard: after a card is clicked, Space plays and pauses the clock', r.ok, r.detail);
+  // Read on both sides of the same real keydown dispatch. No animation frame can finish a short clock between
+  // these samples; separate Playwright reads can race even on two consecutive attempts. The bubble listener is
+  // installed after the page's handlers, so it sees their synchronous play()/pause() update, before default actions.
+  await page.click(`[data-preset="${card}"]`); await settle(page, wait);
+  await page.evaluate((sel) => {
+    const ctl = new AbortController(), edges = [];
+    const read = () => document.querySelector(sel)?.getAttribute('aria-pressed') ?? null;
+    let current = null;
+    window.__trvSpaceKeys = { edges, stop: () => ctl.abort() };
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === ' ' && !ev.repeat) { current = { before: read(), after: null }; edges.push(current); }
+    }, { capture: true, signal: ctl.signal });
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === ' ' && !ev.repeat && current) { current.after = read(); current = null; }
+    }, { signal: ctl.signal });
+  }, PLAY);
+  let edges;
+  try {
+    await page.keyboard.press(' ');
+    await page.keyboard.press(' ');
+  } finally {
+    edges = await page.evaluate(() => {
+      const watch = window.__trvSpaceKeys; watch.stop(); delete window.__trvSpaceKeys; return watch.edges;
+    });
+  }
+  const toggled = (e) => ['true', 'false'].includes(e.before) && ['true', 'false'].includes(e.after) && e.before !== e.after;
+  check('keyboard: after a card is clicked, Space plays and pauses the clock', edges.length === 2 && edges.every(toggled),
+    `card ${card}: ${edges.map((e) => `playing ${e.before} → Space → ${e.after}`).join('; ')}`);
   await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
 }
 
