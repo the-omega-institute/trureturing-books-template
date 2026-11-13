@@ -1376,9 +1376,10 @@ class StageViewGate(unittest.TestCase):
                                                 ("单位圆", "Unit circle"), ("整圈", "Full turn")]))
         + "</div>\n"
     )
-    # the shared layout of 0.5.2, which these copies put back one piece at a time
+    # Force the old collision even when the runtime's measured position overrides ordinary page offsets.
+    # The other copies put back one piece of the shared layout of 0.5.2 at a time.
     OLD_HUD = (".stage:has(> .hud-tl, > .hud-tr) { display: block; padding: 0; }\n"
-               ".stage > .hud-tl, .stage.hud-stack > .hud-tl { position: absolute; top: 14px; left: 20px; max-width: calc(100% - 40px); }\n"
+               ".stage > .hud-tl, .stage.hud-stack > .hud-tl { position: absolute; top: 14px !important; left: 20px; max-width: calc(100% - 40px); }\n"
                ".stage > .hud-tr { position: absolute; top: 12px; right: 18px; max-width: 60%; }\n")
     OLD_ROWS = (".app.lab { grid-template-rows: auto minmax(0, 1fr) auto; }\n"
                 ".lab .center { min-height: 0; grid-template-rows: minmax(0, 1fr) auto; }\n"
