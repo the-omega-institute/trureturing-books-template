@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- 长章拆分的写作手册改为先自动检查与构建，普通导出页面按 `book-export` 的条件按需查看；保留图件更新和媒体视觉验收，补齐拆章流程中遗漏的无条件预览要求。
+
 ## [0.9.3] - 2026-11-14
 
 ### 修复
