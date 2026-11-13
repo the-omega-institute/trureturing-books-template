@@ -64,13 +64,15 @@
   };
 
   /* ---------- redraw and animation ---------- */
-  /** paint() requests one frame; paint.now() draws synchronously. Repaints on resize, loaded fonts and language. */
+  /** paint() requests one frame; paint.now() draws synchronously. Both finish fitting the HUD after the draw changes
+      its text. Repaints on resize, loaded fonts and language. */
   const painters = [];
   function painter(draw, watch) {
     let queued = false;
-    const run = (t) => { if (!queued) return; queued = false; draw(t); };
+    const render = (t) => { draw(t); TRV.hudFit(); };
+    const run = (t) => { if (!queued) return; queued = false; render(t); };
     const paint = () => { if (!queued) { queued = true; requestAnimationFrame(run); } };
-    paint.now = () => { queued = false; draw(performance.now()); };
+    paint.now = () => { queued = false; render(performance.now()); };
     painters.push(paint);
     window.addEventListener('resize', paint);
     TRV.onLang(paint);
@@ -591,7 +593,7 @@
       if (tour) {
         const list = ids(), k = list.indexOf(api.current), b = k >= 0 ? el.querySelector(`[data-preset="${api.current}"]`) : null;
         const name = b ? [...b.querySelectorAll('.cn')].map((c) => `<span class="${c.classList.contains('en') ? 'en' : 'zh'}">${c.innerHTML}</span>`).join('') : '';
-        tour.querySelector('.what').innerHTML = `<b>${k >= 0 ? `${k + 1} / ${list.length} · ${name}` : TRV.L('自由探索', 'Free play')}</b>${text}`;
+        tour.querySelector('.what').innerHTML = `<b>${k >= 0 ? `${k + 1} / ${list.length} · ${name}` : TRV.L('自由探索', 'Free play')}</b><span class="tour-note">${text}</span>`;
       }
     }
     api.mark = (id) => { api.current = id || null; el.querySelectorAll('[data-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === api.current))); note(); };

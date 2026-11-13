@@ -242,7 +242,9 @@ canvas.plot { width: 100%; display: block; }
 .hud-tr .chip[aria-pressed="true"] { background: var(--cyan); color: var(--on-accent); }
 /* where a line of the title block would run under a scene button (narrow screens, the book's narrow frame), shell.js
    gives the stage .hud-stack and the bottom edge of the buttons as --hud-tr-bottom: the title block goes below them */
-.hud-stack .hud-tl { top: calc(var(--hud-tr-bottom, 40px) + 6px); }
+/* A measured collision takes precedence over a page's fixed title offset. */
+.stage.hud-stack > .hud-tl { top: calc(var(--hud-tr-bottom, 40px) + 6px) !important; }
+.hud-stack .hud-tr { left: 20px; max-width: none; }
 /* text set in capitals keeps its Greek letters and one-letter variables as written: shell.js (TRV.keepCase) wraps them */
 .keepcase { text-transform: none; }
 .tag {
@@ -261,7 +263,7 @@ canvas.plot { width: 100%; display: block; }
 .hud-bl { position: absolute; left: 20px; right: 20px; bottom: 12px; pointer-events: none; display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 11.5px; color: var(--ink); text-shadow: 0 0 6px var(--tr-void-deep), 0 0 2px var(--tr-void-deep); }
 /* a legend entry is one line of inline text after its swatch, so a <sub> or <sup> stays on its letter (a flex entry
    would make it an item of its own, set apart by the gap) */
-.hud-bl > span { display: inline-block; white-space: nowrap; }
+.hud-bl > span { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .hud-bl > span > .sw { margin-right: 6px; vertical-align: middle; }
 .sw { width: 14px; height: 3px; display: inline-block; background: var(--cyan); flex: none; }
 .sw.box { height: 10px; width: 10px; }
@@ -327,7 +329,7 @@ body:has(> .app.lab) { overflow-x: hidden; overflow-y: auto; }
 }
 .app.lab > header.top, .app.lab > footer.rail { grid-column: 1 / -1; }
 .lab .center { display: grid; grid-template-rows: minmax(min-content, 1fr) auto; gap: 10px; min-width: 0; }
-.lab .center > .stage { min-height: 220px; }
+.lab .center > .stage { min-height: max(220px, var(--hud-min-height, 0px)); }
 .strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; height: 176px; min-height: 0; }
 .strip .panel { display: flex; flex-direction: column; min-height: 0; }
 .strip .head { display: flex; justify-content: space-between; align-items: baseline; gap: 2px 10px; padding: 7px 12px 0; flex-wrap: wrap; }
@@ -346,9 +348,13 @@ body:has(> .app.lab) { overflow-x: hidden; overflow-y: auto; }
 .preset[aria-pressed="true"] { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber), 0 0 14px color-mix(in srgb, var(--amber) 25%, transparent); }
 .preset[aria-pressed="true"] .code { color: var(--amber); }
 /* tour bar: step through the experiment cards without leaving the stage (shown where the deck is out of view) */
-.tour { display: none; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--panel-edge); background: var(--panel); padding: 6px 8px; }
-.tour .what { min-width: 0; font-size: 12px; color: var(--dim); line-height: 1.4; }
-.tour .what b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 11.5px; letter-spacing: 0.1em; color: var(--amber); text-transform: uppercase; }
+.tour { display: none; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; border: 1px solid var(--panel-edge); background: var(--panel); padding: 6px 8px; }
+/* The complete note uses the width of the frame, rather than a narrow column between two tall gutters. */
+.tour .what { display: contents; font-size: 12px; color: var(--dim); line-height: 1.4; }
+.tour .what b { grid-column: 2; grid-row: 1; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: 11.5px; letter-spacing: 0.1em; color: var(--amber); text-transform: uppercase; }
+.tour .tour-note { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+.tour [data-tour="prev"] { grid-column: 1; grid-row: 1; }
+.tour [data-tour="next"] { grid-column: 3; grid-row: 1; }
 /* readouts: one line that matters, set large */
 dl.ro .key { grid-column: 1 / -1; }
 dl.ro .key dd { font-size: 12px; color: var(--dim); }

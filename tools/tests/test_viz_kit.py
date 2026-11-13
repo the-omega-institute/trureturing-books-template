@@ -198,7 +198,7 @@ class RuntimeSource(unittest.TestCase):
         self.assertRegex(css, r"\.lean\.frozen\s*\{[^}]*var\(--ink\)")
         self.assertNotRegex(css, r"\.lean\.frozen[^{]*\{[^}]*--ok")   # neutral, never green
         self.assertRegex(css, r"\.keepcase\s*\{\s*text-transform:\s*none;")
-        self.assertIn(".hud-stack .hud-tl", css)
+        self.assertIn(".stage.hud-stack > .hud-tl", css)
 
     def test_kit_names_plot_arrow(self):
         kit = (paths.THEME / "viz" / "kit.js").read_text(encoding="utf-8")

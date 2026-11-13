@@ -19,6 +19,13 @@ NODE = viz.node_executable()
 
 @unittest.skipUnless(browser_ready(), "Playwright Chromium is required")
 class RuntimeRegressions(unittest.TestCase):
+    def test_complete_hud_after_resize_language_and_synchronous_draw(self):
+        r = subprocess.run([NODE, str(paths.TOOLS / "tests" / "viz_hud_harness.mjs")],
+                           capture_output=True, text=True, cwd=paths.ROOT, timeout=180,
+                           env={**os.environ, "PW_CHROMIUM_PATH": doctor.chromium_path()})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("113/113 passed", r.stdout)
+
     def test_geometry_pixels_and_layout(self):
         r = subprocess.run([NODE, str(paths.TOOLS / "tests" / "viz_runtime_harness.mjs")],
                            capture_output=True, text=True, cwd=paths.ROOT, timeout=600,

@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "04de55e4469f45e06dc6ada5f3e644107f4aed69f529157c57afa41e9f534038",
+      "sha256": "0dbb08e41e73d60762c9b1f5e0e4d6e43bc9a356340fee1a859f70a3a6162c68",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -512,11 +512,11 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "fc5197d037495cffe865547bf03d621678b126967dfd524fbc8136ae533585b1",
+      "sha256": "08a00bc4340e284cc4123ec386637094939b4d4d7ec8c9d2477b9ce550e2fa4f",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
-      "sha256": "1a719fa59078d1b39d743c0d2ae33317c97a7faba8cdfe63429690ab51d7e69a",
+      "sha256": "eaeaf247458c1918ef9469302d84a61a918cc4ecde403368a46490dc22ffae8c",
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
@@ -524,7 +524,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "e492c8487c3eed8b48284f32211103ed8918837b531895d1da555a9c058bf789",
+      "sha256": "554d69c5d82539012efa6c6fd598c6aa8399afd0f874747f57341ae099ccbcb2",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -948,11 +948,11 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {
-      "sha256": "0be5857c408f5ed94b5c4b68569e2578ba2aa6f0e55b4b65ededa4221caaf4b7",
+      "sha256": "3c5a2d91387fa9401e8c475bb89625e9b9735b19b11195a4748720024e6475d0",
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
-      "sha256": "d6f981917667033410dcb0825161ffdce66f7aea48ecdd1ac275af7137d45747",
+      "sha256": "dc7689bc632a1cc3b5ada7a8f7683daecfac315e5b6456e98e7e45dab09c971f",
       "mode": "100644"
     },
     "tools/tests/test_viz_solid.py": {
@@ -961,6 +961,10 @@
     },
     "tools/tests/test_written_proof.py": {
       "sha256": "7c8625ada5b7d40a088e68b58092f36200d0da9349973ce3e60f8d546c9e697c",
+      "mode": "100644"
+    },
+    "tools/tests/viz_hud_harness.mjs": {
+      "sha256": "8178c1c96298adbc4efeae3bd2fb0c03b4303d49406937389a13cbff6d86c288",
       "mode": "100644"
     },
     "tools/tests/viz_runtime_harness.mjs": {

@@ -16,8 +16,8 @@
      TRV.esc(text)    HTML-escape a string for innerHTML
      TRV.keepCase(el) under capitals (text-transform: uppercase) keep Greek letters and one-letter variables as written;
                       runs by itself on the page and on what the page writes (see "capitals that keep their letters")
-     TRV.hudFit()     move the stage title (.hud-tl) below the scene buttons (.hud-tr) where they would overlap; runs by
-                      itself on resize, fonts, language and text changes
+     TRV.hudFit()     keep the title, scene buttons and legend clear; reserve their minimum height in a scrolling lab;
+                      runs on resize, fonts, language, text changes and after a kit painter draws
    Load it in <head>, after theme.css and before any page script (src="../assets/shell.js" from a viz page).
    It sets <html data-lang> immediately, so the paired .zh / .en fragments never flash both languages. */
 (function () {
@@ -247,7 +247,7 @@
   /* ---------- the stage HUD: title block and scene buttons do not overlap ----------
      .hud-tl (top left: title and one line of explanation) and .hud-tr (top right: scene buttons) share the top of a
      stage. Where a line of the title block would run under a button (a narrow screen, the book's narrow frame, many
-     buttons), the stage gets the class hud-stack and the theme moves the title block below the buttons
+     buttons), the stage gets the class hud-stack and the theme gives the buttons a full row, with the title below
      (--hud-tr-bottom: the bottom edge of the buttons in the stage). Where they do not meet, nothing moves, so a wide
      screen looks as before. Not in a cover or a still (?thumb=1, ?shot=1), where the buttons are not shown. */
   const rectsMeet = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
@@ -264,10 +264,19 @@
         range.selectNodeContents(t);
         for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) lines.push(r);
       }
-      if (!buttons.some((a) => lines.some((b) => rectsMeet(a, b)))) continue;
-      st.classList.add('hud-stack');
-      const base = (tl.offsetParent || st).getBoundingClientRect();
-      st.style.setProperty('--hud-tr-bottom', `${Math.ceil(tr.getBoundingClientRect().bottom - base.top)}px`);
+      if (buttons.some((a) => lines.some((b) => rectsMeet(a, b)))) {
+        st.classList.add('hud-stack');
+        const base = (tl.offsetParent || st).getBoundingClientRect();
+        st.style.setProperty('--hud-tr-bottom', `${Math.ceil(tr.getBoundingClientRect().bottom - base.top)}px`);
+      }
+      // A scrolling lab can grow on a short screen. A cited figure has a fixed frame: its tour note uses the full
+      // width instead, and the quality gate still reports a frame that cannot hold its complete contents.
+      const bl = st.querySelector('.hud-bl');
+      if (bl && !(embed && preset)) {
+        const band = Math.max(tl.getBoundingClientRect().bottom, tr.getBoundingClientRect().bottom) - st.getBoundingClientRect().top;
+        const bottom = parseFloat(getComputedStyle(bl).bottom) || 0;
+        st.style.setProperty('--hud-min-height', `${Math.ceil(band + bl.getBoundingClientRect().height + bottom + 8)}px`);
+      }
     }
   }
   let hudQueued = false;
@@ -282,14 +291,14 @@
         for (const r of records) {
           if (r.type === 'characterData') keepCase(r.target); else r.addedNodes.forEach(keepCase);
           const el = r.target.nodeType === 1 ? r.target : r.target.parentElement;
-          if (!hud && el && el.closest && el.closest('.hud-tl, .hud-tr')) hud = true;
+          if (!hud && el && el.closest && el.closest('.hud-tl, .hud-tr, .hud-bl')) hud = true;
         }
         if (hud) hudLater();
       }).observe(document.body, { childList: true, characterData: true, subtree: true });
     }
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(hudLater);
-      document.querySelectorAll('.hud-tr, .hud-tl').forEach((el) => { ro.observe(el); if (el.parentElement) ro.observe(el.parentElement); });
+      document.querySelectorAll('.hud-tr, .hud-tl, .hud-bl').forEach((el) => { ro.observe(el); if (el.parentElement) ro.observe(el.parentElement); });
     } else window.addEventListener('resize', hudLater);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(hudLater);
     langListeners.push(hudLater);
