@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "85218cb727b3f1f0a8a7f24e96df0a5fd026261cf09c5582e7547c807a6e2535",
+      "sha256": "30521c3bfa06607026153e9aba409f15a78b878de1fabdc8443dd472b4810023",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -524,7 +524,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "ef7b154b18d51adda062f03962ab96fb50c2d1ef73564444127c594755cfc2c6",
+      "sha256": "1862da087b7b8adfdd69859e17234b6a7210b30572317fd8cdcc1623957249b7",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -652,7 +652,7 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "3a8d23e4f497af7ee64e765b3f813869287aaf0b55f1369ece28e352bc6ef8f9",
+      "sha256": "bccb0d010ac1b8f33bb629470982a4ede09afdbafa18d3dc56084e586e082696",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
@@ -944,7 +944,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "e4696bee13afacbb7c4c4e6ebe8c19b4b10849a2ec125bcd70d4b4b201e625dc",
+      "sha256": "1a1cfb1f0e63f1b513513d39d83e2678195c384c4d08555b0bfb0afcc2732d91",
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {

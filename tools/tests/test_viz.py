@@ -1511,6 +1511,211 @@ process.exit(0);
         self.assertTrue(self.failed("view-buried", "English, scene", "the scene button can be pressed"))
 
 
+@unittest.skipUnless(NODE, "node not available")
+class CitedNoteBar(unittest.TestCase):
+    """The tour bar of a cited figure (?embed=1&preset=…) in the shared theme, in Chromium on a private copy of the
+    starter page whose second card has a long note in both languages. In a phone frame (334 × 500) and on a desktop
+    page of the book (760 × 500) the bar stays ≤ 84px with ◀ title ▶ on its first row, the stage keeps ≥ 72 % of the
+    frame height and the frame does not scroll; the note keeps its whole text (also for assistive technology) and a
+    reader's wheel scrolls it to its last line. ▶ and ◀ step away and back. A second copy removes the bound of the
+    note in its own style.css, as the theme did before: it must fail, so the note is long enough to need the bound.
+    Run once as it is and once with VIZ_SLOW_FRAMES=1000. Skipped like RailGate."""
+
+    SLUG = "note-bar-fixture"
+    FRAMES = ((334, 500), (760, 500))
+    LONG = {
+        "zh": "θ = 45°：影子与高度一样长，各占平方和的一半。沿着时间轴继续拖动，青色的影子缩短多少，品红的高度就增加多少，"
+              "琥珀色的和始终停在 1；这不是这个角度的巧合，而是勾股定理在单位圆上的样子。用 ◀ ▶ 逐张看过去，"
+              "对照四个位置的读数，看清哪一部分在变、哪一部分从不改变。最后一句：平方和始终等于一。",
+        "en": "θ = 45°: the shadow and the height are equally long, and each holds exactly half of the sum of squares. "
+              "Keep dragging the rail and watch the trade: whatever the cyan shadow loses, the magenta height gains, "
+              "while the amber sum never leaves 1. That is the Pythagorean theorem drawn on the unit circle, not a "
+              "coincidence of this angle. Step through the other cards with ◀ ▶ to compare the four positions and see "
+              "which part changes and which part never does. Last line: the sum of squares stays at one.",
+    }
+    SHORT = {"zh": "θ = 90°：高度是整条半径。", "en": "θ = 90°: the height is the whole radius."}
+    NAME = {"zh": "45°：一半一半", "en": "45°: half and half"}
+    # the theme before the bound: nothing limits the note, which grows the bar and shrinks the stage
+    UNBOUNDED = ":root[data-embed][data-figure] .lab .tour .tour-note { max-height: none; overflow: visible; }\n"
+    RUNNER = """
+import fs from 'node:fs';
+const [kit, out, slug, frames, ...ids] = process.argv.slice(2);
+const { session, settle, until } = await import(kit);
+const T = await session();
+const read = (page) => page.evaluate(() => {
+  const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
+  const inView = (q) => q.w > 0 && q.h > 0 && q.l >= -0.5 && q.t >= -0.5 && q.r <= innerWidth + 0.5 && q.b <= innerHeight + 0.5;
+  const tour = document.querySelector('.tour'), note = tour.querySelector('.tour-note'), title = tour.querySelector('.what b');
+  const n = box(note), port = { l: n.l + note.clientLeft, t: n.t + note.clientTop, r: n.l + note.clientLeft + note.clientWidth, b: n.t + note.clientTop + note.clientHeight };
+  // where the first and the last character of the note are drawn, and whether all of each is in sight. The glyph box
+  // (the font's ascent and descent) is up to a pixel taller than a line at line-height 1.4, so allow 2px; a line
+  // hidden by the scroller is a whole line (~17px) away.
+  const chars = [], walk = document.createTreeWalker(note, NodeFilter.SHOW_TEXT), tol = 2;
+  for (let t = walk.nextNode(); t; t = walk.nextNode()) for (let i = 0; i < t.length; i++) if (t.data[i].trim()) chars.push([t, i]);
+  const seen = ([t, i]) => {
+    const g = document.createRange(); g.setStart(t, i); g.setEnd(t, i + 1);
+    const q = [...g.getClientRects()].filter((r) => r.width > 0 && r.height > 0).pop();
+    return !!q && q.top >= port.t - tol && q.bottom <= port.b + tol && q.left >= port.l - tol && q.right <= port.r + tol
+      && q.top >= -tol && q.bottom <= innerHeight + tol && q.left >= -tol && q.right <= innerWidth + tol;
+  };
+  const tb = box(title), btns = [...tour.querySelectorAll('[data-tour]')];
+  const pressed = document.querySelector('[data-preset][aria-pressed="true"]');
+  return {
+    frameScroll: document.documentElement.scrollHeight - innerHeight, frameScrollX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    scrollY, tour: box(tour).h, tourInView: inView(box(tour)), stage: document.querySelector('.stage').getBoundingClientRect().height / innerHeight,
+    title: title.innerText.replace(/\\s+/g, ' ').trim(), titleInView: inView(tb),
+    titleClear: btns.every((b) => { const a = box(b); return Math.min(a.r, tb.r) - Math.max(a.l, tb.l) <= 0.5 || Math.min(a.b, tb.b) - Math.max(a.t, tb.t) <= 0.5; }),
+    buttons: btns.map((b) => { const q = box(b), hit = document.elementFromPoint((q.l + q.r) / 2, (q.t + q.b) / 2); return { dir: b.dataset.tour, inView: inView(q), hit: !!hit && b.contains(hit) }; }),
+    note: note.textContent, noteShown: n.h > 0 && getComputedStyle(note).visibility !== 'hidden', lines: note.clientHeight / parseFloat(getComputedStyle(note).lineHeight),
+    scrollTop: note.scrollTop, scrollMax: note.scrollHeight - note.clientHeight,
+    firstSeen: chars.length > 0 && seen(chars[0]), lastSeen: chars.length > 0 && seen(chars[chars.length - 1]),
+    card: pressed ? pressed.dataset.preset : null,
+  };
+});
+const res = {};
+for (const id of ids) for (const lang of ['zh', 'en']) for (const [w, h] of JSON.parse(frames)) {
+  const page = await T.open(slug, id, `?embed=1&lang=${lang}&preset=even`, { viewport: { width: w, height: h }, locale: lang === 'zh' ? 'zh-CN' : 'en-US' });
+  await settle(page, 300);
+  const r = { open: await read(page), aria: await page.locator('.tour').ariaSnapshot() };
+  // a reader's wheel over the note, as far as it goes
+  const nb = await page.locator('.tour .tour-note').boundingBox();
+  await page.mouse.move(nb.x + nb.width / 2, nb.y + nb.height / 2);
+  await page.mouse.wheel(0, 4000);
+  r.reached = await until(page, () => { const n = document.querySelector('.tour .tour-note'); return n.scrollTop > 0 && n.scrollHeight - n.clientHeight - n.scrollTop <= 1; }, null, 20000);
+  await settle(page, 60);
+  r.end = await read(page);
+  await page.click('.tour [data-tour="next"]'); await settle(page, 120);
+  r.next = await read(page);
+  await page.click('.tour [data-tour="prev"]'); await settle(page, 120);
+  r.back = await read(page);
+  res[`${id}/${lang}/${w}x${h}`] = r;
+  await page.context().close();
+}
+await T.browser.close();
+fs.writeFileSync(out, JSON.stringify({ res, errors: T.errors }));
+process.exit(0);
+"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="tbook-note-"))
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        root = cls.tmp / "root"
+        (root / "books").mkdir(parents=True)
+        try:
+            (root / "theme").symlink_to(paths.THEME, target_is_directory=True)
+            if (paths.ROOT / "node_modules").is_dir():
+                (root / "node_modules").symlink_to(paths.ROOT / "node_modules", target_is_directory=True)
+        except OSError as exc:
+            raise unittest.SkipTest(f"cannot link the theme into a private root: {exc}")
+        book = fake_book(root / "books", cls.SLUG)
+
+        def note(js: str, card: str, text: dict) -> str:
+            line = f"    {card}: [{json.dumps(text['zh'], ensure_ascii=False)}, {json.dumps(text['en'], ensure_ascii=False)}],"
+            js, n = re.subn(rf"^    {card}: \[.*\],$", lambda _: line, js, flags=re.M)
+            if n != 1:
+                raise AssertionError(f"templates/viz/main.js no longer has exactly one note for the card {card!r}")
+            return js
+
+        for vid, rules in (("note-long", ""), ("note-unbounded", cls.UNBOUNDED)):
+            viz.scaffold(book, vid, vid.upper().replace("-", "//"), "说明", "Note", added="2026-11-14")
+            main, style = book.viz_dir / vid / "main.js", book.viz_dir / vid / "style.css"
+            main.write_text(note(note(main.read_text(encoding="utf-8"), "even", cls.LONG), "height", cls.SHORT), encoding="utf-8")
+            style.write_text(style.read_text(encoding="utf-8") + rules, encoding="utf-8")
+        runner = cls.tmp / "note-bar.mjs"
+        runner.write_text(cls.RUNNER, encoding="utf-8")
+        kit = (paths.TOOLS / "node" / "viz-testkit.mjs").as_uri()
+        cls.runs = {}
+        for run, slow in (("normal", None), ("slow", "1000")):
+            out = cls.tmp / f"note-bar-{run}.json"
+            env = {k: v for k, v in os.environ.items() if k not in ("VIZ_ORIGIN", "VIZ_SLOW_FRAMES")}
+            env["TBOOK_ROOT"] = str(root)
+            if slow:
+                env["VIZ_SLOW_FRAMES"] = slow
+            r = subprocess.run([NODE, str(runner), kit, str(out), cls.SLUG, json.dumps(cls.FRAMES), "note-long", "note-unbounded"],
+                               capture_output=True, text=True, cwd=paths.ROOT, env=env, timeout=900)
+            if not out.is_file():
+                tail = (r.stdout + r.stderr)[-3000:]
+                if re.search(r"Playwright is not installed|Executable doesn't exist|browserType\.launch", tail):
+                    raise unittest.SkipTest("Playwright Chromium is not available")
+                raise AssertionError(f"the note bar fixture did not run ({run}, exit {r.returncode}):\n{tail}")
+            cls.runs[run] = json.loads(out.read_text(encoding="utf-8"))
+
+    def cases(self, vid: str):
+        for run, data in self.runs.items():
+            for lang in ("zh", "en"):
+                for w, h in self.FRAMES:
+                    key = f"{vid}/{lang}/{w}x{h}"
+                    self.assertIn(key, data["res"], f"{run}: no result for {key}")
+                    yield f"{run} {key}", lang, data["res"][key]
+
+    def assertFrame(self, where: str, v: dict):
+        """The frame of a cited figure: nothing scrolls, the stage keeps its share, ◀ title ▶ are whole and in it."""
+        self.assertLessEqual(v["frameScroll"], 0, f"{where}: the frame scrolls")
+        self.assertLessEqual(v["frameScrollX"], 0, f"{where}: the frame scrolls sideways")
+        self.assertEqual(v["scrollY"], 0, f"{where}: the page moved")
+        self.assertLessEqual(v["tour"], 84, f"{where}: the note bar is {v['tour']:.1f}px")
+        self.assertTrue(v["tourInView"], f"{where}: the note bar is cut off by the frame")
+        self.assertGreaterEqual(v["stage"], 0.72, f"{where}: the stage keeps {v['stage']:.3f} of the frame")
+        self.assertTrue(v["titleInView"] and v["titleClear"], f"{where}: the title is cut off or under ◀ ▶")
+        self.assertEqual([(b["dir"], b["inView"], b["hit"]) for b in v["buttons"]],
+                         [("prev", True, True), ("next", True, True)], f"{where}: ◀ ▶")
+        self.assertTrue(v["noteShown"] and (v["firstSeen"] or v["scrollTop"] > 0), f"{where}: the note is not shown")
+
+    def test_a_long_note_scrolls_inside_a_bounded_bar_to_its_last_line(self):
+        for where, lang, r in self.cases("note-long"):
+            with self.subTest(where):
+                text, title = self.LONG[lang], self.NAME[lang]
+                for state in ("open", "end", "back"):
+                    self.assertFrame(f"{where} ({state})", r[state])
+                    self.assertEqual(r[state]["note"], text, "the note keeps its whole text")
+                    self.assertEqual(r[state]["card"], "even")
+                    self.assertEqual(r[state]["title"].casefold(), f"2 / 4 · {title}".casefold())
+                # the accessibility tree of the bar holds the whole note and both named buttons
+                aria = re.sub(r'[\s"]+', "", r["aria"])
+                self.assertIn(re.sub(r"\s+", "", text), aria, r["aria"])
+                self.assertIn('button"上一个实验"' if lang == "zh" else 'button"Previousexperiment"',
+                              re.sub(r"\s+", "", r["aria"]))
+                self.assertIn('button"下一个实验"' if lang == "zh" else 'button"Nextexperiment"',
+                              re.sub(r"\s+", "", r["aria"]))
+                # two lines in the bar: the first in sight, the last below until the reader scrolls to it
+                o = r["open"]
+                self.assertAlmostEqual(o["lines"], 2, delta=0.05, msg=where)
+                self.assertGreater(o["scrollMax"], 0, f"{where}: the note does not need to scroll")
+                self.assertEqual(o["scrollTop"], 0)
+                self.assertTrue(o["firstSeen"] and not o["lastSeen"], f"{where}: {o}")
+                self.assertTrue(r["reached"], f"{where}: the wheel does not reach the end of the note")
+                e = r["end"]
+                self.assertTrue(e["lastSeen"], f"{where}: the last line is not in sight at the end: {e}")
+                self.assertGreaterEqual(e["scrollTop"], e["scrollMax"] - 1)
+                # ◀ comes back to the start of the note
+                self.assertEqual(r["back"]["scrollTop"], 0)
+                self.assertTrue(r["back"]["firstSeen"])
+
+    def test_the_tour_steps_to_a_short_note_and_back(self):
+        for where, lang, r in self.cases("note-long"):
+            with self.subTest(where):
+                n = r["next"]
+                self.assertFrame(f"{where} (next)", n)
+                self.assertEqual((n["card"], n["note"]), ("height", self.SHORT[lang]))
+                self.assertTrue(n["title"].startswith("3 / 4 · "), n["title"])
+                self.assertLessEqual(n["scrollMax"], 0, f"{where}: a one-line note scrolls")
+                self.assertTrue(n["firstSeen"] and n["lastSeen"])
+                self.assertLess(n["tour"], r["open"]["tour"], "a short note does not keep the room of two lines")
+
+    def test_without_the_bound_the_note_grows_the_bar_over_the_stage(self):
+        for where, _, r in self.cases("note-unbounded"):
+            with self.subTest(where):
+                o = r["open"]
+                self.assertEqual(o["scrollMax"], 0)
+                self.assertGreater(o["tour"], 84, where)
+                self.assertLess(o["stage"], 0.72, where)
+
+    def test_no_page_errors(self):
+        for run, data in self.runs.items():
+            self.assertEqual(data["errors"], [], run)
+
+
 class KeysGate(unittest.TestCase):
     """The "keys" part of stageFirstChecks (spaceAfterCard in tools/node/viz-testkit.mjs), run in Chromium on private
     copies of the starter page: Space right after a pointer click on a card plays and pauses the clock; a page whose
@@ -1528,9 +1733,21 @@ const res = {};
 for (const id of ids) {
   const from = T.results.length;
   const page = await T.goto(slug, id, '?lang=zh'); await settle(page, 300);
+  // Force the transport to deliver each real key only after the short clock has stopped. A separate state read
+  // before keyboard.press can now disagree with the state at keydown, on every attempt rather than by chance.
+  let endedBeforeKey = 0;
+  if (id.endsWith('-delayed')) {
+    const press = page.keyboard.press.bind(page.keyboard);
+    page.keyboard.press = async (...args) => {
+      if (await page.locator('footer.rail #play').getAttribute('aria-pressed') === 'true') endedBeforeKey++;
+      await page.waitForFunction(() => document.querySelector('footer.rail #play').getAttribute('aria-pressed') === 'false');
+      return press(...args);
+    };
+  }
   await spaceAfterCard(T, page);
   const focus = await page.evaluate(() => document.activeElement === document.body);
-  res[id] = { checks: T.results.slice(from), blurred: focus };
+  const watcherGone = await page.evaluate(() => !window.__trvSpaceKeys);
+  res[id] = { checks: T.results.slice(from), blurred: focus, watcherGone, endedBeforeKey };
 }
 await T.browser.close();
 fs.writeFileSync(out, JSON.stringify({ res, errors: T.errors }));
@@ -1564,6 +1781,9 @@ process.exit(0);
         variants = {
             "keys-plain": (lambda js: js, lambda h: h),
             "keys-sticky": (lambda js: js + cls.STICKY, lambda h: h),
+            "keys-delayed": (lambda js: swap(js, "rate: 60, step: 15,", "rate: 3600, step: 15,"), lambda h: h),
+            "keys-sticky-delayed": (lambda js: swap(js, "rate: 60, step: 15,", "rate: 3600, step: 15,") + cls.STICKY, lambda h: h),
+            "keys-off-delayed": (lambda js: swap(js, "rate: 60, step: 15,", "rate: 3600, step: 15, keys: false,"), lambda h: h),
             "keys-dead": (lambda js: swap(js, cls.PRESET, cls.PRESET + cls.DISABLE), lambda h: h),
             # a page without the clock's ▶ in footer.rail (here: the same button under another id)
             "keys-noplay": (lambda js: swap(js, "$('play')", "$('playBtn')"),
@@ -1595,13 +1815,21 @@ process.exit(0);
     def test_the_starter_passes(self):
         [(ok, detail)] = self.outcome("keys-plain")
         self.assertTrue(ok, detail)
-        self.assertRegex(detail, r"playing (true|false) → Space → (true|false) → Space → (true|false)")
+        self.assertRegex(detail, r"playing (true|false) → Space → (true|false); playing (true|false) → Space → (true|false)")
         self.assertTrue(self.res["keys-plain"]["blurred"], "the check leaves nothing focused for the checks after it")
+        self.assertTrue(all(r["watcherGone"] for r in self.res.values()), "event listeners are cleaned up")
         self.assertEqual(self.errors, [])
 
+    def test_natural_completion_between_transport_calls_does_not_fail_a_working_shortcut(self):
+        [(ok, detail)] = self.outcome("keys-delayed")
+        self.assertTrue(ok, detail)
+        self.assertGreaterEqual(self.res["keys-delayed"]["endedBeforeKey"], 1)
+
     def test_a_card_that_keeps_the_focus_fails(self):
-        [(ok, detail)] = self.outcome("keys-sticky")
-        self.assertFalse(ok, detail)
+        for vid in ("keys-sticky", "keys-sticky-delayed", "keys-off-delayed"):
+            with self.subTest(vid):
+                [(ok, detail)] = self.outcome(vid)
+                self.assertFalse(ok, detail)
 
     def test_pages_without_a_clock_to_run_are_skipped(self):
         for vid in ("keys-dead", "keys-noplay"):
