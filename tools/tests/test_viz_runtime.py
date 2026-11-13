@@ -87,6 +87,18 @@ process.exit(T.results.every(r=>r.ok)&&T.errors.length===0?0:1);
             for part in ("turning the camera", "context is given back", "a touch takes"):
                 self.assertTrue(any(part in row["name"] and row["ok"] for row in rows), rows)
 
+    def test_embedded_solid_settles_after_its_visibility_verdict(self):
+        # A busy machine can deliver the first IntersectionObserver verdict after three.js is in; settle() must not
+        # draw the first frame before it, or a rest check reads a context that was never taken as one given back.
+        r = subprocess.run([NODE, str(paths.TOOLS / "tests" / "viz_rest_harness.mjs")],
+                           capture_output=True, text=True, cwd=paths.ROOT, timeout=180,
+                           env={**os.environ, "PW_CHROMIUM_PATH": doctor.chromium_path()})
+        rows = [json.loads(s) for s in r.stdout.splitlines() if s.startswith("{")]
+        if any("skip" in row for row in rows):
+            self.skipTest(rows[0]["skip"])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("11/11 passed", r.stdout)
+
     def test_screenshot_cli_selects_card_and_viewport(self):
         with tempfile.TemporaryDirectory(prefix="tbook-shots-") as tmp:
             root = Path(tmp)

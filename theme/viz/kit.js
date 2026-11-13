@@ -6,7 +6,8 @@
      kit.v3                       vector algebra on [x, y, z]: add sub scale dot cross len unit lerp rot slerp sph
      kit.painter(draw, [els])     coalesced redraw: paint() asks for one frame; repaints on resize, fonts and language
      kit.flush()                  finish running transitions and draw every painter now (browser suites use it instead of waiting)
-     kit.ready()                  a promise: resolves once the work the page waits for (three.js for kit.solid) is in
+     kit.ready()                  a promise: resolves once the work the page waits for (three.js for kit.solid, and
+                                  inside a book whether its stage is on screen) is in
      kit.tween(ms, step, done)    eased 0 → 1 animation (one jump under prefers-reduced-motion); returns { cancel }
      kit.stage3(el, opts)         a 3D scene on a 2D canvas: orbit camera (drag, wheel, pinch), depth-cued lines, sphere,
                                   arcs, arrows, polygons, DOM labels, picking on the unit sphere
@@ -85,7 +86,8 @@
       deliver the frame that ends it long after its nominal duration. */
   const tweens = new Set();
   function flush() { [...tweens].forEach((finish) => finish()); painters.forEach((p) => p.now()); }
-  /** Work the page is waiting for before its first true frame (kit.solid registers the loading of three.js):
+  /** Work the page is waiting for before its first true frame (kit.solid registers the loading of three.js and,
+      inside a book, the first verdict of whether its stage is on screen):
       kit.ready() resolves once all of it is in; the suites' settle() waits for it before calling flush(). */
   const waits = [];
   const pending = (promise) => { waits.push(promise); return promise; };
@@ -700,8 +702,8 @@
    Surfaces, glass shells, polyhedra and tubes take a key and keep their buffers from frame to frame; lines, arrows,
    beads, rings and fans are made for one frame. Inside a book (TRV.embed) the WebGL context is made only once the stage
    is on screen and is given back after a short rest (the frame stays on the page's 2D canvas as a picture); a touch or
-   a new frame takes it back. sc.ready resolves once the core is in; kit.ready() waits for every stage, and the suites'
-   settle() waits for kit.ready(). */
+   a new frame takes it back. sc.ready resolves once the core is in; kit.ready() waits for every stage (inside a book
+   also for its first verdict of whether it is on screen), and the suites' settle() waits for kit.ready(). */
 (function () {
   'use strict';
   const TRV = window.TRV;
@@ -809,9 +811,15 @@
       return overlay;
     };
     if (TRV.embed && window.IntersectionObserver) {
+      // The first frame waits for the first verdict, and rendering updates deliver it: a busy machine can hold them
+      // back until after three.js is in, so kit.ready() waits for the verdict as well as for the core.
+      let judged = null;
+      const verdict = new Promise((resolve) => { judged = resolve; });
+      if (kit.pending) kit.pending(verdict);
       new IntersectionObserver((entries) => {
         const seen = entries[entries.length - 1].isIntersecting;
         if (seen && !onScreen) { onScreen = true; if (o.onChange) o.onChange(); } else if (!seen && onScreen) { onScreen = false; park(); }
+        judged();
       }).observe(el);
     }
 

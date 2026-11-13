@@ -116,7 +116,7 @@ export function createScene(o) {
 
   /* buffers */
   const keyed = new Map();
-  let loose = [], pickables = [], occluders = [], marks = [], used = new Set();
+  let loose = [], spent = [], pickables = [], occluders = [], marks = [], used = new Set();
   // Picking and hiding are independent: transparent objects do not hide marks; pick:false lets rays pass.
   function register(mesh, s, extra, opaque) {
     const p = { mesh, ...extra };
@@ -149,10 +149,15 @@ export function createScene(o) {
     return m;
   }
 
-  /** Start a frame: the objects of the last frame without a key are dropped, those with a key wait to be placed. */
+  /** Start a frame: the objects of the last frame without a key are dropped, those with a key wait to be placed. A
+      dropped object's geometry goes now, its material once the next frame is drawn (or at the next begin, if none
+      is): three.js deletes a shader program when the last material using it is disposed, and the lines, arrows,
+      beads, rings and fans of this frame need the same programs, which would otherwise be linked again every frame. */
+  const release = () => { spent.forEach((m) => m.dispose()); spent = []; };
   sc.begin = () => {
     used = new Set();
-    loose.forEach((x) => { scene.remove(x); if (x.geometry) x.geometry.dispose(); if (x.material) x.material.dispose(); });
+    release();
+    loose.forEach((x) => { scene.remove(x); if (x.geometry) x.geometry.dispose(); if (x.material) spent.push(x.material); });
     loose = []; pickables = []; occluders = []; marks = []; sc.faces = 0;
     lighting();
   };
@@ -427,6 +432,7 @@ export function createScene(o) {
     const sz = renderer.getSize(new T.Vector2());
     if (sz.x !== sc.W || sz.y !== sc.H) renderer.setSize(sc.W, sc.H, false);
     renderer.render(scene, camera);
+    release();
   };
 
   /* picking: a ray from the eye through the canvas point */
@@ -481,6 +487,6 @@ export function createScene(o) {
   /** The beads and rings of the frame: { key, kind, p, x, y, hidden } (x, y in canvas pixels). */
   sc.marks = () => marks.map((m) => { const q = sc.p(m.p); return { key: m.key, kind: m.kind, p: m.p, x: q[0], y: q[1], hidden: sc.occluded(m.p, 0.02) }; });
   /** Free the GPU-side and scene objects. */
-  sc.dispose = () => { [...keyed.keys()].forEach(drop); loose.forEach((x) => { scene.remove(x); if (x.geometry) x.geometry.dispose(); if (x.material) x.material.dispose(); }); loose = []; };
+  sc.dispose = () => { [...keyed.keys()].forEach(drop); release(); loose.forEach((x) => { scene.remove(x); if (x.geometry) x.geometry.dispose(); if (x.material) x.material.dispose(); }); loose = []; };
   return sc;
 }

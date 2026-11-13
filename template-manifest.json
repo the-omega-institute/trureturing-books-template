@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "ccfd7984c2cf46c30b900b821144fa8682d05a7ae636a78e82520cdd495d2cdb",
+      "sha256": "15a837189b0297a17a1bdd1dbda4440aef49f937991d7c766b31bb25dd20fbe7",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -512,7 +512,7 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "0d8351e46345f5c0f797f4da71f7312e266025db39e19f2e8def269983ce449c",
+      "sha256": "4fdc940c8d4b1f6d088710093eb130a0c1414c57404f557c2daf18e25febc1bc",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
@@ -520,7 +520,7 @@
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
-      "sha256": "a057ca8a5d99816687c4d0cf89a0750cce22c5a373901ba37193b885f80d7c55",
+      "sha256": "df28ec9cde46be988bc3084d1862f889d7927e436a7a781acc53f70a1da06df6",
       "mode": "100644"
     },
     "theme/viz/theme.css": {
@@ -956,11 +956,11 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
-      "sha256": "4bf665ea69f2d3b0d367c78f077dd0a36b6a9a1473a9ecd374d736cf5b9a2544",
+      "sha256": "09136552402260ffeadd0ed9c9b8518c95c740b5664367b0e98ac95797eecb22",
       "mode": "100644"
     },
     "tools/tests/test_viz_solid.py": {
-      "sha256": "4928b0016fd0cb0e559bdb8cbfe9abfa859c9fd729fb4d131da6dcea0cd244dc",
+      "sha256": "a770a4eb652d65c5412d3283225fec5ec20bb17d09daa98983bef44bb956e06c",
       "mode": "100644"
     },
     "tools/tests/test_written_proof.py": {
@@ -971,12 +971,20 @@
       "sha256": "4ece056cce23ccbc4db0ddabf9c828c67486633d0a8c401f97ecac84570d63cd",
       "mode": "100644"
     },
+    "tools/tests/viz_rest_harness.mjs": {
+      "sha256": "11055f0258507a1a1b53d82729a2ecded300ad1d33ffdf6d6ca3256879222580",
+      "mode": "100644"
+    },
     "tools/tests/viz_runtime_harness.mjs": {
       "sha256": "59a06acca48c75e28e9c2a423121b4f1edff19ae0226f5656969e58521061ff5",
       "mode": "100644"
     },
     "tools/tests/viz_scroll_harness.mjs": {
       "sha256": "f5402774d9b7345075c6786a19b05f8495e443a7e8910c6849a7392d7d0ef355",
+      "mode": "100644"
+    },
+    "tools/tests/viz_solid_program_harness.mjs": {
+      "sha256": "0b0ab8f54ae54a0794b6b4ff062599a0bf2771f4872623d3b17c970a31712420",
       "mode": "100644"
     }
   }
