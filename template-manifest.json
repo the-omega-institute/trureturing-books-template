@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -68,11 +68,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "e2a2dcb337dc494d62fa59f3f31449504b332734aed19aae8fea8e7e5dec25a2",
+      "sha256": "c65cbfbba1de975c9595b63be44fca39605c3eb51ffcde6b11e783eacfbd8d47",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "85218cb727b3f1f0a8a7f24e96df0a5fd026261cf09c5582e7547c807a6e2535",
+      "sha256": "930e846fdc1b788c90074802fcc612ca3b4f4846668a58bfbb54e30e915ba8a9",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -140,7 +140,7 @@
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "3e5a2a123febe778168755be530e42ba9e3d80b4f8e36364536da7433b9f48ee",
+      "sha256": "70a380e1951ca1bf5b0c9e8b9400712c5875cb990fcc12180662e01e7ab670ef",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
@@ -684,7 +684,7 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "4391a1ed9b542ba207af1b666c827f769efed0c73d57b6ca77a33e027d02f718",
+      "sha256": "50638196815650ad3a9b1f333f910db9b84f55fac2597e01eac05f07fc5af6c1",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
@@ -844,7 +844,7 @@
       "mode": "100644"
     },
     "tools/tests/test_core.py": {
-      "sha256": "c2ea3df794b1bbed5d3851c84b6db799ecba027af5415fe1191fd4aa8a5ad3e6",
+      "sha256": "93b8f91010607223309ed5cc6e6642ea27551183519de15be328b9fffe228f76",
       "mode": "100644"
     },
     "tools/tests/test_figkit_marks.py": {
@@ -873,6 +873,10 @@
     },
     "tools/tests/test_followups_pandoc.py": {
       "sha256": "44795368da18fff283c55b7767d551ffd160cf0a1e6391cf266afcf0c88bf5cb",
+      "mode": "100644"
+    },
+    "tools/tests/test_heading_checks.py": {
+      "sha256": "545c7811c572f3b56b20e16f80a92efd4987a2b4c3a339a3578c3135468d106d",
       "mode": "100644"
     },
     "tools/tests/test_hide.py": {

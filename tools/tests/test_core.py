@@ -241,7 +241,7 @@ def chapters(lang: str) -> dict[str, str]:
             {'由' if zh else 'By'} [@thm-a] {'与' if zh else 'and'} [@lem-b].
             """,
         "part/ch02-1.md": f"""\
-            # {'第一节' if zh else 'Section'}
+            # {'第二章第一节' if zh else 'Section 2.1'}
 
             ::: {{.corollary #cor-c lean="{GID_INT}"}}
             [@thm-a].
@@ -249,21 +249,21 @@ def chapters(lang: str) -> dict[str, str]:
 
             ![fig](../../assets/fig.svg)
             """,
-        "appendix-a.md": """\
-            # A
+        "appendix-a.md": f"""\
+            # {'附录甲' if zh else 'Appendix A'}
 
-            ::: {.example #ex-a}
+            ::: {{.example #ex-a}}
             x
             :::
             """,
-        "appendix-b.md": """\
-            # B
+        "appendix-b.md": f"""\
+            # {'附录乙' if zh else 'Appendix B'}
 
-            ::: {.remark #rem-b}
+            ::: {{.remark #rem-b}}
             y
             :::
 
-            ::: {.problem #prob-p title="Open"}
+            ::: {{.problem #prob-p title="Open"}}
             z
             :::
             """,
