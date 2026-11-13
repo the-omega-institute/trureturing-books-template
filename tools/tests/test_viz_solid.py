@@ -4,7 +4,9 @@ Run: PYTHONPATH=tools .venv/bin/python -m unittest discover -s tools/tests -p 't
 The browser part runs tools/tests/solid_harness.mjs in Chromium (skipped without node, Playwright or a Chromium) and
 checks each of its lines: picking against the analytic sphere and torus, occlusion that flips with the camera, the two
 sides of a surface, the key light, giving the WebGL context back and taking it again, and that three.js is fetched only
-by the first call of kit.solid.
+by the first call of kit.solid. tools/tests/viz_solid_program_harness.mjs draws frame after frame with the core and with
+kit.solid and counts WebGL calls: once warm, a frame that draws the same kinds of primitive as the frame before links
+no shader program (through changes, resizing, parking and waking), and live resources stay bounded.
 """
 
 from __future__ import annotations
@@ -63,9 +65,10 @@ class VendoredThree(unittest.TestCase):
 
     def test_browser_fixture_names_no_book(self):
         # A books repository hides the example books; the harness must run under whichever book is visible.
-        harness = (paths.TOOLS / "tests" / "solid_harness.mjs").read_text(encoding="utf-8")
-        self.assertNotIn("/site/example-", harness)
-        self.assertIn("listBooks()", harness)
+        for name in ("solid_harness.mjs", "viz_solid_program_harness.mjs"):
+            harness = (paths.TOOLS / "tests" / name).read_text(encoding="utf-8")
+            self.assertNotIn("/site/example-", harness, name)
+            self.assertIn("listBooks()", harness, name)
 
     def test_published_with_the_runtime(self):
         import tempfile
@@ -81,29 +84,40 @@ def browser_ready() -> bool:
     return bool(NODE and (paths.ROOT / "node_modules" / "playwright-chromium").is_dir() and doctor.chromium_path())
 
 
-@unittest.skipUnless(browser_ready(), "node, node_modules/playwright-chromium and a Chromium are required")
-class SolidInTheBrowser(unittest.TestCase):
+def run_harness(name: str) -> tuple[dict, str]:
+    """Run a browser harness of tools/tests/ and collect its { name, ok, detail } lines by name."""
+    env = dict(os.environ)
+    env.setdefault("PW_CHROMIUM_PATH", doctor.chromium_path())
+    r = subprocess.run([NODE, str(paths.TOOLS / "tests" / name)], capture_output=True, text=True,
+                       timeout=600, env=env, cwd=paths.ROOT)
+    results = {}
+    for line in r.stdout.splitlines():
+        if line.startswith("{"):
+            row = json.loads(line)
+            if "skip" in row:  # no visible book to serve the runtime from
+                raise unittest.SkipTest(row["skip"])
+            if "name" in row:
+                results[row["name"]] = row
+    return results, r.stdout + r.stderr
+
+
+class BrowserHarness(unittest.TestCase):
+    harness = ""
     results: dict = {}
 
     @classmethod
     def setUpClass(cls):
-        env = dict(os.environ)
-        env.setdefault("PW_CHROMIUM_PATH", doctor.chromium_path())
-        r = subprocess.run([NODE, str(paths.TOOLS / "tests" / "solid_harness.mjs")], capture_output=True, text=True,
-                           timeout=600, env=env, cwd=paths.ROOT)
-        cls.output = r.stdout + r.stderr
-        cls.results = {}
-        for line in r.stdout.splitlines():
-            if line.startswith("{"):
-                row = json.loads(line)
-                if "skip" in row:  # no visible book to serve the runtime from
-                    raise unittest.SkipTest(row["skip"])
-                cls.results[row["name"]] = row
+        cls.results, cls.output = run_harness(cls.harness)
 
     def expect(self, name: str):
         row = self.results.get(name)
         self.assertIsNotNone(row, f"no result for {name!r}:\n{self.output[-3000:]}")
         self.assertTrue(row["ok"], f"{name}: {row['detail']}")
+
+
+@unittest.skipUnless(browser_ready(), "node, node_modules/playwright-chromium and a Chromium are required")
+class SolidInTheBrowser(BrowserHarness):
+    harness = "solid_harness.mjs"
 
     def test_three_is_fetched_on_first_use_only(self):
         self.expect("no three.js before kit.solid is called")
@@ -142,6 +156,40 @@ class SolidInTheBrowser(unittest.TestCase):
         """sc.line(pts, { dash }) of the core (kit.solid, the film engine's solid shots) cuts dashes along the whole
         polyline: a densely sampled curve stays dashed (regression check of the dense-sampling case)."""
         self.expect("core: a dashed line looks the same sampled with 2 and with 400 points, about half of it inked")
+
+    def test_no_errors(self):
+        self.expect("no page error, console error or failed request")
+
+
+@unittest.skipUnless(browser_ready(), "node, node_modules/playwright-chromium and a Chromium are required")
+class SolidProgramsInTheBrowser(BrowserHarness):
+    """Lines, circles, arrows, beads, rings and fans are made anew each frame, and three.js deletes a shader program
+    with the last material that uses it: the core keeps the last frame's materials until the next frame is drawn, so a
+    played page does not link its programs again on every frame (a stall of seconds on a busy machine). Every frame is
+    drawn for real; the counts are of WebGL calls, not of time."""
+    harness = "viz_solid_program_harness.mjs"
+
+    def test_frames_reuse_the_programs_of_the_frame_before(self):
+        self.expect("core: the first frame links the programs it needs (the counter sees links)")
+        self.expect("core: after one cycle, frames that draw the same kinds of primitive link no program")
+        self.expect("core: the same state gives the same pixels, the next state other pixels")
+
+    def test_changes_and_resizing_link_only_what_is_new(self):
+        self.expect("core: a change of geometry, colours and kinds of primitive links on its first frame only")
+        self.expect("core: resizing the canvas links no program")
+        self.expect("core: when they come back, their programs are linked on the first frame only")
+
+    def test_live_resources_stay_bounded(self):
+        self.expect("core: live programs, buffers, materials and geometries are the same one cycle later (nothing piles up)")
+        self.expect("core: primitives no longer drawn are released with their materials, buffers and programs")
+        self.expect("core: frames built but not drawn keep at most one frame of materials, and the next drawn frame lets them go")
+        self.expect("core: dispose() frees every material and geometry")
+
+    def test_kit_solid_frames_parking_and_resizing(self):
+        self.expect("kit.solid: played frames link no program after warm-up")
+        self.expect("kit.solid: picking and hidden marks are unchanged")
+        self.expect("kit.solid: after parking and waking, the new context draws the same picture and links nothing once warm")
+        self.expect("kit.solid: resizing the stage links no program")
 
     def test_no_errors(self):
         self.expect("no page error, console error or failed request")
