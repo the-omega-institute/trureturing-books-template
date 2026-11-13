@@ -41,14 +41,16 @@ for (const [width, height] of [[390, 844], [334, 320]]) {
     await page.setContent(`<!doctype html><style>html{overflow:auto}html,body{margin:0}.center{${axis === 'y' ? `margin-top:${height - 98 + edge}px` : `margin-left:${width - 91 + edge}px`}}.stage{height:100px;width:100px}.stage>span{display:block;width:100%;height:100%}.tail{height:1000px;width:1000px}</style><main class="center"><div class="stage"><span>Owned child</span></div></main><div class="tail"></div>`);
     const initial = await page.evaluate(axis => {
       const r = document.querySelector('.stage').getBoundingClientRect(), x = r.left + r.width * (axis === 'x' ? .9 : .1), y = axis === 'y' ? r.bottom - 3 : r.top + 3;
-      return { x, y, hit: document.elementFromPoint(x, y)?.tagName || null, viewport: [innerWidth, innerHeight] };
+      return { x, y, hit: document.elementFromPoint(x, y)?.tagName || null, viewport: [innerWidth, innerHeight],
+        corners: [[r.left + 10, r.top + 3], [r.left + 90, r.top + 3], [r.left + 10, r.top + 97], [r.left + 90, r.top + 97]] };
     }, axis);
     // Record the gate's actual calls; do not replace the browser's hit results.
     await page.evaluate(() => { window.hits = []; const real = document.elementFromPoint.bind(document); document.elementFromPoint = (x, y) => { const hit = real(x, y); hits.push({ x, y, scroll: [scrollX, scrollY], hit: hit?.tagName || null }); return hit; }; });
     const v = await stageView(page, '.stage');
     const hits = await page.evaluate(() => hits);
     T.check(`${width}×${height} fractional ${axis} edge ${edge}: same corners hit owner or child after allowed scroll`, !v.layout.length, JSON.stringify({ initial, hits, layout: v.layout }));
-    T.check(`${width}×${height} fractional ${axis} edge ${edge}: all four original corners were tested`, hits.length === 4 && hits.every(h => h.hit === 'SPAN'), JSON.stringify(hits));
+    T.check(`${width}×${height} fractional ${axis} edge ${edge}: all four original corners were tested`, hits.length === 4 && hits.every((h, i) => h.hit === 'SPAN'
+      && Math.abs(h.x + h.scroll[0] - initial.corners[i][0]) < 1e-6 && Math.abs(h.y + h.scroll[1] - initial.corners[i][1]) < 1e-6), JSON.stringify({ initial, hits }));
   }
 }
 for (const kind of ['overlay', 'clipping', 'unscrollable', 'fractional-unscrollable', 'figure', 'null']) {
