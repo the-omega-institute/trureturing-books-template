@@ -70,6 +70,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import unicodedata
 import uuid
 import zipfile
@@ -1662,6 +1663,20 @@ def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", p
     return out_path
 
 
+def _compact_pdf(path: Path) -> Path:
+    """Pack PDF objects and Flate streams without resampling or re-encoding images."""
+    import pikepdf
+
+    with tempfile.TemporaryDirectory(prefix=".tbook-pdf-", dir=path.parent) as tmp:
+        compact = Path(tmp) / path.name
+        with pikepdf.open(path) as pdf:
+            pdf.save(compact, object_stream_mode=pikepdf.ObjectStreamMode.generate,
+                     compress_streams=True, recompress_flate=True, deterministic_id=True)
+        if compact.stat().st_size < path.stat().st_size:
+            compact.replace(path)
+    return path
+
+
 def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
               stage_dir: Path | None = None) -> Path:
     """Build ``out_path`` (PDF: ``screen`` (dark), ``print`` (light), or ``academic`` (scholarly layout)).
@@ -1671,9 +1686,10 @@ def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
     if variant not in config.PDF_VARIANTS:
         raise PandocError(f"unknown PDF variant {variant!r}; expected one of {config.PDF_VARIANTS}")
     staged = typst_source(site, book, edition, model, lock, stage_dir=stage_dir)
-    return compile_typst(staged.dir / "main.typ", Path(out_path), root=staged.dir,
+    result = compile_typst(staged.dir / "main.typ", Path(out_path), root=staged.dir,
                          sys_inputs={"tr-variant": variant}, timestamp=source_date_epoch(book) or None,
                          pdf_tags=bool(book.pdf.get("academic_tags", False)) if variant == "academic" else True)
+    return _compact_pdf(result) if variant == "academic" else result
 
 
 # --------------------------------------------------------------------------- EPUB
