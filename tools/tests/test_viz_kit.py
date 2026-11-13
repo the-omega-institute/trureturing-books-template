@@ -204,6 +204,8 @@ class RuntimeSource(unittest.TestCase):
         kit = (paths.THEME / "viz" / "kit.js").read_text(encoding="utf-8")
         self.assertIn("g.arrow = (a, b, s) =>", kit)
         self.assertIn("lineDashOffset", kit)
+        self.assertIn("rawIh", kit)
+        self.assertIn("--plot-min-height", kit)
 
 
 @unittest.skipUnless(browser_ready(), "node, node_modules/playwright-chromium and a Chromium are required")

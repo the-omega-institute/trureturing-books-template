@@ -512,7 +512,7 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "08a00bc4340e284cc4123ec386637094939b4d4d7ec8c9d2477b9ce550e2fa4f",
+      "sha256": "25c0cb5a160d204168d0c3213c8fd64dc9aadc15577a4c03ca3d7a2614586c88",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
@@ -524,7 +524,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "554d69c5d82539012efa6c6fd598c6aa8399afd0f874747f57341ae099ccbcb2",
+      "sha256": "ef7b154b18d51adda062f03962ab96fb50c2d1ef73564444127c594755cfc2c6",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -812,7 +812,7 @@
       "mode": "100644"
     },
     "tools/tests/kit_harness.mjs": {
-      "sha256": "06d9a0976bdabcc9ac4acae5c5c416f9fc2bce8e21f3931fa41ba5c117dff0a3",
+      "sha256": "a8ee22681b81a0e8c0e5f9261f460ebfae8ab5a7ffbaa052cc4f0f39ad684404",
       "mode": "100644"
     },
     "tools/tests/solid_harness.mjs": {
@@ -948,7 +948,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {
-      "sha256": "3c5a2d91387fa9401e8c475bb89625e9b9735b19b11195a4748720024e6475d0",
+      "sha256": "808cacb17df30a2b8f2b29e8432159817b2d30fe5f8da437ebf4cf422f157fba",
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {

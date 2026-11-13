@@ -353,7 +353,20 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (o.clear !== false) ctx.clearRect(0, 0, W, H);
     const pad = o.pad || [38, 12, 10, 22], pl = pad[0], pr = pad[1], pt = pad[2], pb = pad[3];
-    const iw = Math.max(1, W - pl - pr), ih = Math.max(1, H - pt - pb);
+    const iw = Math.max(1, W - pl - pr), rawIh = H - pt - pb;
+    /* A chart owns the height its caller requested. Keep a safe one-pixel drawing box for the first frame while the
+       stage grows to the declared budget, but expose the real allocation and never treat that fallback as readable.
+       The default is two 10px label rows plus a 4px breathing gap; denser pages may request a larger minimum. */
+    const minHeight = o.minHeight == null ? 24 : Math.max(0, Number(o.minHeight));
+    const stage = cv.closest && cv.closest('.stage');
+    /* A cited figure has a fixed stage-plus-tour frame; its HUD minimum is part of that frame's grid allocation, while
+       a chart's extra panel budget belongs to the page and must be satisfied by its own layout. */
+    if (stage && !TRV.still && !TRV.figure) {
+      const need = Math.max(0, pt + pb + minHeight);
+      const old = parseFloat(stage.style.getPropertyValue('--plot-min-height')) || 0;
+      if (need > old + 0.5) stage.style.setProperty('--plot-min-height', `${Math.ceil(need)}px`);
+    }
+    const ih = Math.max(1, rawIh);
     const fx = o.logX ? Math.log10 : (v) => v, fy = o.logY ? Math.log10 : (v) => v;
     let a0 = fx(o.x[0]), a1 = fx(o.x[1]), b0 = fy(o.y[0]), b1 = fy(o.y[1]);
     if (o.equal) {
@@ -363,7 +376,9 @@
     const X = (v) => pl + (fx(v) - a0) / (a1 - a0) * iw, Y = (v) => pt + ih - (fy(v) - b0) / (b1 - b0) * ih;
     const inv = (f) => (o[f] ? (u) => Math.pow(10, u) : (u) => u);
     const g = {
-      ctx, W, H, X, Y, pl, pr, pt, pb, iw, ih,
+      ctx, W, H, X, Y, pl, pr, pt, pb, iw, ih, rawIh, minHeight,
+      /** Whether the caller's requested chart box currently has its declared readable height. */
+      drawable: rawIh >= minHeight,
       x0: inv('logX')(a0), x1: inv('logX')(a1), y0: inv('logY')(b0), y1: inv('logY')(b1),
       /** Screen pixel → data value (for pointer picking). */
       invX: (px) => inv('logX')(a0 + (px - pl) / iw * (a1 - a0)),

@@ -147,6 +147,15 @@ const dashS = { color: '#ffffff', width: 1.5, dash: [6, 6] };
   const api = await page.evaluate(() => { const g = TRV.kit.plot(document.getElementById('pl'), { x: [0, 1], y: [0, 1] }); return typeof g.arrow === 'function' && g.arrow.length === 3; });
   out('plot: g.arrow takes (a, b, s) as st.arrow of kit.stage3', api);
 }
+{
+  const r = await page.evaluate(() => {
+    const cv = document.getElementById('cv'), st = document.getElementById('st');
+    const top = cv.clientHeight + 10, bottom = 80;
+    const g = TRV.kit.plot(cv, { x: [0, 1], y: [0, 1], pad: [10, 10, top, bottom] });
+    return { raw: g.rawIh, safe: g.ih, drawable: g.drawable, min: parseFloat(st.style.getPropertyValue('--plot-min-height')), want: top + bottom + g.minHeight };
+  });
+  out('plot: a short allocation reports its real height and publishes the stage budget', r.raw < 0 && r.safe === 1 && !r.drawable && r.min >= r.want, JSON.stringify(r));
+}
 
 /* ---------- the ink swatch ---------- */
 {
