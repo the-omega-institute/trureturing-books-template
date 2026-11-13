@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "a05aa6a6f921291912bab2f5f80c312d82b3f9bdb6c4b5f247522286da6ab4a0",
+      "sha256": "6cc54178b70035171aa33453dc92399522fac757a1e6b94141c914d50c7d5a52",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -480,7 +480,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "b402e129cad79ad19d434d45a0e622f0646eded1354ec20af91417778bf20c4b",
+      "sha256": "16757b49518d74983d98745d026eb9ae1721ba233fc6064020e146684a238162",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -904,7 +904,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "cf49b54aa9388203d2311c04712a4e3a974edb9091514fb6da098848ea0e7e35",
+      "sha256": "515c7b4164abd6538c5e96fd9ebc2e456d2267609c371072496d615a6ad83434",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {
