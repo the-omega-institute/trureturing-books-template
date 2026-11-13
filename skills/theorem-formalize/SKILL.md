@@ -22,7 +22,7 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 
 ### 0. 先找，再写
 
-1. 在 trureturing checkout（`$TRURETURING_DIR` 或 `../trureturing`；没有就 `git clone https://github.com/the-omega-institute/trureturing ../trureturing`）中检索：`D5/` 的声明 → 钉版 mathlib → 其他。按 trureturing 的检索顺序找可复用的已冻结声明。
+1. 默认使用 `~/trureturing`；用户显式指定的路径或已有 `TRURETURING_DIR` 优先。用 `export TRURETURING_DIR="${TRURETURING_DIR:-$HOME/trureturing}"` 沿用选定位置；目录不存在时克隆到该位置：`git clone https://github.com/the-omega-institute/trureturing "$TRURETURING_DIR"`。核对上游工作区规则后，在该 checkout 中检索：`D5/` 的声明 → 钉版 mathlib → 其他。后续 skill 与钉版步骤继续使用同一变量，不重新选择路径。
 2. 找到 → 记下 GID（`<模块路径>.<声明名>`），确认 `Golden/Frozen/state/<模块路径>.lean.json` 里有它且 `kind` 为 `theorem`，回到本仓库写作即可。
 3. 找到但陈述不同 → 判断书中陈述能否作为它的忠实特例或推论；能，就在 trureturing 里补一条小定理（仍走下面的流程），不要在书里“近似地”引用。
 

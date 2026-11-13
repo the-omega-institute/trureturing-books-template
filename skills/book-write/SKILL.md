@@ -92,8 +92,11 @@ PDF 一端由 `tools/filters/typst-compat.lua` 负责与 KaTeX 保持一致：�
 
 把源文已证结果写成显式 written-proof 之前，先在所钉提交上搜索匹配的冻结声明；真正未证才用 conjecture。经典结论常常已经冻结，只是换了名字，或以有限维、固定参数、等价改写的形式出现。trureturing 每个 `D5/**/*.lean` 文件头有一行英文 `digest:` 摘要：
 
+本地上游默认使用 `~/trureturing`；用户显式指定时先将该路径设为 `TRURETURING_DIR`，否则沿用已有值。后续形式化与钉版继续使用这个目录。
+
 ```bash
-T="${TRURETURING_DIR:-../trureturing}"
+export TRURETURING_DIR="${TRURETURING_DIR:-$HOME/trureturing}"
+T="$TRURETURING_DIR"
 C=$(python3 -c "import json; print(json.load(open('trureturing.lock.json'))['commit'])")
 git -C "$T" grep -n -i -E 'digest: .*(stinespring|trace distance)' "$C" -- D5
 git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && echo frozen
