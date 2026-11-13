@@ -198,12 +198,14 @@ class RuntimeSource(unittest.TestCase):
         self.assertRegex(css, r"\.lean\.frozen\s*\{[^}]*var\(--ink\)")
         self.assertNotRegex(css, r"\.lean\.frozen[^{]*\{[^}]*--ok")   # neutral, never green
         self.assertRegex(css, r"\.keepcase\s*\{\s*text-transform:\s*none;")
-        self.assertIn(".hud-stack .hud-tl", css)
+        self.assertIn(".stage.hud-stack > .hud-tl", css)
 
     def test_kit_names_plot_arrow(self):
         kit = (paths.THEME / "viz" / "kit.js").read_text(encoding="utf-8")
         self.assertIn("g.arrow = (a, b, s) =>", kit)
         self.assertIn("lineDashOffset", kit)
+        self.assertIn("rawIh", kit)
+        self.assertIn("--plot-min-height", kit)
 
 
 @unittest.skipUnless(browser_ready(), "node, node_modules/playwright-chromium and a Chromium are required")
@@ -244,6 +246,10 @@ class KitInTheBrowser(unittest.TestCase):
     def test_plot_arrow(self):
         self.expect("plot: g.arrow([x0, y0], [x1, y1], s) draws a shaft in data coordinates and a head at the far end",
                     "plot: g.arrow takes (a, b, s) as st.arrow of kit.stage3")
+
+    def test_plot_height_budget(self):
+        self.expect("plot: a short allocation reports its real height and publishes the stage budget",
+                    "plot: the stage budget includes its border box")
 
     def test_ink_swatch(self):
         self.expect("theme: .sw.ik is the ink swatch (the --tr-ink token)")

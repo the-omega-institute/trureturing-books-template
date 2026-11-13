@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "93716e4168bae910c4739a32d9719872e748b0d12b6d25ba08815e0bedb2b79f",
+      "sha256": "98fb94bd87f8072fb31750ee5b4e0105e4955816d1d811b7f5338b4f29bf55b1",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -512,11 +512,11 @@
       "mode": "100644"
     },
     "theme/viz/kit.js": {
-      "sha256": "fc5197d037495cffe865547bf03d621678b126967dfd524fbc8136ae533585b1",
+      "sha256": "0d8351e46345f5c0f797f4da71f7312e266025db39e19f2e8def269983ce449c",
       "mode": "100644"
     },
     "theme/viz/shell.js": {
-      "sha256": "1a719fa59078d1b39d743c0d2ae33317c97a7faba8cdfe63429690ab51d7e69a",
+      "sha256": "d3909ddf13c079b82bdb140c6674ca8206c07bd25336c3c69ddf6586ac17aada",
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
@@ -524,7 +524,7 @@
       "mode": "100644"
     },
     "theme/viz/theme.css": {
-      "sha256": "e492c8487c3eed8b48284f32211103ed8918837b531895d1da555a9c058bf789",
+      "sha256": "ef7b154b18d51adda062f03962ab96fb50c2d1ef73564444127c594755cfc2c6",
       "mode": "100644"
     },
     "theme/viz/vendor/README.md": {
@@ -812,7 +812,7 @@
       "mode": "100644"
     },
     "tools/tests/kit_harness.mjs": {
-      "sha256": "06d9a0976bdabcc9ac4acae5c5c416f9fc2bce8e21f3931fa41ba5c117dff0a3",
+      "sha256": "2b5ce47a9e39c656d3b5979091df59a6dad947ddb348ebd1901d4ecc9806ab96",
       "mode": "100644"
     },
     "tools/tests/solid_harness.mjs": {
@@ -944,15 +944,15 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "a68ef19101a6c6a71ea65758ce7a185a68f4ed35eec3fd40e424155bf9599a81",
+      "sha256": "e4696bee13afacbb7c4c4e6ebe8c19b4b10849a2ec125bcd70d4b4b201e625dc",
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {
-      "sha256": "0be5857c408f5ed94b5c4b68569e2578ba2aa6f0e55b4b65ededa4221caaf4b7",
+      "sha256": "db3ec917634892eba1e698d8a81c2f9730fcd0ced7622740a3b2698a8cdb2d79",
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
-      "sha256": "d6f981917667033410dcb0825161ffdce66f7aea48ecdd1ac275af7137d45747",
+      "sha256": "e0c6f705d1807a571587cede6611df61016677e26237631708feb00d98be32e3",
       "mode": "100644"
     },
     "tools/tests/test_viz_solid.py": {
@@ -961,6 +961,10 @@
     },
     "tools/tests/test_written_proof.py": {
       "sha256": "1bee585a0d97dc1f59b6bd51dfcb7cb8faeebca74d9f90cd7b18835734985961",
+      "mode": "100644"
+    },
+    "tools/tests/viz_hud_harness.mjs": {
+      "sha256": "4ece056cce23ccbc4db0ddabf9c828c67486633d0a8c401f97ecac84570d63cd",
       "mode": "100644"
     },
     "tools/tests/viz_runtime_harness.mjs": {
