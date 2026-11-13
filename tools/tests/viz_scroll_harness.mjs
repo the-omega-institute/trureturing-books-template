@@ -36,24 +36,24 @@ for (let mask = 0; mask < 8; mask++) {
 // No runtime is involved in these fixtures: only the shared quality gate decides ownership and scrollability.
 for (const [width, height] of [[390, 844], [334, 320]]) {
   await page.setViewportSize({ width, height });
-  for (const edge of [-0.25, 0, 0.49, 0.5, 0.734375, 0.99, 1.25]) {
+  for (const axis of ['x', 'y']) for (const edge of [-0.25, 0, 0.49, 0.5, 0.734375, 0.99, 1.25]) {
     await page.goto('about:blank');
-    await page.setContent(`<style>html,body{margin:0;overflow:auto}.center{margin-top:${height - 98 + edge}px}.stage{height:100px;width:100%}.stage>span{display:block;width:100%;height:100%}.tail{height:1000px}</style><main class="center"><div class="stage"><span>Owned child</span></div></main><div class="tail"></div>`);
-    const initial = await page.evaluate(() => {
-      const r = document.querySelector('.stage').getBoundingClientRect(), x = r.width * .1, y = r.bottom - 3;
+    await page.setContent(`<style>html,body{margin:0;overflow:auto}.center{${axis === 'y' ? `margin-top:${height - 98 + edge}px` : `margin-left:${width - 91 + edge}px`}}.stage{height:100px;width:100px}.stage>span{display:block;width:100%;height:100%}.tail{height:1000px;width:1000px}</style><main class="center"><div class="stage"><span>Owned child</span></div></main><div class="tail"></div>`);
+    const initial = await page.evaluate(axis => {
+      const r = document.querySelector('.stage').getBoundingClientRect(), x = r.left + r.width * (axis === 'x' ? .9 : .1), y = axis === 'y' ? r.bottom - 3 : r.top + 3;
       return { x, y, hit: document.elementFromPoint(x, y)?.tagName || null, viewport: [innerWidth, innerHeight] };
-    });
+    }, axis);
     // Record the gate's actual calls; do not replace the browser's hit results.
     await page.evaluate(() => { window.hits = []; const real = document.elementFromPoint.bind(document); document.elementFromPoint = (x, y) => { const hit = real(x, y); hits.push({ x, y, scroll: [scrollX, scrollY], hit: hit?.tagName || null }); return hit; }; });
     const v = await stageView(page, '.stage');
     const hits = await page.evaluate(() => hits);
-    T.check(`${width}×${height} fractional edge ${edge}: same corners hit owner or child after allowed scroll`, !v.layout.length, JSON.stringify({ initial, hits, layout: v.layout }));
-    T.check(`${width}×${height} fractional edge ${edge}: all four original corners were tested`, hits.length === 4 && hits.every(h => h.hit === 'SPAN'), JSON.stringify(hits));
+    T.check(`${width}×${height} fractional ${axis} edge ${edge}: same corners hit owner or child after allowed scroll`, !v.layout.length, JSON.stringify({ initial, hits, layout: v.layout }));
+    T.check(`${width}×${height} fractional ${axis} edge ${edge}: all four original corners were tested`, hits.length === 4 && hits.every(h => h.hit === 'SPAN'), JSON.stringify(hits));
   }
 }
-for (const kind of ['overlay', 'clipping', 'unscrollable', 'figure']) {
+for (const kind of ['overlay', 'clipping', 'unscrollable', 'fractional-unscrollable', 'figure', 'null']) {
   await page.goto('about:blank');
-  await page.setContent(`<style>html,body{margin:0;${kind === 'unscrollable' ? 'overflow:hidden' : ''}}.center{margin-top:${kind === 'unscrollable' || kind === 'figure' ? 224 : 20}px;${kind === 'clipping' ? 'height:40px;overflow:hidden' : ''}}.stage{height:100px;width:100%}.tail{height:1000px}#overlay{position:fixed;inset:0;z-index:100}</style><main class="center"><div class="stage"></div></main><div class="tail"></div>${kind === 'overlay' ? '<div id="overlay"></div>' : ''}`);
+  await page.setContent(`<style>html,body{margin:0;${kind.includes('unscrollable') ? 'overflow:hidden' : ''}${kind === 'null' ? 'pointer-events:none' : ''}}.center{margin-top:${kind === 'fractional-unscrollable' ? 222.75 : kind === 'unscrollable' || kind === 'figure' ? 224 : 20}px;${kind === 'clipping' ? 'height:40px;overflow:hidden' : ''}}.stage{height:100px;width:100%}.tail{height:1000px}#overlay{position:fixed;inset:0;z-index:100}</style><main class="center"><div class="stage"></div></main><div class="tail"></div>${kind === 'overlay' ? '<div id="overlay"></div>' : ''}`);
   const v = await stageView(page, '.stage', kind === 'figure');
   T.check(`negative ${kind}: obstructed or unreachable original corners fail`, v.layout.some(s => kind === 'unscrollable' || kind === 'figure' ? /cannot be/.test(s) : /painted over/.test(s)), JSON.stringify(v));
   if (kind === 'figure') T.check('a cited figure never scrolls and still requires complete content', await page.evaluate(() => scrollY === 0) && v.layout.some(s => /frame scrolls/.test(s)), JSON.stringify(v));

@@ -246,7 +246,7 @@ export const stageView = (page, sel, figure = false) => page.evaluate(([sel, fig
       window.scrollBy(insideX() ? 0 : x - innerWidth / 2, insideY() ? 0 : y - innerHeight / 2);
       [x, y] = pt();
     }
-    return { hit: insideX() && insideY() ? document.elementFromPoint(x, y) : undefined,
+    return { hit: x >= 0 && x < innerWidth && y >= 0 && y < innerHeight ? document.elementFromPoint(x, y) : undefined,
       point: `sample ${before.join(',')} → ${x},${y}; scroll ${start.join(',')} → ${scrollX},${scrollY}; viewport ${innerWidth}×${innerHeight}` };
   };
   const layout = [], hud = [];

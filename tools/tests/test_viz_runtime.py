@@ -24,7 +24,7 @@ class RuntimeRegressions(unittest.TestCase):
                            capture_output=True, text=True, cwd=paths.ROOT, timeout=180,
                            env={**os.environ, "PW_CHROMIUM_PATH": doctor.chromium_path()})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("82/82 passed", r.stdout)
+        self.assertIn("112/112 passed", r.stdout)
 
     def test_complete_hud_after_resize_language_and_synchronous_draw(self):
         r = subprocess.run([NODE, str(paths.TOOLS / "tests" / "viz_hud_harness.mjs")],
