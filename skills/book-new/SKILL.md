@@ -43,7 +43,16 @@ description: 在书库中新建一本书、新增章节或新增一个语言版�
 ./tbook new-chapter <slug> ch02-name --title zh="第二章 …" --title en="Chapter 2 …"
 ```
 
-会在每个语言版本的 `SUMMARY.md` 末尾追加条目并创建文件。每个语言版本都要有 `--title`，且都已有 `SUMMARY.md`；先全部校验再写入，出错时不改任何文件，修正参数后直接重试即可。如果 SUMMARY 末尾有附录类（无编号）章节，请手动把新条目移到编号列表里。嵌套小节：在 SUMMARY 中缩进两个空格。
+会在每个语言版本的 `SUMMARY.md` 编号章节末尾追加条目并创建文件；如果末尾有无编号附录，插在附录之前。每个语言版本都要有 `--title`，且都已有 `SUMMARY.md`；先全部校验再写入，出错时不改任何文件，修正参数后直接重试即可。嵌套子章节用 `--parent`，父项可带或不带 `.md`；命令把新条目放在父项已有的全部后代之后、下一个同级章节或部标题之前。父项必须是已存在的编号章节；各语言目录层级不一致时拒绝写入。可以继续指定子章节为父项，创建更深一级。
+
+```bash
+./tbook new-chapter <slug> ch02-s01-projections --parent ch02-name \
+  --title zh="投影的几何" --title en="Geometry of projections"
+./tbook new-chapter <slug> ch02-s01-s01-examples --parent ch02-s01-projections \
+  --title zh="手算例子" --title en="Worked examples"
+```
+
+文件命名与已有大章的拆分步骤见 `docs/AUTHORING.md` 的“章节命名与长章拆分”。子章节仍使用所属主章的定理编号并接续计数；不会另起一章。
 
 ## 新语言版本
 
