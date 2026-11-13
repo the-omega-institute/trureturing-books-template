@@ -85,8 +85,9 @@ def chapter_prefix(summary: Summary, chapter: Chapter) -> str:
     return _letters(suffix_tops.index(top))
 
 
-def parse_summary(path: Path) -> Summary:
-    text = path.read_text(encoding="utf-8")
+def parse_summary(path: Path, *, text: str | None = None) -> Summary:
+    if text is None:
+        text = path.read_text(encoding="utf-8")
     title = ""
     chapters: list[Chapter] = []
     section = "prefix"

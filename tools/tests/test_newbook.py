@@ -100,6 +100,73 @@ class Repo:
 
 
 class NewChapterTests(unittest.TestCase):
+    def test_split_keeps_environment_numbers_and_next_chapter_number(self):
+        from tbook.model import load_edition
+        with Repo() as repo:
+            book = repo.book()
+            first = "::: {.example #first}\nFirst.\n:::\n"
+            second = "::: {.example #second}\nSecond.\n:::\n"
+            for ed in book.editions:
+                write(ed.dir / "ch01.md", "# One\n\n" + first + "\n" + second)
+            before = [(e.id, e.number) for e in load_edition(book.primary).all_envs()]
+            newbook.new_chapter("demo", "ch01-s01-more", {"*": "More"}, parent="ch01")
+            newbook.new_chapter("demo", "ch02-next", {"*": "Next"})
+            for ed in book.editions:
+                write(ed.dir / "ch01.md", "# One\n\n" + first)
+                write(ed.dir / "ch01-s01-more.md", "# More\n\n" + second)
+                write(ed.dir / "ch02-next.md", "# Next\n\n::: {.example #next}\nNext.\n:::\n")
+                after = [(e.id, e.number) for e in load_edition(ed).all_envs()]
+                self.assertEqual(after, before + [("next", "2.1")])
+
+    def test_parent_inserts_after_subtree_before_next_part_and_supports_grandchildren(self):
+        from tbook.summary import parse_summary
+        with Repo() as repo:
+            summary = ("# Summary\n\n- [One](ch01.md)\n  - [First](ch01-s01-first.md)\n"
+                       "    - [Detail](ch01-s01-s01-detail.md)\n\n# Next part\n\n- [Two](ch02.md)\n")
+            book = repo.book(summaries={lang: summary for lang in ("zh", "en")})
+            created = newbook.new_chapter("demo", "ch01-s02-second", {"*": "Second"}, parent="ch01.md")
+            for ed in book.editions:
+                parsed = parse_summary(ed.summary)
+                child = next(ch for ch in parsed.chapters if ch.path == "ch01-s02-second.md")
+                self.assertEqual(child.number, (1, 2))
+                self.assertEqual(child.part, "")
+                self.assertEqual(parsed.files()[-1], "ch02.md")
+            self.assertEqual(len(created), 2)
+            code, _, err = repo.run_cli("new-chapter", "demo", "ch01-s02-s01-detail", "--parent",
+                                       "ch01-s02-second", "--title", "zh=细节", "--title", "en=Detail")
+            self.assertEqual((code, err), (0, ""))
+            self.assertEqual(parse_summary(book.primary.summary).chapters[-2].number, (1, 2, 1))
+
+    def test_child_validation_failure_in_later_edition_writes_nothing(self):
+        for summary in ("# Summary\n\n- [Other](other.md)\n",
+                        "# Summary\n\n- [Draft]()\n- [One](ch01.md)\n",
+                        "# Summary\n\n[One](ch01.md)\n"):
+            with self.subTest(summary=summary), Repo() as repo:
+                repo.book(summaries={"en": summary})
+                before = snapshot(repo.root / "books")
+                with self.assertRaises(config.ConfigError):
+                    newbook.new_chapter("demo", "ch01-s01-part", {"*": "Part"}, parent="ch01")
+                self.assertEqual(snapshot(repo.root / "books"), before)
+
+    def test_new_top_level_chapter_precedes_suffix(self):
+        from tbook.summary import parse_summary
+        with Repo() as repo:
+            book = repo.book(summaries={lang: "# Summary\n\n- [One](ch01.md)\n\n[Appendix](appendix-a.md)\n"
+                                        for lang in ("zh", "en")})
+            newbook.new_chapter("demo", "ch02-two", {"*": "Two"})
+            self.assertEqual(parse_summary(book.primary.summary).files(),
+                             ["ch01.md", "ch02-two.md", "appendix-a.md"])
+
+    def test_names_and_multiline_titles_are_rejected_before_writing(self):
+        for name, title in (("trailing-", "T"), ("double--dash", "T"), ("../escape", "T"),
+                            ("valid", "T\n- [Injected](extra.md)")):
+            with self.subTest(name=name), Repo() as repo:
+                repo.book()
+                before = snapshot(repo.root / "books")
+                with self.assertRaises(config.ConfigError):
+                    newbook.new_chapter("demo", name, {"*": title}, parent="ch01")
+                self.assertEqual(snapshot(repo.root / "books"), before)
+
     def test_creates_the_chapter_in_every_edition(self):
         with Repo() as repo:
             repo.book(langs=("zh", "en", "ja"))

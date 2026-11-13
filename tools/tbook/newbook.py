@@ -72,23 +72,27 @@ def _write_book(target: Path, slug: str, titles: dict[str, str], langs: list[str
     (target / "book.toml").write_text(text, encoding="utf-8")
 
 
-CHAPTER_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+CHAPTER_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def new_chapter(slug: str, name: str, titles: dict[str, str]) -> list[Path]:
+def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | None = None) -> list[Path]:
     """Append ``- [title](name.md)`` to every edition's SUMMARY and create the files.
 
     All or nothing: every edition is validated (title, SUMMARY.md present and parseable, chapter
     not there yet) before any file is written, so a failure leaves the book as it was.
     """
-    if not CHAPTER_RE.match(name):
+    if not CHAPTER_RE.fullmatch(name):
         raise config.ConfigError(f"chapter file name {name!r} must be kebab-case")
     book = config.named_book(slug)
+    parent_path = parent if parent is None or parent.endswith(".md") else parent + ".md"
     plan = []
+    placement = None
     for ed in book.editions:
         title = titles.get(ed.lang) or titles.get("*")
         if not title:
             raise config.ConfigError(f"missing a title for the {ed.lang!r} edition (use --title {ed.lang}=…)")
+        if "\n" in title or "\r" in title:
+            raise config.ConfigError("chapter title must fit on one SUMMARY link line")
         if not ed.summary.is_file():
             hint = ("every edition directory needs a SUMMARY.md" if ed.primary else
                     f"set up the {ed.lang!r} edition first by copying {paths.rel(book.primary.dir)}/ to "
@@ -98,16 +102,57 @@ def new_chapter(slug: str, name: str, titles: dict[str, str]) -> list[Path]:
         if md.exists():
             raise config.ConfigError(f"{paths.rel(md)} already exists")
         try:
-            listed = parse_summary(ed.summary).files()
+            parsed = parse_summary(ed.summary)
+            listed = parsed.files()
         except SummaryError as exc:
             raise config.ConfigError(f"{paths.rel(exc.path)}:{exc.line}: {exc.message}") from None
         if f"{name}.md" in listed:
             raise config.ConfigError(f"{paths.rel(ed.summary)} already lists {name}.md")
-        plan.append((ed, title, md))
+        lines = ed.summary.read_text(encoding="utf-8").splitlines(keepends=True)
+        indent = ""
+        insert = len(lines)
+        if parent_path is not None:
+            matches = [ch for ch in parsed.chapters if ch.path == parent_path]
+            if len(matches) != 1 or matches[0].section != "numbered":
+                raise config.ConfigError(f"{paths.rel(ed.summary)}: parent {parent_path!r} must name one numbered chapter")
+            ancestor = matches[0]
+            if not (ed.dir / parent_path).is_file():
+                raise config.ConfigError(f"{paths.rel(ed.dir / parent_path)} not found")
+            # Place the new child after the whole existing subtree, before any following part.
+            start = parsed.chapters.index(ancestor)
+            last = ancestor
+            for child in parsed.chapters[start + 1:]:
+                if child.depth <= ancestor.depth:
+                    break
+                last = child
+            insert = last.line
+            source_indent = re.match(r"[ \t]*", lines[ancestor.line - 1]).group().expandtabs(4)
+            indent = source_indent + "  "
+            shape = [(ch.path, ch.section, ch.number, ch.depth) for ch in parsed.chapters]
+            if placement is not None and shape != placement:
+                raise config.ConfigError("edition chapter hierarchy differs; align SUMMARY.md before adding a child")
+            placement = shape
+        else:
+            # mdBook forbids a numbered chapter after an unnumbered suffix.
+            suffix = next((ch for ch in parsed.chapters if ch.section == "suffix"), None)
+            if suffix is not None:
+                insert = suffix.line - 1
+        entry = f"{indent}- [{title}]({name}.md)\n"
+        if insert and not lines[insert - 1].endswith("\n"):
+            entry = "\n" + entry
+        lines.insert(insert, entry)
+        summary = "".join(lines)
+        # Validate generated Markdown, including title syntax, before touching any edition.
+        try:
+            generated = parse_summary(ed.summary, text=summary)
+        except SummaryError as exc:
+            raise config.ConfigError(f"invalid chapter title: {exc.message}") from None
+        added = [ch for ch in generated.chapters if ch.path == f"{name}.md"]
+        if len(added) != 1 or len(generated.chapters) != len(parsed.chapters) + 1:
+            raise config.ConfigError("chapter title must fit on one SUMMARY link line")
+        plan.append((ed, title, md, summary))
     created = []
-    for ed, title, md in plan:
-        summary = ed.summary.read_text(encoding="utf-8").rstrip("\n")
-        summary += f"\n- [{title}]({name}.md)\n"
+    for ed, title, md, summary in plan:
         ed.summary.write_text(summary, encoding="utf-8")
         md.write_text(f"# {title}\n\n", encoding="utf-8")
         created.append(md)

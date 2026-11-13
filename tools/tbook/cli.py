@@ -202,7 +202,7 @@ def cmd_new_book(args) -> int:
 def cmd_new_chapter(args) -> int:
     from . import newbook
 
-    for p in newbook.new_chapter(args.book, args.name, _langs_titles(args.title)):
+    for p in newbook.new_chapter(args.book, args.name, _langs_titles(args.title), parent=args.parent):
         print(f"created {paths.rel(p)}")
     return 0
 
@@ -310,6 +310,7 @@ def parser() -> argparse.ArgumentParser:
     c = sub.add_parser("new-chapter", help="add a chapter to every edition of a book")
     c.add_argument("book")
     c.add_argument("name", help="file name without .md, e.g. ch02-deficit")
+    c.add_argument("--parent", help="existing numbered chapter path, with or without .md; add a nested child")
     c.add_argument("--title", action="append", required=True, help="LANG=TITLE, once per edition")
     c.set_defaults(fn=cmd_new_chapter)
 
