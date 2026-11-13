@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "98fb94bd87f8072fb31750ee5b4e0105e4955816d1d811b7f5338b4f29bf55b1",
+      "sha256": "4a23de3a3c2e60d76e88bcc6b604dfd790c6e9f14f4161bbefdc2f96154ba837",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -516,7 +516,7 @@
       "mode": "100644"
     },
     "theme/viz/shell.js": {
-      "sha256": "d3909ddf13c079b82bdb140c6674ca8206c07bd25336c3c69ddf6586ac17aada",
+      "sha256": "9fcbe2814d96a30d6ed2f292766ad05756f3789f84cfbb2de69828f2206bb98a",
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
@@ -652,7 +652,7 @@
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
-      "sha256": "ec750b5d970f43517bb44f823dc2b247a44e2c40510ef00cb7803076255198bb",
+      "sha256": "25b56c913a18d13ea16c2ab886f342db1dd39825d678a70b96ea61f41e047838",
       "mode": "100644"
     },
     "tools/node/viz-thumbs.mjs": {
@@ -952,7 +952,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
-      "sha256": "e0c6f705d1807a571587cede6611df61016677e26237631708feb00d98be32e3",
+      "sha256": "b91e82e920180b5c9c56ce3e434d732f04e93cef7a9d611bb9a3445f4ede3d57",
       "mode": "100644"
     },
     "tools/tests/test_viz_solid.py": {
@@ -969,6 +969,10 @@
     },
     "tools/tests/viz_runtime_harness.mjs": {
       "sha256": "59a06acca48c75e28e9c2a423121b4f1edff19ae0226f5656969e58521061ff5",
+      "mode": "100644"
+    },
+    "tools/tests/viz_scroll_harness.mjs": {
+      "sha256": "00f82da7601de102ac61ecde3e01b84780238fe2f8d5699e5249831e72d4aace",
       "mode": "100644"
     }
   }

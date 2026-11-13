@@ -210,7 +210,7 @@ export const capitalGreek = (page) => page.evaluate(() => {
  *           no legend entry and their band ends above a legend along the bottom; each button is rendered, named,
  *           visible and on top where it is drawn; a title with text is not hidden
  */
-const stageView = (page, sel, figure = false) => page.evaluate(([sel, figure]) => {
+export const stageView = (page, sel, figure = false) => page.evaluate(([sel, figure]) => {
   const stage = document.querySelector(sel); if (!stage) return null;
   const css = (el) => getComputedStyle(el), root = document.documentElement;
   const shown = (el) => { if (!el || !el.getClientRects().length || css(el).visibility === 'hidden') return false; for (let a = el; a; a = a.parentElement) if (css(a).opacity === '0') return false; return true; };
@@ -234,12 +234,20 @@ const stageView = (page, sel, figure = false) => page.evaluate(([sel, figure]) =
   };
   const sx = scrollX, sy = scrollY, rv = css(root).overflowY, scroller = rv !== 'visible' ? rv : css(document.body).overflowY;
   const scrolls = !figure && scroller !== 'hidden' && scroller !== 'clip';
-  // what is hit at a point inside el, brought into view as a reader would; undefined when it cannot be
+  // What is hit at the same point inside el, brought into view as a reader would; undefined when it cannot be.
+  // Chromium rounds hit coordinates at the viewport edge: the last fractional CSS pixel can return null.
+  // Keep a whole CSS pixel at the far edges, by scrolling rather than moving the sample within the element.
   const look = (el, fx, fy) => {
     const pt = () => { const r = el.getBoundingClientRect(); return [r.left + Math.min(Math.max(r.width * fx, 3), r.width - 3), r.top + Math.min(Math.max(r.height * fy, 3), r.height - 3)]; };
     let [x, y] = pt();
-    if ((y < 0 || y >= innerHeight) && scrolls) { window.scrollBy(0, y - innerHeight / 2); [x, y] = pt(); }
-    return x >= 0 && x < innerWidth && y >= 0 && y < innerHeight ? document.elementFromPoint(x, y) : undefined;
+    const before = [x, y], start = [scrollX, scrollY];
+    const insideX = () => x >= 0 && x <= innerWidth - 1, insideY = () => y >= 0 && y <= innerHeight - 1;
+    if (scrolls && (!insideX() || !insideY())) {
+      window.scrollBy(insideX() ? 0 : x - innerWidth / 2, insideY() ? 0 : y - innerHeight / 2);
+      [x, y] = pt();
+    }
+    return { hit: insideX() && insideY() ? document.elementFromPoint(x, y) : undefined,
+      point: `sample ${before.join(',')} → ${x},${y}; scroll ${start.join(',')} → ${scrollX},${scrollY}; viewport ${innerWidth}×${innerHeight}` };
   };
   const layout = [], hud = [];
 
@@ -251,9 +259,9 @@ const stageView = (page, sel, figure = false) => page.evaluate(([sel, figure]) =
   }
   const rail = document.querySelector('footer.rail');
   for (const el of [...flow, ...(shown(rail) ? [rail] : [])]) for (const [fx, fy] of [[0.1, 0], [0.9, 0], [0.1, 1], [0.9, 1]]) {
-    const hit = look(el, fx, fy), where = `${fy ? 'bottom' : 'top'} ${fx < 0.5 ? 'left' : 'right'}`;
-    if (hit === undefined) layout.push(`${who(el)} (${where}) cannot be ${figure ? 'seen in the frame' : 'scrolled into view'}`);
-    else if (!hit || (hit !== el && !el.contains(hit))) layout.push(`${who(el)} (${where}) is painted over by ${who(hit)}`);
+    const { hit, point } = look(el, fx, fy), where = `${fy ? 'bottom' : 'top'} ${fx < 0.5 ? 'left' : 'right'}`;
+    if (hit === undefined) layout.push(`${who(el)} (${where}) cannot be ${figure ? 'seen in the frame' : 'scrolled into view'} (${point})`);
+    else if (!hit || (hit !== el && !el.contains(hit))) layout.push(`${who(el)} (${where}) is painted over by ${who(hit)} (${point})`);
   }
   if (figure && root.scrollHeight > innerHeight) layout.push(`the frame scrolls by ${root.scrollHeight - innerHeight}px`);
   window.scrollTo(sx, sy);
@@ -277,9 +285,9 @@ const stageView = (page, sel, figure = false) => page.evaluate(([sel, figure]) =
   const floor = legend.length ? Math.min(...legend.map((g) => g.t)) : clip.b, low = floor > (clip.t + clip.b) / 2;
   if ((title.length || buttons.length) && legend.length && low && band > floor + 0.5) hud.push(`the band of the title and buttons ends at ${Math.round(band)}, below the top of the legend at ${Math.round(floor)}`);
   for (const b of buttons) {
-    const hit = look(b.el, 0.5, 0.5);
-    if (hit === undefined) hud.push(`${b.what} cannot be brought into view`);
-    else if (!hit || !b.el.contains(hit)) hud.push(`${b.what} is covered by ${who(hit)}`);
+    const { hit, point } = look(b.el, 0.5, 0.5);
+    if (hit === undefined) hud.push(`${b.what} cannot be brought into view (${point})`);
+    else if (!hit || !b.el.contains(hit)) hud.push(`${b.what} is covered by ${who(hit)} (${point})`);
   }
   window.scrollTo(sx, sy);
   const room = Math.round((low ? floor : clip.b) - band);

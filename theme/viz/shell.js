@@ -273,7 +273,11 @@
       // width instead, and the quality gate still reports a frame that cannot hold its complete contents.
       const bl = st.querySelector('.hud-bl');
       if (bl && !(embed && preset)) {
-        const band = Math.max(tl.getBoundingClientRect().bottom, tr.getBoundingClientRect().bottom) - st.getBoundingClientRect().top;
+        // A display:none block has a zero rectangle at the viewport origin, not at the stage. Only rendered
+        // rectangles contribute to this local band, so scrolling the stage cannot change its required height.
+        const top = st.getBoundingClientRect().top;
+        const band = Math.max(0, ...[tl, tr].map((el) => el.getBoundingClientRect())
+          .filter((r) => r.width > 0 && r.height > 0).map((r) => r.bottom - top));
         const bottom = parseFloat(getComputedStyle(bl).bottom) || 0;
         st.style.setProperty('--hud-min-height', `${Math.ceil(band + bl.getBoundingClientRect().height + bottom + 8)}px`);
       }
