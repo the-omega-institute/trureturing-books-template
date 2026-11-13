@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- 学术版 PDF 的行内分式按字形实际边界留出上下间距，修复分母与下一行分子相交；保留原有数学字体、适宽与行内流动，并补充中英文真实段落及窄宽度回归检查。
+
 ## [0.8.1] - 2026-11-13
 
 ### 修复
