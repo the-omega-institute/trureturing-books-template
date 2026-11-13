@@ -68,11 +68,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "e2a2dcb337dc494d62fa59f3f31449504b332734aed19aae8fea8e7e5dec25a2",
+      "sha256": "c65cbfbba1de975c9595b63be44fca39605c3eb51ffcde6b11e783eacfbd8d47",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "153138b6069b65f45b124c31b2aa4b03a9984c9fe2a3e8d8706d786b97e88784",
+      "sha256": "2c11e7bf55354e13a7e0bd111fd353902af98a21dbd79f9b20a9af188d4cd62b",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -140,7 +140,7 @@
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "bb50a634bae74bc70f54eb53df7f31da9587740880dcd4c7979a2736bde10d26",
+      "sha256": "14b10155a47b1e62f771d3e11ef85b5be501e854def43897171f6fb492c749e7",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
@@ -684,7 +684,7 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "4391a1ed9b542ba207af1b666c827f769efed0c73d57b6ca77a33e027d02f718",
+      "sha256": "50638196815650ad3a9b1f333f910db9b84f55fac2597e01eac05f07fc5af6c1",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
@@ -844,7 +844,7 @@
       "mode": "100644"
     },
     "tools/tests/test_core.py": {
-      "sha256": "c2ea3df794b1bbed5d3851c84b6db799ecba027af5415fe1191fd4aa8a5ad3e6",
+      "sha256": "93b8f91010607223309ed5cc6e6642ea27551183519de15be328b9fffe228f76",
       "mode": "100644"
     },
     "tools/tests/test_figkit_marks.py": {
@@ -873,6 +873,10 @@
     },
     "tools/tests/test_followups_pandoc.py": {
       "sha256": "44795368da18fff283c55b7767d551ffd160cf0a1e6391cf266afcf0c88bf5cb",
+      "mode": "100644"
+    },
+    "tools/tests/test_heading_checks.py": {
+      "sha256": "545c7811c572f3b56b20e16f80a92efd4987a2b4c3a339a3578c3135468d106d",
       "mode": "100644"
     },
     "tools/tests/test_hide.py": {

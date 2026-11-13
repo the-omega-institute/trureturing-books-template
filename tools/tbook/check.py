@@ -17,7 +17,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from . import config, evidence, lean, mdscan, paths, render, viz
+from . import config, evidence, lean, mdscan, pandoc, paths, render, viz
 from .model import (DEFINITION, FORMAL, MEDIA, NUMBERED, OPEN, PROOF, WRITTEN_PROOF, EditionModel, Issue, load_book_models, kind_of,
                     media_cited_gids)
 from .summary import Chapter, Summary, chapter_prefix
@@ -131,6 +131,50 @@ def check_orphans(model: EditionModel, issues: list[Issue]) -> None:
         if md.name == "SUMMARY.md" or md.resolve() in listed:
             continue
         _warn(issues, md, 0, "not listed in SUMMARY.md (it will not be published)")
+
+
+def _chapter_headings(text: str) -> list[pandoc.Heading]:
+    normalized = pandoc.normalize_setext(text)
+    formula = pandoc._in_formula(normalized.split("\n"))
+    return [h for h in pandoc.find_headings(normalized) if not formula[h.index]]
+
+
+def check_headings(model: EditionModel, issues: list[Issue]) -> None:
+    """Report titles and levels that make the page and its navigation disagree.
+
+    Numbering and punctuation are an editorial choice; this checks the same title
+    within one edition, without imposing a language or numbering style on books.
+    """
+    def title(text: str) -> str:
+        return " ".join(mdscan.unescape_markdown(re.sub(r"<!--.*?-->", "", text, flags=re.S)).split())
+
+    for doc in model.chapters:
+        heads = _chapter_headings(doc.text)
+        tops = [h for h in heads if h.level == 1]
+        if len(tops) != 1:
+            _warn(issues, doc.path, 0,
+                  f"chapter has {len(tops)} level-1 headings; use one page title matching SUMMARY.md")
+        elif title(tops[0].text) != title(doc.chapter.title):
+            _warn(issues, doc.path, tops[0].index + 1,
+                  "page title differs from SUMMARY.md; keep the level-1 heading and navigation title aligned")
+        previous = 1
+        for h in heads:
+            if h.level > previous + 1:
+                _warn(issues, doc.path, h.index + 1,
+                      f"heading jumps from level {previous} to {h.level}; use consecutive heading levels")
+            previous = h.level
+
+
+def check_heading_parity(book: config.Book, models: dict[str, EditionModel], issues: list[Issue]) -> None:
+    primary = models[book.languages[0]]
+    levels = {doc.chapter.path: [h.level for h in _chapter_headings(doc.text)] for doc in primary.chapters}
+    for lang in book.languages[1:]:
+        for doc in models[lang].chapters:
+            expected = levels.get(doc.chapter.path)
+            actual = [h.level for h in _chapter_headings(doc.text)]
+            if expected is not None and actual != expected:
+                _warn(issues, doc.path, 0,
+                      f"heading levels differ from the {book.languages[0]} edition; align section order and depth")
 
 
 def check_links(model: EditionModel, site: config.Site, issues: list[Issue]) -> None:
@@ -615,6 +659,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
             issues.extend(model.issues)
             check_env_policy(model, issues)
             check_orphans(model, issues)
+            check_headings(model, issues)
             check_links(model, site, issues)
             check_footnotes(model, issues)
             check_captions(model, issues)
@@ -622,6 +667,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
             if model.summary is not None and not model.chapters:
                 _warn(issues, model.edition.summary, 0, "edition has no chapters yet")
         check_parity(book, models, issues)
+        check_heading_parity(book, models, issues)
         check_image_parity(book, models, issues)
         check_drawn_images(book, models, issues)
         check_unused_figures(book, models, issues)
