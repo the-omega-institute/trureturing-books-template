@@ -362,7 +362,10 @@
     /* A cited figure has a fixed stage-plus-tour frame; its HUD minimum is part of that frame's grid allocation, while
        a chart's extra panel budget belongs to the page and must be satisfied by its own layout. */
     if (stage && !TRV.still && !TRV.figure) {
-      const need = Math.max(0, pt + pb + minHeight);
+      /* The stage owns its border-box while the canvas reports only its content box. Include that
+         owner-level overhead so the declared chart height survives the stage border. */
+      const stageOverhead = Math.max(0, stage.getBoundingClientRect().height - cv.clientHeight);
+      const need = Math.max(0, pt + pb + minHeight + stageOverhead);
       const old = parseFloat(stage.style.getPropertyValue('--plot-min-height')) || 0;
       if (need > old + 0.5) stage.style.setProperty('--plot-min-height', `${Math.ceil(need)}px`);
     }
