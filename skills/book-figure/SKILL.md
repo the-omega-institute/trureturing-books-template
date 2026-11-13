@@ -1,6 +1,6 @@
 ---
 name: book-figure
-description: 为书做静态图时使用：一张图只讲一件事，由脚本按数学生成（books/<slug>/figures/<name>.py），随深浅主题与印刷版变化，每种语言一版标签，在讲到它的那句话旁用 ::: {.figure src=…} 引用；也用于修改、排查已有静态图，把旧的手绘 SVG 换成标准图。
+description: '为书做静态图时使用：一张图只讲一件事，由 figures/ 目录下的脚本按数学生成，随深浅主题与印刷版变化，每种语言一版标签，在讲到它的那句话旁用 ::: {.figure src=…} 引用；也用于修改、排查已有静态图，把旧的手绘 SVG 换成标准图。'
 ---
 
 # 静态图
@@ -114,7 +114,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
                        # assets/ 里没有被引用的文件、没有脚本的 SVG、没有章节引用的图（警告）；
                        # 手机上最小标签不到 10 px 的图（警告，site.toml 可升为错误）；图片语法引用的手绘 SVG、
                        # 两种语言共用的带字 SVG、只隔着空行相邻的两块媒体（警告）
-./tbook build html pdf epub --book <book>     # 实际构建，在站点与 PDF 里看一眼
+./tbook build html pdf epub --book <book>     # 构建并检查日志；导出页面按 book-export 按需排查
 ```
 
 ## 反模式
@@ -158,4 +158,4 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 
 ## 完成标准
 
-每张图对应正文里的一句话，并放在它旁边；四种画面、两种语言都亲眼看过；`./tbook fig build --check`、`./tbook check` 通过；各语言章节的引用位置与 `src` 一致；在 HTML 与 PDF 中实际看过。
+每张图对应正文里的一句话，并放在它旁边；四种画面、两种语言都亲眼看过；`./tbook fig build --check`、`./tbook check` 通过；各语言章节的引用位置与 `src` 一致；受影响的 HTML/PDF/EPUB 构建通过，导出页面的额外视觉排查按 [book-export](../book-export/SKILL.md) 的触发条件执行。
