@@ -247,6 +247,10 @@ class KitInTheBrowser(unittest.TestCase):
         self.expect("plot: g.arrow([x0, y0], [x1, y1], s) draws a shaft in data coordinates and a head at the far end",
                     "plot: g.arrow takes (a, b, s) as st.arrow of kit.stage3")
 
+    def test_plot_height_budget(self):
+        self.expect("plot: a short allocation reports its real height and publishes the stage budget",
+                    "plot: the stage budget includes its border box")
+
     def test_ink_swatch(self):
         self.expect("theme: .sw.ik is the ink swatch (the --tr-ink token)")
 

@@ -1,6 +1,6 @@
 ---
 name: book-write
-description: 撰写或修改 books/<slug>/<lang>/ 下的章节时使用：定理环境、Lean 引用、数学、交叉引用、媒体嵌入的写法，多语言逐条对齐，以及 Lean 优先、带 DOI 的书面证明与形式化请求登记规则。
+description: 撰写或修改 books/<slug>/<lang>/ 下的章节时使用：定理环境、Lean 引用、数学、交叉引用、媒体嵌入的写法，多语言逐条对齐，以及 Lean 优先、带 DOI 或源仓库的书面证明与形式化请求登记规则。
 ---
 
 # 撰写章节
@@ -22,7 +22,7 @@ description: 撰写或修改 books/<slug>/<lang>/ 下的章节时使用：定理
 
 ## 硬规则
 
-1. **显式区分验证状态。** `theorem / lemma / proposition / corollary` 默认带 `lean="<GID>"`，且锁文件解析为 Lean `theorem`。先检索并优先引用匹配的冻结 Lean 声明。仅在没有匹配验证、源文有书面证明且能引用 DOI 时，用 `status="written-proof" proof="<proof-id>" doi="<裸 DOI>" source="<原文定位>" request="<issue URL>"`，不得带 `lean`，每个语言版本必须有同 id 的非空 proof 块（可跨章）。只有真正开放的结果才用 `conjecture/problem`。书面证明由作者评审负责，工具不检查数学正确性或自动判定是否已有匹配 Lean 证明。必须在 trureturing-requests 搜索复用或新建 issue，并用英文标题、正文与评论登记书籍用途，标题与标记见 `docs/FORMALIZATION-REQUESTS.md`。见 AUTHORING §2。
+1. **显式区分验证状态。** `theorem / lemma / proposition / corollary` 默认带 `lean="<GID>"`，且锁文件解析为 Lean `theorem`。先检索并优先引用匹配的冻结 Lean 声明。仅在没有匹配验证、源文有书面证明时，用 `status="written-proof" proof="<proof-id>" doi="<裸 DOI>" source="<原文定位>" request="<issue URL>"`；没有 DOI 的新论文省略 `doi` 并填 `repository="<源论文仓库 HTTPS 地址>"`，不得带 `lean`，每个语言版本必须有同 id 的非空 proof 块（可跨章）。只有真正开放的结果才用 `conjecture/problem`。书面证明由作者评审负责，工具不检查数学正确性或自动判定是否已有匹配 Lean 证明。必须在 trureturing-requests 搜索复用或新建 issue，并用英文标题、正文与评论登记书籍用途、源仓库和书库仓库，标题与标记见 `docs/FORMALIZATION-REQUESTS.md`。见 AUTHORING §2。
 2. **陈述要忠实。** Lean 验证结果的书面陈述必须与 Lean 声明一致；written-proof 结果必须忠实于源文的陈述与论证（改写须保持同一结果；特例或变体只作明确比较，不当作该结果的验证）。引用 Lean 前先读源文件（锁文件里有行号：`./tbook check` 通过后，链接指向 `blob/<commit>/<module>.lean#L<line>`）和 trureturing 的 `Blueprint/<module>.md`。不夸大：存在性定理不写成算法，反例不写成“最小反例”。
 3. **证明块按证据负责。** Lean 结果的 proof 用于解释，可指向完整内核证明。written-proof 的关联 proof 必须忠实给出源文论证并注明出处，由作者与评审核对；不得声称由 Lean 检查。
 4. **多语言逐条对齐。** 每个语言版本的章节文件名、顺序相同；每章的环境序列（种类、`#id`、`lean`、`status`、`proof`、`doi`、`source`、`request`）与媒体序列完全相同。先改权威版本（`editions` 的第一个，默认中文），再同步其他版本。英文要自然、准确，不逐字硬译。
@@ -107,7 +107,7 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 - **Lean 的全函数约定。** 除以零得 `0`、`Real.log 0 = 0`、`ZMod` 的 `.val` 取标准代表元、自然数减法截断。陈述涉及这些边界时，把约定写进定义或紧随其后的说明，否则书面陈述在边界情形与 Lean 不一致。
 - **模块里的局部实例与记号。** 同一个 `‖·‖` 可能是算子范数，也可能是模块用 `local instance` 指定的希尔伯特—施密特范数；`star`、`•`、`*ᵥ` 同理。读源文件的 `open`、`variable` 与 `local instance`，不要只读定理那几行。
 - **库里的命题名照定义展开。** 引用 Mathlib 的命名命题（如 `RiemannHypothesis`）时写出它的定义；它与教科书表述的等价若依赖未形式化的事实，要说出来。
-- **Lean 没有陈述的推论不能冒用 Lean 徽章。** 模块文档写明“不陈述某推论”时，不能把该推论当作 Lean 已验证；无 DOI 来源时作为“手工推导，未在本书形式化”的注记，满足书面证明与请求登记要求时才可使用紫色定理框。
+- **Lean 没有陈述的推论不能冒用 Lean 徽章。** 模块文档写明“不陈述某推论”时，不能把该推论当作 Lean 已验证；没有 DOI 的新论文必须以源论文仓库地址作为来源，满足书面证明与请求登记要求时才可使用紫色定理框。
 
 ### 手写的计数、清单与数值
 
@@ -117,7 +117,7 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 
 ## 步骤
 
-1. 确认要写的每条形式结论在 trureturing 中已有冻结声明：在 trureturing checkout 中搜索 `D5/`，或读 `Golden/Frozen/state/<module>.lean.json`。没有 → 若源文有证明，按 DOI、原文定位和对应 issue 登记显式书面证明，并关联每版证明；没有 DOI 时保留注明边界的注记，不使用书面证明徽章；若确实开放，用 conjecture/problem。需要内核验证且已获授权时再走 `skills/theorem-formalize`。
+1. 确认要写的每条形式结论在 trureturing 中已有冻结声明：在 trureturing checkout 中搜索 `D5/`，或读 `Golden/Frozen/state/<module>.lean.json`。没有 → 若源文有证明，按 DOI 或源论文仓库地址、原文定位和对应 issue 登记显式书面证明，并关联每版证明；若确实开放，用 conjecture/problem。需要内核验证且已获授权时再走 `skills/theorem-formalize`。
 2. 在权威版本中写作；新增 GID 后运行 `./tbook pin --refresh`（不移动提交，只解析新引用）。
 3. 同步其他语言版本（同样的 id、lean、顺序）。
 4. `./tbook check` 必须 0 错误；处理警告（未列入 SUMMARY 的文件、未使用的锁条目）。

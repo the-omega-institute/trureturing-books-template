@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -60,19 +60,19 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "c51667e20517a1cfb060c8e514a587242f658debe8991d141b5f8c3de4c83985",
+      "sha256": "5afb398b2503e55cf2e003538bb02fe54dccc308486e06876157025dbc21f88b",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "45ba5b272410b288e1c62d52220401192b02163477a3d1b6fe2a9ab1b3ed165f",
+      "sha256": "f81272fddc26e93e37db617f60e5a4619c1b239610e3764e590a0eb43e0826ab",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "bd3a27ec01ee2fbbeb118075bcc06f2ecaef5fde983a6314181ab8743131739d",
+      "sha256": "5317bd7767b94b440d7175d772b2a31ec528d45cb97248089ba921b2a7a03b02",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "0dbb08e41e73d60762c9b1f5e0e4d6e43bc9a356340fee1a859f70a3a6162c68",
+      "sha256": "98fb94bd87f8072fb31750ee5b4e0105e4955816d1d811b7f5338b4f29bf55b1",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -80,7 +80,7 @@
       "mode": "100644"
     },
     "docs/FORMALIZATION-REQUESTS.md": {
-      "sha256": "8353b039d060daf098d4e1cb1574447487848ef638c696c8326f3f99014dfcf3",
+      "sha256": "65e963e87dab5ff4a874c85accb0d8ef198d8c10d7da080362c374bdef3f1892",
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
@@ -96,7 +96,7 @@
       "mode": "100644"
     },
     "docs/VERIFICATION.md": {
-      "sha256": "8c5b80b7a68472229121f0d7c24f54023b4d5987143146b103cf2dedfd71586f",
+      "sha256": "df2608383c03d56cab5c7a1ad4e5951950198993dfce47e5249c03c6b99d946d",
       "mode": "100644"
     },
     "package-lock.json": {
@@ -112,7 +112,7 @@
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
-      "sha256": "7a3dd9a4affe827deabc9ab6a0ae0b916864c96d0150527e3d2fb84b61492061",
+      "sha256": "7d19193e201fd6552f2cb2a37dafdaa093059acef64e065ada873af01ef5a650",
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
@@ -132,7 +132,7 @@
       "mode": "100644"
     },
     "skills/book-slides/SKILL.md": {
-      "sha256": "5c04db7a99258d97cb413ffff88e086a40927306f94615a37e5304d3c76cb265",
+      "sha256": "deac870519aa7234d28fff91635dea8176365c06afff872e3ebfe9170ee8b478",
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
@@ -140,7 +140,7 @@
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "46edf129495bf04e2f1205deded65a8ce365e8cab29ce70e772fd9c072cd1bbd",
+      "sha256": "e50b353b221d3d3488b1af0eb7bc5a888fbc28358c5dd60284b842b3a3d66901",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
@@ -148,7 +148,7 @@
       "mode": "100644"
     },
     "skills/theorem-formalize/SKILL.md": {
-      "sha256": "c6967b45fbace864a1d215dedb865a24d8707821106dfe97fe664d32f3d82537",
+      "sha256": "c314da984eac5b05d4d52dec6fa91ed625e8038757b996e85cc22646b5bde430",
       "mode": "100644"
     },
     "skills/trureturing-pin/SKILL.md": {
@@ -344,11 +344,11 @@
       "mode": "100644"
     },
     "theme/i18n/en.toml": {
-      "sha256": "769350af5bcfc94704f0b958b18f16e4bb1703b8734719b2b0c7b7d0de2c9174",
+      "sha256": "3fc68c561471dfa49a7ea9ff5fcc85b795cef4474125f861e913464233989243",
       "mode": "100644"
     },
     "theme/i18n/zh.toml": {
-      "sha256": "c83348ea2020e08bb653615224f76e1c1ddac3f79ec0b2e3f9a6e776ff861788",
+      "sha256": "6592b6fd1c2e397a1e58c591f1310dc70b19f11c468e42c52328ddaa7b235f65",
       "mode": "100644"
     },
     "theme/mdbook/favicon.svg": {
@@ -380,7 +380,7 @@
       "mode": "100644"
     },
     "theme/slides/README.md": {
-      "sha256": "df34afdc3ad47c84fa5e4ae7508c6a756a09b3c160bf2c34dde5fa0e232541b2",
+      "sha256": "83b4dfd8d93e47526dd82b6518e26d9159687cf94bf0b53fa38625f76f27b2b9",
       "mode": "100644"
     },
     "theme/slides/components/LeanBadge.vue": {
@@ -408,7 +408,7 @@
       "mode": "100644"
     },
     "theme/slides/components/TheoremCard.vue": {
-      "sha256": "8ee9968d563ab957ba04127fc4d965de267b0b109c31970fd04d18a51a7fbdb0",
+      "sha256": "f7ba8ccbb75d6bf59b4f23f94f996ef7e0ed1ac991e08f42a9baed9ee38f21dd",
       "mode": "100644"
     },
     "theme/slides/env.d.ts": {
@@ -480,7 +480,7 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "b402e129cad79ad19d434d45a0e622f0646eded1354ec20af91417778bf20c4b",
+      "sha256": "16757b49518d74983d98745d026eb9ae1721ba233fc6064020e146684a238162",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
@@ -620,7 +620,7 @@
       "mode": "100644"
     },
     "tools/node/slides-check.mjs": {
-      "sha256": "89870e20aa3e8d2ab04ad9364bb4c2787684b0b5d8cf606643844380c337041f",
+      "sha256": "5c8073d4b82e0479387f7a326ebf512c3e950ff655cadcfb82421fc50470e4cb",
       "mode": "100644"
     },
     "tools/node/slides-lib.mjs": {
@@ -672,7 +672,7 @@
       "mode": "100644"
     },
     "tools/tbook/academic.py": {
-      "sha256": "782d9922aab22d394f097a39b12c9ec64a1fa01274e20bee78c40646fd962e82",
+      "sha256": "d49f84fd08b06922c6b9f7a7d51103e124317fe4cecea017f38fec32e7bfeac6",
       "mode": "100644"
     },
     "tools/tbook/build.py": {
@@ -684,11 +684,11 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "54242f3f42287d7271016d1ff1a0812ac5d30b5490e626d1f9c4198c8c84dcc1",
+      "sha256": "4391a1ed9b542ba207af1b666c827f769efed0c73d57b6ca77a33e027d02f718",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
-      "sha256": "5ff7c3f80d2ae35b83062521081f01139657eebbec997d5c981b54ab58566e27",
+      "sha256": "ea3f3e3698b919c421a3e954a8736067e5f587d44ed64c62ef98c049eb426cd1",
       "mode": "100644"
     },
     "tools/tbook/config.py": {
@@ -704,7 +704,7 @@
       "mode": "100644"
     },
     "tools/tbook/evidence.py": {
-      "sha256": "003f2db5ba284ef997172ae95bf5df5375263cb5d17428fcef3d5a55d4878dbb",
+      "sha256": "45e5021ab1c70b0d1c45948a6f2a707ae26752c8ab5404449764d4ce9bd23fd1",
       "mode": "100644"
     },
     "tools/tbook/figkit.py": {
@@ -764,11 +764,11 @@
       "mode": "100644"
     },
     "tools/tbook/render.py": {
-      "sha256": "ee7be508e1fb12a1e5a226450e1bf6306cd937f36d475af54cc713c829803809",
+      "sha256": "5f3078c1643598a8bd9f91dd99134c152af51aae23ef81f013ccbe5a38b3d522",
       "mode": "100644"
     },
     "tools/tbook/requests.py": {
-      "sha256": "a848ca610919a288f55d3cc25403448932c5b256c31def6e89077086f88a3bcf",
+      "sha256": "08f6f3581c4743e6bb706dc72c6a077e9d39fe5ef52780cdc40698ff2391202e",
       "mode": "100644"
     },
     "tools/tbook/serve.py": {
@@ -780,7 +780,7 @@
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
-      "sha256": "918f5d6aea4dd0a92d94b5328fbb428fa7553944a7ce4f7d9529a921460094e5",
+      "sha256": "d3d8eb23d4122ff7b54bdc91aca4ac2e37eb779b284a55989d98f4e1d0e35ee8",
       "mode": "100644"
     },
     "tools/tbook/summary.py": {
@@ -812,7 +812,7 @@
       "mode": "100644"
     },
     "tools/tests/kit_harness.mjs": {
-      "sha256": "a8ee22681b81a0e8c0e5f9261f460ebfae8ab5a7ffbaa052cc4f0f39ad684404",
+      "sha256": "2b5ce47a9e39c656d3b5979091df59a6dad947ddb348ebd1901d4ecc9806ab96",
       "mode": "100644"
     },
     "tools/tests/solid_harness.mjs": {
@@ -904,7 +904,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
-      "sha256": "cf49b54aa9388203d2311c04712a4e3a974edb9091514fb6da098848ea0e7e35",
+      "sha256": "515c7b4164abd6538c5e96fd9ebc2e456d2267609c371072496d615a6ad83434",
       "mode": "100644"
     },
     "tools/tests/test_pdf_math.py": {
@@ -948,7 +948,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {
-      "sha256": "808cacb17df30a2b8f2b29e8432159817b2d30fe5f8da437ebf4cf422f157fba",
+      "sha256": "db3ec917634892eba1e698d8a81c2f9730fcd0ced7622740a3b2698a8cdb2d79",
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
@@ -960,7 +960,7 @@
       "mode": "100644"
     },
     "tools/tests/test_written_proof.py": {
-      "sha256": "7c8625ada5b7d40a088e68b58092f36200d0da9349973ce3e60f8d546c9e697c",
+      "sha256": "1bee585a0d97dc1f59b6bd51dfcb7cb8faeebca74d9f90cd7b18835734985961",
       "mode": "100644"
     },
     "tools/tests/viz_hud_harness.mjs": {

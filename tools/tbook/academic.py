@@ -367,6 +367,11 @@ def doi_link(doi):
     return r"\href{" + url_tex(evidence.doi_url(doi)) + r"}{\texttt{" + display + "}}"
 
 
+def repository_link(repository):
+    """Link a source repository in generated Beamer provenance."""
+    return r"\href{" + url_tex(repository) + r"}{\nolinkurl{" + url_tex(repository) + "}}"
+
+
 def snapshot_path(book, vid, preset, lang):
     return book.viz_dir / vid / f"fig-{preset}.{lang}.paper.png"
 
@@ -409,9 +414,13 @@ def generate_package(book, lang, source, lock, dest):
         badges[ident] = badge
         block = "alertblock" if env and env.kind in model.OPEN else "block"
         provenance = ""
-        if env and env.status == "written-proof" and evidence.doi_url(env.attrs.get("doi")):
-            provenance = (r"\par{\tiny DOI: " + doi_link(env.attrs.get("doi"))
-                          + "; " + tex(env.attrs.get("source") or ""))
+        if env and env.status == "written-proof":
+            doi = evidence.doi_url(env.attrs.get("doi"))
+            repository = evidence.repository_url(env.attrs.get("repository"))
+            citation = "DOI: " + doi_link(env.attrs.get("doi")) if doi else "Source repository: " + repository_link(repository)
+            provenance = (r"\par{\tiny " + citation + "; " + tex(env.attrs.get("source") or ""))
+            if doi and repository:
+                provenance += "; Source repository: " + repository_link(repository)
             if evidence.request_number(env.attrs.get("request")):
                 provenance += r"; \href{" + url_tex(env.attrs.get("request")) + r"}{trureturing-requests\#" + str(evidence.request_number(env.attrs.get("request"))) + "}"
             provenance += "}"
@@ -432,7 +441,11 @@ def generate_package(book, lang, source, lock, dest):
             gids = []
             if env and env.status == "written-proof":
                 doi = env.attrs.get("doi") or ""
-                gids = ["DOI: " + doi_link(doi) + "; " + tex(env.attrs.get("source") or "")]
+                repository = evidence.repository_url(env.attrs.get("repository"))
+                citation = "DOI: " + doi_link(doi) if evidence.doi_url(doi) else "Source repository: " + repository_link(repository)
+                gids = [citation + "; " + tex(env.attrs.get("source") or "")]
+                if evidence.doi_url(doi) and repository:
+                    gids.append("Source repository: " + repository_link(repository))
                 if evidence.request_number(env.attrs.get("request")):
                     gids.append(r"\href{" + url_tex(env.attrs.get("request")) + r"}{trureturing-requests\#" + str(evidence.request_number(env.attrs.get("request"))) + "}")
             elif env and env.lean:

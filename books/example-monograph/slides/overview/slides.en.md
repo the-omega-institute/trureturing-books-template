@@ -16,7 +16,7 @@ layout: cover
 
 <p class="kicker">Sample monograph · Slides</p>
 <h1 class="display">Golden Integers<br>and <em>Observability</em></h1>
-<p class="lead">A sample monograph distinguishing Lean verification, written proofs and open questions. Matching frozen Lean results take priority; written proofs include a DOI and formalization request.</p>
+<p class="lead">A sample monograph distinguishing Lean verification, written proofs and open questions. Matching frozen Lean results take priority; written proofs include a DOI or source repository and a formalization request.</p>
 
 ---
 # 02 What the template guarantees
@@ -26,7 +26,7 @@ section: "Guarantees"
 <div class="body">
   <p class="kicker">What the template guarantees</p>
   <h2 class="t">Give priority to <em>frozen Lean declarations</em></h2>
-  <p class="lead">Lean results are checked at the pinned commit. Only without matching verification may a written proof be used, with a DOI, associated argument and registered request.</p>
+  <p class="lead">Lean results are checked at the pinned commit. Only without matching verification may a written proof be used, with a DOI or source repository, associated argument and registered request.</p>
   <div class="flow mt-l">
     <div class="step"><span class="i">01 · Book</span><b>Name the GID</b><p>Lean results carry <code>lean="…"</code>, at least one.</p></div>
     <div class="step"><span class="i">02 · Lock</span><b>Pin a commit</b><p><code>trureturing.lock.json</code> records the commit and what it resolved.</p></div>
@@ -36,7 +36,7 @@ section: "Guarantees"
   <div class="g3 mt-l">
     <Stat value="33" label="Lean-verified results in the whole book" tone="ok" />
     <Stat value="3" label="open problems and conjectures in the whole book, marked OPEN" tone="warn" />
-    <Stat value="1" label="written proof, with a DOI and formalization request" />
+    <Stat value="1" label="written proof, with a DOI or source repository and formalization request" />
   </div>
 </div>
 <Source>docs/ARCHITECTURE.md §1, §4; trureturing.lock.json</Source>

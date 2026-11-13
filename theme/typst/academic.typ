@@ -155,6 +155,7 @@
       it
     })
   show math.equation: set text(font: ("New Computer Modern Math",), fallback: true)
+  show math.equation.where(block: false): set text(top-edge: "bounds", bottom-edge: "bounds")
   set math.accent(dotless: false)
   set math.mat(column-gap: 1em)
   show math.equation.where(block: true): set block(above: 0.8em, below: 0.8em)

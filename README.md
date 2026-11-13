@@ -15,7 +15,7 @@
 | 视觉 | trureturing 赛博朋克风，配色唯一来源 `theme/tokens.json` |
 
 源文有书面证明但没有匹配冻结声明时，保留形式结论种类，使用
-`status="written-proof" proof="<proof-id>"`，并填写 DOI、原文定位和 trureturing-requests issue；不得带 `lean`，每版要有对应的非空 proof 块。已有匹配 Lean 验证时必须优先使用 Lean。
+`status="written-proof" proof="<proof-id>"`，并填写 DOI 或源论文仓库、原文定位和 trureturing-requests issue；不得带 `lean`，每版要有对应的非空 proof 块。已有匹配 Lean 验证时必须优先使用 Lean。
 各端显示紫色“书面证明 / WRITTEN PROOF”，不带验证链接、不计入 Lean 数量，
 账本单列；真正开放才用 conjecture/problem。见 [写作手册](docs/AUTHORING.md) 与 [形式化请求规范](docs/FORMALIZATION-REQUESTS.md)。
 

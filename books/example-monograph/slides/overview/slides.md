@@ -16,7 +16,7 @@ layout: cover
 
 <p class="kicker">示例专著 · 演示文稿</p>
 <h1 class="display">黄金整数<br>与<em>可观测性</em></h1>
-<p class="lead">区分 Lean 验证、书面证明与开放问题的示例专著。已有匹配的冻结 Lean 验证时必须引用；书面证明附 DOI 与形式化请求。</p>
+<p class="lead">区分 Lean 验证、书面证明与开放问题的示例专著。已有匹配的冻结 Lean 验证时必须引用；书面证明附 DOI 或源论文仓库与形式化请求。</p>
 
 ---
 # 02 模板的保证
@@ -26,7 +26,7 @@ section: "模板的保证"
 <div class="body">
   <p class="kicker">What the template guarantees</p>
   <h2 class="t">优先引用<em>冻结的 Lean 声明</em></h2>
-  <p class="lead">Lean 结果在所钉提交上逐条核对；只有没有匹配验证时，才允许有 DOI、关联证明与请求登记的书面证明。</p>
+  <p class="lead">Lean 结果在所钉提交上逐条核对；只有没有匹配验证时，才允许有 DOI 或源论文仓库、关联证明与请求登记的书面证明。</p>
   <div class="flow mt-l">
     <div class="step"><span class="i">01 · 书</span><b>写明 GID</b><p>Lean 验证结果带 <code>lean="…"</code>，至少一条。</p></div>
     <div class="step"><span class="i">02 · 锁文件</span><b>钉住提交</b><p><code>trureturing.lock.json</code> 记录提交与解析结果。</p></div>
@@ -36,7 +36,7 @@ section: "模板的保证"
   <div class="g3 mt-l">
     <Stat value="33" label="条 Lean 验证结论（全书）" tone="ok" />
     <Stat value="3" label="个开放问题与猜想（全书），标为 OPEN" tone="warn" />
-    <Stat value="1" label="条书面证明，附 DOI 与形式化请求" />
+    <Stat value="1" label="条书面证明，附 DOI 或源论文仓库与形式化请求" />
   </div>
 </div>
 <Source>docs/ARCHITECTURE.md §1、§4；trureturing.lock.json</Source>
