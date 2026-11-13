@@ -48,5 +48,16 @@ for(const [query,width,height] of [['',1440,500],['',1081,320],['',390,844],['?e
     }
   }
 }
+// Subpixel font metrics can leave less than one pixel of overlap, still enough to paint one glyph under a button.
+await T.page.setViewportSize({width:740,height:500});await T.page.goto(url);await settle(T.page,100);
+await T.page.evaluate(()=>{
+  TRV.setLang('en');window.text='short';TRV.kit.flush();
+  const st=document.getElementById('stage'),tr=st.querySelector('.hud-tr'),rg=document.createRange();
+  st.classList.remove('hud-stack');rg.selectNodeContents(st.querySelector('.big'));
+  const title=rg.getBoundingClientRect(),sr=st.getBoundingClientRect();
+  tr.style.cssText=`left:${title.right-sr.left-1-.75}px;right:auto;top:${title.top-sr.top-1}px;max-width:none`;
+  TRV.kit.flush();
+});
+const edge=await inspect();T.check('a fractional-pixel text/button collision is fitted synchronously',edge.clear,JSON.stringify(edge));
 T.check('no page or request errors',T.errors.length===0,JSON.stringify(T.errors));
 await T.finish();

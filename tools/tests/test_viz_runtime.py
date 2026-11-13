@@ -24,7 +24,7 @@ class RuntimeRegressions(unittest.TestCase):
                            capture_output=True, text=True, cwd=paths.ROOT, timeout=180,
                            env={**os.environ, "PW_CHROMIUM_PATH": doctor.chromium_path()})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("113/113 passed", r.stdout)
+        self.assertIn("114/114 passed", r.stdout)
 
     def test_geometry_pixels_and_layout(self):
         r = subprocess.run([NODE, str(paths.TOOLS / "tests" / "viz_runtime_harness.mjs")],

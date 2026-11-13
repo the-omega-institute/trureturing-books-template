@@ -250,7 +250,7 @@
      buttons), the stage gets the class hud-stack and the theme gives the buttons a full row, with the title below
      (--hud-tr-bottom: the bottom edge of the buttons in the stage). Where they do not meet, nothing moves, so a wide
      screen looks as before. Not in a cover or a still (?thumb=1, ?shot=1), where the buttons are not shown. */
-  const rectsMeet = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+  const rectsMeet = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   function hudFit() {
     hudQueued = false;
     if (thumbMode || shot) return;

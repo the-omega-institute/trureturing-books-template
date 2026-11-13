@@ -516,7 +516,7 @@
       "mode": "100644"
     },
     "theme/viz/shell.js": {
-      "sha256": "eaeaf247458c1918ef9469302d84a61a918cc4ecde403368a46490dc22ffae8c",
+      "sha256": "d3909ddf13c079b82bdb140c6674ca8206c07bd25336c3c69ddf6586ac17aada",
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
@@ -952,7 +952,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
-      "sha256": "dc7689bc632a1cc3b5ada7a8f7683daecfac315e5b6456e98e7e45dab09c971f",
+      "sha256": "e0c6f705d1807a571587cede6611df61016677e26237631708feb00d98be32e3",
       "mode": "100644"
     },
     "tools/tests/test_viz_solid.py": {
@@ -964,7 +964,7 @@
       "mode": "100644"
     },
     "tools/tests/viz_hud_harness.mjs": {
-      "sha256": "8178c1c96298adbc4efeae3bd2fb0c03b4303d49406937389a13cbff6d86c288",
+      "sha256": "4ece056cce23ccbc4db0ddabf9c828c67486633d0a8c401f97ecac84570d63cd",
       "mode": "100644"
     },
     "tools/tests/viz_runtime_harness.mjs": {
