@@ -8,7 +8,7 @@ when one of the core targets needs it:
 check          Python ≥ 3.11, trureturing.lock.json, trureturing access (checkout or network),
                the pinned commit on the site.toml trureturing branch
 html           mdBook 0.5.x, Node ≥ 22.12, KaTeX in node_modules
-pdf            pypandoc (Pandoc 3.9), typst; fonts are optional (Typst falls back)
+pdf            pypandoc (Pandoc 3.9), typst, pikepdf; fonts are optional (Typst falls back)
 epub           pypandoc; epubcheck + Java are optional (validation is skipped without them)
 site           whatever html/pdf/epub need (it assembles their outputs)
 =============  ===========================================================================
@@ -190,6 +190,15 @@ def check_typst(report: Report) -> None:
         return
     version = _dist_version("typst") or "?"
     report.add(Check(f"typst {version} (Python module)", True, "", _pip_hint(), targets=("pdf",)))
+
+
+def check_pikepdf(report: Report) -> None:
+    try:
+        importlib.import_module("pikepdf")
+    except ImportError:
+        report.add(Check("pikepdf", False, "not installed", _pip_hint(), targets=("pdf",)))
+        return
+    report.add(Check(f"pikepdf {_dist_version('pikepdf') or '?'}", True, "", _pip_hint(), targets=("pdf",)))
 
 
 def check_epubcheck(report: Report) -> None:
@@ -512,6 +521,7 @@ def collect() -> Report:
     check_trureturing(report, pinned)
     check_pandoc(report)
     check_typst(report)
+    check_pikepdf(report)
     check_epubcheck(report)
     check_mdbook(report)
     check_node(report)
