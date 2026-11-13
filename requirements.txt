@@ -3,5 +3,7 @@
 pypandoc_binary==1.17
 # Typst compiler as a Python module (Typst → PDF, cover PNG)
 typst==0.15.2
+# Lossless PDF object-stream compression (QPDF bindings)
+pikepdf==10.0.2
 # EPUB validator (bundles the W3C epubcheck jar; needs Java)
 epubcheck==5.3.0

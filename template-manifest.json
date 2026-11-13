@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "6cc54178b70035171aa33453dc92399522fac757a1e6b94141c914d50c7d5a52",
+      "sha256": "ac8e03aa4bd828f26e78361d2a14cd97d7f44edd12256ba866897c79a105bf5e",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -84,7 +84,7 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "22fd88a29c4d056de25b5978d0e2c2079cc1a1075d87633439a4f7c15d84670b",
+      "sha256": "ae2c08433e46f10abdf9a56a0ae70cb8b92781b1cd4c9b1db60c99e12eb391fd",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "requirements.txt": {
-      "sha256": "71077ac39b13e13d8d7daf1009c654b23efd0ef0a1c56defae547df7c1b03931",
+      "sha256": "d799ed9c0f6497597359517f89c7629835ceb37f0f8fc977499d6dc0d9e5a265",
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
@@ -700,7 +700,7 @@
       "mode": "100644"
     },
     "tools/tbook/doctor.py": {
-      "sha256": "7ea4bbebc9d6113c21b567caf82aaa61169c92deeb8b7770c53076a4179c1d24",
+      "sha256": "4d891e576451067c85370c7b1194f6b34e70740f00ef648bea86c79b277b90cc",
       "mode": "100644"
     },
     "tools/tbook/evidence.py": {
@@ -752,7 +752,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "b052a3e5716c3173da4c4ca04b3e1c4746cb440caccca89ef9117df051fe8592",
+      "sha256": "cb7bdfa4c96f0b313f5a190743a96b373b5a4db5eb85879fee6b62c7cf741610",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -900,7 +900,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "c1e6f7a1a7f1f5f5d7896b2989a58b88a3beadff1daab3eae5055c23bfd3246b",
+      "sha256": "f601fea45fee4ea10228c0288f9f46fa19bc267de65a4a505193a3c68ab3165a",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
