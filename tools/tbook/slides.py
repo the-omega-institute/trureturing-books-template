@@ -1367,7 +1367,7 @@ def citations(content: str) -> tuple[list[Citation], list[str]]:
         group = False  # a v-on object began a new group of props since: its first gid source wins
         for a in _ATTR_RE.finditer(m.group(2)):
             name = a.group(1)
-            policy_prop = re.fullmatch(r"(?:(?::|v-bind:|v-model:))?(status|kind|cite|doi|source|request)(?:\..*)?", name)
+            policy_prop = re.fullmatch(r"(?:(?::|v-bind:|v-model:))?(status|kind|cite|doi|source|repository|request)(?:\..*)?", name)
             if policy_prop and (name != policy_prop[1] or name in attrs):
                 problems.append(f'<{m.group(1)} {name}=…>: verification metadata must use one literal attribute per prop')
             attrs[name] = next((v for v in a.group(2, 3, 4) if v is not None), True)
@@ -1596,7 +1596,7 @@ def check(book: config.Book) -> list[Issue]:
                                          f"unlike {paths.rel(main.path)}")
                 def citation_key(c):
                     base = c.gid or f"({c.attrs.get('status')})"
-                    return base + (json.dumps([c.attrs.get(k) for k in ("cite", "doi", "source", "request")], ensure_ascii=False)
+                    return base + (json.dumps([c.attrs.get(k) for k in ("cite", "doi", "source", "repository", "request")], ensure_ascii=False)
                                    if c.attrs.get("status") == "written-proof" else "")
                 ga = [citation_key(c) for c in cites[main.lang][i - 1]]
                 gb = [citation_key(c) for c in cites[ed.lang][i - 1]]
@@ -1616,8 +1616,16 @@ def _check_citation(c: Citation, ed: DeckEdition, s: Slide, lock: lean.Lock | No
     if status == "written-proof":
         if c.tag != "TheoremCard" or not c.attrs.get("cite"):
             err(ed.path, s.line, 'written-proof needs a TheoremCard with cite="<book-result-id>" and its associated book proof')
-        if not evidence.doi_url(c.attrs.get("doi")):
-            err(ed.path, s.line, 'written-proof requires a bare doi="10.<registrant>/<suffix>"')
+        doi = c.attrs.get("doi") or ""
+        repository = c.attrs.get("repository") or ""
+        if "doi" in c.attrs and not doi:
+            err(ed.path, s.line, 'omit doi="" when the source has no DOI; use repository="https://…"')
+        if doi and not evidence.doi_url(doi):
+            err(ed.path, s.line, 'written-proof doi must be a bare 10.<registrant>/<suffix> identifier')
+        if not doi and not evidence.repository_url(repository):
+            err(ed.path, s.line, 'written-proof without a DOI requires repository="https://…"')
+        if repository and not evidence.repository_url(repository):
+            err(ed.path, s.line, 'written-proof repository must be an absolute HTTPS source repository URL')
         if not evidence.source_location(c.attrs.get("source")) or evidence.request_number(c.attrs.get("request")) is None:
             err(ed.path, s.line, 'written-proof requires source and a trureturing-requests issue URL')
     if status not in (None, "open", "argued", "written-proof"):
@@ -1658,8 +1666,8 @@ def _check_cite(c: Citation, ed: DeckEdition, s: Slide, model, err) -> None:
     if (c.attrs.get("status") == "written-proof") != (env.status == "written-proof"):
         err(ed.path, s.line, f'<TheoremCard cite="{cite}">: written-proof status must agree with the book')
     if env.status == "written-proof":
-        for key in ("doi", "source", "request"):
-            if c.attrs.get(key) != env.attrs.get(key):
+        for key in ("doi", "source", "repository", "request"):
+            if (c.attrs.get(key) or "") != (env.attrs.get(key) or ""):
                 err(ed.path, s.line, f'<TheoremCard cite="{cite}">: {key} must agree with the book')
     is_open = c.attrs.get("status") == "open"
     if is_open != (env.kind in OPEN):
