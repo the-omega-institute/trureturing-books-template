@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- 形式化、写作检索与钉版技能的本地上游默认统一为 `~/trureturing`，显式路径与已有 `TRURETURING_DIR` 继续优先，并在跨技能步骤间沿用所选目录。来源：下游持续模型研究的路径约定。
+
 ## [0.9.1] - 2026-11-14
 
 ### 变更

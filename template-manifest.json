@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "2c11e7bf55354e13a7e0bd111fd353902af98a21dbd79f9b20a9af188d4cd62b",
+      "sha256": "d171435732eb55b3fcb407e5503c5db7d6fe25882ab41c75bfe534be3e1fbfa8",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -140,7 +140,7 @@
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "14b10155a47b1e62f771d3e11ef85b5be501e854def43897171f6fb492c749e7",
+      "sha256": "2c20de72a9f03a644ebbb0654b961e75ef05717476da8465caa3fc7cd6242238",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
@@ -148,11 +148,11 @@
       "mode": "100644"
     },
     "skills/theorem-formalize/SKILL.md": {
-      "sha256": "c314da984eac5b05d4d52dec6fa91ed625e8038757b996e85cc22646b5bde430",
+      "sha256": "3a9baf0d6aa92b7a19818092c6abac41e1b2e928d381e2d3b283738034bce4c7",
       "mode": "100644"
     },
     "skills/trureturing-pin/SKILL.md": {
-      "sha256": "83b01cc67068d97f6f03d062b57f1de84529c245a6d1d4ecbfcfe138a002b806",
+      "sha256": "f1748ee71342bd47d455c6bbb3bad77e0a47d2b4d91d27b0a825a44356be1cff",
       "mode": "100644"
     },
     "tbook": {
