@@ -22,7 +22,7 @@
 5. **托管文件不在书库里改。** `template.toml` 的 `[managed].paths` 下的文件归模板所有；改进请回馈模板仓库（`skills/template-update`）。书库自己的 skill 放 `skills/local-<name>/`，自己的文档放 `docs/project/`。
 6. **版式服从内容，契约不可改。** 交互可视化按 `skills/book-viz` 的方法做：舞台就是页面，每张实验卡都是正文可以单独引用的图（`::: {.viz src=… preset=…}`）；按对象选舞台，不把所有主题套进同一副骨架。共享运行时（`theme/viz/`）、页面契约、依据标注类名与质量门（`stageFirstChecks`）是硬约束，不自造私有运行时或非标徽章。静态图按 `skills/book-figure` 由脚本生成（`books/<slug>/figures/`），只写颜色角色、不写色值，在讲到它的那句话旁用 `::: {.figure src=…}` 引用。视频与演示文稿对齐 `books/example-monograph/` 的示例（`films/001-golden-deficit/`、`slides/overview/`）与 `templates/`。
 7. **只用相对链接。** 站点挂在 `/<repo>/` 下，以 `/` 开头的站内链接会断。
-8. **提交前验证。** 至少运行 `./tbook check`（0 错误）；改动影响输出时运行对应的 `./tbook build …`，用 `./tbook serve` 在中英文、深浅主题、手机宽度下实际查看。改动工具时运行 `PYTHONPATH=tools python3 -m unittest discover -s tools/tests`。
+8. **提交前验证。** 至少运行 `./tbook check`（0 错误）；改动影响输出时运行对应的 `./tbook build …`。普通 HTML/PDF/EPUB 默认以自动检查和构建验收；仅在出现相关错误或警告，或任务明确要求视觉／版式检查与修复时，按 `skills/book-export` 查看受影响页面，不默认截图、逐页阅读或遍历语言、主题与屏宽组合。可视化与静态图仍按各自 skill 看图。改动工具时运行 `PYTHONPATH=tools python3 -m unittest discover -s tools/tests`。
 9. **不在提交、文档或书中写模型标识。**
 10. **保持文档语言。** 修改现有文档（包括 README、`docs/` 与 `SKILL.md`）时，新增或修订的标题、正文、示例说明与示例注释沿用该文档的主要语言；新文档遵循所在目录的语言约定，未约定时默认中文。命令、代码标识符、引文和明确的外语示例保留原文。多语言文档分别遵循各自语言并同步更新。
 

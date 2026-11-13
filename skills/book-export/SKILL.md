@@ -36,16 +36,24 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 | PDF academic | 同上，`tr-paper` 配色与预印本版式 | A4 单栏、11 pt 衬线正文、题名与摘要同页、连续页码、章部随文、传统定理与证明；在 `[outputs] pdf` 中加 `"academic"` 启用 |
 | EPUB | Pandoc EPUB 3，MathML，封面 PNG | 适配 Apple Books 的白/米/灰/夜间主题；`epubcheck` 0 错误 |
 
+## 验证策略
+
+普通 HTML/PDF/EPUB 先运行 `./tbook check` 和受影响格式的构建，检查日志及适用的自动校验结果（如 EPUBCheck、数学转换、字体、文本与越界检查）。没有相关异常、任务也未要求视觉检查时，以这些检查和构建通过结束验收，不默认渲染页面、生成截图或拼图、逐页阅读，也不遍历中英文、深浅主题、桌面与手机组合。修改公式本身不触发看图。
+
+仅在构建／自动校验出现相关错误或警告，或任务明确要求视觉／版式检查与修复时，才做页面视觉排查。先用日志与最小复现定位，需要图像证据时只查看受影响的页面、语言、变体、主题与尺寸；HTML 可用 `./tbook serve`，PDF 渲染对应问题页，EPUB 按问题使用实际阅读器。已有可读性问题的修复仍需核对问题处，编译通过不能独自证明该问题已解决。
+
+可视化和静态图仍按 [book-viz](../book-viz/SKILL.md)、[book-figure](../book-figure/SKILL.md) 查看舞台、实验卡与图件；不因此额外要求普通导出页面的全套截图验收。
+
 ## 排错清单
 
 1. **先跑 `./tbook check`。** 导出不修内容错误；未解析的引用会渲染成 `[@id?]`。
 2. **字体**：PDF 用 Typst，只认 TTF/OTF。中文需要 Noto Serif/Sans CJK SC（CI 装 `fonts-noto-cjk`）；标题字体 Chakra Petch 与 JetBrains Mono 由 `tools/fetch-fonts.sh` 拉到 `.cache/fonts/`。缺字体时会回退，但字形会变——`./tbook doctor` 会提示。
 3. **数学**：标题使用 `$…$`；章节标题、SUMMARY 链接标题与部分标题、菜单栏书名由构建工具预渲染，侧栏的 JS 与无 JS 目录都支持公式，浏览器标签和搜索索引用可见文字。不要手改暂存 SUMMARY 或在浏览器另加 MathJax。HTML 端 KaTeX 渲染失败的公式显示为代码并在构建日志中警告；PDF 端是 Pandoc 的 TeX→Typst 转换，复杂环境（`aligned`、`cases`）若出错，先在小文件中用 `pandoc -t typst` 复现。EPUB 端是 MathML。标题含公式时，PDF/EPUB 构建也调用 Node（KaTeX）算出与 HTML 相同的标题 id；日志出现“ids of headings with math follow their TeX”时先 `npm ci`，否则指向这类标题的链接会变成纯文字。
 4. **EPUB 校验**：构建后运行 epubcheck；Apple Books 对 XHTML 很严格，任何原始 HTML 都必须是合法 XHTML。
-5. **Apple Books 显示**：不要在 CSS 中强制页面背景色；夜间主题由 `prefers-color-scheme: dark` 和 Apple 的主题选择器切换霓虹配色。用 Books（macOS/iOS）打开实测一次。
+5. **Apple Books 显示**：不要在 CSS 中强制页面背景色；夜间主题由 `prefers-color-scheme: dark` 和 Apple 的主题选择器切换霓虹配色。排查 Books 特有的显示问题时，用 Books（macOS/iOS）打开对应内容实测。
 6. **图片**：放在 `books/<slug>/assets/`，章节中写 `../assets/x.svg`；构建会复制进 `_book/`。PDF 支持 SVG/PNG/JPG。
 7. **mdBook**：版本须为 0.5.4（`MDBOOK` 环境变量或 PATH）。0.4.x 的预处理协议不同。
-8. **PDF 重叠与越界**：检查书中启用的全部 PDF 变体及语言；启用 academic 时按 `PDF-TYPOGRAPHY.md` 检查中英文预印本首页、连续页码与无框定理，尤其是窄表格中的 Lean 标识符、公式及长章名页眉。模板会让表格内代码换行，并把超宽公式缩至当前单元格、列表或定理框宽度；缩得过小的公式应在正文用 `aligned` 显式分行，源码换行本身不会产生公式换行。宽审计表可用 Pandoc 的管道表格列宽：分隔行总宽超过 72 字符时，各列横线数量决定 PDF 列宽比例，把更多空间留给精确契约。实际渲染问题页，确认内容完整可读后再交付，不能只检查编译是否成功。
+8. **PDF 重叠与越界**：按上面的触发条件排查问题涉及的 PDF 变体及语言；academic 的版式规范见 `PDF-TYPOGRAPHY.md`，注意窄表格中的 Lean 标识符、公式及长章名页眉。模板会让表格内代码换行，并把超宽公式缩至当前单元格、列表或定理框宽度；缩得过小的公式应在正文用 `aligned` 显式分行，源码换行本身不会产生公式换行。宽审计表可用 Pandoc 的管道表格列宽：分隔行总宽超过 72 字符时，各列横线数量决定 PDF 列宽比例，把更多空间留给精确契约。修复已知重叠或越界时渲染对应问题页，确认内容完整可读。
 9. **PDF 里印出了源码或颜色值**：`pdftotext <pdf> - | grep -n 'rgb(\|\\[a-zA-Z]\{2,\}\|\$\$\|#box\|class("'`（poppler-utils）扫一遍所有启用的 PDF，正常结果是没有命中（书里贴的代码清单除外）。两种来源：(a) 公式里有 Pandoc 不认识的命令（`\over`、`\genfrac`、未登记的宏），整条公式连同 `$` 原样印出，构建日志里有 `Could not convert TeX math`，换一种写法或把宏登记进 `TEX_MACROS`；(b) 主题 `theme/typst/book.typ` 新定义的名字与 Typst 数学函数重名（主题是整体导入文档的，`accent`、`mono` 都出过事），公式里印出主题变量的值，`tools/tests/test_pdf_math.py` 的重名检查会拦住，改主题里的名字。
 10. **PDF 里公式的间距、大小或结构与 HTML 不同**（符号相叠、多出或缺少空格、上下标位置不对、分式层次不对、矩阵散开）：这是 TeX→Typst 转换的问题，不改正文。按第 12 条取得这条公式的 Typst 代码，对照 `tools/filters/typst-compat.lua` 文件头列出的七类差异找到缺的那条规则，补上并在 `tools/tests/test_pdf_math.py` 加用例。这类问题不会让构建失败，文字扫描也发现不了，只能渲染页面与 HTML 并排看。
 11. **epubcheck 报 RSC-005 `maxsize`/`minsize`/`stretchy` not allowed**：定尺寸命令套在了括号以外的符号上（典型是 `a\big/b`），MathML 里成了带尺寸属性的 `<mi>`。报错给出 `chNNN.xhtml`，到对应章节搜 `\big/`、`\Big/`，改成 `\frac` 或普通的 `/`。
@@ -56,4 +64,4 @@ description: 构建或排查书的导出产物时使用：mdBook HTML、Typst PD
 
 ## 完成标准
 
-目标产物在 `build/` 下生成；HTML 无原始 `$`；Lean 验证定理有 `LEAN ✓` 徽章与指向所钉提交的 Lean 链接；书面证明有紫色徽章、DOI 或源论文仓库、原文定位和形式化请求链接，账本单列且不计入 Lean 数量；PDF 首页、目录、定理与账本符合对应变体规范；academic 的字体嵌入、文本检索与活动内容检查通过，文字扫描无源码泄漏、无越界，改动过的公式所在页面已渲染查看；EPUB epubcheck 无错误。
+目标产物在 `build/` 下生成；HTML 无原始 `$`；Lean 验证定理有 `LEAN ✓` 徽章与指向所钉提交的 Lean 链接；书面证明有紫色徽章、DOI 或源论文仓库、原文定位和形式化请求链接，账本单列且不计入 Lean 数量；PDF 首页、目录、定理与账本符合对应变体规范；academic 的字体嵌入、文本检索与活动内容检查通过，文字扫描无源码泄漏、无越界；EPUB epubcheck 无错误。仅在“验证策略”的触发条件成立时补充对应页面的视觉检查，记录实际范围与问题处理结果。

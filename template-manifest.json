@@ -60,7 +60,7 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "5afb398b2503e55cf2e003538bb02fe54dccc308486e06876157025dbc21f88b",
+      "sha256": "16fdf287a206cd6d15c83746e76a8d552331d213b2d57d4317420e31b0c183e1",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "30521c3bfa06607026153e9aba409f15a78b878de1fabdc8443dd472b4810023",
+      "sha256": "153138b6069b65f45b124c31b2aa4b03a9984c9fe2a3e8d8706d786b97e88784",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -84,7 +84,7 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "ae2c08433e46f10abdf9a56a0ae70cb8b92781b1cd4c9b1db60c99e12eb391fd",
+      "sha256": "170a5c2360843e390a04ba6bfdc92a653cdd68db47835228b567b822b585b7d2",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -112,11 +112,11 @@
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
-      "sha256": "7d19193e201fd6552f2cb2a37dafdaa093059acef64e065ada873af01ef5a650",
+      "sha256": "bca46b426fc9c29fc29c68aa30554955c3664dc4e5175d8fa158044cf381bae4",
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
-      "sha256": "f3953b0ebcdd0921dab016234ba4cdc125532fd6792a5fc09ec796082034b124",
+      "sha256": "9570fdf7b535ab9d6c6e04c44ed7857bd54818bfc9cad09fca8b4235819a2c23",
       "mode": "100644"
     },
     "skills/book-film/SKILL.md": {
@@ -136,11 +136,11 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "ad62c4f685d83b30f5ca0b73da4f2f17686c201fcf5121d094a95fb981692507",
+      "sha256": "e0a851797e384a266d9cd2b46f279a0f8cb12397a49fa74d86329a1da69068c8",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "3e5a2a123febe778168755be530e42ba9e3d80b4f8e36364536da7433b9f48ee",
+      "sha256": "bb50a634bae74bc70f54eb53df7f31da9587740880dcd4c7979a2736bde10d26",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
