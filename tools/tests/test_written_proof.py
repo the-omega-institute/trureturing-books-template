@@ -15,9 +15,11 @@ from test_core import CoreRepo, GID_3V, make_lock, write
 
 DOI = '10.1000/fixture.proof'
 SOURCE = 'Theorem 2.1'
+REPOSITORY = 'https://github.com/example/new-paper'
 REQUEST = evidence.REQUEST_PREFIX + '1'
 SOURCE_ATTRS = f'doi="{DOI}" source="{SOURCE}" request="{REQUEST}"'
 ATTRS = 'status="written-proof" proof="pf-a" ' + SOURCE_ATTRS
+NO_DOI_ATTRS = f'status="written-proof" proof="pf-a" source="{SOURCE}" repository="{REPOSITORY}" request="{REQUEST}"'
 
 
 class WrittenProofTests(unittest.TestCase):
@@ -69,6 +71,36 @@ The statement from the source.
                 issues = []
                 check.check_env_policy(model.load_edition(book.edition('en')), issues)
                 self.assertTrue(any(message in i.message for i in issues), issues)
+
+    def test_no_doi_requires_source_repository_and_is_rendered(self):
+        with CoreRepo() as repo:
+            book = self.book(repo, NO_DOI_ATTRS)
+            models = model.load_book_models(book)
+            issues = []
+            for edition in models.values():
+                check.check_env_policy(edition, issues)
+            self.assertEqual(issues, [])
+            self.assertEqual(evidence.request_title('A new result', '', SOURCE),
+                             f'[Formalization] A new result | No DOI | {SOURCE}')
+            self.assertEqual(evidence.parse_request_title(
+                f'[Formalization] A new result | No DOI | {SOURCE}'), ('', SOURCE))
+            group, = requests.collect(models.values())
+            self.assertEqual(group['sources'], [{'doi': '', 'source': SOURCE, 'repository': REPOSITORY}])
+            self.assertEqual(group['suggested_title'], f'[Formalization] thm-a | No DOI | {SOURCE}')
+            env = models['en'].envs['thm-a']
+            ctx = render.RenderContext(config.load_site(), book, book.edition('en'), models['en'], make_lock(), target='mdbook')
+            view = render.env_view(env, ctx)
+            html = render.mdbook_env(env, view, 'statement')
+            self.assertIn(REPOSITORY, html)
+            self.assertIn('Source repository', html)
+            self.assertIn('Source repository:', render.source_markdown(env))
+
+    def test_no_doi_without_repository_is_rejected(self):
+        with CoreRepo() as repo:
+            book = self.book(repo, 'status="written-proof" proof="pf-a" source="Theorem 2.1" request="' + REQUEST + '"')
+            issues = []
+            check.check_env_policy(model.load_edition(book.edition('en')), issues)
+            self.assertTrue(any('requires either doi' in i.message for i in issues), issues)
 
     def test_open_and_non_result_cannot_claim_written_proof(self):
         for kind in (*model.OPEN, 'definition', 'remark', 'proof'):
@@ -157,6 +189,26 @@ The statement from the source.
             slides._check_cite(citation, ed, slide, m, err)
             self.assertTrue(any('written-proof status must agree' in e for e in errors))
 
+    def test_no_doi_slide_and_academic_sources_use_repository(self):
+        with CoreRepo() as repo:
+            book = WrittenProofTests().book(repo, NO_DOI_ATTRS)
+            m = model.load_edition(book.edition('en'))
+            ed, slide = SimpleNamespace(path=book.edition('en').dir / 'slides.md', lang='en'), SimpleNamespace(line=1)
+            citation = SimpleNamespace(tag='TheoremCard', gid='', attrs={
+                'status': 'written-proof', 'cite': 'thm-a', 'label': m.envs['thm-a'].ref_text('en'),
+                'source': SOURCE, 'repository': REPOSITORY, 'request': REQUEST})
+            errors = []
+            err = lambda *args: errors.append(args[-1])
+            slides._check_citation(citation, ed, slide, make_lock(), err)
+            slides._check_cite(citation, ed, slide, m, err)
+            self.assertEqual(errors, [])
+            out = repo.root / 'generated'
+            out.mkdir()
+            academic.generate_package(book, 'en', SimpleNamespace(results=['thm-a']), make_lock(), out)
+            text = (out / 'tbook-lean.sty').read_text()
+            self.assertIn(REPOSITORY, text)
+            self.assertIn('Source repository', text)
+
 
 # Real Pandoc/Lua/Typst conversions catch divergence hidden by intermediate Markdown.
 
@@ -239,7 +291,7 @@ class WrittenProofEvidenceTests(unittest.TestCase):
         for value in (None, True, '10.1000/a\u200bb', '10.1000/a\nb'):
             self.assertEqual(evidence.doi_url(value), '')
         self.assertIsNotNone(evidence.parse_request_title(evidence.request_title('A result', DOI, SOURCE)))
-        for title in ('A result', '[形式化] X | DOI:10.1000/a | Theorem 1', f'[Formalization]  | DOI:{DOI} | {SOURCE}', '[Formalization] X | DOI:not-a-doi | Theorem 1'):
+        for title in ('A result', '[形式化] X | DOI:10.1000/a | Theorem 1', f'[Formalization]  | DOI:{DOI} | {SOURCE}', '[Formalization] X | DOI:not-a-doi | Theorem 1', '[Formalization] X | No DOI | '):
             self.assertIsNone(evidence.parse_request_title(title))
 
     def test_existing_issue_requires_registration_of_this_book_and_source(self):
@@ -261,6 +313,17 @@ class WrittenProofEvidenceTests(unittest.TestCase):
                 self.assertEqual(requests.check([edition], site_config), [])
             with mock.patch.object(requests, '_api', side_effect=[issue, [{'body':use + '\nDOI:10.1000/wrong | ' + SOURCE}]]):
                 self.assertTrue(requests.check([edition], site_config))
+
+    def test_no_doi_issue_title_and_repository_registration(self):
+        with CoreRepo() as repo:
+            edition = model.load_edition(WrittenProofTests().book(repo, NO_DOI_ATTRS).edition('en'))
+            cfg = config.load_site()
+            use = requests.marker(cfg.repo, edition.edition.book.slug, 'thm-a')
+            title = evidence.request_title('A new result', '', SOURCE)
+            body = use + '\n' + requests.registration('', SOURCE, REPOSITORY)
+            issue = {'title': title, 'body': body, 'comments': 0}
+            with mock.patch.object(requests, '_api', return_value=issue):
+                self.assertEqual(requests.check([edition], cfg), [])
 
     def test_title_pr_missing_issue_and_offline_policy(self):
         from urllib.error import HTTPError, URLError

@@ -39,14 +39,19 @@ def collect(editions) -> list[dict]:
         key = url or f"{edition.edition.book.slug}#{env.id}"
         group = groups.setdefault(key, {
             "request": url, "sources": [],
-            "suggested_title": evidence.request_title(english_names.get((edition.edition.book.slug, env.id)) or env.id, env.attrs.get("doi") or "", env.attrs.get("source") or ""),
+            "suggested_title": evidence.request_title(english_names.get((edition.edition.book.slug, env.id)) or env.id,
+                                                       env.attrs.get("doi") or "", env.attrs.get("source") or "",
+                                                       env.attrs.get("repository") or ""),
             "uses": [],
         })
         group["uses"].append({"book": edition.edition.book.slug, "id": env.id,
                               "chapter": env.chapter.path, "lang": edition.lang,
                               "title": env.title or "", "proof": env.attrs.get("proof") or "",
-                              "doi": env.attrs.get("doi") or "", "source": env.attrs.get("source") or ""})
+                              "doi": env.attrs.get("doi") or "", "source": env.attrs.get("source") or "",
+                              **({"repository": env.attrs.get("repository")} if env.attrs.get("repository") else {})})
         source = {"doi": env.attrs.get("doi") or "", "source": env.attrs.get("source") or ""}
+        if env.attrs.get("repository"):
+            source["repository"] = env.attrs.get("repository")
         if source not in group["sources"]:
             group["sources"].append(source)
     for group in groups.values():
@@ -64,8 +69,19 @@ def _api(path: str):
         return json.load(r)
 
 
-def registration(doi: str, source: str) -> str:
-    return f"DOI:{doi} | {source}"
+def registration(doi: str, source: str, repository: str = "", book_repository: str = "") -> str:
+    """The visible provenance line registered in a requests issue.
+
+    ``No DOI`` is explicit so a missing identifier cannot be mistaken for an
+    incomplete registration.  Repository URLs keep new manuscripts reviewable.
+    """
+    citation = f"DOI:{doi}" if evidence.doi_url(doi) else "No DOI"
+    lines = [f"{citation} | {source}"]
+    if repository:
+        lines.append(f"Source repository: {repository}")
+    if book_repository:
+        lines.append(f"Book repository: https://github.com/{book_repository}")
+    return "\n".join(lines)
 
 
 def registered(issue: dict, number: int, markers: dict[str, str]) -> bool:
@@ -94,7 +110,7 @@ def check(editions, site: config.Site, *, offline=False) -> list[model.Issue]:
     groups = {}
     for edition, env in entries(editions):
         number = evidence.request_number(env.attrs.get("request"))
-        if number and evidence.doi_url(env.attrs.get("doi")) and evidence.source_location(env.attrs.get("source")):
+        if number and evidence.source_location(env.attrs.get("source")):
             groups.setdefault(number, []).append((edition, env))
     for number, uses in groups.items():
         edition, env = uses[0]
@@ -109,9 +125,12 @@ def check(editions, site: config.Site, *, offline=False) -> list[model.Issue]:
             if "pull_request" in issue:
                 report("error", "the URL names a pull request, not a formalization issue")
                 continue
-            if not evidence.parse_request_title(issue.get("title", "")):
-                report("error", "title must be [Formalization] <Result name> | DOI:<bare DOI> | <Source location>")
-            markers = {marker(site.repo, ed.edition.book.slug, e.id): registration(e.attrs.get("doi"), e.attrs.get("source")) for ed, e in uses}
+            parsed_title = evidence.parse_request_title(issue.get("title", ""))
+            if not parsed_title:
+                report("error", "title must be [Formalization] <Result name> | DOI:<bare DOI> or No DOI | <Source location>")
+            markers = {marker(site.repo, ed.edition.book.slug, e.id): registration(
+                e.attrs.get("doi") or "", e.attrs.get("source") or "", e.attrs.get("repository") or "")
+                       for ed, e in uses}
             if not site.repo or not registered(issue, number, markers):
                 report("error", "register every book/result in the issue body or a comment with " + ", ".join(sorted(markers)))
         except HTTPError as exc:

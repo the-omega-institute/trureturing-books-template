@@ -53,8 +53,16 @@ def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
             if "status" in env.attrs.kv and status != WRITTEN_PROOF:
                 _err(issues, *where, f'unknown result status {status!r}; use status="written-proof" or omit status')
             if status == WRITTEN_PROOF:
-                if not evidence.doi_url(env.attrs.get("doi")):
-                    _err(issues, *where, 'a written-proof result requires doi="10.<registrant>/<suffix>" citing its source proof (a bare DOI, not a URL)')
+                doi = env.attrs.get("doi")
+                repository = env.attrs.get("repository")
+                if "doi" in env.attrs.kv and not doi:
+                    _err(issues, *where, 'omit doi="" when the source has no DOI; use repository="https://…"')
+                if doi and not evidence.doi_url(doi):
+                    _err(issues, *where, 'doi="…" must be one bare DOI (10.<registrant>/<suffix>), not a URL or malformed identifier')
+                if not evidence.doi_url(doi) and not evidence.repository_url(repository):
+                    _err(issues, *where, 'a written-proof result requires either doi="10.<registrant>/<suffix>" or repository="https://…" for a source with no DOI')
+                if repository and not evidence.repository_url(repository):
+                    _err(issues, *where, 'repository="…" must be an absolute HTTPS source repository URL')
                 if not evidence.source_location(env.attrs.get("source")):
                     _err(issues, *where, 'a written-proof result requires source="<original theorem number or section/page>"')
                 if evidence.request_number(env.attrs.get("request")) is None:
@@ -362,7 +370,7 @@ def _env_signature(model: EditionModel) -> list:
     sig = []
     for ch in model.chapters:
         items = [(e.kind, e.id, tuple(e.lean), e.attrs.get("status"), e.attrs.get("proof"),
-                  e.attrs.get("doi"), e.attrs.get("source"), e.attrs.get("request"))
+                  e.attrs.get("doi"), e.attrs.get("source"), e.attrs.get("repository"), e.attrs.get("request"))
                  for e in ch.envs if e.kind in NUMBERED + PROOF]
         # a cited card (viz preset=…) is part of the citation: every edition cites the same card at the same place
         items += [(e.kind, e.attrs.get("src"), (e.attrs.get("preset"),) if e.attrs.get("preset") else ()) for e in ch.media]

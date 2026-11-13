@@ -17,8 +17,26 @@ def request_number(value: str | None) -> int | None:
     return int(m[1]) if m else None
 
 
-def request_title(name: str, doi: str, source: str) -> str:
-    return f"{REQUEST_TITLE_PREFIX}{name} | DOI:{doi} | {source}"
+def repository_url(value: str | None) -> str:
+    """Return a usable HTTPS repository/source URL, or an empty string.
+
+    A DOI is not available for every new manuscript.  In that case the source
+    repository is the stable, reviewable location for the written argument.
+    The URL is deliberately host-neutral so GitHub, GitLab, and institutional
+    repositories can be cited.
+    """
+    if not isinstance(value, str) or not value or value.strip() != value:
+        return ""
+    if not re.fullmatch(r"https://[^\s<>\"']+", value):
+        return ""
+    if any(c in "|\r\n" or unicodedata.category(c).startswith("C") for c in value):
+        return ""
+    return value
+
+
+def request_title(name: str, doi: str, source: str, repository: str = "") -> str:
+    citation = f"DOI:{doi}" if doi_url(doi) else "No DOI"
+    return f"{REQUEST_TITLE_PREFIX}{name} | {citation} | {source}"
 
 
 def source_location(value: str | None) -> bool:
@@ -29,9 +47,11 @@ def source_location(value: str | None) -> bool:
 def parse_request_title(title: str) -> tuple[str, str] | None:
     parts = title.split(" | ")
     if (len(title) <= 256 and len(parts) == 3 and parts[0].startswith(REQUEST_TITLE_PREFIX)
-            and bool(parts[0][len(REQUEST_TITLE_PREFIX):].strip()) and parts[1].startswith("DOI:")
-            and doi_url(parts[1][4:]) and source_location(parts[2])):
-        return parts[1][4:], parts[2]
+            and bool(parts[0][len(REQUEST_TITLE_PREFIX):].strip()) and source_location(parts[2])):
+        if parts[1] == "No DOI":
+            return "", parts[2]
+        if parts[1].startswith("DOI:") and doi_url(parts[1][4:]):
+            return parts[1][4:], parts[2]
     return None
 
 

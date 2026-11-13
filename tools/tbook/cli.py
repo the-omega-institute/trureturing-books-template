@@ -100,7 +100,10 @@ def cmd_requests(args) -> int:
         for group in groups:
             print(f'{group["book_count"]} book(s), {group["result_count"]} result(s): {group["request"] or "MISSING ISSUE"}')
             for source in group["sources"]:
-                print(f'  DOI:{source["doi"]} | {source["source"]}')
+                citation = f'DOI:{source["doi"]}' if source.get("doi") else "No DOI"
+                print(f'  {citation} | {source["source"]}')
+                if source.get("repository"):
+                    print(f'  Source repository: {source["repository"]}')
             for use in group["uses"]:
                 print(f'  {use["book"]}/{use["chapter"]}#{use["id"]}')
         print(f'{len(groups)} formalization request(s)')
@@ -268,7 +271,7 @@ def parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("requests", help="list formalization requests, grouped by issue and counted once per book/result")
     c.add_argument("--book", action="append")
-    c.add_argument("--json", action="store_true", help="emit DOI, source, issue and book/result usage counts as JSON")
+    c.add_argument("--json", action="store_true", help="emit DOI/repository, source, issue and book/result usage counts as JSON")
     c.set_defaults(fn=cmd_requests)
 
     c = sub.add_parser("pin", help="pin a trureturing commit and resolve cited declarations")

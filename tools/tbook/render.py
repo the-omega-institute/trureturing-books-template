@@ -461,7 +461,7 @@ def mdbook_env(env: Env, view: dict, inner: str) -> str:
     parts = [f'<section class="{classes}" id="{esc(env.id)}" data-kind="{env.kind}">' if env.id
              else f'<section class="{classes}" data-kind="{env.kind}">',
              f'<header class="tr-env-head">{"".join(head)}</header>', "", inner.strip("\n"), ""]
-    if view.get("doi_url"):
+    if view.get("doi_url") or view.get("repository"):
         parts.append('<footer class="tr-env-lean">' + source_html(view) + '</footer>')
     if view["lean"]:
         links = []
@@ -488,29 +488,43 @@ def source_view(env: Env) -> dict:
         "doi": env.attrs.get("doi") if written else "",
         "doi_url": evidence.doi_url(env.attrs.get("doi")) if written else "",
         "source": env.attrs.get("source") if written else "",
+        "repository": evidence.repository_url(env.attrs.get("repository")) if written else "",
         "request": env.attrs.get("request") if written and evidence.request_number(env.attrs.get("request")) else "",
     }
 
 
 def source_html(view: dict) -> str:
     """Written-proof provenance, kept separate from the non-link verification badge."""
-    if not view.get("doi_url"):
+    if not view.get("doi_url") and not view.get("repository"):
         return ""
-    out = f'DOI: <a href="{esc(view["doi_url"])}">{esc(view["doi"])}</a>'
+    if view.get("doi_url"):
+        out = f'DOI: <a href="{esc(view["doi_url"])}">{esc(view["doi"])}</a>'
+    else:
+        out = f'Source repository: <a href="{esc(view["repository"])}">{esc(view["repository"])}</a>'
     if view.get("source"):
         out += " · " + esc(view["source"])
+    if view.get("repository") and view.get("doi_url"):
+        out += f' · <a href="{esc(view["repository"])}">Source repository</a>'
     if view.get("request"):
         out += f' · <a href="{esc(view["request"])}">trureturing-requests#{evidence.request_number(view["request"])}</a>'
     return out
 
 
 def source_markdown(env: Env) -> str:
-    url = evidence.doi_url(env.attrs.get("doi")) if env.status == "written-proof" else ""
-    if not url:
+    if env.status != "written-proof":
         return ""
-    text = f'DOI: [{mdscan.escape_markdown(env.attrs.get("doi"))}]({url})'
+    url = evidence.doi_url(env.attrs.get("doi"))
+    repository = evidence.repository_url(env.attrs.get("repository"))
+    if url:
+        text = f'DOI: [{mdscan.escape_markdown(env.attrs.get("doi"))}]({url})'
+    elif repository:
+        text = f'Source repository: [{mdscan.escape_markdown(repository)}](<{repository}>)'
+    else:
+        return ""
     if env.attrs.get("source"):
         text += " · " + mdscan.escape_markdown(env.attrs.get("source"))
+    if repository and url:
+        text += f' · [Source repository](<{repository}>)'
     number = evidence.request_number(env.attrs.get("request"))
     if number:
         text += f' · [trureturing-requests#{number}]({env.attrs.get("request")})'

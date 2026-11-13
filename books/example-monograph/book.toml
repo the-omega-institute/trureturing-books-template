@@ -16,8 +16,8 @@ zh = "一本区分 Lean 验证、书面证明与开放问题的示例专著"
 en = "A sample monograph distinguishing Lean verification, written proofs and open questions"
 
 [book.description]
-zh = "四章与一个附录：从 Zeckendorf 表示的进位亏量出发，经由反驳猜想的有限证书与读数的可观测性，到细化、记忆与熵，再到黄金词与回归。优先引用 trureturing 中已冻结的 Lean 声明，书面证明附 DOI 与形式化请求，开放问题明确标出；附交互可视化、讲解视频与演示文稿。"
-en = "Four chapters and an appendix: from the carry deficit of Zeckendorf representations, through finite certificates that refute conjectures and the observability of readouts, to refinement, memory and entropy, and on to the golden word and its returns. Matching frozen Lean declarations take priority; written proofs include a DOI and formalization request, and open problems are marked as open. With an interactive visualization, an explainer film and a slide deck."
+zh = "四章与一个附录：从 Zeckendorf 表示的进位亏量出发，经由反驳猜想的有限证书与读数的可观测性，到细化、记忆与熵，再到黄金词与回归。优先引用 trureturing 中已冻结的 Lean 声明，书面证明附 DOI 或源论文仓库与形式化请求，开放问题明确标出；附交互可视化、讲解视频与演示文稿。"
+en = "Four chapters and an appendix: from the carry deficit of Zeckendorf representations, through finite certificates that refute conjectures and the observability of readouts, to refinement, memory and entropy, and on to the golden word and its returns. Matching frozen Lean declarations take priority; written proofs include a DOI or source repository and a formalization request, and open problems are marked as open. With an interactive visualization, an explainer film and a slide deck."
 
 [outputs]
 html = true

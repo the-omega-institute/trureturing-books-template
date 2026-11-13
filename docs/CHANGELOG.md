@@ -18,7 +18,7 @@
 
 ### 新增
 
-- 形式结论支持 `status="written-proof" proof="<proof-id>"`：优先使用匹配的 Lean 验证，仅在没有匹配验证时允许书面证明；每版要求非空证明、裸 DOI、原文定位及 trureturing-requests issue，校验标题与书籍登记，禁止 `lean`，与开放问题分开；HTML、三种 PDF、EPUB、Slidev 与 Beamer 使用紫色书面证明徽章，来源和请求可点击，不计入 Lean 数量，账本单列。新增 `./tbook requests [--json]` 及站点清单需求数据，按 issue 汇总书籍与结果，翻译不重复计数。
+- 形式结论支持 `status="written-proof" proof="<proof-id>"`：优先使用匹配的 Lean 验证，仅在没有匹配验证时允许书面证明；每版要求非空证明、DOI 或源论文仓库、原文定位及 trureturing-requests issue，校验标题与书籍登记，禁止 `lean`，与开放问题分开；HTML、三种 PDF、EPUB、Slidev 与 Beamer 使用紫色书面证明徽章，来源和请求可点击，不计入 Lean 数量，账本单列。新增 `./tbook requests [--json]` 及站点清单需求数据，按 issue 汇总书籍与结果，翻译不重复计数。
 
 - 独立模板层：下游 `template.d/<name>.toml` 与清单、保留的文档/skill/工作流前缀，沿用同一升级命令、三方冲突、迁移、版本与 git 历史规则；安装前拒绝路径认领重叠及认领下游专属排除路径，独立源仓库无需上游配置即可生成层清单。每周 `template-sync` 按来源独立开 PR。来源：第二个出版模板需叠加领域规则而不分叉上游。
 - 在 Slidev 之外支持学术 Beamer 演示稿：可选书中语言版本的子集、4:3/16:9 画布、原创 Apache-2.0 白底讨论班主题及演示稿自有主题和图片。结果块、所钉提交与验证账本均从书模型和锁文件生成；TeX 引用检查处理注释、原样文本与嵌套参数。
