@@ -23,6 +23,7 @@ import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import film_inputs
 from ci import viz_budget
+from ci.plan_io import load_plan, workflow_controls
 
 VERSION = 5
 SCHEMA = "tbook-ci-coverage-v1"
@@ -580,7 +581,7 @@ def verify_results(plan, results, *, pages=False, pages_enabled=True):
 def write_outputs(result):
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
-        fields = dict(plan=result, site=result["site"], publish=result["publish"],
+        fields = dict(plan=workflow_controls(result), site=result["site"], publish=result["publish"],
                       **{k.replace("-", "_"): v for k, v in result["tasks"].items()},
                       build_matrix={"include": result["exports"]}, viz_matrix={"include": result["viz"]},
                       slow_matrix={"include": result["slow"]}, film_matrix={"include": result["films"]})
@@ -602,7 +603,7 @@ def main():
     parser.add_argument("--verify", action="store_true")
     args = parser.parse_args()
     if args.verify:
-        result = json.loads(os.environ["PLAN_JSON"])
+        result = load_plan()
         verify_results(result, json.loads(os.environ["RESULTS_JSON"]), pages=args.workflow == "pages", pages_enabled=os.environ.get("PAGES_ENABLED") == "true")
         reports = [json.loads(p.read_text()) for p in Path("viz-reports").rglob("*.json")]
         viz_budget.merge_reports(result, reports)

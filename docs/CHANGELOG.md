@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- CI 与 Pages 用同次运行的工件传递完整选择计划，作业输出只保留条件开关，避免大书库的诊断与路径清单超过环境变量限制、使检出步骤报 `Argument list too long`。检查、幻灯片执行及最终覆盖核验仍读取完整计划；失败作业重跑可复用同一运行的计划。来源：下游书库约 188 KB 的计划使检出与清理步骤失败。
+
 ## [0.12.0] - 2026-11-14
 
 ### 新增

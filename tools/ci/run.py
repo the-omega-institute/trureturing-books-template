@@ -1,14 +1,13 @@
 """Execute selected structural/static checks and decks; retain ordinary whole-book cache units."""
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import academic, build, buildcache, config, paths, slides  # noqa: E402
+from ci.plan_io import load_plan  # noqa: E402
 
 
 def run(command):
@@ -42,7 +41,7 @@ def selected_slides(items):
 
 
 def main():
-    plan = json.loads(os.environ["PLAN_JSON"])
+    plan = load_plan()
     selected = plan["selections"]["normal"]
     books = selected["books"]
     kind = sys.argv[1]

@@ -86,17 +86,29 @@ jobs:
           SLOW_FRAMES: ${{ inputs.slow_frames }}
         run: python3 tools/ci/plan.py
 
+      - name: Retain the complete selection plan
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-plan
+          path: ci-plan.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
   validate:
     name: Validate selected inputs
     needs: plan
     if: needs.plan.outputs.validate == 'true'
-    env:
-      PLAN_JSON: ${{ needs.plan.outputs.plan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@v5
+
+      - name: Download the complete selection plan
+        uses: actions/download-artifact@v7
+        with:
+          name: tbook-plan
 
       - name: Set up the toolchain
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
@@ -383,8 +395,6 @@ jobs:
 
   media:
     if: needs.plan.outputs.media == 'true'
-    env:
-      PLAN_JSON: ${{ needs.plan.outputs.plan }}
     name: Slides
     needs: plan
     runs-on: ubuntu-24.04
@@ -396,6 +406,11 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+
+      - name: Download the complete selection plan
+        uses: actions/download-artifact@v7
+        with:
+          name: tbook-plan
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -483,6 +498,10 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - name: Download the complete selection plan
+        uses: actions/download-artifact@v7
+        with:
+          name: tbook-plan
       - name: Download current browser execution reports
         if: needs.plan.outputs.viz == 'true' || needs.plan.outputs.viz_slow == 'true'
         uses: actions/download-artifact@v7
@@ -491,8 +510,14 @@ jobs:
           path: viz-reports
       - name: Require every planned job to succeed
         env:
-          PLAN_JSON: ${{ needs.plan.outputs.plan }}
-          RESULTS_JSON: ${{ toJSON(needs) }}
+          RESULTS_JSON: >-
+            {"plan":{"result":"${{ needs.plan.result }}"},
+             "validate":{"result":"${{ needs.validate.result }}"},
+             "build":{"result":"${{ needs.build.result }}"},
+             "viz":{"result":"${{ needs.viz.result }}"},
+             "viz-slow":{"result":"${{ needs['viz-slow'].result }}"},
+             "media":{"result":"${{ needs.media.result }}"},
+             "films":{"result":"${{ needs.films.result }}"}}
         run: python3 tools/ci/plan.py --verify
       - name: Record successful normal coverage
         if: needs.plan.outputs.publish == 'true' && contains(fromJSON(needs.plan.outputs.plan).profiles, 'normal')

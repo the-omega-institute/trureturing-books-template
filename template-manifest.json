@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "0a7cdd5527188f2b09bdd0a79943f9962d72977ee9341764c35a7f1b2c370b95",
+      "sha256": "6429c5fcd30625379d13dd0097007fec56ee1ca8f9c7c819d1899f7d1ce8217c",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -28,7 +28,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "611ebc9c05d32279b9c4142e4605a55f66502f557ca86d7ff7bebf5d7c23b8b8",
+      "sha256": "3a8ce7490145f26e4bd50c12bc0729be1eaae731d407909ad80530a88aa3dce2",
       "mode": "100644"
     },
     ".github/workflows/release.yml": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "b62b7395a33128285af767899c02740e5dc7bde52d49994889fa6032102acd0d",
+      "sha256": "defd814ff1b7997bf6908ce5dd9fc3ddd94a11c8dbdccf2c59369797ab9d87b4",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -548,11 +548,15 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "e4bc9402122d401903bc5adac5dd608ea3d3cdbbe702a4648f55c961e7e3ad03",
+      "sha256": "c58d627134af860d167882c2adf2137c82b6d4bd123cfee1aa2643c5725f1c45",
+      "mode": "100644"
+    },
+    "tools/ci/plan_io.py": {
+      "sha256": "25b66c5d6faeafdddabd5e0822be12337f89aa627240462c1c2c0eb3943754c4",
       "mode": "100644"
     },
     "tools/ci/run.py": {
-      "sha256": "a6223f85394f28f074b6b8d48595e033d0be41f8e321a8a95ec02937d6f9d06b",
+      "sha256": "604db2c3835c6f25b6a6e72f18d2948cea8a552046fc132db48b8a75930c4831",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -865,6 +869,10 @@
     },
     "tools/tests/test_ci_performance.py": {
       "sha256": "a2e1af4d5cdffbf0e2c018a3798971da6351730d1be0e67f0d9eea0357c9405d",
+      "mode": "100644"
+    },
+    "tools/tests/test_ci_plan_transport.py": {
+      "sha256": "9ccb71de35d01c8a009fea946b181acd63bf5b5ae005bd14d2d1bb2ed7b46a55",
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_budget.py": {

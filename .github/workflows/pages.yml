@@ -58,6 +58,15 @@ jobs:
           SELECTION_MODE: ${{ inputs.selection_mode || 'auto' }}
         run: python3 tools/ci/plan.py --workflow pages
 
+      - name: Retain the complete selection plan
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-plan
+          path: ci-plan.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
   probe:
     name: Is GitHub Pages enabled?
     runs-on: ubuntu-24.04
@@ -221,10 +230,17 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - name: Download the complete selection plan
+        uses: actions/download-artifact@v7
+        with:
+          name: tbook-plan
       - name: Require planned assembly and deployment
         env:
-          PLAN_JSON: ${{ needs.plan.outputs.plan }}
-          RESULTS_JSON: ${{ toJSON(needs) }}
+          RESULTS_JSON: >-
+            {"plan":{"result":"${{ needs.plan.result }}"},
+             "probe":{"result":"${{ needs.probe.result }}"},
+             "build":{"result":"${{ needs.build.result }}"},
+             "deploy":{"result":"${{ needs.deploy.result }}"}}
           PAGES_ENABLED: ${{ needs.probe.outputs.enabled }}
         run: python3 tools/ci/plan.py --workflow pages --verify
       - name: Record successful deployment coverage
