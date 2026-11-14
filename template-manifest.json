@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "2b53ba2623c78f8e12759ea11989e8b904dcc6124af71e34b9c9741a0e8f2528",
+      "sha256": "0a7cdd5527188f2b09bdd0a79943f9962d72977ee9341764c35a7f1b2c370b95",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "2569370edad5eebd5465fa3ea290d302515cdc4a92df800a530cd33e7a1c1181",
+      "sha256": "3fb8fa24ee7211af68059bdc566beca9a5ed0f4b79b0eda5758e336ca3fbf9f4",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "608cfadc4130ed0183a9173877896b5175776ed4cd8d83d2ceeebbf1a7b9e3a5",
+      "sha256": "eb2e43aad4568a885cbfece678e84429479c398234acdf8c7d0be10f25c8bc24",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -548,7 +548,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "d7fdd48088b07a1b01b2853865c03d3e58b3293b0dd36bd0587238d51e7e28c3",
+      "sha256": "e4bc9402122d401903bc5adac5dd608ea3d3cdbbe702a4648f55c961e7e3ad03",
       "mode": "100644"
     },
     "tools/ci/run.py": {
@@ -557,6 +557,10 @@
     },
     "tools/ci/trusted_cache.py": {
       "sha256": "2ce9b35133f40a3b4c74192081b3c4e0b678cbdabea1b3e9df51e60573c5994c",
+      "mode": "100644"
+    },
+    "tools/ci/viz_budget.py": {
+      "sha256": "725091563231f2a308a63d5721ccedd526008ad0d918cba5ed38c41a6b1c0ffe",
       "mode": "100644"
     },
     "tools/container/Dockerfile": {
@@ -656,7 +660,7 @@
       "mode": "100644"
     },
     "tools/node/viz-test.mjs": {
-      "sha256": "735b701db3bffe007210986d0b8599391f655b1dc28f4f8c65e5d664f07bca7f",
+      "sha256": "4ffa44cd04d0a8e0370ec4364fef9bed7ef6624f77daaea26105169c84b4c1fc",
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
@@ -812,7 +816,7 @@
       "mode": "100644"
     },
     "tools/tbook/viz.py": {
-      "sha256": "278d4aef14e4ce67faa304f42fd12180b0262076d49eed86cb9d161813fa3920",
+      "sha256": "5ee7a7b42ee373c95b3ba60cbbf51ae5e70b017a3c1b83a5a9cef031011a316e",
       "mode": "100644"
     },
     "tools/tests/epub-layout.mjs": {
@@ -848,7 +852,11 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "ab491ffcfe60e13a19538cbf5d4c00362efe7bde14fbef47a08e5984740f80f5",
+      "sha256": "a2e1af4d5cdffbf0e2c018a3798971da6351730d1be0e67f0d9eea0357c9405d",
+      "mode": "100644"
+    },
+    "tools/tests/test_ci_viz_budget.py": {
+      "sha256": "2dced969283bf23010cefa49af060ef1cc3d604aaa78f5fe9b06a21d008f3769",
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_slow.py": {

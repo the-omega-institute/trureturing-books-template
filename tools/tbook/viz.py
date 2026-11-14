@@ -591,6 +591,13 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
             err(d, 0, f"viz/{d.name}/ is not registered in {REGISTRY}")
     tdir = vdir / "tests"
     if tdir.is_dir():
+        part_file = tdir / "execution-parts.json"
+        if part_file.exists():
+            from ci.viz_budget import parts
+            try:
+                parts(json.loads(part_file.read_text(encoding="utf-8")), [f.name for f in tdir.glob("*.test.mjs")])
+            except (ValueError, TypeError) as exc:
+                err(part_file, 0, str(exc))
         for f in sorted(tdir.glob("*.test.mjs")):
             if f.name[: -len(".test.mjs")] not in seen:
                 warn(f, 0, f"tests/{f.name} belongs to no registered visualization")

@@ -336,7 +336,16 @@ jobs:
       - name: Visualization browser tests
         env:
           CI_ITEMS: ${{ toJSON(matrix.items) }}
-        run: node tools/node/viz-test.mjs --selection-env CI_ITEMS
+        run: node tools/node/viz-test.mjs --selection-env CI_ITEMS --report viz-reports/normal.json
+
+      - name: Upload exact browser results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-viz-${{ github.run_attempt }}-normal-${{ matrix.batch }}
+          path: viz-reports/normal.json
+          if-no-files-found: error
+          retention-days: 14
 
   viz-slow:
     name: Visualization browser tests, slow frames (${{ matrix.shard }})
@@ -361,7 +370,16 @@ jobs:
       - name: Visualization browser tests (slow frames)
         env:
           CI_ITEMS: ${{ toJSON(matrix.items) }}
-        run: node tools/node/viz-test.mjs --slow --selection-env CI_ITEMS
+        run: node tools/node/viz-test.mjs --slow --selection-env CI_ITEMS --report viz-reports/slow.json
+
+      - name: Upload exact slow browser results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-viz-${{ github.run_attempt }}-slow-${{ matrix.batch }}
+          path: viz-reports/slow.json
+          if-no-files-found: error
+          retention-days: 14
 
   media:
     if: needs.plan.outputs.media == 'true'
@@ -465,6 +483,12 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - name: Download current browser execution reports
+        if: needs.plan.outputs.viz == 'true' || needs.plan.outputs.viz_slow == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: tbook-viz-${{ github.run_attempt }}-*
+          path: viz-reports
       - name: Require every planned job to succeed
         env:
           PLAN_JSON: ${{ needs.plan.outputs.plan }}

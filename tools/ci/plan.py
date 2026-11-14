@@ -22,8 +22,9 @@ import zipfile
 # This constructor is dependency-free and shared with the actual video unit.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import film_inputs
+from ci import viz_budget
 
-VERSION = 4
+VERSION = 5
 SCHEMA = "tbook-ci-coverage-v1"
 DEPENDENCIES = "tbook-ci-dependencies-v1"
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -109,7 +110,9 @@ def inventory(tree):
                         ".." not in PurePosixPath(x).parts and "\\" not in x for x in patterns):
                     raise ValueError(f"{deps_path}: unsafe dependency patterns for {name}")
                 deps[suite] = patterns
-        books[slug] = dict(suites=suites, films=films, slides=sorted(decks), deps=deps,
+        parts_path = prefix + "viz/tests/execution-parts.json"
+        declared = viz_budget.parts(tree.json(parts_path), [PurePosixPath(s).name for s in suites]) if parts_path in tree.files else {}
+        books[slug] = dict(suites=suites, parts=declared, films=films, slides=sorted(decks), deps=deps,
                            outputs=[*( ["html"] if outputs.get("html", True) else []),
                                     *("pdf-" + v for v in pdf), *( ["epub"] if outputs.get("epub", True) else [])])
     return books
@@ -175,6 +178,29 @@ def suite_inputs(tree, slug, book, suite):
     roots = [suite, *(p for p in tree.files if p.endswith((".js", ".mjs")) and
                       any(fnmatch.fnmatchcase(p, pat) for pat in patterns))]
     return patterns, imports(tree, *roots)
+
+
+def execution_inventory(tree, *, with_workloads=False):
+    """Every part inherits the parent's full real input relation and source identity."""
+    blobs = {}
+    for entry in git(tree.root, "ls-tree", "-r", "-z", tree.sha).split(b"\0"):
+        if entry:
+            meta, name = entry.split(b"\t", 1)
+            blobs[name.decode()] = meta.decode()
+    result, workloads = {}, {}
+    for slug, book in inventory(tree).items():
+        for suite in book["suites"]:
+            declared = book["parts"].get(PurePosixPath(suite).name, [])
+            patterns, closure = suite_inputs(tree, slug, book, suite)
+            files = closure | {p for p in tree.files if any(fnmatch.fnmatchcase(p, pat) for pat in patterns)}
+            # Cost eligibility follows the executable test/import/part definition.
+            # Page/data changes remain visible as workload provenance; estimates
+            # are advisory and do not discharge the newly selected work.
+            definition = viz_budget.fingerprint([(p, blobs.get(p)) for p in imports(tree, suite)], declared)
+            workload = viz_budget.fingerprint([(p, blobs.get(p)) for p in files], patterns)
+            result[suite] = {u: definition for u in viz_budget.units(suite, declared)}
+            workloads.update({u: workload for u in result[suite]})
+    return (result, workloads) if with_workloads else result
 
 
 def scope_contains(path, source):
@@ -285,7 +311,15 @@ def impact(current, previous, paths, *, full=False, template=False):
             for film in set(b["films"]) & uncertain_films:
                 films.add(film)
                 reasons.append(f"unknown book-local film reads -> {film}")
-            if local.startswith("viz/tests/") and p in all_suites:
+            if local == "viz/tests/execution-parts.json":
+                # Changes to a parent's finite execution contract select that parent
+                # in either tree, without widening already-declared nonreaders.
+                before = old.get(slug, {}).get("parts", {})
+                for suite in b["suites"]:
+                    name = PurePosixPath(suite).name
+                    if b["parts"].get(name) != before.get(name):
+                        suites.add(suite)
+            elif local.startswith("viz/tests/") and p in all_suites:
                 suites.add(p)
             elif local.startswith("viz/"):
                 for suite in b["suites"]:
@@ -458,11 +492,13 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         pr_base = parents[0]
         limit = pr_base
     selections, coverage = {}, {}
+    execution, matrices, workloads = {}, {}, {}
+    live_execution, live_workloads = execution_inventory(current, with_workloads=True) if any(p in profiles for p in ("normal", "slow")) else ({}, {})
     template = repo == "the-omega-institute/trureturing-books-template"
     deferred_films = event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
     for profile in profiles:
         record = None
-        if mode != "full":
+        if mode != "full" or profile in ("normal", "slow"):
             # A normal CI success may have deferred films. Only actual film responsibility
             # coverage, from CI or Pages, can discharge them; no deployment proof is needed
             # for a successful strict film build in an otherwise successful Pages run.
@@ -473,6 +509,9 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                         record = candidate
                 except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
                     reasons.append(f"{profile}/{producer}: baseline unavailable ({type(exc).__name__})")
+        cost_record = record
+        if mode == "full":
+            record = None  # Costs can guide full execution; they never supply its coverage.
         previous, paths = None, []
         try:
             if base and (not record or Tree(root, base).sha != record["sha"]):
@@ -496,6 +535,16 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                                      run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT", "1"),
                                      inherited={k: record[k] for k in ("sha", "source_run", "artifact_id", "deployment_sha") if k in record} if record else None,
                                      paths=paths)
+        if profile in ("normal", "slow"):
+            live = {u: src for part in live_execution.values() for u, src in part.items()}
+            raw_hints = cost_record.get("timings", {}) if cost_record else {}
+            raw_hints = raw_hints if isinstance(raw_hints, dict) else {}
+            hints = {u: raw_hints[u] for u, src in live.items() if viz_budget.valid_hint(raw_hints.get(u), src) and
+                     isinstance(raw_hints[u].get("workload"), str)}
+            coverage[profile]["timings"] = hints
+            execution[profile] = {u: src for suite in selected["suites"] for u, src in live_execution[suite].items()}
+            workloads[profile] = {u: live_workloads[u] for u in execution[profile]}
+            matrices[profile] = viz_budget.pack(execution[profile], hints, workloads[profile])
         selections[profile] = selected
     normal = selections.get("normal", {})
     if normal:
@@ -510,7 +559,8 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                  media=bool(normal.get("slides")), films=bool(film_items))
     result = dict(version=VERSION, event=event, entry="own" if own else "call", sha=current.sha, mode=mode,
                   profiles=profiles, coverage=coverage, selections=selections, tasks=tasks,
-                  viz=shards(normal.get("suites", []), 8), slow=shards(selections.get("slow", {}).get("suites", []), 8),
+                  viz=matrices.get("normal", []), slow=matrices.get("slow", []), execution=execution, workloads=workloads,
+                  browser_budget=dict(target=viz_budget.TARGET, ceiling=viz_budget.CEILING, reserve=viz_budget.RESERVE, margin=viz_budget.MARGIN),
                   films=shards(film_items, 4), exports=export_matrix(normal.get("exports", [])), slides=normal.get("slides", []),
                   site=selections.get("pages", {}).get("site", False), deferred_films=normal.get("films", []) if deferred_films else [],
                   publish=own and not event.startswith("pull_request") and (ref == f"refs/heads/{branch}" or
@@ -554,6 +604,8 @@ def main():
     if args.verify:
         result = json.loads(os.environ["PLAN_JSON"])
         verify_results(result, json.loads(os.environ["RESULTS_JSON"]), pages=args.workflow == "pages", pages_enabled=os.environ.get("PAGES_ENABLED") == "true")
+        reports = [json.loads(p.read_text()) for p in Path("viz-reports").rglob("*.json")]
+        viz_budget.merge_reports(result, reports)
         Path("coverage").mkdir(exist_ok=True)
         for profile, record in result["coverage"].items():
             if profile == "pages":

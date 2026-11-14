@@ -680,6 +680,18 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
         import sys
         # Run --verify rather than manufacturing records that merely resemble successful coverage.
         shutil.rmtree(self.root / "coverage", ignore_errors=True)
+        shutil.rmtree(self.root / "viz-reports", ignore_errors=True)
+        # This history fixture simulates successful browser jobs explicitly. The
+        # real child/report/Check boundary has independent failure regressions.
+        for profile, execution in result.get("execution", {}).items():
+            if not execution:
+                continue
+            record = result["coverage"][profile]
+            self.write(f"viz-reports/{profile}.json", json.dumps(dict(
+                schema="tbook-viz-report-v1", profile=profile, sha=result["sha"],
+                run_id=record["run_id"], run_attempt=record["run_attempt"], runtime=record["runtime"],
+                frames=1000 if profile == "slow" else 0,
+                results=[dict(unit=u, seconds=1, exit_code=0, signal=None) for u in execution])))
         if workflow == "ci":
             results = {"plan": {"result": "success"}, **{
                 job: {"result": "success" if selected else "skipped"} for job, selected in result["tasks"].items()}}
@@ -713,7 +725,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
             self.deployments[ident] = result["sha"]
 
     def bootstrap(self):
-        (self.root / ".git/info/exclude").write_text("coverage/\n")
+        (self.root / ".git/info/exclude").write_text("coverage/\nviz-reports/\n")
         self.git("checkout", "--detach", self.base)
         self.runs, self.artifacts, self.records, self.deployments = {"ci": [], "pages": []}, {}, {}, {}
         self.next_run = 10
