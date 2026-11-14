@@ -365,7 +365,18 @@ class WorkflowStepTests(unittest.TestCase):
         return self.run_step(SETUP_ACTION, "Find films", **{"WANTED": "true", **env})[0]["install"]
 
     def decks(self) -> str:
-        return self.run_step(WORKFLOWS / "ci.yml", "Find slide decks")[0]["present"]
+        # Inventory is now selected before setup, rather than discovered inside the slide runner.
+        from test_ci_performance import planner
+        import json
+        import tomllib
+        class DiskTree:
+            def __init__(tree):
+                tree.files = {p.relative_to(self.root).as_posix() for p in self.root.rglob("*") if p.is_file()}
+            def toml(tree, name):
+                return tomllib.loads((self.root / name).read_text()) if name in tree.files else {}
+            def json(tree, name):
+                return json.loads((self.root / name).read_text())
+        return "true" if any(b["slides"] for b in planner.inventory(DiskTree()).values()) else "false"
 
     def test_find_films(self):
         self.site(None)

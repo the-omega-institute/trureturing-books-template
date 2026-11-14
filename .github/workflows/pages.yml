@@ -14,9 +14,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      selection_mode:
+        description: auto selects affected site inputs; full forces complete assembly
+        type: choice
+        options: [auto, full]
+        default: auto
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: pages
@@ -26,6 +33,31 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  plan:
+    name: Plan affected work
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      site: ${{ steps.plan.outputs.site }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - name: Check out the tested tree and complete history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Select before installing or downloading caches
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_WORKFLOW_REF: ${{ github.workflow_ref }}
+          SELECTION_MODE: ${{ inputs.selection_mode || 'auto' }}
+        run: python3 tools/ci/plan.py --workflow pages
+
   probe:
     name: Is GitHub Pages enabled?
     runs-on: ubuntu-24.04
@@ -63,7 +95,8 @@ jobs:
 
   build:
     name: Build the site
-    needs: probe
+    needs: [plan, probe]
+    if: needs.plan.outputs.site == 'true'
     runs-on: ubuntu-24.04
     # Rendering a film that no cache holds takes long (frames, narration, encoding). The build step has a
     # shorter limit of its own: a step that runs out of time fails, while a job that does is cancelled and
@@ -164,8 +197,8 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [probe, build]
-    if: needs.probe.outputs.enabled == 'true'
+    needs: [plan, probe, build]
+    if: needs.plan.outputs.site == 'true' && needs.probe.outputs.enabled == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -178,3 +211,37 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  coverage:
+    name: Confirm deployment coverage
+    needs: [plan, probe, build, deploy]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - name: Require planned assembly and deployment
+        env:
+          PLAN_JSON: ${{ needs.plan.outputs.plan }}
+          RESULTS_JSON: ${{ toJSON(needs) }}
+          PAGES_ENABLED: ${{ needs.probe.outputs.enabled }}
+        run: python3 tools/ci/plan.py --workflow pages --verify
+      - name: Record successful deployment coverage
+        if: needs.plan.outputs.publish == 'true' && needs.probe.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-coverage-pages
+          path: coverage/pages.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true
+      - name: Record successful film responsibility coverage
+        if: needs.plan.outputs.publish == 'true' && needs.plan.outputs.site == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-coverage-films
+          path: coverage/films.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true

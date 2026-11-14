@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -41,10 +43,22 @@ def build_one(site: config.Site, item: film.Film) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard", type=shard, default=(1, 1))
+    parser.add_argument("--selection-env", help="environment variable containing exact book/film JSON array")
+    parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
     site, books = config.load_site(), config.load_books()
     items = {(b.slug, f.id): f for b in books for f in film.films(b)}
-    selected = selection(items, args.shard)
+    keys = list(items)
+    if args.selection_env:
+        names = json.loads(os.environ[args.selection_env])
+        known = {"/".join(key): key for key in items}
+        if not isinstance(names, list) or not all(isinstance(x, str) for x in names) or len(names) != len(set(names)) or set(names) - known.keys():
+            raise ValueError("invalid, duplicate, missing or hidden selected film")
+        keys = [known[name] for name in names]
+    selected = selection(keys, args.shard)
+    if args.list:
+        print("\n".join("/".join(key) for key in selected))
+        return 0
     failures = []
     for book in books:
         keys = [key for key in selected if key[0] == book.slug]

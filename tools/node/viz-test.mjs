@@ -19,13 +19,19 @@ import { startServer } from './viz-server.mjs';
 const args = process.argv.slice(2);
 let shard = [1, 1];
 const books = [];
-let list = false, slow = false;
+let list = false, slow = false, selection = null;
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === '--shard') {
     const m = /^(\d+)\/(\d+)$/.exec(args[++k] || '');
     if (!m || +m[1] < 1 || +m[1] > +m[2]) { console.error('usage: --shard i/n with 1 ≤ i ≤ n'); process.exit(2); }
     shard = [+m[1], +m[2]];
+  } else if (a === '--selection-env') {
+    try { selection = JSON.parse(process.env[args[++k]] || ''); }
+    catch { console.error('invalid selection environment JSON'); process.exit(2); }
+    if (!Array.isArray(selection) || selection.some((x) => typeof x !== 'string') || new Set(selection).size !== selection.length) {
+      console.error('selection must be a JSON array of unique suite paths'); process.exit(2);
+    }
   } else if (a === '--list') list = true;
   else if (a === '--slow') slow = true;
   else if (a === '-h' || a === '--help') { console.log('usage: node tools/node/viz-test.mjs [book ...] [--shard i/n] [--slow] [--list]'); process.exit(0); }
@@ -39,7 +45,10 @@ for (const book of books.length ? books : listBooks()) {
   if (!fs.existsSync(dir)) continue;
   for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.test.mjs')).sort()) all.push(path.join(dir, f));
 }
-const suites = all.filter((_, k) => k % shard[1] === shard[0] - 1);
+const byName = new Map(all.map((f) => [rel(f), f]));
+if (selection && selection.some((f) => !byName.has(f))) { console.error('unknown or hidden selected suite'); process.exit(2); }
+const chosen = selection === null ? all : selection.map((f) => byName.get(f)).sort();
+const suites = chosen.filter((_, k) => k % shard[1] === shard[0] - 1);
 if (list) { console.log(suites.map(rel).join('\n')); process.exit(0); }
 if (!suites.length) { console.log(all.length ? `shard ${shard[0]}/${shard[1]} has no suites` : 'no browser suites under books/*/viz/tests/'); process.exit(0); }
 
