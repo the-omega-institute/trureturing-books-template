@@ -699,10 +699,11 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
             results = {"plan": {"result": "success"}, "probe": {"result": "success"},
                        "build": {"result": outcome if result["site"] else "skipped"},
                        "deploy": {"result": "success" if result["site"] and enabled else "skipped"}}
+        results["plan"]["outputs"] = {"plan": json.dumps(result)}
+        self.write("ci-needs.json", json.dumps(results))
         script = Path(__file__).parents[1] / "ci/plan.py"
         verified = self.subprocess.run([sys.executable, str(script), "--workflow", workflow, "--verify"],
-                                      cwd=self.root, env=dict(os.environ, PLAN_JSON=json.dumps(result),
-                                      RESULTS_JSON=json.dumps(results), PAGES_ENABLED=str(enabled).lower()),
+                                      cwd=self.root, env=dict(os.environ, PAGES_ENABLED=str(enabled).lower()),
                                       capture_output=True, text=True)
         self.assertEqual(verified.returncode == 0, outcome == "success", verified.stderr)
         ident = self.next_run
@@ -725,7 +726,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
             self.deployments[ident] = result["sha"]
 
     def bootstrap(self):
-        (self.root / ".git/info/exclude").write_text("coverage/\nviz-reports/\n")
+        (self.root / ".git/info/exclude").write_text("coverage/\nviz-reports/\nci-needs.json\n")
         self.git("checkout", "--detach", self.base)
         self.runs, self.artifacts, self.records, self.deployments = {"ci": [], "pages": []}, {}, {}, {}
         self.next_run = 10

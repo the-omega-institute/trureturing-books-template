@@ -223,10 +223,13 @@ jobs:
         uses: actions/checkout@v5
       - name: Require planned assembly and deployment
         env:
-          PLAN_JSON: ${{ needs.plan.outputs.plan }}
-          RESULTS_JSON: ${{ toJSON(needs) }}
           PAGES_ENABLED: ${{ needs.probe.outputs.enabled }}
-        run: python3 tools/ci/plan.py --workflow pages --verify
+        # Keep the full needs fanout in the runner's script/file, never its environment.
+        run: |
+          cat <<'TBOOK_NEEDS_JSON' > "$RUNNER_TEMP/ci-needs.json"
+          ${{ toJSON(needs) }}
+          TBOOK_NEEDS_JSON
+          python3 tools/ci/plan.py --workflow pages --verify --needs-file "$RUNNER_TEMP/ci-needs.json"
       - name: Record successful deployment coverage
         if: needs.plan.outputs.publish == 'true' && needs.probe.outputs.enabled == 'true'
         uses: actions/upload-artifact@v6
