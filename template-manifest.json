@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "73e7f67783da0c700d40619e6f0d96e48dac81f329bb4ec7a080d58107017a0f",
+      "sha256": "2b53ba2623c78f8e12759ea11989e8b904dcc6124af71e34b9c9741a0e8f2528",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -64,7 +64,7 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "f81272fddc26e93e37db617f60e5a4619c1b239610e3764e590a0eb43e0826ab",
+      "sha256": "1115bca5021c2223e5f62541f165f04f4ee141373ca59f14ad169ab11e1a0092",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "7df1af44d08d09f02b138fb7575ae962a44e302df1c101eae0576eff1ea790c2",
+      "sha256": "c24410ae39ac9ca6bdfc3ac18d92006161f4e89f4c484c81f17f8798ab1302f1",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -84,11 +84,11 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "2b6e1e888e186533229017c27020feba5e7fb001475ee800543df474b4d7455c",
+      "sha256": "1be1af1f180887ee83b847cd696d875520a35dcff26ae404c205edad374ec109",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "8481e0dbbf3376f30b6cb4cba57d34420e27c7b4aa22fc7c94017f4ce250c91b",
+      "sha256": "bed6ab221748a0032a579f26fbd4b8de12d7d7bc9e94af4260751ca36d022943",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "requirements.txt": {
-      "sha256": "d799ed9c0f6497597359517f89c7629835ceb37f0f8fc977499d6dc0d9e5a265",
+      "sha256": "f47260262e5cc14017965f3464ce6a5be5b22a5a36ff9741352f608d8fef6409",
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
@@ -708,7 +708,7 @@
       "mode": "100644"
     },
     "tools/tbook/doctor.py": {
-      "sha256": "4d891e576451067c85370c7b1194f6b34e70740f00ef648bea86c79b277b90cc",
+      "sha256": "969ccb274606a3edefa5cf50aa315a5c360fe9a66f6397914ca45d1bc70b8b32",
       "mode": "100644"
     },
     "tools/tbook/evidence.py": {
@@ -760,7 +760,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "150403c6bc08ba6ee8fb36a2689f6a2534cdc3bed6a8d1f3f27b490194efa8c2",
+      "sha256": "c7498ca7cdf01b4011764fb2478bddc4116a9c6035b712ee70a95d874bc37dbd",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -860,7 +860,7 @@
       "mode": "100644"
     },
     "tools/tests/test_export_layout.py": {
-      "sha256": "cbb5ee1f7f71dd3d7895ad17a0198f402ca4e70f4992d47fa6536c7532cc08d8",
+      "sha256": "999c1ac5ce41470f1b67293fd12e62979a35fb16bb1b93b84741657225011a3d",
       "mode": "100644"
     },
     "tools/tests/test_figkit_marks.py": {
@@ -960,7 +960,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "f92240c823398384e8d0eadf56aa334cc68e57a0970664b211305ce24e379838",
+      "sha256": "30d65934132c48dce2f528850785f8e5d28da728a6fd5a7bdc99d2dd212a3f2d",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {

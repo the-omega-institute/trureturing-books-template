@@ -1208,6 +1208,31 @@ fi
 """
 
 
+class ExportRegressionWorkflowTests(unittest.TestCase):
+    def test_required_browser_export_runs_after_all_ordinary_unit_rounds(self):
+        workflow = GITHUB_DIR / "workflows" / "ci.yml"
+        steps = workflow_jobs(workflow)["validate"]
+        rounds = [i for i, step in enumerate(steps)
+                  if "python -m unittest discover -s tools/tests" in step.get("run", "")]
+        self.assertEqual(len(rounds), 3)
+        setups = [(i, step) for i, step in enumerate(steps) if step.get("uses") == "./.github/actions/setup"]
+        self.assertEqual(len(setups), 2)
+        (early, ordinary), (late, browser) = setups
+        self.assertLess(early, min(rounds))
+        self.assertEqual(ordinary["with"]["browsers"], "false")
+        self.assertGreater(late, max(rounds))
+        self.assertEqual(browser["with"]["browsers"], "true")
+        required, = [(i, step) for i, step in enumerate(steps)
+                     if step.get("run") == "python tools/tests/test_export_layout.py"]
+        self.assertGreater(required[0], late)
+        self.assertEqual(required[1]["if"], browser["if"])
+        self.assertIn("checks.unit ||", browser["if"])
+        self.assertIn("checks.compat", browser["if"])
+        self.assertNotIn("continue-on-error", required[1])
+        validate = workflow.read_text().split("\n  validate:\n", 1)[1].split("\n  build:\n", 1)[0]
+        self.assertIn("timeout-minutes: 30", validate)
+
+
 class BuildCacheWorkflowTests(unittest.TestCase):
     """The build cache store (.cache/artifacts) in GitHub Actions: who restores and who saves it, the builds
     that use it, and the releases that carry it (docs/PUBLISHING.md §5, docs/VERIFICATION.md §2)."""

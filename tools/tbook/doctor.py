@@ -201,6 +201,15 @@ def check_pikepdf(report: Report) -> None:
     report.add(Check(f"pikepdf {_dist_version('pikepdf') or '?'}", True, "", _pip_hint(), targets=("pdf",)))
 
 
+def check_zopfli(report: Report) -> None:
+    try:
+        importlib.import_module("zopfli.zlib")
+    except ImportError:
+        report.add(Check("zopfli", False, "not installed", _pip_hint(), targets=("pdf",)))
+        return
+    report.add(Check(f"zopfli {_dist_version('zopfli') or '?'}", True, "", _pip_hint(), targets=("pdf",)))
+
+
 def check_epubcheck(report: Report) -> None:
     try:
         importlib.import_module("epubcheck")
@@ -522,6 +531,7 @@ def collect() -> Report:
     check_pandoc(report)
     check_typst(report)
     check_pikepdf(report)
+    check_zopfli(report)
     check_epubcheck(report)
     check_mdbook(report)
     check_node(report)
