@@ -5,6 +5,7 @@ import copy
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -100,7 +101,10 @@ class LargePlanTransportTest(unittest.TestCase):
                 path = self.temp / "ci-plan.json"
                 self.assertEqual(json.loads(path.read_text()), plan)
                 for kind in kinds:
-                    with mock.patch.object(sys, "argv", ["run.py", kind, "--plan-file", str(path)]), \
+                    consumer = self.step("ci.yml", job, f"tools/ci/run.py {kind}")
+                    with mock.patch.dict(os.environ, RUNNER_TEMP=str(self.temp)):
+                        argv = shlex.split(os.path.expandvars(consumer["run"]))[1:]
+                    with mock.patch.object(sys, "argv", argv), \
                             mock.patch.object(runner, "run") as command, \
                             mock.patch.object(runner, "selected_slides") as slides:
                         runner.main()
