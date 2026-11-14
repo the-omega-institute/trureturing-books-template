@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "3fb8fa24ee7211af68059bdc566beca9a5ed0f4b79b0eda5758e336ca3fbf9f4",
+      "sha256": "8b470502be33e1be6618951557bcf11ee4f55ef409be9dc157448246753cdbdd",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -136,7 +136,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "e0a851797e384a266d9cd2b46f279a0f8cb12397a49fa74d86329a1da69068c8",
+      "sha256": "80bb27cf5a64881ac5c977e65dd6fb22efe44cdfef1a8dc1aba7b84f466730fa",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
