@@ -1670,8 +1670,23 @@ def _compact_pdf(path: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix=".tbook-pdf-", dir=path.parent) as tmp:
         compact = Path(tmp) / path.name
         with pikepdf.open(path) as pdf:
+            # Typst's numeric drawing/text operators compress better with FILTERED.
+            # Restrict this to plain page streams: image and font bytes stay untouched.
+            seen = set()
+            for page in pdf.pages:
+                contents = page.obj.get("/Contents", [])
+                streams = contents if isinstance(contents, pikepdf.Array) else [contents]
+                for stream in streams:
+                    if (stream.objgen in seen or stream.get("/Filter") != pikepdf.Name.FlateDecode
+                            or stream.get("/DecodeParms") is not None):
+                        continue
+                    seen.add(stream.objgen)
+                    encoder = zlib.compressobj(9, zlib.DEFLATED, 15, 9, zlib.Z_FILTERED)
+                    encoded = encoder.compress(stream.read_bytes()) + encoder.flush()
+                    if len(encoded) < len(stream.read_raw_bytes()):
+                        stream.write(encoded, filter=pikepdf.Name.FlateDecode)
             pdf.save(compact, object_stream_mode=pikepdf.ObjectStreamMode.generate,
-                     compress_streams=True, recompress_flate=True, deterministic_id=True)
+                     compress_streams=True, recompress_flate=False, deterministic_id=True)
         if compact.stat().st_size < path.stat().st_size:
             compact.replace(path)
     return path
@@ -1855,6 +1870,26 @@ def display_options_xml(specified_fonts: bool) -> str:
 
 _XHTML_TITLE_RE = re.compile(rb"<title>[^<]*\.xhtml</title>")
 _H1_RE = re.compile(rb"<h1[^>]*>(.*?)</h1>", re.S)
+_EPUB_MATH_RE = re.compile(rb'<math\b[^>]*>.*?</math>', re.S)
+_EPUB_TABLE_RE = re.compile(rb'<table\b[^>]*>|</table>')
+
+
+def _epub_scroll_containers(xhtml: bytes) -> bytes:
+    """Contain unbreakable native mathematics and tables without rewriting their content.
+
+    Pandoc writes unprefixed MathML and XHTML tables. Insert HTML containers around
+    those elements, retaining their original bytes, namespaces, ids and links.
+    """
+    def math(m: re.Match) -> bytes:
+        kind = b"block" if b'display="block"' in m.group(0).split(b">", 1)[0] else b"inline"
+        return b'<span class="tr-math-scroll tr-math-' + kind + b'">' + m.group(0) + b'</span>'
+
+    def table(m: re.Match) -> bytes:
+        if m.group(0) == b"</table>":
+            return m.group(0) + b"</div>"
+        return b'<div class="tr-table-scroll" tabindex="0">' + m.group(0)
+
+    return _EPUB_TABLE_RE.sub(table, _EPUB_MATH_RE.sub(math, xhtml))
 
 
 def _page_title(xhtml: bytes, fallback: str) -> bytes:
@@ -1911,7 +1946,7 @@ def finalize_epub(src: Path, dst: Path, *, specified_fonts: bool, epoch: int, ti
         data = {n: zin.read(n) for n in names}
     for n in names:
         if n.endswith(".xhtml"):
-            data[n] = _page_title(data[n], title)
+            data[n] = _epub_scroll_containers(_page_title(data[n], title))
     rootfile = _ROOTFILE_RE.search(data.get("META-INF/container.xml", b""))
     opf_name = rootfile.group(1).decode("utf-8") if rootfile else next((n for n in names if n.endswith(".opf")), "")
     if opf_name in data:

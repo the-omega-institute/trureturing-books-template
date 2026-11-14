@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "8299c0c245233ca731567b01ca45b7cd038a2db3b962b68adf1af902d2bd4cd8",
+      "sha256": "3f53e141fe83cbb3b506c993a3a9055bb2d581507a8c34d82b2f83c582163182",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -84,11 +84,11 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "170a5c2360843e390a04ba6bfdc92a653cdd68db47835228b567b822b585b7d2",
+      "sha256": "2b6e1e888e186533229017c27020feba5e7fb001475ee800543df474b4d7455c",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "22a051cc152db360f4c0da13e8ec7b9cf9d686b9953e06d3ed64065207e93971",
+      "sha256": "8481e0dbbf3376f30b6cb4cba57d34420e27c7b4aa22fc7c94017f4ce250c91b",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -256,7 +256,7 @@
       "mode": "100644"
     },
     "theme/epub/book.css": {
-      "sha256": "f88f3f209b5a1e807642753455d1d699854a539813cb6f0d3330c1fbd3da72df",
+      "sha256": "6c8b21c7a1da106d616170341895f237599121303d7329b1f7a6b2c4eebec926",
       "mode": "100644"
     },
     "theme/film/build.py": {
@@ -760,7 +760,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "cb7bdfa4c96f0b313f5a190743a96b373b5a4db5eb85879fee6b62c7cf741610",
+      "sha256": "150403c6bc08ba6ee8fb36a2689f6a2534cdc3bed6a8d1f3f27b490194efa8c2",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -811,6 +811,10 @@
       "sha256": "278d4aef14e4ce67faa304f42fd12180b0262076d49eed86cb9d161813fa3920",
       "mode": "100644"
     },
+    "tools/tests/epub-layout.mjs": {
+      "sha256": "7ca8f4f716a13941ec5a4c7ff69513315fe1ed53c3f0d20a77ba4f5a72926ec7",
+      "mode": "100644"
+    },
     "tools/tests/example_support.py": {
       "sha256": "165567f49709826e5c600b491218fd19b2ddd680591666fde59c27ff25ffebc9",
       "mode": "100644"
@@ -853,6 +857,10 @@
     },
     "tools/tests/test_core.py": {
       "sha256": "93b8f91010607223309ed5cc6e6642ea27551183519de15be328b9fffe228f76",
+      "mode": "100644"
+    },
+    "tools/tests/test_export_layout.py": {
+      "sha256": "cbb5ee1f7f71dd3d7895ad17a0198f402ca4e70f4992d47fa6536c7532cc08d8",
       "mode": "100644"
     },
     "tools/tests/test_figkit_marks.py": {
