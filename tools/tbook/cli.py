@@ -90,6 +90,22 @@ def cmd_build(args) -> int:
     return 1 if result.failures else 0
 
 
+def cmd_stats(args) -> int:
+    from . import stats
+
+    rows = [stats.collect(book, exclude=tuple(args.exclude) if args.exclude else None) for book in _books(args)]
+    print(json.dumps(rows, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_sync(args) -> int:
+    from . import derived
+
+    for book in _books(args):
+        derived.refresh(book, check=args.check)
+    return 0
+
+
 def cmd_requests(args) -> int:
     from . import model, requests
 
@@ -354,6 +370,16 @@ def parser() -> argparse.ArgumentParser:
     t.add_argument("--dry-run", action="store_true")
     t.add_argument("--force", action="store_true")
     c.set_defaults(fn=cmd_template)
+
+    c = sub.add_parser("stats", help="authoritative publication statistics as JSON")
+    c.add_argument("--book", action="append")
+    c.add_argument("--exclude", action="append", default=[], help="generated index chapter to exclude")
+    c.set_defaults(fn=cmd_stats)
+
+    c = sub.add_parser("sync", help="refresh configured book-owned derived data and images")
+    c.add_argument("--book", action="append")
+    c.add_argument("--check", action="store_true", help="read-only freshness check")
+    c.set_defaults(fn=cmd_sync)
 
     c = sub.add_parser("cache", help="build cache: status, key, prune, export (see docs/ARCHITECTURE.md)")
     csub = c.add_subparsers(dest="cache_cmd", required=True)

@@ -647,6 +647,12 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         lock = None
     models_by_book: dict[str, dict[str, EditionModel]] = {}
     for book in books:
+        from . import derived
+
+        try:
+            derived.refresh(book, check=True)
+        except config.ConfigError as exc:
+            _err(issues, book.dir / "book.toml", 0, str(exc))
         for lang in book.languages:
             if not config.has_i18n(lang):
                 _err(issues, book.dir / "book.toml", 0,

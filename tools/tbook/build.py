@@ -111,6 +111,10 @@ def build(targets: list[str], books: list[config.Book], langs: list[str] | None 
         raise config.ConfigError(f"no {' or '.join(repr(lang) for lang in unknown)} edition in the selected "
                                  f"books: {have}")
     site = config.load_site()
+    from . import derived
+
+    for book in books:
+        derived.refresh(book)
     lock = lean.Lock.load()
     result = BuildResult()
     want = set(targets)
