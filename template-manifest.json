@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/trureturing-bump.yml": {
-      "sha256": "075713a60b799ce35e0484eae90ee589a0f586197c3a0d3b0775576a81140efe",
+      "sha256": "a4a4a2fb115dfbec33e3b266ee51450d1739c24805b3adc64123777b50f39100",
       "mode": "100644"
     },
     ".gitignore": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "9511fa88958ff1f179acf674dc30df41c6109f607849a38f71ac8423790a74d1",
+      "sha256": "b62b7395a33128285af767899c02740e5dc7bde52d49994889fa6032102acd0d",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
