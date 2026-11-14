@@ -78,6 +78,8 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 
 ### 3. 生成与看图
 
+统计图先复用 `stats.collect(book)` 的正式解析结果或本书确定性生成器的共享统计快照，不另写正则计数或固定排名断言。生成索引从统计输入排除；已配置 `[derived]` 时先 `./tbook sync --book <book>`。脚本计算结果未变时生成器不会重写 SVG；已有相同输入的画面检查可按原范围复用，只对实际改变的图补看。数学、布局、配色或标签发生变化时仍按下面要求看图。
+
 ```bash
 ./tbook fig build --book <book> [<name> …]     # 每种语言生成 figures/<name>.<语言>.svg，提交入库
 ./tbook fig shots <book> <name> [<name> …]     # 深色、浅色、手机、印刷四种画面，中英各一，写到 build/fig-shots/<book>/

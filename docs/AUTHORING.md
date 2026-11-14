@@ -289,3 +289,36 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 TeX 源在导言区写 `\input{tbook-deck}`；用 `\begin{bookresult}{thm-…}` 引用书中 id，正文自己写，种类、编号、标题与 Lean 徽章由书和锁生成。开放问题没有 GID；未解析的 GID 显示 `UNVERIFIED` 并使检查失败。`\PinnedCommit` 显示当前钉版，`\FormalVerification` 生成本报告引用过的结果账本。按“标题页、提纲、section/subsection/frame、appendix”组织，逐帧写 `% Manuscript: ...`，用 `\note{...}` 保留演讲备注。
 
 `\BookViz{golden-carry}{plus}` 插入纸面静态图并链接在线实验；先用 `./tbook slides snapshots <book>` 生成并提交 `fig-<卡>.<语言>.paper.png`。`\BookFigure{phase-square}` 经现有 `figure.materialize(...,"paper")` 路径插图，检查会拒绝过期 SVG。章节仍用 `::: {.slides src="<deck>"}`，各语言媒体序列一致；deck 缺少该语言时链接所选第一语言。完整命令、源解析边界、自有主题与排版规范见 [theme/beamer/README.md](../theme/beamer/README.md) 和 `skills/book-slides`。
+
+## 统计与派生产物
+
+统计应使用正式出版解析器，避免在正文、图注、幻灯片和绘图脚本各写一份计数：
+
+```bash
+./tbook stats --book example-monograph   # 紧凑统计摘要；--json 输出声明与引用明细
+./tbook sync --book <slug>              # 刷新本书配置的派生数据与图片
+./tbook sync --book <slug> --check      # 只检查是否过期
+```
+
+绘图或索引生成器使用 `from tbook import stats; data = stats.collect(book)`。环境次数、唯一声明数和跨章复用是不同的量；书面证明、开放问题、定义均不计入 `lean_verified`。只统计目录中的权威版本，忽略代码示例与未出版文件；声明仅限本书的正文及媒体引用，其他书的锁定声明不增加本书总数。`groups.inline` 是未被环境引用的分区，可能包含媒体消费者；查看各项 `citations[].via` 区分来源。
+
+生成索引中的声明链接不应回头充当引用统计输入；其中人工撰写的编号环境仍计入环境次数。可在 `book.toml` 配置：
+
+```toml
+[statistics]
+exclude = ["appendix-c.md"]
+
+[derived]
+command = ["python3", "books/my-book/sync-statistics.py"]
+```
+
+`command` 是作者显式配置的命令参数数组，以仓库根目录为工作目录，不经过 shell。`python3` 使用当前工具的解释器；生成器可导入 `tbook`。生成器必须支持 `--check`：只比对、退出非零表示过期，禁止在这个模式写入。`./tbook check` 调用该模式；`./tbook build` 在读取书稿和构建缓存前自动刷新，失败即停止。生成器应先计算全部目标内容，只写字节改变的文件，保留人工编辑的论述与稳定条目编号，不调用语言或图片生成服务。无配置的书不执行额外命令。
+
+`viz-thumbs.mjs` 为每页保存 `.stills.json`，与图片一起提交。它按页面、共享运行时、配色、字体、锁文件、工具及包版本的内容摘要核对输入，并核对每张成品图片的摘要；无变化时直接返回，不启动 Chromium。增引一张卡只补该卡，移除引用会清理无消费者的静帧；输出缺失、被修改或清单损坏会重出。正文普通措辞或源文件时间戳变化不触发图片重出。
+
+```bash
+node tools/node/viz-thumbs.mjs <book> <id> --check  # 不写入，不启动浏览器
+node tools/node/viz-thumbs.mjs <book> <id> --force  # 显式重采样，如核对另一渲染环境
+```
+
+清单证明源码与已生成图片的对应关系，不替代数学、页面行为或画面质量验收。首次引入清单需实际生成，不能给未经采样的旧图补签。普通措辞、钉版或统计变动先运行同步并看实际差异；只有改变的画面需要重新查看。静态 SVG 仍由脚本生成并逐字节核对；生成内容未改变时不重写。

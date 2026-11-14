@@ -58,11 +58,25 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.BOT_TOKEN || github.token }}
 
+      - name: Find configured derived generators
+        id: derived
+        env:
+          PYTHONPATH: tools
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          from tbook import config
+          enabled = any(book.raw.get("derived", {}).get("command") for book in config.load_books())
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"browsers={str(bool(enabled)).lower()}\n")
+          PYTHON
+
       - name: Set up the toolchain
         uses: ./.github/actions/setup
         with:
           fonts: 'false'
           mdbook: 'false'
+          browsers: ${{ steps.derived.outputs.browsers }}
 
       - name: Resolve the target commit
         id: target
@@ -128,7 +142,10 @@ jobs:
         run: |
           set -euo pipefail
           rc=0
-          ./tbook check > build/check.txt 2>&1 || rc=$?
+          ./tbook sync > build/check.txt 2>&1 || rc=$?
+          if [ "$rc" = "0" ]; then
+            ./tbook check >> build/check.txt 2>&1 || rc=$?
+          fi
           cat build/check.txt
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
 
@@ -240,6 +257,7 @@ jobs:
           git switch -C "$branch"
           if [ "$PIN_RC" = "0" ]; then
             git add trureturing.lock.json
+            git add --all -- books
             git commit -q -m "Pin trureturing $short" -m "$(head -n 1 build/pin.md)"
           else
             # Nothing is staged: ./tbook pin writes the lock only when it succeeds, so this pull request
