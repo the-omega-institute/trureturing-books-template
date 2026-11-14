@@ -14,11 +14,16 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
+import sys
 import tomllib
 from urllib.parse import urlencode
 import zipfile
 
-VERSION = 3
+# This constructor is dependency-free and shared with the actual video unit.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tbook import film_inputs
+
+VERSION = 4
 SCHEMA = "tbook-ci-coverage-v1"
 DEPENDENCIES = "tbook-ci-dependencies-v1"
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -81,6 +86,10 @@ def inventory(tree):
                 scripts = meta.get("scripts", [])
                 if not isinstance(scripts, list) or not all(isinstance(x, str) for x in scripts):
                     raise ValueError(f"{f}: invalid scripts")
+                if not isinstance(meta.get("solid", False), bool):
+                    raise ValueError(f"{f}: invalid solid")
+                if any(not x.endswith(".js") or x.startswith("/") or ".." in PurePosixPath(x).parts or "\\" in x for x in scripts):
+                    raise ValueError(f"{f}: invalid script path")
                 films[f"{slug}/{fm[1]}"] = {"scripts": [prefix + x for x in scripts], "solid": meta.get("solid", False)}
             if sm and not sm[1].startswith(("_", ".")):
                 if not SLUG.fullmatch(sm[1]):
@@ -130,9 +139,13 @@ def export_matrix(exports):
     return list(groups.values())
 
 
-def imports(tree, suite):
-    """Static local JS import closure, including model imports shared by suites and film scripts."""
-    seen, pending = set(), [suite]
+def imports(tree, *sources):
+    """Literal relative JS import closure; computed/extra reads need a complete summary."""
+    # Trees are immutable. Many suite summaries share the same runtime roots;
+    # parse each module once rather than once per consumer/profile.
+    if not hasattr(tree, "_import_edges"):
+        tree._import_edges = {}
+    seen, pending = set(), list(sources)
     while pending:
         p = pending.pop()
         if p in seen:
@@ -140,34 +153,49 @@ def imports(tree, suite):
         seen.add(p)
         if p not in tree.files or not p.endswith((".js", ".mjs")):
             continue
-        for spec in re.findall(r'(?:from\s*|import\s*(?:\(\s*)?)[\'"]([^\'"]+)[\'"]', tree.read(p)):
-            if spec.startswith("."):
-                import posixpath
-                q = posixpath.normpath(str(PurePosixPath(p).parent / spec))
-                if q not in seen:
-                    pending.append(q)
+        if p not in tree._import_edges:
+            import posixpath
+            tree._import_edges[p] = [posixpath.normpath(str(PurePosixPath(p).parent / spec))
+                for spec in re.findall(r'(?:from\s*|import\s*(?:\(\s*)?)[\'"]([^\'"]+)[\'"]', tree.read(p))
+                if spec.startswith(".")]
+        pending.extend(q for q in tree._import_edges[p] if q not in seen)
     return seen
 
 
-def shared_role(current, previous, path):
-    """Only runtime roles with established loading/input contracts can narrow execution.
+def suite_inputs(tree, slug, book, suite):
+    """Implicit own inputs plus the existing complete extra-read contract.
 
-    A new vendor module has no old reader correspondence: even if the new core
-    imports it, existing concrete suite declarations need not mention it yet.
-    Deleted modules retain their old role; an unclassified rename endpoint falls
-    through to full impact. Optional local i18n files are inputs even when absent.
+    Imports of declared runtime modules count too, so a new module reached by
+    the same constructor does not require a second concrete filename registry.
+    Semantic completeness is a source/author premise, not inferred from JSON.
     """
-    if path == "theme/viz/solid-core.js":
-        return "solid"
-    if path in ("theme/viz/hub.js", "theme/viz/hub.css"):
-        return "hub"
-    if re.fullmatch(r"(?:theme/)?i18n/(?:zh|en)\.toml", path):
-        return "localization"
-    if (path.startswith("theme/viz/vendor/") and previous and path in previous.files and
-            path in imports(previous, "theme/viz/solid-core.js") and
-            (path not in current.files or path in imports(current, "theme/viz/solid-core.js"))):
-        return "solid"
-    return None
+    base = f"books/{slug}/viz/"
+    ident = PurePosixPath(suite).name.removesuffix(".test.mjs")
+    patterns = [base + ident + "/**", base + "visualizations.json", *book["deps"].get(suite, [])]
+    roots = [suite, *(p for p in tree.files if p.endswith((".js", ".mjs")) and
+                      any(fnmatch.fnmatchcase(p, pat) for pat in patterns))]
+    return patterns, imports(tree, *roots)
+
+
+def scope_contains(path, source):
+    return path == source.rstrip("/") or (source.endswith("/") and path.startswith(source))
+
+
+def film_reads(tree, slug, film, meta):
+    """Project the supported video constructor, retaining provenance and exclusions.
+
+    Classic scripts are inlined in out/index.html. Their module URLs would have
+    a different base; do not treat source-relative imports as complete film reads.
+    Arbitrary custom I/O is outside this constructor's completeness premise.
+    """
+    where = f"books/{slug}/films/{film.split('/')[1]}"
+    scopes = (*film_inputs.video_files(where), *film_inputs.extra_files(meta["scripts"], meta["solid"]))
+    sources = set(film_inputs.engine_sources(slug))
+    scripts = [*meta["scripts"], where + "/scenes.js"]
+    closure = imports(tree, *scripts)
+    uncertain = any(re.search(r"\bimport\s*(?:\(|['\"{*]|[\w$]+\s*(?:,|from\b))|\bexport\s+.*\bfrom\s*['\"]", tree.read(p))
+                    for p in scripts if p in tree.files)
+    return scopes, sources | closure, uncertain
 
 
 def impact(current, previous, paths, *, full=False, template=False):
@@ -200,25 +228,29 @@ def impact(current, previous, paths, *, full=False, template=False):
 
     if full:
         everything("full: explicit mode or unavailable comparable successful coverage")
+    readers = []
+    for tree, books in ((current, now), (previous, old)):
+        if tree is not None and paths:
+            readers.append((tree, books,
+                {s: suite_inputs(tree, slug, b, s) for slug, b in books.items() for s in b["suites"]},
+                {f: film_reads(tree, slug, f, m) for slug, b in books.items() for f, m in b["films"].items()}))
+    uncertain_films = set()
+    for film in all_films:
+        summaries = [video_reads.get(film) for _, _, _, video_reads in readers]
+        if len(summaries) != 2 or any(s is None or s[2] for s in summaries):
+            uncertain_films.add(film)
     for p in paths:
         # Declared nonlocal dependencies apply even to otherwise documentary paths.
-        for tree, books in ((current, now), (previous, old)):
-            if tree is None:
-                continue
-            for slug, b in books.items():
-                for suite in b["suites"]:
-                    patterns = b["deps"].get(suite)
-                    if ((patterns is not None and any(fnmatch.fnmatchcase(p, pat) for pat in patterns)) or
-                            p in imports(tree, suite)):
-                        if suite in all_suites:
-                            suites.add(suite)
-                            reasons.append(f"{p} -> suite {suite}")
-                for film, meta in b["films"].items():
-                    closure = set().union(*(imports(tree, script) for script in meta["scripts"])) if meta["scripts"] else set()
-                    if p in closure or (meta["solid"] and (p == "theme/viz/solid-core.js" or p.startswith("theme/viz/vendor/"))):
-                        if film in all_films:
-                            films.add(film)
-                            reasons.append(f"{p} -> film {film}")
+        for tree, books, suite_reads, video_reads in readers:
+            for suite, (patterns, closure) in suite_reads.items():
+                if suite in all_suites and (p in closure or any(fnmatch.fnmatchcase(p, pat) for pat in patterns)):
+                    suites.add(suite)
+                    reasons.append(f"{p} -> suite {suite}")
+            for film, (scopes, sources, uncertain) in video_reads.items():
+                if film in all_films and (p in sources or any(scope_contains(p, src) and
+                        not any(skip in "/" + p for skip in exclude) for src, exclude in scopes)):
+                    films.add(film)
+                    reasons.append(f"{p} -> film {film}")
         if p.startswith(("docs/", "skills/", ".claude/")) or ("/" not in p and p.endswith(".md")) or p in ("LICENSE", "template-manifest.json"):
             continue
         if p.startswith("books/"):
@@ -250,6 +282,9 @@ def impact(current, previous, paths, *, full=False, template=False):
                 if suite not in b["deps"] or (slug in old and suite not in old[slug]["deps"]):
                     suites.add(suite)
                     reasons.append(f"unregistered suite dependency -> {suite}")
+            for film in set(b["films"]) & uncertain_films:
+                films.add(film)
+                reasons.append(f"unknown book-local film reads -> {film}")
             if local.startswith("viz/tests/") and p in all_suites:
                 suites.add(p)
             elif local.startswith("viz/"):
@@ -278,9 +313,8 @@ def impact(current, previous, paths, *, full=False, template=False):
                 if f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
                     slides.add(deck)
             continue
-        role = shared_role(current, previous, p)
-        if role:
-            shared_outputs(f"shared {role} input: {p}")
+        if p.startswith(("theme/", "templates/", "i18n/")):
+            shared_outputs(f"shared consumer input: {p}")
             for slug, b in now.items():
                 for suite in b["suites"]:
                     # Both summaries must apply to the live reader. New or undeclared
@@ -288,10 +322,11 @@ def impact(current, previous, paths, *, full=False, template=False):
                     if suite not in b["deps"] or suite not in old.get(slug, {}).get("deps", {}):
                         suites.add(suite)
                         reasons.append(f"unknown shared reads -> {suite}")
-            if role == "localization":
-                # engine_data -> engine_strings reads both languages for every film,
-                # including existing or newly created local overrides.
-                films.update(all_films)
+            # Uncertainty belongs to an inapplicable consumer summary, not to a
+            # resource filename/role. A complete supported constructor describes
+            # optional and future paths too; file existence is no completeness proof.
+            films.update(uncertain_films)
+            reasons.extend(f"unknown shared film reads -> {film}" for film in uncertain_films)
             continue
         if p.startswith(("tools/", "theme/", "templates/", ".github/", "i18n/")) or p in (
                 "site.toml", "trureturing.lock.json", "package.json", "package-lock.json", "requirements.txt", "template.toml", "tbook"):

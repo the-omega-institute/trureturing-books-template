@@ -113,6 +113,24 @@ class FilmBuildTest(unittest.TestCase):
                 films.build_one(self.sb.site, self.sb.film())
             rendering.assert_not_called()
 
+    def test_source_scope_projection_preserves_the_existing_video_input_key(self):
+        # Freeze the pre-extraction key contract, including file/value ordering.
+        f = films.film
+        item = self.sb.film()
+        where = f.paths.rel(item.dir)
+        legacy = (f.buildcache.Inputs()
+                  .files(item.dir, exclude=(f"/{where}/{f.POSTER}", f"/{where}/README.md", f"/{where}/out/"))
+                  .files(f.THEME_FILM, exclude=("/theme/film/site/",))
+                  .files(f.paths.GENERATED / "tokens.mjs", f.paths.TOOLS / "tbook" / "film.py")
+                  .text("engine", f.engine_data(item)).text("npm", f._npm_packages())
+                  .text("kokoro", f.KOKORO_RELEASE).text("node", f.buildcache.node_version()))
+        legacy.files(*(p for p in item.scripts if p.is_file()))
+        if item.solid:
+            legacy.files(f.SOLID_CORE, f.SOLID_VENDOR)
+        current = f.video_unit(self.sb.site, item).inputs
+        self.assertEqual(current.parts, legacy.parts)
+        self.assertEqual(current.key(), legacy.key())
+
 
 planner = ci_module("plan")
 
@@ -216,12 +234,16 @@ class AffectedPlanTest(unittest.TestCase):
 
     def test_unknown_shared_inputs_keep_full_fallback(self):
         tree = planner.Tree(self.root, "HEAD")
-        for path in ("theme/viz/vendor/three.js", "package-lock.json", "tools/test.py", "new-unknown"):
+        for path in ("package-lock.json", "tools/test.py", "new-unknown"):
             result = planner.impact(tree, tree, [path])
             self.assertEqual(len(result["suites"]), 4, path)
             self.assertEqual(result["films"], ["one/001-film", "two/001-film"], path)
             self.assertTrue(result["checks"]["unit"], path)
             self.assertTrue(result["reasons"])
+        # Missing roles do not override complete summaries of either kind.
+        result = planner.impact(tree, tree, ["theme/unrepresented/new.js"])
+        self.assertEqual(result["suites"], [])
+        self.assertEqual(result["films"], [])
 
     def shared_readers(self):
         import json
@@ -241,6 +263,8 @@ class AffectedPlanTest(unittest.TestCase):
                 self.write(prefix + "viz/b/model.js", 'export const load = (origin) => fetch(origin + "/one/viz/");\n')
                 deps["b.test.mjs"] = ["theme/viz/hub.*", "theme/i18n/*.toml", "i18n/*.toml"]
             self.write(prefix + "viz/tests/dependencies.json", json.dumps({"schema": planner.DEPENDENCIES, "suites": deps}))
+            self.write(prefix + "viz/shared/classic.js", "window.MODEL = {};\n")
+            self.write(prefix + "films/001-film/film.json", '{"solid":true,"scripts":["viz/shared/classic.js"]}')
             self.write(prefix + "films/002-flat/film.json", '{"solid":false}')
         self.base = self.commit()
 
@@ -296,15 +320,16 @@ class AffectedPlanTest(unittest.TestCase):
         self.assertEqual(self.impact()["films"], ["one/001-film", "two/001-film"])
         self.git("mv", "theme/viz/vendor/module.js", "theme/viz/vendor/renamed.js")
         self.commit()
-        self.assertEqual(len(self.impact()["suites"]), 4, "unknown rename endpoint must widen")
-        # New modules, unsupported resource roles and new languages have no old correspondence.
+        self.assertEqual(self.impact()["suites"], [f"books/{s}/viz/tests/a.test.mjs" for s in ("one", "two")])
+        # Import constructors cover new modules without enumerating vendor filenames.
         self.write("theme/viz/solid-core.js", 'import "./vendor/new.js";\n')
         self.write("theme/viz/vendor/new.js", "")
         self.commit()
-        self.assertEqual(len(self.impact()["suites"]), 4)
+        self.assertEqual(self.impact()["suites"], [f"books/{s}/viz/tests/a.test.mjs" for s in ("one", "two")])
         tree = planner.Tree(self.root, "HEAD")
-        for path in ("theme/viz/vendor/future.js", "theme/unknown.js", "i18n/fr.toml", "theme/viz/kit.js"):
-            self.assertEqual(len(planner.impact(tree, tree, [path])["suites"]), 4, path)
+        for path in ("theme/viz/vendor/future.js", "theme/unknown.js", "theme/viz/kit.js"):
+            self.assertEqual(planner.impact(tree, tree, [path])["suites"], [], path)
+        self.assertEqual(planner.impact(tree, tree, ["i18n/fr.toml"])["suites"], ["books/one/viz/tests/b.test.mjs"])
         # Removed consumers are not executable; publication remains responsible for removal.
         (self.root / "books/one/viz/tests/a.test.mjs").unlink()
         data = json.loads((self.root / "books/one/viz/tests/dependencies.json").read_text())
@@ -330,6 +355,93 @@ class AffectedPlanTest(unittest.TestCase):
         self.commit()
         with self.assertRaisesRegex(ValueError, "invalid schema"):
             self.impact()
+
+    def test_shared_constructor_inputs_do_not_schedule_proved_browser_nonreaders(self):
+        self.shared_readers()
+        for p in ("theme/film/engine.js", "theme/film/lib.js", "theme/generated/tokens.mjs",
+                  "theme/film/site/films.js", "theme/slides/components/Source.vue"):
+            self.write(p, "// source\n")
+        self.base = self.commit()
+        tree = planner.Tree(self.root, self.base)
+        full = planner.impact(tree, tree, [], full=True)
+        for p in ("theme/film/engine.js", "theme/film/lib.js", "theme/generated/tokens.mjs",
+                  "theme/film/site/films.js", "theme/slides/components/Source.vue", "theme/film/new-stage.js"):
+            with self.subTest(path=p):
+                result = planner.impact(tree, tree, [p])
+                self.assertEqual(result["suites"], [])
+                self.assertEqual(result["films"], [] if p.startswith(("theme/film/site/", "theme/slides/")) else full["films"])
+                for key in ("exports", "books", "slides", "checks", "site"):
+                    self.assertEqual(result[key], full[key])
+
+    def test_declared_shared_imports_and_implicit_object_imports_cover_future_members(self):
+        import json
+        # No resource role/name registry: one declared module generates its closure.
+        self.write("theme/other/runtime.mjs", 'import "./new-part.mjs";\n')
+        self.write("theme/other/new-part.mjs", "export const n=1;\n")
+        self.write("books/one/viz/a/main.js", 'import "../../../../theme/other/implicit.mjs";\n')
+        self.write("theme/other/implicit.mjs", "export const n=1;\n")
+        p = "books/two/viz/tests/dependencies.json"
+        data = json.loads((self.root / p).read_text())
+        data["suites"]["b.test.mjs"].append("theme/other/runtime.mjs")
+        self.write(p, json.dumps(data))
+        old = planner.Tree(self.root, self.commit())
+        self.write("theme/other/runtime.mjs", 'import "./renamed-part.mjs";\n')
+        self.git("mv", "theme/other/new-part.mjs", "theme/other/renamed-part.mjs")
+        head = planner.Tree(self.root, self.commit())
+        for path in ("theme/other/new-part.mjs", "theme/other/renamed-part.mjs"):
+            self.assertEqual(planner.impact(head, old, [path])["suites"], ["books/two/viz/tests/b.test.mjs"])
+        self.assertEqual(planner.impact(head, old, ["theme/other/implicit.mjs"])["suites"],
+                         ["books/one/viz/tests/a.test.mjs"])
+
+    def test_arbitrary_shared_read_summary_positive_old_and_unknown_are_separate(self):
+        import json
+        self.shared_readers()
+        path = "books/one/viz/tests/dependencies.json"
+        data = json.loads((self.root / path).read_text())
+        data["suites"]["b.test.mjs"].append("theme/film/**")
+        self.write(path, json.dumps(data))
+        self.write("theme/film/engine.js", "// engine\n")
+        old = planner.Tree(self.root, self.commit())
+        data["suites"]["b.test.mjs"].remove("theme/film/**")
+        self.write(path, json.dumps(data))
+        head = planner.Tree(self.root, self.commit())
+        expected = ["books/one/viz/tests/b.test.mjs"]
+        for current, previous in ((head, old), (old, head)):
+            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"], expected)
+        del data["suites"]["b.test.mjs"]
+        self.write(path, json.dumps(data))
+        unknown = planner.Tree(self.root, self.commit())
+        for current, previous in ((head, unknown), (unknown, head)):
+            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"], expected)
+
+    def test_unsupported_inline_module_keeps_only_its_film_uncertain_in_either_tree(self):
+        self.shared_readers()
+        self.write("theme/viz/kit.js", "// browser-only\n")
+        old = planner.Tree(self.root, self.commit())
+        for code in ('const load = (url) => import(url);\n', 'import model from "./resource.js";\n'):
+            self.write("books/two/films/002-flat/scenes.js", code)
+            head = planner.Tree(self.root, self.commit())
+            for current, previous in ((head, old), (old, head)):
+                selected = planner.impact(current, previous, ["theme/viz/kit.js"])
+                self.assertEqual(selected["suites"], [])
+                self.assertEqual(selected["films"], ["two/002-flat"])
+                # Unknown local reads follow the same consumer scope as unknown suites.
+                selected = planner.impact(current, previous, ["books/two/viz/b/main.js"])
+                self.assertEqual(selected["films"], ["two/002-flat"])
+                selected = planner.impact(current, previous, ["books/one/viz/b/main.js"])
+                self.assertEqual(selected["films"], [])
+
+    def test_new_film_summary_is_inapplicable_in_old_tree_and_malformed_meta_is_error(self):
+        self.shared_readers()
+        self.write("theme/viz/kit.js", "// browser-only\n")
+        old = planner.Tree(self.root, self.commit())
+        self.write("books/one/films/003-new/film.json", "{}")
+        head = planner.Tree(self.root, self.commit())
+        self.assertEqual(planner.impact(head, old, ["theme/viz/kit.js"])["films"], ["one/003-new"])
+        for text in ('{"solid":"yes"}', '{"scripts":["../outside.js"]}'):
+            self.write("books/one/films/003-new/film.json", text)
+            with self.assertRaises(ValueError):
+                planner.inventory(planner.Tree(self.root, self.commit()))
 
     def test_deleted_renamed_hidden_and_empty_inventory(self):
         import shutil

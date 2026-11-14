@@ -91,7 +91,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from . import buildcache, config, lean, paths
+from . import buildcache, config, film_inputs, lean, paths
 from .model import Issue
 
 FILM_DIR_RE = re.compile(r"^(?P<num>\d{3})-(?P<name>[a-z0-9]+(?:-[a-z0-9]+)*)$")
@@ -1073,7 +1073,7 @@ def items(book) -> list[dict]:
 
 def engine_strings() -> dict[str, dict[str, str]]:
     out = {}
-    for lang in ("zh", "en"):
+    for lang in film_inputs.ENGINE_LANGUAGES:
         table = {key: t(lang, key) for key in ENGINE_STRING_KEYS}
         table["lean"] = config.s(lang, "badge.lean")
         table["open"] = config.s(lang, "badge.open")
@@ -1575,19 +1575,18 @@ def video_unit(site: config.Site, film: Film) -> buildcache.Unit:
     ``scripts`` lists are inputs too; a film without solid shots does not depend on three.js.
     """
     where = paths.rel(film.dir)
-    inputs = (buildcache.Inputs()
-              .files(film.dir, exclude=(f"/{where}/{POSTER}", f"/{where}/README.md", f"/{where}/out/"))
-              .files(THEME_FILM, exclude=("/theme/film/site/",))
-              .files(paths.GENERATED / "tokens.mjs", paths.TOOLS / "tbook" / "film.py")
-              .text("engine", engine_data(film))
+    inputs = buildcache.Inputs()
+    for source, exclude in film_inputs.video_files(where, theme=paths.rel(THEME_FILM),
+            tokens=paths.rel(paths.GENERATED / "tokens.mjs"), implementation=paths.rel(paths.TOOLS / "tbook" / "film.py")):
+        inputs.files(paths.ROOT / source, exclude=exclude)
+    inputs = (inputs.text("engine", engine_data(film))
               .text("npm", _npm_packages())
               .text("kokoro", KOKORO_RELEASE)
               .text("node", buildcache.node_version()))
     scripts = [p for p in film.scripts if p.is_file()]
-    if scripts:
-        inputs.files(*scripts)
-    if film.solid:
-        inputs.files(SOLID_CORE, SOLID_VENDOR)
+    for source, exclude in film_inputs.extra_files([paths.rel(p) for p in scripts], film.solid,
+            core=paths.rel(SOLID_CORE), vendor=paths.rel(SOLID_VENDOR)):
+        inputs.files(paths.ROOT / source, exclude=exclude)
     return buildcache.Unit("films", f"{film.book.slug}/{film.id}", inputs, [film.build_dir])
 
 
