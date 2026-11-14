@@ -93,6 +93,17 @@ Open.
             with self.assertRaises(config.ConfigError):
                 derived.refresh(book, check=True)
 
+    def test_cli_defaults_to_a_compact_summary(self):
+        with Repo() as repo:
+            repo.book()
+            code, out, err = repo.run_cli('stats')
+            self.assertEqual(code, 0, err)
+            self.assertIn('0 distinct declarations', out)
+            self.assertLess(len(out), 250)
+            code, out, err = repo.run_cli('stats', '--json')
+            self.assertEqual(code, 0, err)
+            self.assertEqual(json.loads(out)[0]['total'], 0)
+
     def test_invalid_hook_and_empty_books(self):
         with Repo() as repo:
             book = repo.book()

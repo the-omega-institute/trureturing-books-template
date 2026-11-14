@@ -94,7 +94,16 @@ def cmd_stats(args) -> int:
     from . import stats
 
     rows = [stats.collect(book, exclude=tuple(args.exclude) if args.exclude else None) for book in _books(args)]
-    print(json.dumps(rows, ensure_ascii=False, indent=2))
+    if args.json:
+        print(json.dumps(rows, ensure_ascii=False, indent=2))
+    else:
+        for data in rows:
+            counts = data['environments']
+            kinds = ', '.join(f'{n} {k}' for k, n in data['kinds'].items()) or 'none'
+            print(f"{data['book']}/{data['lang']}: {data['total']} distinct declarations ({kinds})")
+            print(f"  environments: {counts['lean_verified']} Lean-verified, "
+                  f"{counts['written_proof']} written proofs, {counts['conjecture'] + counts['problem']} open")
+            print('  partitions: ' + ', '.join(f'{k} {len(v)}' for k, v in data['groups'].items()))
     return 0
 
 
@@ -371,9 +380,10 @@ def parser() -> argparse.ArgumentParser:
     t.add_argument("--force", action="store_true")
     c.set_defaults(fn=cmd_template)
 
-    c = sub.add_parser("stats", help="authoritative publication statistics as JSON")
+    c = sub.add_parser("stats", help="authoritative publication statistics (compact summary or --json)")
     c.add_argument("--book", action="append")
     c.add_argument("--exclude", action="append", default=[], help="generated index chapter to exclude")
+    c.add_argument("--json", action="store_true", help="include declarations and citation locations")
     c.set_defaults(fn=cmd_stats)
 
     c = sub.add_parser("sync", help="refresh configured book-owned derived data and images")

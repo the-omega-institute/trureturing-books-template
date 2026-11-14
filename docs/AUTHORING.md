@@ -295,7 +295,7 @@ TeX 源在导言区写 `\input{tbook-deck}`；用 `\begin{bookresult}{thm-…}` 
 统计应使用正式出版解析器，避免在正文、图注、幻灯片和绘图脚本各写一份计数：
 
 ```bash
-./tbook stats --book example-monograph   # 权威语言的环境数、唯一声明、引用位置与章节分组，输出 JSON
+./tbook stats --book example-monograph   # 紧凑统计摘要；--json 输出声明与引用明细
 ./tbook sync --book <slug>              # 刷新本书配置的派生数据与图片
 ./tbook sync --book <slug> --check      # 只检查是否过期
 ```
