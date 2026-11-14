@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "d4094493b5e1665709bdd9a1a9389e68f5f8b613b819ad7d9229d9f182007411",
+      "sha256": "9511fa88958ff1f179acf674dc30df41c6109f607849a38f71ac8423790a74d1",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
-      "sha256": "9570fdf7b535ab9d6c6e04c44ed7857bd54818bfc9cad09fca8b4235819a2c23",
+      "sha256": "7d0a57860ab95987eebcb2d3d0d4a6b78f2aa87853ddff36da99443edeb768b6",
       "mode": "100644"
     },
     "skills/book-film/SKILL.md": {
@@ -136,11 +136,11 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "80bb27cf5a64881ac5c977e65dd6fb22efe44cdfef1a8dc1aba7b84f466730fa",
+      "sha256": "59f813e6df96597e628c8824611b2ab24e23c81daf1ae15218afa0fabc113e67",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "2c20de72a9f03a644ebbb0654b961e75ef05717476da8465caa3fc7cd6242238",
+      "sha256": "eec7cb382a103963fa0f26899159bbe0d6220580eef2363d472a6ae1b8f4d4a7",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
