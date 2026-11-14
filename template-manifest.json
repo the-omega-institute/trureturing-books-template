@@ -68,11 +68,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "c26304bdb2803e5504e912dcb7058cb9ae5e399e87c74ecbfe13100e21f125d0",
+      "sha256": "ae8bf07dbc26529be6690d61c123ab08c1e55833d9cd228d8e96f7be6ee8d1ed",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "253dfb0811b8871adfff05976eceee18b32ff5d84b5bcef5541c5d59790c1040",
+      "sha256": "3fb8fa24ee7211af68059bdc566beca9a5ed0f4b79b0eda5758e336ca3fbf9f4",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -84,7 +84,7 @@
       "mode": "100644"
     },
     "docs/PDF-TYPOGRAPHY.md": {
-      "sha256": "1be1af1f180887ee83b847cd696d875520a35dcff26ae404c205edad374ec109",
+      "sha256": "26cbe1d906513bad5a3ec6f7604ef524f08315cfdc4f53c02311ab791ac02271",
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
@@ -112,7 +112,7 @@
       "mode": "100644"
     },
     "skills/book-export/SKILL.md": {
-      "sha256": "bca46b426fc9c29fc29c68aa30554955c3664dc4e5175d8fa158044cf381bae4",
+      "sha256": "91dd9d458889a9f2dd1057b02524d473ab1e88c8a199fff5f25069018db2d0dd",
       "mode": "100644"
     },
     "skills/book-figure/SKILL.md": {
