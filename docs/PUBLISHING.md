@@ -69,7 +69,7 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 
 影片独立使用 `films` 成功覆盖：CI 实际承担所选影片并通过末尾 Check 时可记录；main／tag push 将影片留给 Pages／Release，不写影片覆盖。Pages 完整严格构建与末尾汇总成功时记录影片覆盖，即使未启用部署也可记录；无构建的 Pages 运行不推进它。影片选择在 CI 与 Pages 的可信成功影片记录中取较新的祖先，以该 SHA 累计比较；已有覆盖且未变的影片跳过。normal 覆盖单独推进不会清除影片责任：Pages 失败、取消或影片证据缺失后，文档 PR／手动 CI 仍选待验证影片，main 仍交给 Pages；全部影片证据缺失时只将影片责任全量回退。影片覆盖不替代独立部署覆盖，也不读取 PR 自产缓存。
 
-纯 `docs/`、`skills/`、项目说明等已知工程文档没有重型消费者；模板仍核对 manifest。未知根路径与共享工具／依赖先保守全量；书内未登记 suite 的额外文件读取先扩大到所属书。现有导出键覆盖整本书，因此书内变动选择该书全部启用格式与语言，不擅自缩窄缓存输入。正文变化覆盖读取 preset／lang／height 的 `stageFirstChecks`；影片的 `film.json scripts` 及其静态 JS import 反向传播到影片；solid 核心与 vendor 变化覆盖 viz 与 film。隐藏／删除书不生成假分片，Pages 仍完整组装以删除旧输出。
+纯 `docs/`、`skills/`、项目说明等已知工程文档没有重型消费者；模板仍核对 manifest。未知根路径与共享工具／依赖先保守全量；书内未登记 suite 的额外文件读取先扩大到所属书。现有导出键覆盖整本书，因此书内变动选择该书全部启用格式与语言，不擅自缩窄缓存输入。正文变化覆盖读取 preset／lang／height 的 `stageFirstChecks`；影片的 `film.json scripts` 保留反向依赖；solid 核心与 vendor 变化覆盖实际 viz 与 film 读者。隐藏／删除书不生成假分片，Pages 仍完整组装以删除旧输出。
 
 **额外测试依赖。** 书库可维护自有 `books/<slug>/viz/tests/dependencies.json`，登记每个 suite 在常规对象目录和静态 import 之外读取的文件。路径从仓库根起算，可用 glob；不能用绝对路径或 `..`。声明不存在的 suite、错误 schema 或损坏 JSON 会使计划失败，不能静默跳过。正文仍保守传播到该书全部 suite。以下为通用示例，不要求模板修改书籍内容：
 
@@ -87,7 +87,17 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 }
 ```
 
-声明须完整列出 suite 的额外读取；没有声明时，任何该书变动都会选择该书未登记的 suite。模板单测用独立 Git fixture 验证这个契约，不硬编码下游书名。相对 import 自动跟踪，动态计算的路径仍须登记。精确集合通过 JSON 环境变量传给 `viz-test.mjs --selection-env`、`films.py --selection-env`，拒绝不存在、隐藏或重复项。slide 集合按 deck 执行；整书集合沿用原 slides 单元键，部分集合可恢复完整单元，冷构建只运行选中 deck，且不把部分产物写入整书缓存。
+声明须完整列出 suite 的额外读取；没有声明时，任何该书变动都会选择该书未登记的 suite。相对 import 自动跟踪，动态计算的路径、额外页面导航、子进程、文件存在性查询及生成数据的源文件仍须登记。声明是与实际源码对应的完整读取契约；schema 校验、空列表或 glob 未匹配本身不证明没有读取。新增或改变这些读取时须同步复核声明。模板单测用独立 Git fixture 验证传播与回退，不硬编码下游书名。
+
+可比增量模式下，`theme/`、`templates/`、`i18n/` 的执行选择统一沿消费者输入传播，不以共享前缀或资源角色缺失覆盖已知非读者。suite 的输入是自身源码、自身对象目录、registry、支持的相对 import 及完整额外读取声明；声明所列 JS/MJS 模块的相对 import 也会展开，因此同一构造新增 vendor/helper 成员不依赖另一个文件名名单。任一树缺少适用声明（包括新增 suite）时，该 suite 对共享资源仍保守入选，范围跨所有可见书。`kit.solid()` 才加载实体核心及其 vendor 闭包，hub 的 JS/CSS 只由实际打开 hub 的 suite 读取；真实的章节／SUMMARY、CHSH 额外导航、缩略图存在性和 helper 读取仍须完整表达。
+
+影片选择与 `video_unit` 共用 `tools/tbook/film_inputs.py` 的文件输入构造：影片目录及原有排除项、`theme/film/`（排除 `site/`）、`tokens.mjs`、列出的 classic scripts，以及条件 solid 核心／vendor。目录构造覆盖未来成员增删；`engine_data` 和 npm 数据的源路径另外保留，包括书籍元数据、锁文件、包锁和中英主题表／可选本地覆盖。中英语言集合与 `engine_strings` 共用；原本不存在的覆盖文件也有依赖。该提取保留原有文件与生成值的哈希顺序、排除项和输出键范围，源路径不代替生成值进入键。
+
+删除沿旧依赖传播，重命名两端分别分析，已删除消费者不执行。新旧树都必须支持该消费者总结；新增影片或任一端发现不受支持的内联 module import 时，保留该影片的共享读取不确定性，书内变化则保留所属书的这些未知影片。影片脚本在 `out/index.html` 中内联，不能把原源码目录的相对 import 当作实际 URL 的完备证明。现有影片构造的完整性以前提为：脚本自包含，额外资源由已列输入和条件构造提供；任意自定义网络、文件系统、动态生成读取没有通用额外依赖接口，须复核实际源码，无法建立对应时保守扩大影片责任。已有路径、schema、空匹配和当前消费者计数都不证明语义完整；选择器也不宣称能自动发现任意 JavaScript 中未申报的读取。不确定性属于缺少适用总结的消费者，不因一个资源名不存在或缺少角色标签而产生；影片未知不会扩大已有完整总结的浏览器非读者。
+
+浏览器非读者仍可能是发布消费者：`publish_assets` 向每本书复制实体、hub 与 vendor 资源。因此上述执行选择不缩减书籍导出、静态检查、slide 或完整 Pages 组装责任。影片站点资源仍复制发布，但不因而重新渲染非读者影片。工具／检查定义、安装依赖和无法建立整体范围的未知输入，以及显式 full 和不可比成功覆盖，继续遵守既有全量语义。
+
+精确集合通过 JSON 环境变量传给 `viz-test.mjs --selection-env`、`films.py --selection-env`，拒绝不存在、隐藏或重复项。slide 集合按 deck 执行；整书集合沿用原 slides 单元键，部分集合可恢复完整单元，冷构建只运行选中 deck，且不把部分产物写入整书缓存。
 
 **慢帧复查（`viz-slow`）。** `--slow` 令 `VIZ_SLOW_FRAMES=1000`，用于发现固定等待时间造成的偶发失败。每周三的本工作流定时入口只选择 slow profile；手动运行由 `slow_frames` 控制，调用者也可明确传入。slow 使用独立成功基准：相同输入、运行时与检查定义已经覆盖时不开 runner；首次或基准失效则全量 slow fallback。共享运行时、测试工具或 suite 改动后的本地复查仍见 [book-viz](../skills/book-viz/SKILL.md)。
 
