@@ -5,5 +5,7 @@ pypandoc_binary==1.17
 typst==0.15.2
 # Lossless PDF object-stream compression (QPDF bindings)
 pikepdf==10.0.2
+# Stronger lossless Deflate for PDF page streams (supports Python >= 3.10)
+zopfli==0.4.3
 # EPUB validator (bundles the W3C epubcheck jar; needs Java)
 epubcheck==5.3.0
