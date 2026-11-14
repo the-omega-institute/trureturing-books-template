@@ -90,13 +90,19 @@ jobs:
     name: Validate selected inputs
     needs: plan
     if: needs.plan.outputs.validate == 'true'
-    env:
-      PLAN_JSON: ${{ needs.plan.outputs.plan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@v5
+
+      - name: Materialize the complete selected plan
+        # toJSON escapes string newlines; the quoted here-document keeps data inert.
+        # The runner writes this script to disk, so payloads never enter exec arguments/env.
+        run: |
+          cat <<'TBOOK_PLAN_JSON' > "$RUNNER_TEMP/ci-plan.json"
+          ${{ toJSON(fromJSON(needs.plan.outputs.plan)) }}
+          TBOOK_PLAN_JSON
 
       - name: Set up the toolchain
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
@@ -132,7 +138,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # Optional repository secret for a private trureturing (raw files and the compare API).
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
-        run: python tools/ci/run.py structure
+        run: python tools/ci/run.py structure --plan-file "$RUNNER_TEMP/ci-plan.json"
 
       - name: Theme tokens are up to date
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.theme
@@ -150,11 +156,11 @@ jobs:
 
       - name: Visualizations (static validation)
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static
-        run: python tools/ci/run.py viz-static
+        run: python tools/ci/run.py viz-static --plan-file "$RUNNER_TEMP/ci-plan.json"
 
       - name: Slides (static checks)
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
-        run: python tools/ci/run.py slides-static
+        run: python tools/ci/run.py slides-static --plan-file "$RUNNER_TEMP/ci-plan.json"
 
       - name: Without the example books (template repository only)
         # Books repositories may delete the template's example books (books/example-*; hiding them with
@@ -383,8 +389,6 @@ jobs:
 
   media:
     if: needs.plan.outputs.media == 'true'
-    env:
-      PLAN_JSON: ${{ needs.plan.outputs.plan }}
     name: Slides
     needs: plan
     runs-on: ubuntu-24.04
@@ -396,6 +400,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+
+      - name: Materialize the complete selected plan
+        # toJSON escapes string newlines; the quoted here-document keeps data inert.
+        # The runner writes this script to disk, so payloads never enter exec arguments/env.
+        run: |
+          cat <<'TBOOK_PLAN_JSON' > "$RUNNER_TEMP/ci-plan.json"
+          ${{ toJSON(fromJSON(needs.plan.outputs.plan)) }}
+          TBOOK_PLAN_JSON
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -419,7 +431,7 @@ jobs:
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
-        run: python tools/ci/run.py slides
+        run: python tools/ci/run.py slides --plan-file "$RUNNER_TEMP/ci-plan.json"
 
       - name: Upload slide PDFs
         uses: actions/upload-artifact@v6
@@ -490,10 +502,12 @@ jobs:
           pattern: tbook-viz-${{ github.run_attempt }}-*
           path: viz-reports
       - name: Require every planned job to succeed
-        env:
-          PLAN_JSON: ${{ needs.plan.outputs.plan }}
-          RESULTS_JSON: ${{ toJSON(needs) }}
-        run: python3 tools/ci/plan.py --verify
+        # Preserve all needs outputs, including the complete original plan, in a file.
+        run: |
+          cat <<'TBOOK_NEEDS_JSON' > "$RUNNER_TEMP/ci-needs.json"
+          ${{ toJSON(needs) }}
+          TBOOK_NEEDS_JSON
+          python3 tools/ci/plan.py --verify --needs-file "$RUNNER_TEMP/ci-needs.json"
       - name: Record successful normal coverage
         if: needs.plan.outputs.publish == 'true' && contains(fromJSON(needs.plan.outputs.plan).profiles, 'normal')
         uses: actions/upload-artifact@v6

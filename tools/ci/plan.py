@@ -600,10 +600,13 @@ def main():
     parser.add_argument("--base", default=os.environ.get("SELECTION_BASE", ""))
     parser.add_argument("--head", default=os.environ.get("SELECTION_HEAD", ""))
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--needs-file", type=Path, default=Path("ci-needs.json"))
     args = parser.parse_args()
     if args.verify:
-        result = json.loads(os.environ["PLAN_JSON"])
-        verify_results(result, json.loads(os.environ["RESULTS_JSON"]), pages=args.workflow == "pages", pages_enabled=os.environ.get("PAGES_ENABLED") == "true")
+        results = json.loads(args.needs_file.read_text(encoding="utf-8"))
+        # Use the plan from this exact needs fanout; do not maintain a second copy.
+        result = json.loads(results["plan"]["outputs"]["plan"])
+        verify_results(result, results, pages=args.workflow == "pages", pages_enabled=os.environ.get("PAGES_ENABLED") == "true")
         reports = [json.loads(p.read_text()) for p in Path("viz-reports").rglob("*.json")]
         viz_budget.merge_reports(result, reports)
         Path("coverage").mkdir(exist_ok=True)

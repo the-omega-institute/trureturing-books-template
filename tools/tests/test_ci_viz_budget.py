@@ -203,9 +203,11 @@ class ChildRunnerTest(unittest.TestCase):
             shutil.rmtree(self.root / 'viz-reports', ignore_errors=True)
             if report is not None:
                 self.write('viz-reports/normal.json', json.dumps(report))
+            self.write('ci-needs.json', json.dumps({
+                'plan': {'result': 'success', 'outputs': {'plan': json.dumps(result)}},
+                'viz': {'result': 'success'}}))
             return subprocess.run([sys.executable, str(Path(__file__).parents[1] / 'ci/plan.py'), '--verify'],
-                cwd=self.root, env=dict(os.environ, PLAN_JSON=json.dumps(result), RESULTS_JSON=json.dumps({
-                    'plan': {'result': 'success'}, 'viz': {'result': 'success'}})), capture_output=True, text=True)
+                cwd=self.root, capture_output=True, text=True)
         for failing in ('first', 'second'):
             run, failed = self.run_child(units, fail=failing)
             self.assertEqual(run.returncode, 1)

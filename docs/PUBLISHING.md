@@ -47,6 +47,8 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 | `template-sync.yml` | 每周、手动（仅下游） | 升级到模板新版本并开 PR（有冲突时标题以 `[conflicts]` 开头，`.template-new` 文件一并提交） |
 | `template-release.yml` | tag `v*`（仅模板仓库） | 核对版本与清单、跑 CI 后发布模板版本，附示例站点的构建缓存（同样先建草稿、上传后发布） |
 
+`ci.yml` 的选择检查从 JSON 文件读取完整计划；CI 与 Pages 的汇总从另一份 JSON 文件读取完整 `needs`，并直接使用其中的 `plan.outputs.plan`，没有第二份计划副本。工作流用带引号的 here-document 接收 `toJSON` 编码的数据，由运行器先写脚本再落盘；计划和汇总载荷不进入进程参数或环境变量，字符串中的换行与 shell 语法不会被执行。矩阵、检查条件、精确浏览器报告核对与覆盖来源保持原有契约；缺少计划、作业结果或执行报告仍使汇总失败。
+
 检查与构建作业（`ci.yml`、`pages.yml`、`release.yml` 的构建、`trureturing-bump.yml`）通过组合动作 `.github/actions/setup` 安装工具链（Python 3.12 + requirements、Node 22 + `npm ci`、按需安装 Chromium、mdBook 0.5.4、CJK 字体；`films: 'true'` 且有（未隐藏的）书带视频时另装 ffmpeg 与备用字体，运行 `theme/film/setup.sh` 安装 `theme/film/requirements.txt` 并下载 Kokoro 模型到 `.cache/film/models`）。
 
 `ci.yml` 的验证作业先完成普通单元测试及模板仓库的删除／隐藏示例兼容检查，再用同一安装动作启用 Chromium，执行 `PYTHONPATH=tools python tools/tests/test_export_layout.py` 的必需 EPUB 布局回归。普通测试发现模式按工具链体检的 Chromium 可用性保持可选；独立入口遇到缺依赖、跳过或失败均以非零状态退出，验证作业时限仍为 30 分钟。

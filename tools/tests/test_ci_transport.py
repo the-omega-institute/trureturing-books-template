@@ -1,0 +1,203 @@
+"""Large CI data travels through runner script files, including the complete needs fanout."""
+from __future__ import annotations
+
+import copy
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import unittest
+from unittest import mock
+
+import test_ci_performance as fixtures
+from test_verification import GITHUB_DIR, run_bash, workflow_jobs
+
+planner = fixtures.planner
+runner = fixtures.ci_module("run")
+TOOLS = Path(__file__).resolve().parents[1]
+
+
+class LargePlanTransportTest(unittest.TestCase):
+    git = fixtures.AffectedPlanTest.git
+    write = fixtures.AffectedPlanTest.write
+    commit = fixtures.AffectedPlanTest.commit
+    make_plan = fixtures.AffectedPlanTest.make_plan
+
+    def setUp(self):
+        fixtures.AffectedPlanTest.setUp(self)
+        for name in ("ci", "tbook"):
+            (self.root / "tools" / name).symlink_to(TOOLS / name, target_is_directory=True)
+        self.temp = self.root / "runner-temp"
+        self.temp.mkdir()
+
+    def large_plan(self, **kwargs):
+        result = self.make_plan(event="workflow_dispatch", baseline=False, **kwargs)
+        # Generic provenance, independent of any downstream book or failed run.
+        result["coverage"][next(iter(result["coverage"]))]["paths"] = [
+            f"books/one/assets/{i:05}-generic-publication-input.svg" for i in range(5000)]
+        result["reasons"].append("\nTBOOK_PLAN_JSON\nTBOOK_NEEDS_JSON\n$(touch injected)\n`touch injected`\n'\"\\")
+        self.assertGreater(len(json.dumps(result, separators=(",", ":")).encode()), 188430)
+        return result
+
+    def needs(self, plan, *, pages=False, enabled=True):
+        output = self.temp / "outputs"
+        output.unlink(missing_ok=True)
+        with mock.patch.dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=""):
+            planner.write_outputs(plan)
+        outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+        self.assertEqual(json.loads(outputs["plan"]), plan)
+        for field, key in (("build", "exports"), ("viz", "viz"), ("slow", "slow"), ("film", "films")):
+            self.assertEqual(json.loads(outputs[field + "_matrix"]), {"include": plan[key]})
+        selected = ({"probe": True, "build": plan["site"], "deploy": plan["site"] and enabled}
+                    if pages else plan["tasks"])
+        return {"plan": {"result": "success", "outputs": outputs}, **{
+            job: {"result": "success" if chosen else "skipped",
+                  "outputs": {"metadata": "generic fanout " * 20000}}
+            for job, chosen in selected.items()}}
+
+    def reports(self, plan):
+        shutil.rmtree(self.root / "viz-reports", ignore_errors=True)
+        for profile, execution in plan.get("execution", {}).items():
+            if not execution:
+                continue
+            record = plan["coverage"][profile]
+            self.write(f"viz-reports/{profile}.json", json.dumps(dict(
+                schema="tbook-viz-report-v1", profile=profile, sha=plan["sha"],
+                run_id=record["run_id"], run_attempt=record["run_attempt"], runtime=record["runtime"],
+                frames=1000 if profile == "slow" else 0,
+                results=[dict(unit=u, seconds=1, exit_code=0, signal=None) for u in execution])))
+
+    def step(self, workflow, job, marker):
+        return next(s for s in workflow_jobs(GITHUB_DIR / "workflows" / workflow)[job]
+                    if marker in s.get("run", ""))
+
+    def execute(self, step, data, *, enabled=True):
+        script = step["run"]
+        for expr, value in (("toJSON(fromJSON(needs.plan.outputs.plan))", json.loads(data["plan"]["outputs"]["plan"])),
+                            ("toJSON(needs)", data)):
+            script = script.replace("${{ " + expr + " }}", json.dumps(value, ensure_ascii=True, indent=2))
+        self.assertNotIn("${{", script)
+        completed = run_bash(script, self.root, dict(RUNNER_TEMP=str(self.temp),
+            TBOOK_ROOT=str(self.root), PAGES_ENABLED=str(enabled).lower()))
+        self.assertFalse((self.root / "injected").exists(), "JSON must remain inert shell data")
+        return completed
+
+    def test_selected_consumers_read_the_entire_large_plan_and_keep_exact_selection(self):
+        plan = self.large_plan(slow=True)
+        needs = self.needs(plan)
+        books = plan["selections"]["normal"]["books"]
+        commands = {
+            "structure": [str(runner.paths.ROOT / "tbook"), "check", *[v for b in books for v in ("--book", b)]],
+            "viz-static": ["node", "tools/node/viz-validate.mjs", *books],
+            "slides-static": ["node", "tools/node/slides-check.mjs", *[v for b in books for v in ("--book", b)]]}
+        for job, kinds in (("validate", commands), ("media", ["slides"])):
+            with self.subTest(job=job):
+                step = self.step("ci.yml", job, "TBOOK_PLAN_JSON")
+                completed = self.execute(step, needs)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                path = self.temp / "ci-plan.json"
+                self.assertEqual(json.loads(path.read_text()), plan)
+                for kind in kinds:
+                    with mock.patch.object(sys, "argv", ["run.py", kind, "--plan-file", str(path)]), \
+                            mock.patch.object(runner, "run") as command, \
+                            mock.patch.object(runner, "selected_slides") as slides:
+                        runner.main()
+                        if kind == "slides":
+                            slides.assert_called_once_with(plan["slides"])
+                            command.assert_not_called()
+                        else:
+                            command.assert_called_once_with(commands[kind])
+                            slides.assert_not_called()
+
+    def test_ci_own_and_reusable_aggregate_preserve_large_needs_and_all_profiles(self):
+        step = self.step("ci.yml", "check", "--verify")
+        for own in (True, False):
+            with self.subTest(own=own):
+                plan = self.large_plan(own=own, slow=True)
+                self.assertEqual(plan["entry"], "own" if own else "call")
+                self.reports(plan)
+                needs = self.needs(plan)
+                self.assertGreater(len(json.dumps(needs).encode()), 1048576)
+                completed = self.execute(step, needs)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(json.loads((self.temp / "ci-needs.json").read_text()), needs)
+                for profile, original in plan["coverage"].items():
+                    record = json.loads((self.root / f"coverage/{profile}.json").read_text())
+                    for key in set(original) - {"timings"}:
+                        self.assertEqual(record[key], original[key], key)
+                    if profile in ("normal", "slow"):
+                        self.assertEqual(set(record["timings"]), set(plan["execution"][profile]))
+
+    def test_pages_large_needs_preserves_assembly_deployment_and_film_responsibility(self):
+        plan = self.large_plan(workflow="pages")
+        step = self.step("pages.yml", "coverage", "--verify")
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                needs = self.needs(plan, pages=True, enabled=enabled)
+                completed = self.execute(step, needs, enabled=enabled)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                record = json.loads((self.root / "coverage/pages.json").read_text())
+                self.assertEqual(record["deployed"], enabled)
+                self.assertEqual(record["deployment_sha"], plan["sha"])
+                self.assertEqual(record["paths"], plan["coverage"]["pages"]["paths"])
+                self.assertTrue((self.root / "coverage/films.json").exists())
+                if enabled:
+                    needs["deploy"]["result"] = "failure"
+                    self.assert_rejected(step, needs)
+
+    def assert_rejected(self, step, needs):
+        shutil.rmtree(self.root / "coverage", ignore_errors=True)
+        completed = self.execute(step, needs)
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertFalse((self.root / "coverage").exists())
+
+    def test_missing_malformed_failed_and_mismatched_data_never_publish_coverage(self):
+        plan = self.large_plan(slow=True)
+        needs = self.needs(plan)
+        step = self.step("ci.yml", "check", "--verify")
+        self.reports(plan)
+        completed = self.execute(step, needs)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        # Every selected job, including plan, must still succeed.
+        for job in needs:
+            for status in ("failure", "cancelled", "skipped", None):
+                bad = copy.deepcopy(needs)
+                if status is None:
+                    bad[job].pop("result")
+                else:
+                    bad[job]["result"] = status
+                self.assert_rejected(step, bad)
+        for outputs in ({}, {"plan": ""}, {"plan": "{}"}):
+            bad = copy.deepcopy(needs)
+            bad["plan"]["outputs"] = outputs
+            # execute renders both expressions, including the plan; use only needs here.
+            script = step["run"].replace("${{ toJSON(needs) }}", json.dumps(bad))
+            shutil.rmtree(self.root / "coverage", ignore_errors=True)
+            completed = run_bash(script, self.root, {"RUNNER_TEMP": str(self.temp)})
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertFalse((self.root / "coverage").exists())
+        shutil.rmtree(self.root / "viz-reports")
+        self.assert_rejected(step, needs)  # No browser reports despite successful job statuses.
+        for field, wrong in (("sha", "other-tree"), ("run_attempt", "other-attempt"),
+                             ("runtime", {"ImageOS": "other-image"})):
+            self.reports(plan)
+            path = self.root / "viz-reports/slow.json"
+            report = json.loads(path.read_text()); report[field] = wrong
+            path.write_text(json.dumps(report))
+            self.assert_rejected(step, needs)
+        for script, args in (("plan.py", ["--verify", "--needs-file"]),
+                             ("run.py", ["structure", "--plan-file"])):
+            for body in (None, "not json"):
+                path = self.temp / "missing-or-malformed.json"
+                path.unlink(missing_ok=True)
+                if body is not None:
+                    path.write_text(body)
+                completed = subprocess.run([sys.executable, str(TOOLS / "ci" / script), *args, str(path)],
+                    cwd=self.root, capture_output=True, text=True)
+                self.assertNotEqual(completed.returncode, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

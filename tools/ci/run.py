@@ -1,8 +1,8 @@
 """Execute selected structural/static checks and decks; retain ordinary whole-book cache units."""
 from __future__ import annotations
 
+import argparse
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -42,10 +42,14 @@ def selected_slides(items):
 
 
 def main():
-    plan = json.loads(os.environ["PLAN_JSON"])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("kind", choices=("structure", "viz-static", "slides-static", "slides"))
+    parser.add_argument("--plan-file", type=Path, required=True)
+    args = parser.parse_args()
+    plan = json.loads(args.plan_file.read_text(encoding="utf-8"))
     selected = plan["selections"]["normal"]
     books = selected["books"]
-    kind = sys.argv[1]
+    kind = args.kind
     if kind == "structure":
         # Deleted/hidden final book still needs global structural validation.
         run([str(paths.ROOT / "tbook"), "check", *[v for b in books for v in ("--book", b)]])

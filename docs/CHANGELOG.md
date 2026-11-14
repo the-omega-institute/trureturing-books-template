@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- CI 与 Pages 的完整计划和 `needs` 改由运行器脚本写入 JSON 文件，选择检查与汇总从文件读取，避免大计划触发进程参数／环境大小限制；保留全部字段、原有矩阵、成功条件与覆盖来源，并补充大载荷及缺失／不匹配数据的回归。来源：trureturing-books PR #282 后的构建运行与模板问题 #87。
+
 ## [0.12.0] - 2026-11-14
 
 ### 新增
