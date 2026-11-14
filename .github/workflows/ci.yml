@@ -102,6 +102,7 @@ jobs:
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
         uses: ./.github/actions/setup
         with:
+          browsers: ${{ fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat }}
           fonts: 'false'
           mdbook: 'true'
 

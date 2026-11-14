@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "f6bc7cd22eee7d38408e9f3cc11ca4914444d9a920b0fce89f026bc381597de3",
+      "sha256": "73e7f67783da0c700d40619e6f0d96e48dac81f329bb4ec7a080d58107017a0f",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
