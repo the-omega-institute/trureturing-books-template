@@ -203,6 +203,109 @@ class AffectedPlanTest(unittest.TestCase):
             self.assertEqual(result[key], [], key)
         self.assertFalse(result["site"])
 
+    def template_release(self):
+        # Use the tool's accepted minimal config, without new owner restrictions.
+        before = '[template]\nversion="0.12.0"\n[managed]\npaths=["tools/"]\n'
+        self.write("template.toml", before)
+        self.base = self.commit()
+        self.write("template.toml", before.replace('"0.12.0"', '"0.12.1"'))
+        self.write("docs/CHANGELOG.md", "## [0.12.1] - 2026-11-14\n\n修复说明。\n")
+        self.write("template-manifest.json", '{"version":"0.12.1"}')
+        return planner.Tree(self.root, self.commit()), planner.Tree(self.root, self.base)
+
+    def test_template_release_metadata_keeps_tool_checks_and_actual_site_reader_only(self):
+        head, old = self.template_release()
+        self.assertEqual(planner.changed_paths(self.root, old.sha, head.sha),
+                         ["docs/CHANGELOG.md", "template-manifest.json", "template.toml"])
+        result = self.impact()
+        self.assertEqual([k for k, v in result["checks"].items() if v], ["unit", "compat", "manifest"])
+        for key in ("suites", "films", "slides", "exports", "books"):
+            self.assertEqual(result[key], [], key)
+        # _template_info is a real footer/manifest reader, independent of exports.
+        self.assertTrue(result["site"])
+        for event in ("push", "workflow_dispatch", "workflow_call", "schedule"):
+            with self.subTest(event=event):
+                plan = self.make_plan(event=event)
+                for selected in plan["selections"].values():
+                    for key in ("suites", "films", "slides", "exports", "books"):
+                        self.assertEqual(selected[key], [], (event, key))
+                self.assertFalse(any(plan["tasks"][k] for k in ("build", "viz", "viz-slow", "media", "films")))
+        pages = self.make_plan(workflow="pages")
+        self.assertTrue(pages["site"])
+
+    def test_template_version_metadata_retains_declared_readers_in_either_tree(self):
+        import json
+        dep = "books/one/viz/tests/dependencies.json"
+        data = json.loads((self.root / dep).read_text())
+        data["suites"]["a.test.mjs"].append("template.toml")
+        self.write(dep, json.dumps(data))
+        self.write("books/one/viz/tests/a.test.mjs",
+                   'import fs from "node:fs"; fs.readFileSync("template.toml", "utf8");\n')
+        head, old = self.template_release()
+        data["suites"]["a.test.mjs"].remove("template.toml")
+        self.write(dep, json.dumps(data))
+        self.write("books/one/viz/tests/a.test.mjs", 'export const nonreader = true;\n')
+        head = planner.Tree(self.root, self.commit())
+        # A supported constructor's declared root source must also remain live.
+        engine_sources = planner.film_inputs.engine_sources
+        def sources(slug):
+            return (*engine_sources(slug), *(["template.toml"] if slug == "two" else []))
+        with mock.patch.object(planner.film_inputs, "engine_sources", sources):
+            for current, previous in ((head, old), (old, head)):
+                result = planner.impact(current, previous, ["template.toml"])
+                self.assertEqual(result["suites"], ["books/one/viz/tests/a.test.mjs"])
+                self.assertEqual(result["films"], ["two/001-film"])
+                self.assertEqual(result["slides"], [])
+                self.assertEqual(result["books"], ["one", "two"])
+
+    def test_template_metadata_nonversion_invalid_and_absent_inputs_keep_full_fallback(self):
+        head, old = self.template_release()
+        valid = head.read("template.toml")
+        full = planner.impact(head, old, [], full=True, template=True)
+        variants = (valid.replace('paths=["tools/"]', 'paths=["theme/"]'),
+                    valid + '\n[extra]\nflag=true\n',
+                    valid.replace('"0.12.1"', '"invalid"'),
+                    valid.replace('"0.12.1"', '12'),
+                    valid.replace('paths=["tools/"]', 'paths="tools/"'),
+                    '[template\nversion="0.12.1"',
+                    valid.replace('version="0.12.1"', ''),
+                    valid.replace('[template]', 'template=[]\n[other]'))
+        for text in variants:
+            self.write("template.toml", text)
+            changed = planner.Tree(self.root, self.commit())
+            for current, previous in ((changed, old), (old, changed)):
+                with self.subTest(text=text, reverse=current is old):
+                    result = planner.impact(current, previous, ["template.toml"], template=True)
+                    for key in ("checks", "suites", "films", "slides", "exports", "books", "site"):
+                        self.assertEqual(result[key], full[key], key)
+        # Even Python-equal TOML values of different types are non-version edits.
+        for value in ('true', '1'):
+            text = valid.replace('"0.12.1"', '"0.12.0"') if value == 'true' else valid
+            self.write("template.toml", text + '\n[extra]\nflag=' + value + '\n')
+            if value == 'true':
+                before = planner.Tree(self.root, self.commit())
+            else:
+                after = planner.Tree(self.root, self.commit())
+        self.assertEqual(planner.impact(after, before, ["template.toml"])["suites"], full["suites"])
+        (self.root / "template.toml").unlink()
+        absent = planner.Tree(self.root, self.commit())
+        for current, previous in ((head, absent), (absent, head), (head, None)):
+            result = planner.impact(current, previous, ["template.toml"], template=True)
+            self.assertEqual(result["suites"], full["suites"])
+            self.assertEqual(result["films"], full["films"])
+
+    def test_template_metadata_does_not_discharge_unknown_shared_reads_or_full_mode(self):
+        (self.root / "books/one/viz/tests/dependencies.json").unlink()
+        self.write("books/two/films/001-film/scenes.js", 'import(resolveURL());\n')
+        head, old = self.template_release()
+        result = planner.impact(head, old, ["template.toml", "theme/new-resource.js"])
+        self.assertEqual(result["suites"], ["books/one/viz/tests/a.test.mjs", "books/one/viz/tests/b.test.mjs"])
+        self.assertEqual(result["films"], ["two/001-film"])
+        for options in ({"baseline": False}, {"mode": "full"}):
+            plan = self.make_plan(**options)
+            self.assertTrue(plan["tasks"]["viz"])
+            self.assertTrue(plan["tasks"]["build"])
+
     def test_exact_model_and_film_reverse_dependency(self):
         self.write("books/one/viz/a/model.js", "export const n = 2;\n")
         self.commit()

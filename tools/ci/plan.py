@@ -21,7 +21,7 @@ import zipfile
 
 # This constructor is dependency-free and shared with the actual video unit.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tbook import film_inputs
+from tbook import film_inputs, template as template_metadata
 from ci import viz_budget
 
 VERSION = 5
@@ -224,6 +224,32 @@ def film_reads(tree, slug, film, meta):
     return scopes, sources | closure, uncertain
 
 
+def _template_version_only(current, previous):
+    """Prove a release-metadata change using the tool's existing config contract.
+
+    Keep every other parsed field (including unknown fields) in the comparison.
+    Missing/invalid inputs cannot establish this narrower responsibility class.
+    """
+    name = template_metadata.TEMPLATE_TOML
+    if previous is None or any(name not in tree.files for tree in (current, previous)):
+        return False
+    versions, remaining = [], []
+    try:
+        for tree in (current, previous):
+            text = tree.read(name)
+            cfg = template_metadata.TemplateConfig.from_bytes(text.encode())
+            if template_metadata.parse_semver(cfg.version) is None:
+                return False
+            data = tomllib.loads(text)
+            versions.append(data["template"].pop("version"))
+            # Preserve TOML value types (e.g. true != 1); unsupported values widen.
+            remaining.append(json.dumps(data, sort_keys=True))
+    except (template_metadata.TemplateError, ValueError, TypeError, AttributeError, KeyError,
+            subprocess.SubprocessError):
+        return False
+    return versions[0] != versions[1] and remaining[0] == remaining[1]
+
+
 def impact(current, previous, paths, *, full=False, template=False):
     now, old = inventory(current), inventory(previous) if previous else {}
     all_suites = {s for b in now.values() for s in b["suites"]}
@@ -293,6 +319,15 @@ def impact(current, previous, paths, *, full=False, template=False):
         for film in matched_films:
             path_reason("", p, f" -> film {film}")
         if p.startswith(("docs/", "skills/", ".claude/")) or ("/" not in p and p.endswith(".md")) or p in ("LICENSE", "template-manifest.json"):
+            continue
+        if p == "template.toml" and _template_version_only(current, previous):
+            # Template fixtures/tooling consume this metadata. Site assembly reads
+            # it for footer/manifest attribution; export units do not key on it.
+            # As for engineering documents, extra consumer reads above still apply.
+            checks["unit"] = True
+            checks["compat"] = template
+            site = True
+            reasons.add(f"template version metadata: {p}")
             continue
         if p.startswith("books/"):
             parts = p.split("/")
