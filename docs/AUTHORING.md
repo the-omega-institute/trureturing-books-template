@@ -302,7 +302,7 @@ TeX 源在导言区写 `\input{tbook-deck}`；用 `\begin{bookresult}{thm-…}` 
 
 绘图或索引生成器使用 `from tbook import stats; data = stats.collect(book)`。环境次数、唯一声明数和跨章复用是不同的量；书面证明、开放问题、定义均不计入 `lean_verified`。只统计目录中的权威版本，忽略代码示例与未出版文件；声明仅限本书的正文及媒体引用，其他书的锁定声明不增加本书总数。`groups.inline` 是未被环境引用的分区，可能包含媒体消费者；查看各项 `citations[].via` 区分来源。
 
-生成的索引不应回头充当统计输入。可在 `book.toml` 配置：
+生成索引中的声明链接不应回头充当引用统计输入；其中人工撰写的编号环境仍计入环境次数。可在 `book.toml` 配置：
 
 ```toml
 [statistics]

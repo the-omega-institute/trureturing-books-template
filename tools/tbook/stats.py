@@ -8,7 +8,7 @@ from . import config, lean, model, render
 
 
 def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=None) -> dict:
-    """Count the authoritative edition. Exclude generated indexes to avoid self-citations.
+    """Count the authoritative edition. Exclude index citations, retaining its authored environments.
 
     Environment occurrences, distinct declarations and cross-chapter reuse are different
     quantities. Declarations are scoped to this book; an unrelated book in the shared lock
@@ -36,8 +36,6 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
 
     for doc in ed.chapters:
         file = doc.chapter.path
-        if file in exclude:
-            continue
         env_gids, inline_gids = set(), set()
         lines = doc.text.splitlines()
         for env in doc.envs + doc.media:
@@ -50,9 +48,13 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
                 opening = " ".join(lines[env.line - 1:env.line + 1]).lower()
                 if env.kind in model.INFORMAL and ("文献结果" in opening or "literature result" in opening):
                     counts["literature"] += 1
+            if file in exclude:
+                continue
             for gid in env.lean:
                 env_gids.add(gid)
                 cite(gid, {"file": file, "line": env.line, "id": env.id, "via": "environment"})
+        if file in exclude:
+            continue
         for line, gid in doc.lean_links:
             inline_gids.add(gid)
             cite(gid, {"file": file, "line": line, "id": "", "via": "inline"})

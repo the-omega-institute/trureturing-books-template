@@ -68,7 +68,7 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "2c8ee2ed79425aeb86b33e4cf383eef285781d6192f751c516a000a5449c6e98",
+      "sha256": "c78196e8914bb75d50887f84167cbc70aa8acf3d1ac6c764876211b64e2d616e",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
@@ -808,7 +808,7 @@
       "mode": "100644"
     },
     "tools/tbook/stats.py": {
-      "sha256": "5fe53d352bbcaaec27af3231204337407cd284ebcc4b8d391f7d0231372b6601",
+      "sha256": "c6895f0d8ee4f80520f368a152ebf2d44b0bea08da399f514c94fa1f0e6ed4b0",
       "mode": "100644"
     },
     "tools/tbook/summary.py": {
@@ -976,7 +976,7 @@
       "mode": "100644"
     },
     "tools/tests/test_stats.py": {
-      "sha256": "8b7cc688a8f65dbb173ad8ccf64c1c959bf3697004786a732b516d305992dfb3",
+      "sha256": "94cd47e701eb8d053f92b27f91507affb6d3397b72de735e9e257e7e0677a95f",
       "mode": "100644"
     },
     "tools/tests/test_still_cache.py": {

@@ -45,7 +45,7 @@ Open.
 ```
 ''')
             write(book.editions[0].dir / 'ch01-child.md', f'# Child\n\n[Reuse](lean:{A})\n')
-            write(book.editions[0].dir / 'index.md', f'# Index\n\n[Other book](lean:{B})\n')
+            write(book.editions[0].dir / 'index.md', f'# Index\n\n[Other book](lean:{B})\n\n::: {{.remark #index-note}}\n文献结果，未在本书形式化。\n:::\n')
             write(book.editions[0].dir / 'orphan.md', f'# Unpublished\n\n[Other](lean:{B})\n')
             with mock.patch.object(stats.model, 'media_cited_gids', return_value=[]):
                 data = stats.collect(book, exclude=('index.md',), lock=lock())
@@ -53,6 +53,7 @@ Open.
             self.assertEqual(data['environments']['lean_verified'], 1)
             self.assertEqual(data['environments']['written_proof'], 1)
             self.assertEqual(data['environments']['problem'], 1)
+            self.assertEqual(data['environments']['literature'], 1)
             self.assertEqual(data['groups']['theorems'], [A])
             self.assertEqual(data['groups']['definitions'], [D])
             self.assertNotIn(B, data['declarations'])
