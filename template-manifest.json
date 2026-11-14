@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "8299c0c245233ca731567b01ca45b7cd038a2db3b962b68adf1af902d2bd4cd8",
+      "sha256": "f311abe7985f81e4b0b65bdd717551bcd528cb7c29e2b2b4d4bef84b9c05a0c5",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "22a051cc152db360f4c0da13e8ec7b9cf9d686b9953e06d3ed64065207e93971",
+      "sha256": "c6aea41f3e31e4c4ef5d546c1fbe610e1a1dd5729ae1bba7c996dc53c60d9ddc",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -548,7 +548,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "06f4e30c5d6d32fba6c74842d31d7f2c4eca2587831ffa0cd7a840fe664bc865",
+      "sha256": "d7fdd48088b07a1b01b2853865c03d3e58b3293b0dd36bd0587238d51e7e28c3",
       "mode": "100644"
     },
     "tools/ci/run.py": {
@@ -724,7 +724,11 @@
       "mode": "100644"
     },
     "tools/tbook/film.py": {
-      "sha256": "135f9eff09cb190d56cff8372e271bcb4aeae107a1a442a7cc6ab6301605b2cd",
+      "sha256": "fe16137fea30af7d62bf2cfdedf781b86791720bec851aaf41c0405dc18130eb",
+      "mode": "100644"
+    },
+    "tools/tbook/film_inputs.py": {
+      "sha256": "8081a8c466e3982660232d3bf0c5c3d252ce75059cf9d5617be85422a1947eb0",
       "mode": "100644"
     },
     "tools/tbook/html.py": {
@@ -840,7 +844,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "8ce609a250164d59d7929c1908d3efb3672e24488e3540c1bc5129028966d7a3",
+      "sha256": "ab491ffcfe60e13a19538cbf5d4c00362efe7bde14fbef47a08e5984740f80f5",
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_slow.py": {
