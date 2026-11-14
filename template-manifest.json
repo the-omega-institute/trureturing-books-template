@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "85f64d628e6e898603d3ef2be29ef6e6d52879d661184032e66da06822c70d6a",
+      "sha256": "b44d10adb9c0f1cff9d80d98fe63dd74f30f1612d1999f0b3ecc6f2983c9b77c",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "f3cce6192692cb197cf383094b33fe2d60a380fbeb9246ec617a82a9d3e7bc08",
+      "sha256": "57845b268f71cba057fc5a6eca912c332cb231b56f4e718d5e59b0254e0f30f4",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -548,7 +548,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "4356b0c54b6727382cdf14a99159d22321826c171f3e83aa217bf0f77f25fea5",
+      "sha256": "4c05a3b4d502fbf33eb19e8ef30d473756d0191dfa988fee5ec16ed786375ad6",
       "mode": "100644"
     },
     "tools/ci/run.py": {
@@ -864,7 +864,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "f401fe4b9d7aec80658e19ba39530911edcf3b02579a188a8a34f2d4f04229d2",
+      "sha256": "6aef911a34da7c1af564a273fba218719a085ec8572f5fb7858de6f2a07c6adf",
       "mode": "100644"
     },
     "tools/tests/test_ci_transport.py": {
