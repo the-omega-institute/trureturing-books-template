@@ -20,6 +20,115 @@ runner = fixtures.ci_module("run")
 TOOLS = Path(__file__).resolve().parents[1]
 
 
+class PlanOutputBudgetTest(unittest.TestCase):
+    setUp = fixtures.AffectedPlanTest.setUp
+    git = fixtures.AffectedPlanTest.git
+    write = fixtures.AffectedPlanTest.write
+    commit = fixtures.AffectedPlanTest.commit
+    make_plan = fixtures.AffectedPlanTest.make_plan
+
+    def outputs(self, plan):
+        output, summary = self.root / "output.txt", self.root / "summary.md"
+        for path in (output, summary):
+            path.write_text("", encoding="utf-8")
+        original = copy.deepcopy(plan)
+        with mock.patch.dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary)):
+            planner.write_outputs(plan)
+        text = output.read_text(encoding="utf-8")
+        fields = {k: json.loads(v) for k, v in (line.split("=", 1) for line in text.splitlines())}
+        self.assertEqual(fields["plan"], original)
+        self.assertEqual(plan, original)
+        for field, key in (("build", "exports"), ("viz", "viz"), ("slow", "slow"), ("film", "films")):
+            self.assertEqual(fields[field + "_matrix"], {"include": plan[key]})
+        for key in ("site", "publish"):
+            self.assertEqual(fields[key], plan[key])
+        for key, value in plan["tasks"].items():
+            self.assertEqual(fields[key.replace("-", "_")], value)
+        return text, summary.read_text(encoding="utf-8")
+
+    def suites(self, count, patterns):
+        names = ["a", "b", *(f"chapter-{i:03}" for i in range(count - 2))]
+        for name in names[2:]:
+            self.write(f"books/one/viz/tests/{name}.test.mjs", "// suite\n")
+        self.write("books/one/viz/tests/dependencies.json", json.dumps({
+            "schema": planner.DEPENDENCIES, "suites": {name + ".test.mjs": patterns for name in names}}))
+        return sorted(f"books/one/viz/tests/{name}.test.mjs" for name in names)
+
+    def test_single_path_keeps_suite_and_film_trigger_spelling(self):
+        path = "books/one/viz/a/model.js"
+        self.write(path, "export const n = 2;\n")
+        self.commit()
+        plan = self.make_plan(event="workflow_dispatch")
+        for selected in plan["selections"].values():
+            self.assertIn(f"{path} -> suite books/one/viz/tests/a.test.mjs", selected["reasons"])
+            self.assertIn(f"{path} -> film one/001-film", selected["reasons"])
+
+    def test_many_chapters_keep_exact_work_and_fit_job_output_limits(self):
+        suites = self.suites(80, ["books/one/zh/*.md"])
+        paths = [f"books/one/zh/章节-{i:03}.md" for i in range(60)]
+        for path in paths:
+            self.write(path, "# Chapter\n")
+        self.base = self.commit()
+        for path in paths:
+            self.write(path, "# Revised chapter\n")
+        self.commit()
+        plan = self.make_plan(event="workflow_dispatch", slow=True)
+        self.assertEqual(plan["reasons"], [])
+        for profile, selected in plan["selections"].items():
+            self.assertEqual(selected["suites"], suites)
+            self.assertEqual(selected["books"], ["one"])
+            self.assertEqual(selected["films"], [])
+            self.assertEqual(selected["slides"], ["one/a", "one/b"])
+            self.assertEqual(selected["exports"], [
+                dict(name="one-" + name, book="one", target=target, variant=variant)
+                for name, target, variant in (("html", "html", ""), ("pdf-screen", "pdf", "screen"), ("epub", "epub", ""))])
+            self.assertEqual(selected["checks"], dict(unit=False, theme=False, structure=True, viz_static=True,
+                slides_static=True, compat=False, manifest=False))
+            self.assertTrue(selected["site"])
+            self.assertEqual(selected["reasons"], sorted(f"{paths[0]} (+59 more) -> suite {suite}" for suite in suites))
+            self.assertEqual(plan["coverage"][profile]["paths"], paths)
+        for profile, matrix in (("normal", plan["viz"]), ("slow", plan["slow"])):
+            self.assertEqual(sorted(plan["execution"][profile]), suites)
+            self.assertEqual(sorted(plan["workloads"][profile]), suites)
+            self.assertEqual(sorted(item for shard in matrix for item in shard["items"]), suites)
+        self.assertEqual(plan["tasks"], dict(validate=True, build=True, viz=True, **{"viz-slow": True}, media=True, films=False))
+        output, summary = self.outputs(plan)
+        self.assertIn(paths[0], output)
+        self.assertNotIn("\\u7ae0", output)
+        self.assertLess(len(output.encode("utf-8")), 200_000)
+        self.assertLess(len(output.encode("utf-16-le")), 400_000)
+        self.assertLess(len(summary.encode("utf-8")), 900_000)
+
+    def test_five_hundred_paths_coalesce_film_and_resource_diagnostics(self):
+        suites = self.suites(200, ["books/one/zh/*.md", "books/one/assets/**"])
+        resources = [f"books/one/assets/input-{i:03}.js" for i in range(250)]
+        self.write("books/one/films/001-film/film.json", json.dumps({
+            "scripts": [p.removeprefix("books/one/") for p in resources]}))
+        tree = planner.Tree(self.root, self.commit())
+        paths = resources + [f"books/one/zh/chapter-{i:03}.md" for i in range(250)]
+        selected = planner.impact(tree, tree, [*reversed(paths), paths[0]])
+        self.assertEqual(selected["suites"], suites)
+        self.assertEqual(selected["films"], ["one/001-film"])
+        reasons = selected["reasons"]
+        self.assertEqual(len(reasons), 202)
+        self.assertIn(f"{resources[0]} (+249 more) -> film one/001-film", reasons)
+        self.assertIn("book metadata/resource or unknown local dependency: " + resources[0] + " (+249 more)", reasons)
+        self.assertLess(len(json.dumps(reasons, ensure_ascii=False).encode("utf-8")), 40_000)
+
+    def test_large_summary_compacts_or_omits_display_without_changing_outputs(self):
+        plan = self.make_plan(event="workflow_dispatch", baseline=False)
+        for paths, compact in ((["章节"] * 50_000, True), (["章" * 100] * 3000, False)):
+            with self.subTest(compact=compact):
+                plan["coverage"]["normal"]["paths"] = paths
+                self.assertGreater(len(json.dumps(plan, ensure_ascii=False, indent=2).encode("utf-8")), 512 * 1024)
+                _, summary = self.outputs(plan)
+                self.assertLess(len(summary.encode("utf-8")), 900_000)
+                if compact:
+                    self.assertEqual(json.loads(summary.split("```json\n")[1].split("\n```")[0]), plan)
+                else:
+                    self.assertIn("see ci-plan.json", summary)
+
+
 class LargePlanTransportTest(unittest.TestCase):
     git = fixtures.AffectedPlanTest.git
     write = fixtures.AffectedPlanTest.write

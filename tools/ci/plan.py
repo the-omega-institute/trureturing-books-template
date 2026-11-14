@@ -232,12 +232,20 @@ def impact(current, previous, paths, *, full=False, template=False):
     selected_books, suites, films, slides = set(), set(), set(), set()
     checks = dict(unit=False, theme=False, structure=False, viz_static=False, slides_static=False,
                   compat=False, manifest=template)
-    reasons = []
+    reasons, path_reasons = set(), {}
     site = False
 
-    def shared_outputs(reason):
+    def path_reason(prefix, path, suffix=""):
+        key = (prefix, suffix)
+        first, count = path_reasons.get(key, (path, 0))
+        path_reasons[key] = (first, count + 1)
+
+    def shared_outputs(reason, path=None):
         nonlocal site
-        reasons.append(reason)
+        if path is None:
+            reasons.add(reason)
+        else:
+            path_reason(reason, path)
         site = True
         checks.update({k: True for k in checks if k != "manifest"})
         checks["compat"] = template
@@ -247,8 +255,8 @@ def impact(current, previous, paths, *, full=False, template=False):
             selected_books.add(slug)
             slides.update(now[slug]["slides"])
 
-    def everything(reason):
-        shared_outputs(reason)
+    def everything(reason, path=None):
+        shared_outputs(reason, path)
         suites.update(all_suites)
         films.update(all_films)
 
@@ -265,18 +273,25 @@ def impact(current, previous, paths, *, full=False, template=False):
         summaries = [video_reads.get(film) for _, _, _, video_reads in readers]
         if len(summaries) != 2 or any(s is None or s[2] for s in summaries):
             uncertain_films.add(film)
-    for p in paths:
+    for p in sorted(set(paths)):
         # Declared nonlocal dependencies apply even to otherwise documentary paths.
+        matched_suites, matched_films = set(), set()
         for tree, books, suite_reads, video_reads in readers:
             for suite, (patterns, closure) in suite_reads.items():
                 if suite in all_suites and (p in closure or any(fnmatch.fnmatchcase(p, pat) for pat in patterns)):
-                    suites.add(suite)
-                    reasons.append(f"{p} -> suite {suite}")
+                    matched_suites.add(suite)
             for film, (scopes, sources, uncertain) in video_reads.items():
                 if film in all_films and (p in sources or any(scope_contains(p, src) and
                         not any(skip in "/" + p for skip in exclude) for src, exclude in scopes)):
-                    films.add(film)
-                    reasons.append(f"{p} -> film {film}")
+                    matched_films.add(film)
+        suites.update(matched_suites)
+        films.update(matched_films)
+        # Each path counts once per live consumer, even when both trees read it.
+        # Keep only a representative and count, not the path/consumer cross product.
+        for suite in matched_suites:
+            path_reason("", p, f" -> suite {suite}")
+        for film in matched_films:
+            path_reason("", p, f" -> film {film}")
         if p.startswith(("docs/", "skills/", ".claude/")) or ("/" not in p and p.endswith(".md")) or p in ("LICENSE", "template-manifest.json"):
             continue
         if p.startswith("books/"):
@@ -286,18 +301,18 @@ def impact(current, previous, paths, *, full=False, template=False):
                 # Tool tests copy example source fixtures even when the books are hidden.
                 checks["unit"] = True
                 checks["compat"] = template
-                reasons.append(f"tool test example fixture: {p}")
+                path_reason("tool test example fixture: ", p)
             if slug not in now and slug not in old:
                 # Hidden books do not participate; unrecognised files outside a book are uncertain.
                 hidden = current.toml("site.toml").get("books", {}).get("hide", [])
                 if any(fnmatch.fnmatchcase(slug, x) for x in hidden):
                     continue
-                everything(f"unknown book path: {p}")
+                everything("unknown book path: ", p)
                 continue
             site = True
             checks["structure"] = True
             if slug not in now:
-                reasons.append(f"removed book: {slug}; Pages rebuild removes obsolete output")
+                reasons.add(f"removed book: {slug}; Pages rebuild removes obsolete output")
                 continue
             selected_books.add(slug)  # existing export keys include the entire book, all languages
             b = now[slug]
@@ -307,10 +322,10 @@ def impact(current, previous, paths, *, full=False, template=False):
             for suite in b["suites"]:
                 if suite not in b["deps"] or (slug in old and suite not in old[slug]["deps"]):
                     suites.add(suite)
-                    reasons.append(f"unregistered suite dependency -> {suite}")
+                    reasons.add(f"unregistered suite dependency -> {suite}")
             for film in set(b["films"]) & uncertain_films:
                 films.add(film)
-                reasons.append(f"unknown book-local film reads -> {film}")
+                reasons.add(f"unknown book-local film reads -> {film}")
             if local == "viz/tests/execution-parts.json":
                 # Changes to a parent's finite execution contract select that parent
                 # in either tree, without widening already-declared nonreaders.
@@ -341,32 +356,32 @@ def impact(current, previous, paths, *, full=False, template=False):
                 languages = current.toml(f"books/{slug}/book.toml").get("book", {}).get("editions") or current.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
                 if local == "book.toml" or local.split("/")[0] not in languages:
                     films.update(b["films"])
-                    reasons.append(f"book metadata/resource or unknown local dependency: {p}")
+                    path_reason("book metadata/resource or unknown local dependency: ", p)
             # Academic decks read chapters, figures and viz, beyond slides/ itself.
             for deck in b["slides"]:
                 if f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
                     slides.add(deck)
             continue
         if p.startswith(("theme/", "templates/", "i18n/")):
-            shared_outputs(f"shared consumer input: {p}")
+            shared_outputs("shared consumer input: ", p)
             for slug, b in now.items():
                 for suite in b["suites"]:
                     # Both summaries must apply to the live reader. New or undeclared
                     # suites may read any shared resource, including via computed paths.
                     if suite not in b["deps"] or suite not in old.get(slug, {}).get("deps", {}):
                         suites.add(suite)
-                        reasons.append(f"unknown shared reads -> {suite}")
+                        reasons.add(f"unknown shared reads -> {suite}")
             # Uncertainty belongs to an inapplicable consumer summary, not to a
             # resource filename/role. A complete supported constructor describes
             # optional and future paths too; file existence is no completeness proof.
             films.update(uncertain_films)
-            reasons.extend(f"unknown shared film reads -> {film}" for film in uncertain_films)
+            reasons.update(f"unknown shared film reads -> {film}" for film in uncertain_films)
             continue
         if p.startswith(("tools/", "theme/", "templates/", ".github/", "i18n/")) or p in (
                 "site.toml", "trureturing.lock.json", "package.json", "package-lock.json", "requirements.txt", "template.toml", "tbook"):
-            everything(f"shared input: {p}")
+            everything("shared input: ", p)
         else:
-            everything(f"unknown impact: {p}")
+            everything("unknown impact: ", p)
     # Any dependency-selected consumer also needs its book's structural/static checks and site publication.
     for item in suites | films | slides:
         slug = item.split("/")[1] if item.startswith("books/") else item.split("/")[0]
@@ -381,8 +396,11 @@ def impact(current, previous, paths, *, full=False, template=False):
         for output in now[slug]["outputs"]:
             target, _, variant = output.partition("-")
             exports.append(dict(name=f"{slug}-{output}", book=slug, target=target, variant=variant))
+    for (prefix, suffix), (first, count) in path_reasons.items():
+        more = f" (+{count - 1} more)" if count > 1 else ""
+        reasons.add(f"{prefix}{first}{more}{suffix}")
     return dict(checks=checks, books=sorted(selected_books), suites=sorted(suites), films=sorted(films),
-                slides=sorted(slides), exports=exports, site=site, reasons=sorted(set(reasons)))
+                slides=sorted(slides), exports=exports, site=site, reasons=sorted(reasons))
 
 
 def signature(tree, runtime):
@@ -584,13 +602,20 @@ def write_outputs(result):
                       **{k.replace("-", "_"): v for k, v in result["tasks"].items()},
                       build_matrix={"include": result["exports"]}, viz_matrix={"include": result["viz"]},
                       slow_matrix={"include": result["slow"]}, film_matrix={"include": result["films"]})
-        with open(output, "a") as f:
+        with open(output, "a", encoding="utf-8") as f:
             for key, value in fields.items():
-                f.write(f"{key}={json.dumps(value, separators=(',', ':'))}\n")
+                f.write(f"{key}={json.dumps(value, ensure_ascii=False, separators=(',', ':'))}\n")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
-        with open(summary, "a") as f:
-            f.write("### CI selection\n\n```json\n" + json.dumps(result, ensure_ascii=False, indent=2) + "\n```\n")
+        body = json.dumps(result, ensure_ascii=False, indent=2)
+        if len(body.encode("utf-8")) > 512 * 1024:
+            body = json.dumps(result, ensure_ascii=False, separators=(',', ':'))
+        if len(body.encode("utf-8")) <= 512 * 1024:
+            body = "```json\n" + body + "\n```\n"
+        else:
+            body = "Plan exceeds the summary display budget; see ci-plan.json for the complete plan.\n"
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write("### CI selection\n\n" + body)
 
 
 def main():
