@@ -102,6 +102,7 @@ jobs:
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
         uses: ./.github/actions/setup
         with:
+          browsers: 'false'
           fonts: 'false'
           mdbook: 'true'
 
@@ -226,6 +227,22 @@ jobs:
           node tools/node/viz-validate.mjs
           node tools/node/slides-check.mjs
           python -m unittest discover -s tools/tests
+
+      # Install after all three ordinary/compatibility rounds: their browser tests
+      # stay optional, while the export regression below must execute and pass.
+      - name: Set up Chromium for the required EPUB regression
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat
+        uses: ./.github/actions/setup
+        with:
+          browsers: 'true'
+          fonts: 'false'
+          mdbook: 'false'
+
+      - name: Required native EPUB layout regression
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat
+        env:
+          PYTHONPATH: tools
+        run: python tools/tests/test_export_layout.py
 
   build:
     name: Build books (${{ matrix.name }})

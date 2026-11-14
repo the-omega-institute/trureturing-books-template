@@ -26,6 +26,7 @@ body {
   -webkit-hyphens: auto;
   hyphens: auto;
   font-kerning: normal;
+  overflow-wrap: anywhere;
 }
 
 :root:lang(zh) body, :root:lang(ja) body {
@@ -281,10 +282,29 @@ pre {
 }
 pre code { font-size: 1em; }
 
-/* display math */
-math[display="block"] { margin: 0.6em 0; }
+/* Native MathML does not reliably line-wrap in reading systems. Keep the full
+   expression at reading size and let only its HTML container scroll. */
+.tr-math-scroll {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+  text-indent: 0;
+  text-align: left;
+}
+.tr-math-block { display: block; }
+.tr-math-scroll math[display="block"] {
+  width: max-content;
+  min-width: 100%;
+  margin: 0.6em 0;
+}
 
 /* ------------------------------------------------------------------ tables (the ledger) */
+
+.tr-table-scroll { max-width: 100%; overflow-x: auto; }
+/* Let the table grow inside its scroller before prose columns collapse to
+   single characters beside an unbreakable mathematical expression. */
+.tr-table-scroll th, .tr-table-scroll td { min-width: 6em; }
 
 table {
   width: 100%;

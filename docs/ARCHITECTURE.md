@@ -388,6 +388,8 @@ def generate(out_dir) -> Path
 | Python | ≥ 3.11 | 系统 / `actions/setup-python` |
 | Pandoc | 3.9（`pypandoc_binary==1.17`） | `requirements.txt` |
 | Typst | `typst==0.15.2`（Python 模块） | `requirements.txt` |
+| pikepdf / QPDF | `pikepdf==10.0.2` | `requirements.txt`；无损 PDF 对象流打包 |
+| Zopfli | `zopfli==0.4.3` | `requirements.txt`；无损 PDF 页面 Deflate 编码 |
 | epubcheck | 5.3.0（Python 包内含 jar，需 Java） | `requirements.txt` |
 | mdBook | 0.5.4 | CI 用 `taiki-e/install-action`；本地 `cargo install mdbook --version 0.5.4 --locked` |
 | Node | ≥ 22.12 | `package.json` |
