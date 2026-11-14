@@ -18,7 +18,7 @@ import tomllib
 from urllib.parse import urlencode
 import zipfile
 
-VERSION = 2
+VERSION = 3
 SCHEMA = "tbook-ci-coverage-v1"
 DEPENDENCIES = "tbook-ci-dependencies-v1"
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -149,6 +149,27 @@ def imports(tree, suite):
     return seen
 
 
+def shared_role(current, previous, path):
+    """Only runtime roles with established loading/input contracts can narrow execution.
+
+    A new vendor module has no old reader correspondence: even if the new core
+    imports it, existing concrete suite declarations need not mention it yet.
+    Deleted modules retain their old role; an unclassified rename endpoint falls
+    through to full impact. Optional local i18n files are inputs even when absent.
+    """
+    if path == "theme/viz/solid-core.js":
+        return "solid"
+    if path in ("theme/viz/hub.js", "theme/viz/hub.css"):
+        return "hub"
+    if re.fullmatch(r"(?:theme/)?i18n/(?:zh|en)\.toml", path):
+        return "localization"
+    if (path.startswith("theme/viz/vendor/") and previous and path in previous.files and
+            path in imports(previous, "theme/viz/solid-core.js") and
+            (path not in current.files or path in imports(current, "theme/viz/solid-core.js"))):
+        return "solid"
+    return None
+
+
 def impact(current, previous, paths, *, full=False, template=False):
     now, old = inventory(current), inventory(previous) if previous else {}
     all_suites = {s for b in now.values() for s in b["suites"]}
@@ -160,22 +181,22 @@ def impact(current, previous, paths, *, full=False, template=False):
     reasons = []
     site = False
 
-    def book_all(slug):
-        if slug in now:
-            b = now[slug]
-            selected_books.add(slug)
-            suites.update(b["suites"])
-            films.update(b["films"])
-            slides.update(b["slides"])
-
-    def everything(reason):
+    def shared_outputs(reason):
         nonlocal site
         reasons.append(reason)
         site = True
         checks.update({k: True for k in checks if k != "manifest"})
         checks["compat"] = template
         for slug in now:
-            book_all(slug)
+            # publish_assets copies optional runtimes/vendor even for browser nonreaders.
+            # Preserve complete export/static/deck responsibility independently of execution.
+            selected_books.add(slug)
+            slides.update(now[slug]["slides"])
+
+    def everything(reason):
+        shared_outputs(reason)
+        suites.update(all_suites)
+        films.update(all_films)
 
     if full:
         everything("full: explicit mode or unavailable comparable successful coverage")
@@ -187,7 +208,8 @@ def impact(current, previous, paths, *, full=False, template=False):
             for slug, b in books.items():
                 for suite in b["suites"]:
                     patterns = b["deps"].get(suite)
-                    if patterns is not None and (any(fnmatch.fnmatchcase(p, pat) for pat in patterns) or p in imports(tree, suite)):
+                    if ((patterns is not None and any(fnmatch.fnmatchcase(p, pat) for pat in patterns)) or
+                            p in imports(tree, suite)):
                         if suite in all_suites:
                             suites.add(suite)
                             reasons.append(f"{p} -> suite {suite}")
@@ -255,6 +277,21 @@ def impact(current, previous, paths, *, full=False, template=False):
             for deck in b["slides"]:
                 if f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
                     slides.add(deck)
+            continue
+        role = shared_role(current, previous, p)
+        if role:
+            shared_outputs(f"shared {role} input: {p}")
+            for slug, b in now.items():
+                for suite in b["suites"]:
+                    # Both summaries must apply to the live reader. New or undeclared
+                    # suites may read any shared resource, including via computed paths.
+                    if suite not in b["deps"] or suite not in old.get(slug, {}).get("deps", {}):
+                        suites.add(suite)
+                        reasons.append(f"unknown shared reads -> {suite}")
+            if role == "localization":
+                # engine_data -> engine_strings reads both languages for every film,
+                # including existing or newly created local overrides.
+                films.update(all_films)
             continue
         if p.startswith(("tools/", "theme/", "templates/", ".github/", "i18n/")) or p in (
                 "site.toml", "trureturing.lock.json", "package.json", "package-lock.json", "requirements.txt", "template.toml", "tbook"):

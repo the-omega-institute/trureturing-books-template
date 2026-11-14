@@ -214,14 +214,122 @@ class AffectedPlanTest(unittest.TestCase):
         self.commit()
         self.assertEqual(self.impact()["suites"], [f"books/one/viz/tests/{x}.test.mjs" for x in ("a", "b")])
 
-    def test_shared_solid_core_and_vendor_include_viz_and_film(self):
+    def test_unknown_shared_inputs_keep_full_fallback(self):
         tree = planner.Tree(self.root, "HEAD")
-        for path in ("theme/viz/solid-core.js", "theme/viz/vendor/three.js", "package-lock.json", "tools/test.py", "new-unknown"):
+        for path in ("theme/viz/vendor/three.js", "package-lock.json", "tools/test.py", "new-unknown"):
             result = planner.impact(tree, tree, [path])
             self.assertEqual(len(result["suites"]), 4, path)
             self.assertEqual(result["films"], ["one/001-film", "two/001-film"], path)
             self.assertTrue(result["checks"]["unit"], path)
             self.assertTrue(result["reasons"])
+
+    def shared_readers(self):
+        import json
+        self.write("theme/viz/solid-core.js", 'import "./vendor/module.js";\n')
+        self.write("theme/viz/vendor/module.js", 'import "./core.js";\n')
+        self.write("theme/viz/vendor/core.js", "export const n = 1;\n")
+        for path in ("theme/viz/hub.js", "theme/viz/hub.css", "theme/i18n/en.toml", "theme/i18n/zh.toml"):
+            self.write(path, "")
+        for slug in ("one", "two"):
+            prefix = f"books/{slug}/"
+            # Actual literal lazy import; the other model is a source-known nonreader.
+            self.write(prefix + "viz/a/model.js", 'export const load = () => import("../../../../theme/viz/solid-core.js");\n')
+            deps = {"a.test.mjs": [], "b.test.mjs": []}
+            if slug == "one":
+                # A computed browser request is represented by the complete-read contract,
+                # not inferred from a JS import or the presence of a schema key.
+                self.write(prefix + "viz/b/model.js", 'export const load = (origin) => fetch(origin + "/one/viz/");\n')
+                deps["b.test.mjs"] = ["theme/viz/hub.*", "theme/i18n/*.toml", "i18n/*.toml"]
+            self.write(prefix + "viz/tests/dependencies.json", json.dumps({"schema": planner.DEPENDENCIES, "suites": deps}))
+            self.write(prefix + "films/002-flat/film.json", '{"solid":false}')
+        self.base = self.commit()
+
+    def test_optional_shared_readers_and_publication_are_distinct(self):
+        self.shared_readers()
+        tree = planner.Tree(self.root, "HEAD")
+        full = planner.impact(tree, tree, [], full=True)
+        for path in ("theme/viz/solid-core.js", "theme/viz/vendor/module.js", "theme/viz/vendor/core.js",
+                     "theme/viz/hub.js", "theme/viz/hub.css", "theme/i18n/en.toml", "i18n/zh.toml"):
+            with self.subTest(path=path):
+                result = planner.impact(tree, tree, [path])
+                solid = path.startswith(("theme/viz/solid-core", "theme/viz/vendor/"))
+                self.assertEqual(result["suites"], [f"books/{slug}/viz/tests/a.test.mjs" for slug in ("one", "two")]
+                                 if solid else ["books/one/viz/tests/b.test.mjs"])
+                self.assertEqual(result["films"], ["one/001-film", "two/001-film"] if solid else
+                                 full["films"] if "i18n/" in path else [])
+                for key in ("exports", "books", "slides", "checks", "site"):
+                    self.assertEqual(result[key], full[key], key)
+
+    def test_shared_unknown_readers_span_books_and_both_summaries(self):
+        import json
+        self.shared_readers()
+        deps_path = "books/two/viz/tests/dependencies.json"
+        data = json.loads((self.root / deps_path).read_text())
+        del data["suites"]["b.test.mjs"]
+        self.write(deps_path, json.dumps(data))
+        unknown = self.commit()
+        old = planner.Tree(self.root, self.base)
+        head = planner.Tree(self.root, unknown)
+        expected = ["books/one/viz/tests/b.test.mjs", "books/two/viz/tests/b.test.mjs"]
+        self.assertEqual(planner.impact(head, old, ["theme/viz/hub.js"])["suites"], expected)
+        self.assertEqual(planner.impact(old, head, ["theme/viz/hub.js"])["suites"], expected)
+        # An entirely new book/suite cannot inherit an inapplicable old summary.
+        self.write("books/new/book.toml", "[book]\n")
+        self.write("books/new/viz/tests/new.test.mjs", "")
+        self.write("books/new/viz/tests/dependencies.json", json.dumps({"schema": planner.DEPENDENCIES,
+                   "suites": {"new.test.mjs": []}}))
+        self.commit()
+        result = planner.impact(planner.Tree(self.root, "HEAD"), old, ["theme/viz/hub.js"])
+        self.assertIn("books/new/viz/tests/new.test.mjs", result["suites"])
+
+    def test_shared_old_reader_deletion_rename_and_unknown_role(self):
+        import json
+        self.shared_readers()
+        old = planner.Tree(self.root, self.base)
+        # Remove a reader edge in head; an old positive edge still selects the live suite.
+        self.write("books/one/viz/a/model.js", "export const n = 2;\n")
+        self.commit()
+        head = planner.Tree(self.root, "HEAD")
+        self.assertIn("books/one/viz/tests/a.test.mjs", planner.impact(head, old, ["theme/viz/vendor/core.js"])["suites"])
+        (self.root / "theme/viz/vendor/core.js").unlink()
+        self.commit()
+        self.assertEqual(self.impact()["films"], ["one/001-film", "two/001-film"])
+        self.git("mv", "theme/viz/vendor/module.js", "theme/viz/vendor/renamed.js")
+        self.commit()
+        self.assertEqual(len(self.impact()["suites"]), 4, "unknown rename endpoint must widen")
+        # New modules, unsupported resource roles and new languages have no old correspondence.
+        self.write("theme/viz/solid-core.js", 'import "./vendor/new.js";\n')
+        self.write("theme/viz/vendor/new.js", "")
+        self.commit()
+        self.assertEqual(len(self.impact()["suites"]), 4)
+        tree = planner.Tree(self.root, "HEAD")
+        for path in ("theme/viz/vendor/future.js", "theme/unknown.js", "i18n/fr.toml", "theme/viz/kit.js"):
+            self.assertEqual(len(planner.impact(tree, tree, [path])["suites"]), 4, path)
+        # Removed consumers are not executable; publication remains responsible for removal.
+        (self.root / "books/one/viz/tests/a.test.mjs").unlink()
+        data = json.loads((self.root / "books/one/viz/tests/dependencies.json").read_text())
+        del data["suites"]["a.test.mjs"]
+        self.write("books/one/viz/tests/dependencies.json", json.dumps(data))
+        (self.root / "books/one/films/002-flat/film.json").unlink()
+        self.commit()
+        result = self.impact()
+        self.assertNotIn("books/one/viz/tests/a.test.mjs", result["suites"])
+        self.assertNotIn("one/002-flat", result["films"])
+        self.assertTrue(result["site"])
+
+    def test_shared_local_override_add_delete_and_invalid_inventory(self):
+        self.shared_readers()
+        self.write("i18n/en.toml", '[film]\nopen="Open"\n')
+        created = self.commit()
+        expected_films = [f"{slug}/{film}" for slug in ("one", "two") for film in ("001-film", "002-flat")]
+        self.assertEqual(self.impact()["films"], expected_films)
+        (self.root / "i18n/en.toml").unlink()
+        self.commit()
+        self.assertEqual(self.impact(created)["films"], expected_films)
+        self.write("books/one/viz/tests/dependencies.json", '{"schema":"bad","suites":{}}')
+        self.commit()
+        with self.assertRaisesRegex(ValueError, "invalid schema"):
+            self.impact()
 
     def test_deleted_renamed_hidden_and_empty_inventory(self):
         import shutil
