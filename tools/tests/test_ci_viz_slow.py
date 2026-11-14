@@ -1,75 +1,41 @@
-"""ci.yml's slow-frame run of the visualization browser suites (viz-slow): weekly and by hand, never on a PR.
-
-The job conditions are evaluated with the expression subset of test_verification.gha_if; a workflow cannot be
-triggered from here, so these tests read what the workflow says, not what GitHub did with it."""
+"""Slow profile event semantics and dynamic CI wiring (execution selection lives in the planner)."""
 from __future__ import annotations
 
+from pathlib import Path
 import re
 import unittest
-from pathlib import Path
 
-from test_verification import gha_if
+from test_ci_performance import planner
 
-CI = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yml"
-OWN = "the-omega-institute/books/.github/workflows/ci.yml@refs/heads/main"
-CALLER = "the-omega-institute/books/.github/workflows/release.yml@refs/heads/main"
-
-
-def job(name: str) -> str:
-    """The text of one job of ci.yml (its lines up to the next job)."""
-    text = CI.read_text(encoding="utf-8")
-    m = re.search(rf"^  {re.escape(name)}:\n((?:(?:    .*)?\n)*)", text, re.M)
-    assert m, f"ci.yml has no job {name}"
-    return m.group(1)
-
-
-def job_if(name: str) -> str:
-    """A job's ``if:``, a folded ``>-`` value joined into one line ('' when absent)."""
-    m = re.search(r"^    if:\s*(>-)?\s*(.*)$((?:\n      .*)*)", job(name), re.M)
-    return " ".join([m.group(2), *m.group(3).split()]).strip() if m else ""
-
-
-def runs(name: str, event: str, *, ref: str = OWN, slow=None) -> bool:
-    cond = job_if(name)
-    return True if not cond else gha_if(cond, event=event, ref="refs/heads/main",
-                                        context={"github.workflow_ref": ref, "inputs.slow_frames": slow})
+CI = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
 
 
 class VizSlow(unittest.TestCase):
-    def test_runs_weekly_and_by_hand_only(self):
-        self.assertTrue(runs("viz-slow", "schedule"))
-        self.assertTrue(runs("viz-slow", "workflow_dispatch", slow=True))
-        for event, kw in (("pull_request", {}), ("push", {}), ("workflow_dispatch", {"slow": False}),
-                          ("schedule", {"ref": CALLER}), ("workflow_dispatch", {"ref": CALLER}),
-                          ("push", {"ref": CALLER})):
-            with self.subTest(event=event, **kw):
-                self.assertFalse(runs("viz-slow", event, **kw))
+    def test_schedule_only_slow_and_callers_control_their_profile(self):
+        self.assertEqual(planner.event_profiles("schedule", True), ["slow"])
+        self.assertEqual(planner.event_profiles("schedule", False), ["normal", "films"])
+        self.assertEqual(planner.event_profiles("workflow_dispatch", True, True), ["normal", "films", "slow"])
+        for event in ("pull_request", "push", "workflow_call"):
+            self.assertEqual(planner.event_profiles(event, True), ["normal", "films"])
+        self.assertEqual(planner.event_profiles("workflow_call", False, True), ["normal", "films", "slow"])
 
-    def test_weekly_run_does_nothing_else(self):
-        self.assertFalse(runs("check", "schedule"))
-        for event in ("pull_request", "push", "workflow_dispatch"):
-            self.assertTrue(runs("check", event, slow=True), event)
-        self.assertTrue(runs("check", "schedule", ref=CALLER), "a caller's schedule runs the checks")
-        for name in ("build", "viz", "media", "films"):
-            self.assertRegex(job(name), r"(?m)^    needs: check$", f"{name} is skipped with check")
-
-    def test_scheduled_once_a_week(self):
-        text = CI.read_text(encoding="utf-8")
+    def test_weekly_and_manual_entries_use_the_same_plan_before_setup(self):
+        text = CI.read_text()
         crons = re.findall(r"^\s+- cron:\s*'([^']+)'", text, re.M)
-        self.assertEqual(len(crons), 1, crons)
-        minute, hour, dom, month, dow = crons[0].split()
-        self.assertTrue(minute.isdigit() and hour.isdigit() and dom == "*" and month == "*" and dow.isdigit(), crons)
+        self.assertEqual(crons, ['29 3 * * 3'])
         self.assertIn("slow_frames:", text)
-        self.assertRegex(text, r"(?m)^  group: .*github\.event_name == 'schedule'",
-                         "a push to main must not cancel the weekly run")
+        self.assertRegex(text, r"(?m)^  group: .*github\.event_name == 'schedule'")
+        self.assertIn("matrix: ${{ fromJSON(needs.plan.outputs.slow_matrix) }}", text)
+        self.assertIn("matrix: ${{ fromJSON(needs.plan.outputs.viz_matrix) }}", text)
+        self.assertIn("node tools/node/viz-test.mjs --slow --selection-env CI_ITEMS", text)
+        self.assertIn("node tools/node/viz-test.mjs --selection-env CI_ITEMS", text)
+        self.assertNotIn("shard: [1", text)
 
-    def test_same_shards_as_viz_with_slow_frames(self):
-        shards = lambda j: re.search(r"shard: \[([\d, ]+)\]", job(j)).group(1)  # noqa: E731
-        self.assertEqual(shards("viz-slow"), shards("viz"))
-        n = len(shards("viz").split(","))
-        self.assertIn(f"node tools/node/viz-test.mjs --slow --shard ${{{{ matrix.shard }}}}/{n}", job("viz-slow"))
-        self.assertIn(f"node tools/node/viz-test.mjs --shard ${{{{ matrix.shard }}}}/{n}", job("viz"))
-        self.assertNotIn("--slow", job("viz"))
+    def test_dynamic_profiles_have_the_same_disjoint_partition_rule(self):
+        for size in (0, 1, 7, 61):
+            items = [str(i) for i in range(size)]
+            self.assertEqual(planner.shards(items, 8), planner.shards(reversed(items), 8))
+            self.assertEqual(sum(len(p["items"]) for p in planner.shards(items, 8)), size)
 
 
 if __name__ == "__main__":

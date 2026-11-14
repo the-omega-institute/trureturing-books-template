@@ -1,29 +1,4 @@
-# Continuous integration (managed by the template; works in the template repository and in every
-# books repository created from it, including one that hides the example books (site.toml [books].hide),
-# deleted them or has no book yet: with nothing to build, every step passes).
-#
-#   check  ./tbook check (structure, bilingual parity, Lean citations re-verified against trureturing's
-#          frozen ledger at the pinned commit, which must be on the site.toml trureturing branch: the check
-#          steps pass github.token for GitHub's compare API), theme tokens, unit tests, template manifest
-#          (template repository only), static checks of visualizations and slides; in the template
-#          repository also the checks and unit tests once more without books/example-monograph, and once
-#          more with the example books hidden (site.toml [books].hide = ["example-*"])
-#   build  HTML (mdBook), PDF (screen + print), EPUB → workflow artifacts
-#   viz    visualization browser tests, in eight parallel shards
-#   viz-slow  the same suites with animation frames a second apart (node tools/node/viz-test.mjs --slow), as a
-#          busy runner delivers them: only when started by hand (workflow_dispatch, input slow_frames) and weekly
-#          (schedule); the weekly run does nothing else, and pull requests never wait for it
-#   media  slide decks (Slidev + Chromium)
-#   films  strict film builds, in four parallel shards
-#
-# build and media go through the build cache (docs/PUBLISHING.md §5): outside pull-request events they
-# restore the store that pages.yml saved; PRs read an artifact from a successful default-branch Pages run.
-# In every event they may restore a unit from the newest published
-# releases (TBOOK_CACHE_REMOTE=1). CI never saves the Actions cache. Both use the Pages URL, as pages.yml
-# does, so that their keys are the site's keys.
-#
-# Also callable from other workflows (workflow_call), e.g. before a release. A caller grants contents: read
-# actions: read (the trusted Pages artifact) and pages: read (actions/configure-pages).
+# Managed CI: plan before setup/cache; Check is the stable required aggregate.
 name: CI
 
 on:
@@ -32,20 +7,43 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      selection_mode:
+        description: auto uses comparable successful coverage; full diagnoses all consumers
+        type: choice
+        options: [auto, full]
+        default: auto
+      base:
+        description: Optional expected successful baseline SHA (otherwise full fallback)
+        type: string
+      head:
+        description: Optional expected checkout SHA
+        type: string
       slow_frames:
-        description: Also run the visualization browser tests with slow frames (viz-slow, about 20 minutes)
+        description: Also select the slow-frame visualization profile
         type: boolean
         default: true
   workflow_call:
+    inputs:
+      selection_mode:
+        type: string
+        default: auto
+      base:
+        type: string
+        default: ''
+      head:
+        type: string
+        default: ''
+      slow_frames:
+        type: boolean
+        default: false
   schedule:
-    - cron: '29 3 * * 3' # Wednesdays 03:29 UTC: viz-slow only
+    - cron: '29 3 * * 3'
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  # a scheduled run has a group of its own, so that a push to main does not cancel it
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'schedule' && '-schedule' || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch') }}
 
@@ -54,11 +52,46 @@ env:
   FORCE_COLOR: '0'
 
 jobs:
-  check:
-    name: Check
-    # The weekly run of this workflow is for viz-slow alone; build, viz, media and films need check and are
-    # skipped with it. (In a called workflow github.workflow_ref names the caller: a caller's schedule runs it all.)
-    if: github.event_name != 'schedule' || !contains(github.workflow_ref, '/.github/workflows/ci.yml@')
+  plan:
+    name: Plan affected work
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      site: ${{ steps.plan.outputs.site }}
+      publish: ${{ steps.plan.outputs.publish }}
+      validate: ${{ steps.plan.outputs.validate }}
+      build: ${{ steps.plan.outputs.build }}
+      viz: ${{ steps.plan.outputs.viz }}
+      viz_slow: ${{ steps.plan.outputs.viz_slow }}
+      media: ${{ steps.plan.outputs.media }}
+      films: ${{ steps.plan.outputs.films }}
+      build_matrix: ${{ steps.plan.outputs.build_matrix }}
+      viz_matrix: ${{ steps.plan.outputs.viz_matrix }}
+      slow_matrix: ${{ steps.plan.outputs.slow_matrix }}
+      film_matrix: ${{ steps.plan.outputs.film_matrix }}
+    steps:
+      - name: Check out the tested tree and complete history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Select before installing or downloading caches
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_WORKFLOW_REF: ${{ github.workflow_ref }}
+          SELECTION_MODE: ${{ inputs.selection_mode || 'auto' }}
+          SELECTION_BASE: ${{ inputs.base }}
+          SELECTION_HEAD: ${{ inputs.head }}
+          SLOW_FRAMES: ${{ inputs.slow_frames }}
+        run: python3 tools/ci/plan.py
+
+  validate:
+    name: Validate selected inputs
+    needs: plan
+    if: needs.plan.outputs.validate == 'true'
+    env:
+      PLAN_JSON: ${{ needs.plan.outputs.plan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -66,6 +99,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up the toolchain
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
         uses: ./.github/actions/setup
         with:
           fonts: 'false'
@@ -78,6 +112,7 @@ jobs:
         # read state from raw.githubusercontent.com and ask the compare API; tbook ignores .cache/trureturing
         # in them anyway (docs/VERIFICATION.md §2).
         if: >-
+          fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure &&
           github.event_name != 'pull_request' && github.event_name != 'pull_request_target' &&
           (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
           startsWith(github.ref, 'refs/tags/'))
@@ -88,6 +123,7 @@ jobs:
           restore-keys: trureturing-state-
 
       - name: Books, bilingual parity and Lean citations
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure
         env:
           # Without a trureturing checkout, check asks GitHub's compare API whether the pinned commit is on
           # the site.toml branch (in pull requests always: no cache is read there); in GitHub Actions an
@@ -95,34 +131,36 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # Optional repository secret for a private trureturing (raw files and the compare API).
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
-        run: ./tbook check
+        run: python tools/ci/run.py structure
 
       - name: Theme tokens are up to date
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.theme
         run: ./tbook theme --check
 
       - name: Unit tests
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit
         env:
           PYTHONPATH: tools
         run: python -m unittest discover -s tools/tests -v
 
       - name: Template manifest is up to date
-        if: github.repository == 'the-omega-institute/trureturing-books-template'
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.manifest
         run: ./tbook template manifest --check
 
       - name: Visualizations (static validation)
-        if: hashFiles('tools/node/viz-validate.mjs') != ''
-        run: node tools/node/viz-validate.mjs
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static
+        run: python tools/ci/run.py viz-static
 
       - name: Slides (static checks)
-        if: hashFiles('tools/node/slides-check.mjs') != ''
-        run: node tools/node/slides-check.mjs
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
+        run: python tools/ci/run.py slides-static
 
       - name: Without the example books (template repository only)
         # Books repositories may delete the template's example books (books/example-*; hiding them with
         # site.toml [books].hide is the alternative, tested below) and run this same CI with no book at all.
         # Repeat the checks and the unit tests in a worktree without them, so that no managed check or test
         # comes to depend on them.
-        if: github.repository == 'the-omega-institute/trureturing-books-template'
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat
         env:
           PYTHONPATH: tools
           GITHUB_TOKEN: ${{ github.token }}
@@ -154,7 +192,7 @@ jobs:
         # ["example-*"], skills/book-new), so that merging template changes never conflicts over deleted files.
         # Repeat the checks and the unit tests after hiding them and refreshing the lock at another commit:
         # every command must skip them, and no managed test may depend on their declarations or commit.
-        if: github.repository == 'the-omega-institute/trureturing-books-template'
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat
         env:
           PYTHONPATH: tools
           GITHUB_TOKEN: ${{ github.token }}
@@ -191,18 +229,13 @@ jobs:
 
   build:
     name: Build books (${{ matrix.name }})
-    needs: check
+    if: needs.plan.outputs.build == 'true'
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - {name: html, target: html, options: ''}
-          - {name: pdf-screen, target: pdf, options: '--variant screen'}
-          - {name: pdf-print, target: pdf, options: '--variant print'}
-          - {name: pdf-academic, target: pdf, options: '--variant academic'}
-          - {name: epub, target: epub, options: ''}
+      matrix: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
     permissions:
       contents: read
       actions: read
@@ -235,7 +268,15 @@ jobs:
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./tbook build ${{ matrix.target }} ${{ matrix.options }}
+          TARGET: ${{ matrix.target }}
+          BOOKS_JSON: ${{ toJSON(matrix.books) }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          python3 -c 'import json, os; books = json.loads(os.environ["BOOKS_JSON"]); assert books; print("\n".join(books))' > "$RUNNER_TEMP/selected-books"
+          mapfile -t books < "$RUNNER_TEMP/selected-books"
+          args=()
+          for book in "${books[@]}"; do args+=(--book "$book"); done
+          ./tbook build "$TARGET" "${args[@]}" ${VARIANT:+--variant "$VARIANT"}
 
       - name: Upload downloads (PDF, EPUB)
         if: matrix.target != 'html'
@@ -256,15 +297,14 @@ jobs:
           retention-days: 14
 
   viz:
-    name: Visualization browser tests (${{ matrix.shard }}/8)
-    needs: check
+    if: needs.plan.outputs.viz == 'true'
+    name: Visualization browser tests (${{ matrix.shard }})
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        # tools/node/viz-test.mjs --shard i/n runs every n-th suite of the sorted list; a shard without suites passes.
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+      matrix: ${{ fromJSON(needs.plan.outputs.viz_matrix) }}
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -277,24 +317,19 @@ jobs:
           mdbook: 'false'
 
       - name: Visualization browser tests
-        if: hashFiles('tools/node/viz-test.mjs') != ''
-        run: node tools/node/viz-test.mjs --shard ${{ matrix.shard }}/8
+        env:
+          CI_ITEMS: ${{ toJSON(matrix.items) }}
+        run: node tools/node/viz-test.mjs --selection-env CI_ITEMS
 
   viz-slow:
-    name: Visualization browser tests, slow frames (${{ matrix.shard }}/8)
-    # The same suites with an animation frame a second (VIZ_SLOW_FRAMES=1000): a suite that waits a fixed time
-    # for a transition or for playback passes on a fast runner and fails here (docs/PUBLISHING.md §4). Weekly and
-    # by hand only: a calling workflow (workflow_call) passes no input slow_frames, and its own schedule is not
-    # this workflow's (github.workflow_ref names the caller there), so it never runs viz-slow.
-    if: >-
-      (github.event_name == 'schedule' && contains(github.workflow_ref, '/.github/workflows/ci.yml@')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.slow_frames == true)
+    name: Visualization browser tests, slow frames (${{ matrix.shard }})
+    needs: plan
+    if: needs.plan.outputs.viz_slow == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+      matrix: ${{ fromJSON(needs.plan.outputs.slow_matrix) }}
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -307,12 +342,16 @@ jobs:
           mdbook: 'false'
 
       - name: Visualization browser tests (slow frames)
-        if: hashFiles('tools/node/viz-test.mjs') != ''
-        run: node tools/node/viz-test.mjs --slow --shard ${{ matrix.shard }}/8
+        env:
+          CI_ITEMS: ${{ toJSON(matrix.items) }}
+        run: node tools/node/viz-test.mjs --slow --selection-env CI_ITEMS
 
   media:
+    if: needs.plan.outputs.media == 'true'
+    env:
+      PLAN_JSON: ${{ needs.plan.outputs.plan }}
     name: Slides
-    needs: check
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -341,27 +380,13 @@ jobs:
           mode: restore
           pages-url: ${{ steps.pages.outputs.base_url }}
 
-      - name: Find slide decks
-        id: decks
-        # Decks of the books that site.toml [books].hide does not hide.
-        run: |
-          decks="$(./tbook books --files 'slides/*/slides.*')"
-          if [ -n "$decks" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "No slide decks (books/*/slides/<deck>/slides.md of a book that site.toml [books].hide does not hide); skipping."
-          fi
-
       - name: Build slides (HTML, browser checks, PDF)
-        if: steps.decks.outputs.present == 'true'
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./tbook build slides
+        run: python tools/ci/run.py slides
 
       - name: Upload slide PDFs
-        if: steps.decks.outputs.present == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: slides-pdf
@@ -370,13 +395,10 @@ jobs:
           retention-days: 14
 
   films:
-    name: Films (${{ matrix.shard }}/4)
-    needs: check
-    # Pages and the release workflows render films on default-branch pushes and tags.
-    if: >-
-      !(github.event_name == 'push' &&
-      (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
-      startsWith(github.ref, 'refs/tags/')))
+    name: Films (${{ matrix.shard }})
+    needs: plan
+    # Default-branch/tag pushes leave films to Pages/release, as before.
+    if: needs.plan.outputs.films == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -385,8 +407,7 @@ jobs:
       pages: read
     strategy:
       fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
+      matrix: ${{ fromJSON(needs.plan.outputs.film_matrix) }}
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -415,4 +436,47 @@ jobs:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
           TBOOK_FILMS: require
-        run: python tools/ci/films.py --shard ${{ matrix.shard }}/4
+          CI_ITEMS: ${{ toJSON(matrix.items) }}
+        run: python tools/ci/films.py --selection-env CI_ITEMS
+
+  check:
+    name: Check
+    needs: [plan, validate, build, viz, viz-slow, media, films]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - name: Require every planned job to succeed
+        env:
+          PLAN_JSON: ${{ needs.plan.outputs.plan }}
+          RESULTS_JSON: ${{ toJSON(needs) }}
+        run: python3 tools/ci/plan.py --verify
+      - name: Record successful normal coverage
+        if: needs.plan.outputs.publish == 'true' && contains(fromJSON(needs.plan.outputs.plan).profiles, 'normal')
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-coverage-normal
+          path: coverage/normal.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true
+      - name: Record successful slow coverage
+        if: needs.plan.outputs.publish == 'true' && contains(fromJSON(needs.plan.outputs.plan).profiles, 'slow')
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-coverage-slow
+          path: coverage/slow.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true
+      - name: Record successful film responsibility coverage
+        if: needs.plan.outputs.publish == 'true' && fromJSON(needs.plan.outputs.plan).coverage.films != null
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-coverage-films
+          path: coverage/films.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true

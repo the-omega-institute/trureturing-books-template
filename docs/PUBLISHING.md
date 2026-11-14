@@ -37,8 +37,8 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 
 | 工作流 | 触发 | 作用 |
 | --- | --- | --- |
-| `ci.yml` | PR、推送到 main、手动、被调用、每周（只跑 `viz-slow`） | `check` 作业：`./tbook check`、`./tbook theme --check`、全部单元测试、可视化登记校验与幻灯片检查（模板仓库另跑 `./tbook template manifest --check`，并在删去示例书的工作树中、以及用 `site.toml` 的 `[books] hide = ["example-*"]` 隐藏示例书的工作树中重跑检查与单元测试：下游书库可以隐藏或删除示例书，甚至暂时没有书，CI 照样通过）；`build` 作业：HTML、屏幕 PDF、印刷 PDF、学术 PDF、EPUB 分 5 个作业并行，产物按 `books-html-html`、`books-dist-pdf-screen`、`books-dist-pdf-print`、`books-dist-pdf-academic`、`books-dist-epub` 分别上传；`viz` 作业：可视化浏览器回归测试，分 8 片并行（`node tools/node/viz-test.mjs --shard i/8`；每个页面的测试约一分钟，页面多了串行跑会让后面的每次运行排上大半个小时）；`viz-slow` 作业：同样的测试以慢帧（`--slow`，即 `VIZ_SLOW_FRAMES=1000`）分 8 片再跑一遍，只在手动运行（输入 `slow_frames`，默认勾选）与每周三的定时运行中出现，定时运行只跑它，PR 与推送不跑；`media` 作业：幻灯片构建与 PDF；`films` 作业：视频分 4 片严格构建（`TBOOK_FILMS=require`；默认分支推送与 tag 的被调用运行由 Pages / 发版工作流构建视频）。`build`、`media`、`films` 经构建缓存（§5）恢复未变的单元，从不保存；调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
-| `pages.yml` | 推送到 `main`、手动 | `./tbook check` 后构建全部（含视频，`TBOOK_FILMS=require`）并部署 GitHub Pages；Pages 尚未启用时只构建、不部署，并在作业摘要中提示。唯一保存构建缓存的工作流（§5），同一时间只运行一个 |
+| `ci.yml` | PR、推送到 main、手动、被调用、每周 | 先由仅需标准库的 `tools/ci/plan.py` 生成计划，再启动选中的结构／Lean、theme、unit、manifest、静态媒体、模板兼容检查族，以及按书籍启用格式展开的导出、精确 suite、film 和 slide 集合；空集合不开 runner；同一导出格式合并所选书籍，复用一次安装。viz 最多 8 片、film 最多 4 片，先选择再分片，每项恰一次。稳定必需检查名仍为 **Check**，移到末尾用 `always()` 核对全部计划任务，失败、取消和意外跳过均不通过。调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
+| `pages.yml` | 推送到 `main`、手动 | 共用影响规则，以独立的成功部署覆盖为基准；无站点影响且已有有效部署时跳过安装和构建。需要输出时仍 `./tbook check`、`./tbook build all`，恢复未变单元、补建缺失单元、清理删除内容后完整部署；Pages 未启用时只构建并提示，不记录部署覆盖。唯一保存构建缓存的工作流（§5），同一时间只运行一个 |
 | `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
 | `trureturing-bump.yml` | 每周、手动 | 把所钉的 trureturing 提交升级到最新并开 PR；标题前缀 `[refused]`（目标提交不在 `site.toml` 的分支上或无法核实）、`[unresolved]`（有引用无法解析）、`[pin failed]`、`[check fails]`、`[review statements]` 提示需要处理的情况；前三种 PR 不改锁文件，与 `[check fails]` 一样以草稿开出 |
@@ -59,9 +59,35 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 
 容器运行方式见 [容器工具链](CONTAINERS.md)：上游提供预装全部工具、浏览器、字体与语音模型的镜像，避免每次作业依赖 Ubuntu 软件源。
 
-**慢帧复查（`viz-slow`）。** 无头浏览器在忙碌的 runner 上可能一秒才给一帧；测试若为过渡或播放等了固定时间，在快机器上通过、在那里偶发失败。`node tools/node/viz-test.mjs [<book>] --slow` 把动画帧拉开到一秒一帧再跑全部（或一本书的）测试，下游 36 个页面分 4 片约需 20 分钟，故不放进 PR 的 CI。何时跑：新写或改了某个页面的测试，交付前在本地对那个测试跑一次（`VIZ_SLOW_FRAMES=1000 node books/<book>/viz/tests/<id>.test.mjs`）；改了共享运行时（`theme/viz/kit.js`、`shell.js`）或测试工具（`tools/node/viz-testkit.mjs`）、升级模板之后，以及 CI 上出现时过时不过的可视化失败时，在 Actions 中手动运行 CI（`slow_frames` 勾选）；其余由每周的定时运行兜底，失败时看作业日志里的 `FAIL` 行，按 `skills/book-viz` 改成 `settle(page)` / `until(page, …)`。`viz-validate` 对测试里的 `waitForTimeout(…)` 报警告，提前指出这类写法。
+**选择入口与成功基准。** PR 核对实际 checkout 的 merge parents：head 须与事件相同，base 须等于事件 base 或为其后继；base 前进时按实际被测 merge 重新规划，联合完整累计 `merge-base…head` 差异及可信基准至 merge tree 的差异，base 更新也会纳入。main 不用 push 的 `before` 充当覆盖基准，而是寻找最近可比的成功记录；先前失败或取消的变更不会丢失。手动与 `workflow_call` 的 `selection_mode=auto|full`、`base`（可选的预期成功基准）和 `head`（可选的预期 checkout）含义相同；被调用运行以调用方上下文规划，发布时仍由原发布作业完整组装站点。手动运行按同 ref 查找成功记录，非默认分支的记录只供该分支使用；PR、main、定时与被调用运行读取默认分支的可追溯祖先覆盖，分支记录不能成为默认分支覆盖。显式 `full` 用于诊断和全量验收。
 
-开发分支在 PR 上运行完整 CI，不再同时因分支 push 重复跑一轮；尚未开 PR 时可手动运行。PR 与 main 上被新提交取代的 CI 会取消，Pages 仍串行保存缓存并部署。默认分支名称若不是 main，需同步调整 `ci.yml` / `pages.yml` 的 push 分支过滤。
+覆盖工件 `tbook-coverage-normal|films|slow|pages` 保留 90 天，记录 SHA、profile、选择器版本、运行时、工具／检查定义摘要、run ID、attempt 与继承的来源 ID。只读取同仓库、对应工作流与所需分支上已完成且成功的 push／手动／定时运行；PR 自产记录与缓存始终不读。只有末尾汇总成功才写记录，读取时还核对整个运行的最终成功结论与 attempt。每个来源工作流搜索限最近 100 个成功运行；工件过期、权限/API/历史缺失、定义或运行时不可比均在摘要显示 **full fallback**，不能当成空集合。Pages 计划作业以 `deployments: read` 核对覆盖所指的 `github-pages` 部署仍为成功状态；CI 成功不能替代部署成功。
+
+影片独立使用 `films` 成功覆盖：CI 实际承担所选影片并通过末尾 Check 时可记录；main／tag push 将影片留给 Pages／Release，不写影片覆盖。Pages 完整严格构建与末尾汇总成功时记录影片覆盖，即使未启用部署也可记录；无构建的 Pages 运行不推进它。影片选择在 CI 与 Pages 的可信成功影片记录中取较新的祖先，以该 SHA 累计比较；已有覆盖且未变的影片跳过。normal 覆盖单独推进不会清除影片责任：Pages 失败、取消或影片证据缺失后，文档 PR／手动 CI 仍选待验证影片，main 仍交给 Pages；全部影片证据缺失时只将影片责任全量回退。影片覆盖不替代独立部署覆盖，也不读取 PR 自产缓存。
+
+纯 `docs/`、`skills/`、项目说明等已知工程文档没有重型消费者；模板仍核对 manifest。未知根路径与共享工具／依赖先保守全量；书内未登记 suite 的额外文件读取先扩大到所属书。现有导出键覆盖整本书，因此书内变动选择该书全部启用格式与语言，不擅自缩窄缓存输入。正文变化覆盖读取 preset／lang／height 的 `stageFirstChecks`；影片的 `film.json scripts` 及其静态 JS import 反向传播到影片；solid 核心与 vendor 变化覆盖 viz 与 film。隐藏／删除书不生成假分片，Pages 仍完整组装以删除旧输出。
+
+**额外测试依赖。** 书库可维护自有 `books/<slug>/viz/tests/dependencies.json`，登记每个 suite 在常规对象目录和静态 import 之外读取的文件。路径从仓库根起算，可用 glob；不能用绝对路径或 `..`。声明不存在的 suite、错误 schema 或损坏 JSON 会使计划失败，不能静默跳过。正文仍保守传播到该书全部 suite。以下为通用示例，不要求模板修改书籍内容：
+
+```json
+{
+  "schema": "tbook-ci-dependencies-v1",
+  "suites": {
+    "declaration-map.test.mjs": [
+      "trureturing.lock.json",
+      "books/my-book/zh/SUMMARY.md",
+      "books/my-book/zh/*.md"
+    ],
+    "readout.test.mjs": ["books/my-book/en/*.md", "books/my-book/assets/**"]
+  }
+}
+```
+
+声明须完整列出 suite 的额外读取；没有声明时，任何该书变动都会选择该书未登记的 suite。模板单测用独立 Git fixture 验证这个契约，不硬编码下游书名。相对 import 自动跟踪，动态计算的路径仍须登记。精确集合通过 JSON 环境变量传给 `viz-test.mjs --selection-env`、`films.py --selection-env`，拒绝不存在、隐藏或重复项。slide 集合按 deck 执行；整书集合沿用原 slides 单元键，部分集合可恢复完整单元，冷构建只运行选中 deck，且不把部分产物写入整书缓存。
+
+**慢帧复查（`viz-slow`）。** `--slow` 令 `VIZ_SLOW_FRAMES=1000`，用于发现固定等待时间造成的偶发失败。每周三的本工作流定时入口只选择 slow profile；手动运行由 `slow_frames` 控制，调用者也可明确传入。slow 使用独立成功基准：相同输入、运行时与检查定义已经覆盖时不开 runner；首次或基准失效则全量 slow fallback。共享运行时、测试工具或 suite 改动后的本地复查仍见 [book-viz](../skills/book-viz/SKILL.md)。
+
+开发分支在 PR 上运行选择后的 CI，不再因分支 push 重复运行；尚未开 PR 时可手动运行。PR 与 main 被新提交取代的 CI 会取消，Pages 仍串行保存缓存并部署。默认分支名称若不是 main，需同步调整两个工作流的 push 分支过滤。分支保护继续要求稳定的 **Check**；媒体分片数量现在动态变化；若曾将单个矩阵检查设为必需检查，维护者须改为 Check。
 
 ## 5. 构建缓存
 
