@@ -147,6 +147,7 @@ class AffectedPlanTest(unittest.TestCase):
         self.git("init", "-q")
         self.git("config", "user.email", "test@example.invalid")
         self.git("config", "user.name", "Test")
+        self.git("commit", "--allow-empty", "-qm", "initial")
         self.write("site.toml", '[site]\nlanguages=["zh","en"]\n[books]\nhide=[]\n')
         for slug in ("one", "two"):
             prefix = f"books/{slug}/"
@@ -166,6 +167,8 @@ class AffectedPlanTest(unittest.TestCase):
         self.write("trureturing.lock.json", "{}")
         self.write("docs/PUBLISHING.md", "说明\n")
         self.write("tools/test.py", "pass\n")
+        self.write("tools/tests/test_template.py", "import unittest\nimport test\n"
+                   "class ExampleTest(unittest.TestCase):\n    def test_ok(self): pass\n")
         self.base = self.commit()
 
     def git(self, *args):
@@ -303,8 +306,8 @@ class AffectedPlanTest(unittest.TestCase):
         self.assertEqual(result["films"], ["two/001-film"])
         for options in ({"baseline": False}, {"mode": "full"}):
             plan = self.make_plan(**options)
-            self.assertTrue(plan["tasks"]["viz"])
-            self.assertTrue(plan["tasks"]["build"])
+            self.assertEqual(plan["tasks"]["viz"], options.get("mode") == "full")
+            self.assertEqual(plan["tasks"]["build"], options.get("mode") == "full")
 
     def test_exact_model_and_film_reverse_dependency(self):
         self.write("books/one/viz/a/model.js", "export const n = 2;\n")
@@ -337,12 +340,16 @@ class AffectedPlanTest(unittest.TestCase):
 
     def test_unknown_shared_inputs_keep_full_fallback(self):
         tree = planner.Tree(self.root, "HEAD")
-        for path in ("package-lock.json", "tools/test.py", "new-unknown"):
+        for path in ("package-lock.json", "new-unknown"):
             result = planner.impact(tree, tree, [path])
             self.assertEqual(len(result["suites"]), 4, path)
             self.assertEqual(result["films"], ["one/001-film", "two/001-film"], path)
             self.assertTrue(result["checks"]["unit"], path)
             self.assertTrue(result["reasons"])
+        result = planner.impact(tree, tree, ["tools/test.py"])
+        self.assertEqual(result["suites"], [])
+        self.assertEqual(result["films"], [])
+        self.assertTrue(result["checks"]["unit"])
         # Missing roles do not override complete summaries of either kind.
         result = planner.impact(tree, tree, ["theme/unrepresented/new.js"])
         self.assertEqual(result["suites"], [])
@@ -384,7 +391,8 @@ class AffectedPlanTest(unittest.TestCase):
                                  if solid else ["books/one/viz/tests/b.test.mjs"])
                 self.assertEqual(result["films"], ["one/001-film", "two/001-film"] if solid else
                                  full["films"] if "i18n/" in path else [])
-                for key in ("exports", "books", "slides", "checks", "site"):
+                self.assertFalse(result["checks"]["unit"])
+                for key in ("exports", "books", "slides", "site"):
                     self.assertEqual(result[key], full[key], key)
 
     def test_shared_unknown_readers_span_books_and_both_summaries(self):
@@ -473,7 +481,8 @@ class AffectedPlanTest(unittest.TestCase):
                 result = planner.impact(tree, tree, [p])
                 self.assertEqual(result["suites"], [])
                 self.assertEqual(result["films"], [] if p.startswith(("theme/film/site/", "theme/slides/")) else full["films"])
-                for key in ("exports", "books", "slides", "checks", "site"):
+                self.assertFalse(result["checks"]["unit"])
+                for key in ("exports", "books", "slides", "site"):
                     self.assertEqual(result[key], full[key])
 
     def test_declared_shared_imports_and_implicit_object_imports_cover_future_members(self):
@@ -604,15 +613,15 @@ class AffectedPlanTest(unittest.TestCase):
     def test_missing_coverage_explicit_full_and_definition_runtime_invalidation(self):
         self.write("docs/PUBLISHING.md", "new\n")
         self.commit()
-        self.assertTrue(self.make_plan(baseline=False)["tasks"]["viz"])
+        self.assertFalse(self.make_plan(baseline=False)["tasks"]["viz"])
         self.assertTrue(self.make_plan(mode="full")["tasks"]["viz"])
-        self.assertTrue(self.make_plan(base=self.base, baseline=False)["tasks"]["viz"])
+        self.assertFalse(self.make_plan(base=self.base, baseline=False)["tasks"]["viz"])
         tree = planner.Tree(self.root, "HEAD")
         signature = planner.signature(tree, "runtime-one")
         self.assertNotEqual(signature, planner.signature(tree, "runtime-two"))
         self.write("tools/test.py", "changed\n")
         self.commit()
-        self.assertNotEqual(signature, planner.signature(planner.Tree(self.root, "HEAD"), "runtime-one"))
+        self.assertEqual(signature, planner.signature(planner.Tree(self.root, "HEAD"), "runtime-one"))
 
     def test_failed_or_cancelled_push_then_docs_does_not_lose_change(self):
         self.write("books/one/viz/a/model.js", "export const n = 3;\n")
@@ -636,7 +645,7 @@ class AffectedPlanTest(unittest.TestCase):
         self.assertEqual(called["profiles"], ["normal", "films"])
         self.assertFalse(called["publish"])
         first = self.make_plan(event="schedule", baseline=False)
-        self.assertTrue(first["tasks"]["viz-slow"])
+        self.assertFalse(first["tasks"]["viz-slow"])
         self.assertFalse(first["tasks"]["build"])
 
     def test_aggregate_rejects_failure_cancel_unexpected_skip_and_missing_plan(self):
@@ -909,15 +918,15 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
                     self.finish(no_op, "pages")
                 self.assert_films(self.docs_pr(), [])
 
-    def test_missing_all_film_evidence_widens_only_film_responsibility(self):
+    def test_missing_film_artifact_keeps_unchanged_films_out_of_the_git_diff(self):
         self.bootstrap()
         self.docs()
         self.finish(self.select())
         for artifacts in self.artifacts.values():
             artifacts[:] = [a for a in artifacts if a["name"] != "tbook-coverage-films"]
         result = self.select("workflow_dispatch")
-        self.assert_films(result, ["one/001-film", "two/001-film"])
-        self.assertTrue(any("films: full fallback" in reason for reason in result["reasons"]))
+        self.assert_films(result, [])
+        self.assertTrue(any("films: changes only" in reason for reason in result["reasons"]))
 
     def test_failed_or_cancelled_producer_cannot_supply_even_an_uploaded_film_record(self):
         for outcome in ("failure", "cancelled"):

@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import academic, build, buildcache, config, paths, slides  # noqa: E402
+from ci import testing  # noqa: E402
 
 
 def run(command):
@@ -43,14 +44,16 @@ def selected_slides(items):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kind", choices=("structure", "viz-static", "slides-static", "slides"))
+    parser.add_argument("kind", choices=("structure", "viz-static", "slides-static", "slides", "unit", "browser"))
     parser.add_argument("--plan-file", type=Path, required=True)
     args = parser.parse_args()
     plan = json.loads(args.plan_file.read_text(encoding="utf-8"))
     selected = plan["selections"]["normal"]
     books = selected["books"]
     kind = args.kind
-    if kind == "structure":
+    if kind in ("unit", "browser"):
+        testing.run_tests(selected["unit_tests" if kind == "unit" else "browser_tests"], required=kind == "browser")
+    elif kind == "structure":
         # Deleted/hidden final book still needs global structural validation.
         run([str(paths.ROOT / "tbook"), "check", *[v for b in books for v in ("--book", b)]])
     elif kind == "viz-static":

@@ -83,7 +83,7 @@ class PlanOutputBudgetTest(unittest.TestCase):
                 dict(name="one-" + name, book="one", target=target, variant=variant)
                 for name, target, variant in (("html", "html", ""), ("pdf-screen", "pdf", "screen"), ("epub", "epub", ""))])
             self.assertEqual(selected["checks"], dict(unit=False, theme=False, structure=True, viz_static=True,
-                slides_static=True, compat=False, manifest=False))
+                                                     slides_static=True, compat=False, manifest=False, browser=False))
             self.assertTrue(selected["site"])
             self.assertEqual(selected["reasons"], sorted(f"{paths[0]} (+59 more) -> suite {suite}" for suite in suites))
             self.assertEqual(plan["coverage"][profile]["paths"], paths)

@@ -21,7 +21,7 @@ on:
       slow_frames:
         description: Also select the slow-frame visualization profile
         type: boolean
-        default: true
+        default: false
   workflow_call:
     inputs:
       selection_mode:
@@ -105,7 +105,7 @@ jobs:
           TBOOK_PLAN_JSON
 
       - name: Set up the toolchain
-        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure || fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser || fromJSON(needs.plan.outputs.plan).selections.normal.checks.viz_static || fromJSON(needs.plan.outputs.plan).selections.normal.checks.slides_static
         uses: ./.github/actions/setup
         with:
           browsers: 'false'
@@ -148,7 +148,7 @@ jobs:
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit
         env:
           PYTHONPATH: tools
-        run: python -m unittest discover -s tools/tests -v
+        run: python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"
 
       - name: Template manifest is up to date
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.manifest
@@ -192,7 +192,7 @@ jobs:
           ./tbook check
           node tools/node/viz-validate.mjs
           node tools/node/slides-check.mjs
-          python -m unittest discover -s tools/tests
+          python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"
 
       - name: With the example books hidden (template repository only)
         # Books repositories keep the template's example books and hide them (site.toml [books].hide =
@@ -232,23 +232,22 @@ jobs:
           if grep '^example-' <<<"$visible"; then echo "::error::./tbook books lists a hidden book"; exit 1; fi
           node tools/node/viz-validate.mjs
           node tools/node/slides-check.mjs
-          python -m unittest discover -s tools/tests
+          python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"
 
-      # Install after all three ordinary/compatibility rounds: their browser tests
-      # stay optional, while the export regression below must execute and pass.
-      - name: Set up Chromium for the required EPUB regression
-        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat
+      # Install a browser only when an affected browser regression is selected.
+      - name: Set up Chromium for selected browser regressions
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser
         uses: ./.github/actions/setup
         with:
           browsers: 'true'
           fonts: 'false'
           mdbook: 'false'
 
-      - name: Required native EPUB layout regression
-        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.unit || fromJSON(needs.plan.outputs.plan).selections.normal.checks.compat
+      - name: Selected browser regressions
+        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser
         env:
           PYTHONPATH: tools
-        run: python tools/tests/test_export_layout.py
+        run: python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json"
 
   build:
     name: Build books (${{ matrix.name }})
