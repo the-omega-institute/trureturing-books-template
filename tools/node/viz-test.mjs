@@ -1,26 +1,30 @@
 #!/usr/bin/env node
 // Run the browser regression suites books/<slug>/viz/tests/*.test.mjs, one after another, against one shared server:
-//   node tools/node/viz-test.mjs                         every suite of every book
-//   node tools/node/viz-test.mjs example-monograph       the suites of one book (slug or directory; repeatable)
+//   node tools/node/viz-test.mjs                         affected suites since the origin/main branch point, including working-tree edits
+//   node tools/node/viz-test.mjs example-monograph       affected suites limited to one book (slug or directory; repeatable)
+//   node tools/node/viz-test.mjs --base HEAD             compare with another branch point
+//   node tools/node/viz-test.mjs --full                  explicitly run every suite (optionally limited to named books)
 //   node tools/node/viz-test.mjs --shard 2/4             suites 2, 6, 10, … of the sorted list (CI runs shards in parallel)
 //   node tools/node/viz-test.mjs --shard 2/4 --list      print the selection without running it
 //   node tools/node/viz-test.mjs --slow                  the same with animation frames a second apart (VIZ_SLOW_FRAMES=1000,
-//                                                        as on a busy runner; see viz-testkit.mjs): before trusting a new
-//                                                        or changed suite, and weekly in CI (ci.yml, viz-slow)
+//                                                        as on a busy runner; see viz-testkit.mjs): for clock/async changes,
+//                                                        slow-frame investigations, and weekly in CI (ci.yml, viz-slow)
 // Each suite is a standalone script that exits non-zero when a check fails (see tools/node/viz-testkit.mjs).
 // Needs Playwright with Chromium (playwright-chromium devDependency, or PW_CHROMIUM_PATH pointing at a Chromium).
 // Adapted from trureturing-visualize/scripts/test-browser.mjs (Apache-2.0, the-omega-institute).
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
-import { listBooks, resolveBook, rel } from './viz-common.mjs';
+import { fileURLToPath } from 'node:url';
+import { ROOT, listBooks, resolveBook, rel } from './viz-common.mjs';
 import { startServer } from './viz-server.mjs';
 
 const args = process.argv.slice(2);
 let shard = [1, 1];
 const books = [];
 let list = false, slow = false, selection = null, reportPath = null;
+let full = false, base = 'origin/main', explicitBase = false;
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === '--shard') {
@@ -36,18 +40,55 @@ for (let k = 0; k < args.length; k++) {
   } else if (a === '--report') {
     reportPath = args[++k];
     if (!reportPath) { console.error('missing --report path'); process.exit(2); }
-  } else if (a === '--list') list = true;
+  } else if (a === '--base') {
+    base = args[++k];
+    if (!base || base.startsWith('-')) { console.error('missing --base ref'); process.exit(2); }
+    explicitBase = true;
+  } else if (a === '--full') full = true;
+  else if (a === '--list') list = true;
   else if (a === '--slow') slow = true;
-  else if (a === '-h' || a === '--help') { console.log('usage: node tools/node/viz-test.mjs [book ...] [--shard i/n] [--slow] [--list]'); process.exit(0); }
+  else if (a === '-h' || a === '--help') {
+    console.log('usage: node tools/node/viz-test.mjs [book ...] [--base ref | --full] [--shard i/n] [--slow] [--list]\n'
+      + 'Default: only affected suites since the origin/main branch point, including staged, unstaged and untracked files.\n'
+      + 'Named books filter that selection. Use --full to run all suites in scope.');
+    process.exit(0);
+  }
   else {
     try { books.push(resolveBook(a)); } catch (e) { console.error(e.message); process.exit(2); }
   }
+}
+if ((selection !== null && (full || explicitBase)) || (full && explicitBase)) {
+  console.error('--selection-env, --full and --base are mutually exclusive'); process.exit(2);
 }
 const all = [];
 for (const book of books.length ? books : listBooks()) {
   const dir = path.join(book.dir, 'viz', 'tests');
   if (!fs.existsSync(dir)) continue;
   for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.test.mjs')).sort()) all.push(path.join(dir, f));
+}
+if (selection === null && !full && all.length) {
+  // Use the same old/new dependency graph as ./tbook test and CI, even when TBOOK_ROOT points at a fixture.
+  const codeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const venv = path.join(codeRoot, '.venv', 'bin', 'python');
+  const python = process.env.TBOOK_PYTHON || (fs.existsSync(venv) ? venv : 'python3');
+  const code = 'import json, sys\nfrom ci import plan, testing\n'
+    + 'old, current, changed = testing.working_changes(sys.argv[1], sys.argv[2])\n'
+    + 'json.dump(plan.impact(current, old, changed)["suites"], sys.stdout)\n';
+  const result = spawnSync(python, ['-c', code, ROOT, base], {
+    cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26,
+    env: { ...process.env, PYTHONPATH: [path.join(codeRoot, 'tools'), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }
+  });
+  if (result.error || result.status !== 0) {
+    console.error(`cannot determine affected visualization suites: ${result.error?.message || result.stderr.trim() || result.signal || result.status}\n`
+      + 'Provide an available comparison ref with --base <ref>, or explicitly request --full.');
+    process.exit(2);
+  }
+  try {
+    const affected = JSON.parse(result.stdout);
+    if (!Array.isArray(affected) || affected.some((s) => typeof s !== 'string')) throw new Error('expected suite paths');
+    const scope = new Set(all.map(rel));
+    selection = affected.filter((s) => scope.has(s));
+  } catch (e) { console.error(`invalid affected suite selection: ${e.message}`); process.exit(2); }
 }
 // A parent path still means the complete standalone suite. CI uses explicit #part units.
 const byName = new Map(all.map((f) => [rel(f), { file: f, part: '' }]));
@@ -85,7 +126,12 @@ const saveReport = () => {
   fs.writeFileSync(reportPath + '.tmp', JSON.stringify(report) + '\n');
   fs.renameSync(reportPath + '.tmp', reportPath);
 };
-if (!suites.length) { saveReport(); console.log(all.length ? `shard ${shard[0]}/${shard[1]} has no suites` : 'no browser suites under books/*/viz/tests/'); process.exit(0); }
+if (!suites.length) {
+  saveReport();
+  console.log(!all.length ? 'no browser suites under books/*/viz/tests/'
+    : !chosen.length ? 'no affected visualization suites' : `shard ${shard[0]}/${shard[1]} has no suites`);
+  process.exit(0);
+}
 
 const { server, origin } = await startServer(0);
 const env = { ...process.env, VIZ_ORIGIN: origin, ...(slow ? { VIZ_SLOW_FRAMES: '1000' } : {}) };

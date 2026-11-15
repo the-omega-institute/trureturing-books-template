@@ -44,7 +44,7 @@
       "mode": "100644"
     },
     ".github/workflows/toolchain-image.yml": {
-      "sha256": "6b657ea6869ee72a0f8c3c75c62f9aecb04af8013a2a14bd47971c74a5949299",
+      "sha256": "a9ef145cd1837de689d200f75ae594139dedd99aa96aaabff7ec8f00b8f537fe",
       "mode": "100644"
     },
     ".github/workflows/trureturing-bump.yml": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "59099cd5bf8ae568216419ba0412a5d74d98d2337cf11e3ae8cdc53f5bc56b5f",
+      "sha256": "b49d0ee323b09f22675a91d2e11c0b55faa77e073f4845357b9262ec0f0cb976",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "4c3092b44bfbfbf1b13be884d694167ffe42100faaadada2efcc514a4fe0a704",
+      "sha256": "a679a13ca41e754d7394ed10f1d494c5d782291ab6f94af18fb5d10004dd2660",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
@@ -140,7 +140,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "59f79eba809df700120e7d57aa417f285ccea7ae90bd3550bd22def2d9ada2d3",
+      "sha256": "deb395b4fe034c002d8b7f3de412da0dd448fcd41267c416b73edad0ef102318",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -532,7 +532,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "c1b5ee47d9ef85972d2ed34ec2cd8ab4d2a9fe71eed6fc04895c9e37104f290c",
+      "sha256": "438da8800f86bc3e5d48f6351149c66d40f52054db78930ca7ffe610b7a215b8",
       "mode": "100644"
     },
     "tools/ci/run.py": {
@@ -540,7 +540,7 @@
       "mode": "100644"
     },
     "tools/ci/testing.py": {
-      "sha256": "cbcfa6dbe4f2811d0586c15c24a999e2549ba6802e517caca488245e7669f6c6",
+      "sha256": "4921f6e9897444939b0fc4e309d6c28c8d9cab0d0267dd8fe37781d879aa47f5",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -656,7 +656,7 @@
       "mode": "100644"
     },
     "tools/node/viz-test.mjs": {
-      "sha256": "4ffa44cd04d0a8e0370ec4364fef9bed7ef6624f77daaea26105169c84b4c1fc",
+      "sha256": "b0152e88bd238325c8f2d88e1697e1ca8556a2fac2628414c702740e8de38b42",
       "mode": "100644"
     },
     "tools/node/viz-testkit.mjs": {
@@ -876,7 +876,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_testing.py": {
-      "sha256": "419389c286fa199f0d3757c0a93681a1bfe2a15436ca8f8b65ae65b0be431b0d",
+      "sha256": "ee3ff77f8cf71d87d283fee1ebfeeda94df963a08942d85c079c69f8dab32af1",
       "mode": "100644"
     },
     "tools/tests/test_ci_transport.py": {
@@ -1024,7 +1024,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "b8ca81cf1c9ab67868efad76cb62cb70d5f7018532d6ae344a8a611bd60eb29b",
+      "sha256": "dfea2ed62f3dc74d7437237e3563b026ab55fdd3b3d12c1fd97c0dfe73c5a96f",
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {

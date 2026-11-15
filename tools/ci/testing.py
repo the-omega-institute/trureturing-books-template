@@ -13,6 +13,7 @@ import sys
 # Keep these alongside the selector; new test constructors must declare such reads.
 EXTRA = {
     "test_ci*": ["tools/ci/**", ".github/**"],
+    "test_ci_testing": ["tools/node/viz-test.mjs"],
     "test_template*": ["template.toml", "tools/migrations/**", "templates/**", "books/example-*/**"],
     "test_migration*": ["tools/migrations/**"],
     "test_container": ["tools/container/**", ".github/**"],

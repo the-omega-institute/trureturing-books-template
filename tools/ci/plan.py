@@ -387,7 +387,8 @@ def impact(current, previous, paths, *, full=False, template=False):
             path_reason("", p, f" -> film {film}")
         if p.startswith(("docs/", "skills/", ".claude/")) or ("/" not in p and p.endswith(".md")) or p in ("LICENSE", "template-manifest.json"):
             continue
-        if p.startswith(("tools/ci/", "tools/tests/")) or p == ".github/workflows/ci.yml":
+        if p.startswith(("tools/ci/", "tools/tests/")) or p in (
+                ".github/workflows/ci.yml", ".github/workflows/toolchain-image.yml"):
             # Planning/test infrastructure has no publication output. Declared
             # runtime readers were already propagated above, before classification.
             continue
