@@ -52,6 +52,16 @@ class SelectionTests(unittest.TestCase):
         selected = testing.select(head, old, ["theme/mdbook/tr-book.css"])
         self.assertEqual(selected["browser_tests"], ["test_site.BrowserLayoutTest"])
 
+    def test_starter_browser_regressions_follow_the_template_and_scaffolder(self):
+        self.write("tools/tests/test_viz.py", "import unittest\n"
+                   "class RailGate(unittest.TestCase):\n def test_starter(self): pass\n")
+        head, old = self.views()
+        for path in ("templates/viz/main.js", "templates/viz/index.html", "tools/tbook/viz.py"):
+            with self.subTest(path=path):
+                selected = testing.select(head, old, [path])
+                self.assertNotIn("test_viz.RailGate", selected["unit_tests"])
+                self.assertEqual(selected["browser_tests"], ["test_viz.RailGate"])
+
     def test_citation_dependencies_follow_both_endpoints_and_ignore_fenced_examples(self):
         deps = {"schema": planner.DEPENDENCIES, "suites": {
             "a.test.mjs": ["@citations"], "b.test.mjs": ["@citations"]}}
