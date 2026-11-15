@@ -69,7 +69,7 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 
 覆盖工件 `tbook-coverage-normal|films|slow|pages` 保留 90 天，记录 SHA、profile、选择器版本、运行时、工具链环境摘要、run ID、attempt 与继承的来源 ID。只读取同仓库、对应工作流与所需分支上已完成且成功的 push／手动／定时运行；PR 自产记录与缓存始终不读。只有末尾汇总成功才写记录，读取时还核对整个运行的最终成功结论与 attempt。每个来源工作流搜索限最近 100 个成功运行；工件过期或工具链环境不可比时，改用最近同来源的成功运行树计算差异；首次运行使用事件的 PR base、push before 或上一提交，显式 `base` 优先。摘要列出实际比较 SHA，并标明没有继承覆盖；历史不足以计算差异时计划失败，要求补充基准，不自动启动全量浏览器。Pages 计划作业以 `deployments: read` 核对覆盖所指的 `github-pages` 部署仍为成功状态；CI 成功不能替代部署成功。
 
-影片独立使用 `films` 成功覆盖：CI 实际承担所选影片并通过末尾 Check 时可记录；main／tag push 将影片留给 Pages／Release，不写影片覆盖。Pages 完整严格构建与末尾汇总成功时记录影片覆盖，即使未启用部署也可记录；无构建的 Pages 运行不推进它。影片选择在 CI 与 Pages 的可信成功影片记录中取较新的祖先，以该 SHA 累计比较；已有覆盖且未变的影片跳过。normal 覆盖单独推进不会清除影片责任：Pages 失败、取消或影片证据缺失后，文档 PR／手动 CI 仍选待验证影片，main 仍交给 Pages；全部影片证据缺失时只将影片责任全量回退。影片覆盖不替代独立部署覆盖，也不读取 PR 自产缓存。
+影片独立使用 `films` 成功覆盖：CI 实际承担所选影片并通过末尾 Check 时可记录；main／tag push 将影片留给 Pages／Release，不写影片覆盖。Pages 完整严格构建与末尾汇总成功时记录影片覆盖，即使未启用部署也可记录；无构建的 Pages 运行不推进它。影片选择在 CI 与 Pages 的可信成功影片记录中取较新的祖先，以该 SHA 累计比较；已有覆盖且未变的影片跳过。normal 覆盖单独推进不会清除影片责任：Pages 失败、取消或影片证据缺失后，文档 PR／手动 CI 仍选待验证影片，main 仍交给 Pages；影片工件缺失时优先比较最近成功 Pages 的树；保留事件或显式基准作为差异来源，不因工件缺失重渲染全部未变影片。影片覆盖不替代独立部署覆盖，也不读取 PR 自产缓存。
 
 纯 `docs/`、`skills/`、项目说明等已知工程文档没有重型消费者；模板仍核对 manifest。未知根路径与安装依赖仍保守覆盖全部可能读者；书内未登记 suite 的额外文件读取先扩大到所属书。现有导出键覆盖整本书，因此书内变动选择该书全部启用格式与语言，不擅自缩窄缓存输入。正文变化仅覆盖引用该页面的章节与显式声明的额外正文读取，保留 preset／lang／height 的 `stageFirstChecks`；影片的 `film.json scripts` 保留反向依赖；solid 核心与 vendor 变化覆盖实际 viz 与 film 读者。隐藏／删除书不生成假分片，Pages 仍完整组装以删除旧输出。
 

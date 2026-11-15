@@ -8,12 +8,12 @@ on:
   workflow_dispatch:
     inputs:
       selection_mode:
-        description: auto uses comparable successful coverage; full diagnoses all consumers
+        description: auto selects changed inputs; full diagnoses all consumers
         type: choice
         options: [auto, full]
         default: auto
       base:
-        description: Optional expected successful baseline SHA (otherwise full fallback)
+        description: Optional Git comparison baseline SHA
         type: string
       head:
         description: Optional expected checkout SHA

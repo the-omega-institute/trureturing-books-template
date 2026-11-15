@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "61cfeb703ae9b899bec5c34654e1c4d18680b7c5a38d19188ab1db4313151f66",
+      "sha256": "0105c9ff944d459374070086cbd9401916aa00dca2530bfa4ecec94c19d78e3a",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "055212b966d27ea0918ae4c91518b43c7796a20452e7f9998f22c63a7bd9dace",
+      "sha256": "a1a527da88e3557dfdaf52dc678d5be6b88ac7562a94012166c44ac12222fbca",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -548,7 +548,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "87385997a897897d90dfb4ec21d2d2c74cc495799309ea6076575daa2bf864fb",
+      "sha256": "fcdc42ed0afa524228992eeb5d8d0eaae4efbb13ccd475131c950544c7323bd8",
       "mode": "100644"
     },
     "tools/ci/run.py": {

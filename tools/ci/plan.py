@@ -1,4 +1,4 @@
-"""Plan CI before setup, using Git trees and successful, trusted coverage artifacts only.
+"""Plan CI before setup, using Git diffs and trusted successful producer records.
 
 No third party Python/Node dependency is needed. Unknown paths widen coverage; malformed
 inventories and selector failures fail the plan job rather than becoming an empty selection.
