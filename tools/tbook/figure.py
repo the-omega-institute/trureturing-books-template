@@ -527,7 +527,8 @@ def _shot_page(book, name: str, lang: str, view: str) -> str:
             f'<meta name="viewport" content="width=device-width, initial-scale=1"><style>{tok}\n{mdbook_css()}\n{fig_css}\n'
             "html,body{margin:0;background:var(--tr-void);color:var(--tr-ink);font-family:var(--tr-font-body)}"
             ".col{max-width:760px;margin:0 auto;padding:16px;box-sizing:border-box}"
-            ".paper{background:#fff;padding:16px}.paper svg{display:block;width:100%;height:auto}"
+            # Size only the outer canvas; nested SVG viewports retain their authored dimensions.
+            ".paper{background:#fff;padding:16px}.paper > .col > div > svg{display:block;width:100%;height:auto}"
             f"</style></head><body>{body}</body></html>")
 
 

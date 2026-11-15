@@ -2,6 +2,12 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+### 修复
+
+- 静态图印刷截图仅缩放外层 SVG，保留嵌套面板的原定尺寸与位置，避免预览裁切；补充浏览器几何回归。
+
 ## [0.12.1] - 2026-11-14
 
 ### 修复

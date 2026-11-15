@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "9255ee6310407eec8b5760dd33369f424df584b197d965efcd37d79486ae8fc6",
+      "sha256": "4a217571069c2b6041890b5faa61fcda35b7ef0112cc7d4809e82d7517d146da",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -732,7 +732,7 @@
       "mode": "100644"
     },
     "tools/tbook/figure.py": {
-      "sha256": "44ba6883ae9b2a9ccf8789cf49f2ab6845739142031c8ecf2db3ffeafdc65b1f",
+      "sha256": "16fabc4a5b79937f1bbdec7415a958c6da47f30e1728ed8efcf1a92782bb5a8d",
       "mode": "100644"
     },
     "tools/tbook/film.py": {
@@ -839,6 +839,10 @@
       "sha256": "165567f49709826e5c600b491218fd19b2ddd680591666fde59c27ff25ffebc9",
       "mode": "100644"
     },
+    "tools/tests/figure-shots.mjs": {
+      "sha256": "40045bb3f783f5d35fe05fade7328a0216147bd1dbe345ef3752fc571ac2aac9",
+      "mode": "100644"
+    },
     "tools/tests/film_solid_harness.mjs": {
       "sha256": "be0389656246feea491df30fb6e486b45d9c245d435041ffc2ccc28989797273",
       "mode": "100644"
@@ -901,6 +905,10 @@
     },
     "tools/tests/test_figure.py": {
       "sha256": "228359e4427db49698c77bac543134980a5d96b806311eb6320c097f6fdd0733",
+      "mode": "100644"
+    },
+    "tools/tests/test_figure_shots.py": {
+      "sha256": "7ae30e51098177957ecdb2d905e13b93ff5fcd9f6a7cafa7b06dcf8377ae786b",
       "mode": "100644"
     },
     "tools/tests/test_film.py": {
