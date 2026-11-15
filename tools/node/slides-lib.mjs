@@ -16,7 +16,18 @@ import { spawnSync } from 'node:child_process';
 // tools/node/slides-lib.mjs -> repository root (TBOOK_ROOT overrides, as in tools/tbook/paths.py)
 export const ROOT = resolve(process.env.TBOOK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
 // Materialize palette derivatives for direct Node commands after a source-only checkout.
-if (existsSync(join(ROOT, 'theme/tokens.json'))) {
+function themeNeedsGeneration() {
+  if (!existsSync(join(ROOT, 'theme/tokens.json'))) return false;
+  if (['css', 'typ', 'mjs'].some((ext) => !existsSync(join(ROOT, `theme/generated/tokens.${ext}`)))) return true;
+  try {
+    const source = JSON.parse(readFileSync(join(ROOT, 'theme/tokens.json'), 'utf8'));
+    const module = readFileSync(join(ROOT, 'theme/generated/tokens.mjs'), 'utf8');
+    const encoded = /export const TOKENS = (\{[\s\S]*\});\s*export default TOKENS;/.exec(module)?.[1];
+    const expected = Object.fromEntries(['screen', 'paper', 'film', 'semantic', 'font', 'effect'].map((key) => [key, source[key]]));
+    return !encoded || JSON.stringify(JSON.parse(encoded)) !== JSON.stringify(expected);
+  } catch { return true; }
+}
+if (themeNeedsGeneration()) {
   const python = process.env.TBOOK_PYTHON || (existsSync(join(ROOT, '.venv/bin/python')) ? join(ROOT, '.venv/bin/python') : 'python3');
   const toolRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const generated = spawnSync(python, ['-c', 'from tbook import theme; theme.write()'], {
