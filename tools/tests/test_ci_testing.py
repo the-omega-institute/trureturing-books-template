@@ -54,6 +54,19 @@ class SelectionTests(unittest.TestCase):
         selected = planner.impact(head, head, [path])
         self.assertEqual(selected["suites"], ["books/one/viz/tests/b.test.mjs"])
 
+    def test_new_summary_does_not_replay_unchanged_readers_but_keeps_changed_inputs(self):
+        dep = "books/one/viz/tests/dependencies.json"
+        (self.root / dep).unlink()
+        self.base = self.commit()
+        self.write(dep, json.dumps({"schema": planner.DEPENDENCIES, "suites": {
+            "a.test.mjs": ["@citations"], "b.test.mjs": ["@citations"]}}))
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, ["tools/ci/plan.py"])["suites"], [])
+        self.write("books/one/viz/a/model.js", "export const n=3;\n")
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, ["books/one/viz/a/model.js"])["suites"],
+                         ["books/one/viz/tests/a.test.mjs"])
+
     def test_local_list_includes_staged_unstaged_and_untracked_inputs_without_running(self):
         self.write("tools/test.py", "n=2\n")
         self.git("add", "tools/test.py")

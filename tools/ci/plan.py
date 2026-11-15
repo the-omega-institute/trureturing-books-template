@@ -276,8 +276,46 @@ def _template_version_only(current, previous):
     return versions[0] != versions[1] and remaining[0] == remaining[1]
 
 
+def blob_id(tree, name):
+    if name not in tree.files:
+        return None
+    if hasattr(tree, "sha"):
+        if not hasattr(tree, "_blob_ids"):
+            tree._blob_ids = {}
+            for entry in git(tree.root, "ls-tree", "-r", "-z", tree.sha).split(b"\0"):
+                if entry:
+                    meta, path = entry.split(b"\t", 1)
+                    tree._blob_ids[path.decode()] = meta.split()[2].decode()
+        return tree._blob_ids[name]
+    # The local adapter includes uncommitted binary assets too.
+    data = (tree.root / name).read_bytes()
+    return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+
+
+def adopt_unchanged_summaries(current, previous, now, old):
+    """A newly declared reader can describe the old tree when ALL its inputs are equal."""
+    if previous is None:
+        return
+    for slug, book in now.items():
+        prior = old.get(slug)
+        if not prior:
+            continue
+        for suite, deps in book["deps"].items():
+            if suite in prior["deps"] or suite not in prior["suites"]:
+                continue
+            view = dict(prior, deps={**prior["deps"], suite: deps})
+            relations = []
+            for tree, metadata in ((current, book), (previous, view)):
+                patterns, closure = suite_inputs(tree, slug, metadata, suite)
+                relations.append(closure | {p for p in tree.files
+                                             if any(fnmatch.fnmatchcase(p, pat) for pat in patterns)})
+            if relations[0] == relations[1] and all(blob_id(current, p) == blob_id(previous, p) for p in relations[0]):
+                prior["deps"][suite] = deps
+
+
 def impact(current, previous, paths, *, full=False, template=False):
     now, old = inventory(current), inventory(previous) if previous else {}
+    adopt_unchanged_summaries(current, previous, now, old)
     all_suites = {s for b in now.values() for s in b["suites"]}
     all_films = {f for b in now.values() for f in b["films"]}
     all_slides = {s for b in now.values() for s in b["slides"]}

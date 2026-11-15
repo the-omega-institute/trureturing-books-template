@@ -407,7 +407,9 @@ class AffectedPlanTest(unittest.TestCase):
         head = planner.Tree(self.root, unknown)
         expected = ["books/one/viz/tests/b.test.mjs", "books/two/viz/tests/b.test.mjs"]
         self.assertEqual(planner.impact(head, old, ["theme/viz/hub.js"])["suites"], expected)
-        self.assertEqual(planner.impact(old, head, ["theme/viz/hub.js"])["suites"], expected)
+        # Restoring a complete declaration for an unchanged reader also describes
+        # the former tree; removing a live declaration above still widens coverage.
+        self.assertEqual(planner.impact(old, head, ["theme/viz/hub.js"])["suites"], expected[:1])
         # An entirely new book/suite cannot inherit an inapplicable old summary.
         self.write("books/new/book.toml", "[book]\n")
         self.write("books/new/viz/tests/new.test.mjs", "")
@@ -524,7 +526,8 @@ class AffectedPlanTest(unittest.TestCase):
         self.write(path, json.dumps(data))
         unknown = planner.Tree(self.root, self.commit())
         for current, previous in ((head, unknown), (unknown, head)):
-            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"], expected)
+            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"],
+                             [] if current is head else expected)
 
     def test_unsupported_inline_module_keeps_only_its_film_uncertain_in_either_tree(self):
         self.shared_readers()

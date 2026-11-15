@@ -78,6 +78,8 @@ class Scratch:
         self.stack.enter_context(mock.patch.dict(os.environ))
         for key in CACHE_ENV:
             os.environ.pop(key, None)
+        config.load_site.cache_clear()
+        self.stack.callback(config.load_site.cache_clear)
         buildcache._clear_memos()
         self.stack.callback(buildcache._clear_memos)
         return self

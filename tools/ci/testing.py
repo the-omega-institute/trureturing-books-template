@@ -123,7 +123,7 @@ def select(tree, previous, changed, *, full=False):
             elif affected and (any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test_")
                                   for n in cls.body) or any(isinstance(b, ast.Name) for b in cls.bases)):
                 ordinary.append(ident)
-    return dict(unit_tests=ordinary, browser_tests=browser)
+    return dict(unit_tests=sorted(ordinary), browser_tests=sorted(browser))
 
 
 def run_tests(names, *, required=False):
