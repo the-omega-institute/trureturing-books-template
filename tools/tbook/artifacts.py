@@ -35,6 +35,13 @@ def outputs(book) -> set[Path]:
     return result
 
 
+def books(only: list[str] | None = None):
+    # Source hygiene covers hidden books too: their files are still part of Git merges.
+    if only:
+        return config.load_books(only)
+    return [config.load_book(str(p.parent)) for p in sorted(paths.BOOKS.glob("*/book.toml"))]
+
+
 def tracked(books) -> list[str]:
     theme_outputs = {paths.ROOT / "theme/generated" / f"tokens.{ext}" for ext in ("css", "typ", "mjs")}
     theme_outputs.update(paths.ROOT / "theme/slides/styles" / f"backdrop.{ext}" for ext in ("jpg", "json"))
@@ -52,8 +59,8 @@ def untrack(books) -> list[str]:
 
 
 def cli(args) -> int:
-    books = config.load_books(args.book)
-    names = untrack(books) if args.action == "untrack" else tracked(books)
+    selected = books(args.book)
+    names = untrack(selected) if args.action == "untrack" else tracked(selected)
     for name in names:
         print(name)
     if args.action == "check" and names:

@@ -7,7 +7,7 @@ import sys
 def migrate(root: Path) -> list[str]:
     # Use the newly installed tools, including when invoked by the template migration runner.
     from tbook import artifacts, config, paths
-    books = config.load_books()
+    books = artifacts.books()
     for book in books:
         copies = {p.relative_to(book.dir).as_posix() for p in artifacts.outputs(book)
                   if "/slides/" in p.as_posix() or p in {book.dir / n for n in book.raw.get("derived", {}).get("outputs", [])}}

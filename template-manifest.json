@@ -600,7 +600,7 @@
       "mode": "100644"
     },
     "tools/migrations/v1.0.0.py": {
-      "sha256": "6a0008ef072ff15ca16126a88d65381c48be9e639c7963caeaf0b6e2f7dedfc3",
+      "sha256": "21c840fa77b115df47c75b0667c5bc14a9df5daac1efca468aaa7473e4ae17f4",
       "mode": "100644"
     },
     "tools/node/beamer-snapshots.mjs": {
@@ -684,7 +684,7 @@
       "mode": "100644"
     },
     "tools/tbook/artifacts.py": {
-      "sha256": "1c334a3ff1b50ba32f3823b0871a6123456dc2b1748bfa627cfa4df6fa60cfc9",
+      "sha256": "fd63584a77680fcc61dfd6ecea19b8373d58f2a862bf3dc418ee891e48725f31",
       "mode": "100644"
     },
     "tools/tbook/build.py": {
