@@ -257,7 +257,8 @@ jobs:
     if: needs.plan.outputs.build == 'true'
     needs: plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Cold exports of large books capture all cited visualization stills before typesetting.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
