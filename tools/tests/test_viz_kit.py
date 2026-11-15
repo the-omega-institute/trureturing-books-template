@@ -23,7 +23,7 @@ from pathlib import Path
 from tbook import config, doctor, paths, viz
 from tbook.model import load_book_models
 
-from test_viz import fake_book
+from test_viz import fake_book, fake_lock
 
 NODE = viz.node_executable()
 GID = "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"
@@ -277,7 +277,7 @@ class KitInTheBrowser(unittest.TestCase):
 @unittest.skipUnless(browser_ready(), "node, node_modules/playwright-chromium and a Chromium are required")
 class FrozenAndCapitalsGate(unittest.TestCase):
     """evidenceChecks on .lean.frozen boxes, and the capitals warning of stageFirstChecks, run in Chromium on private
-    copies of the starter page (a private root with the repository's lock)."""
+    copies of the starter page (a private root with its own lock fixture)."""
 
     SLUG = "frozen-gate-fixture"
     EVIDENCE = '<section class="panel sec" id="evidence">\n'
@@ -311,9 +311,7 @@ process.exit(0);
                 (root / "node_modules").symlink_to(paths.ROOT / "node_modules", target_is_directory=True)
         except OSError as exc:
             raise unittest.SkipTest(f"cannot link the theme into a private root: {exc}")
-        if not paths.LOCK_FILE.is_file() or GID not in json.loads(paths.LOCK_FILE.read_text(encoding="utf-8")).get("declarations", {}):
-            raise unittest.SkipTest(f"the repository's lock does not hold {GID}")
-        shutil.copy(paths.LOCK_FILE, root / "trureturing.lock.json")
+        fake_lock().save(root / "trureturing.lock.json")
         book = fake_book(root / "books", cls.SLUG)
 
         def swap(text: str, old: str, new: str) -> str:

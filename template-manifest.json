@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "0c9a42c2063b6594e7a89687f8996765a4052ac4d57730a93e2b0ebb8875b963",
+      "sha256": "5784985378c4880ed0d8ceae8229ef63ee0b54de2316cd95d740977f63fe5bcf",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -1020,7 +1020,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {
-      "sha256": "db3ec917634892eba1e698d8a81c2f9730fcd0ced7622740a3b2698a8cdb2d79",
+      "sha256": "d9e4ce798ef8670fb88c2ea2962026efa67bafbd80022287240799d4f635d3b5",
       "mode": "100644"
     },
     "tools/tests/test_viz_runtime.py": {
