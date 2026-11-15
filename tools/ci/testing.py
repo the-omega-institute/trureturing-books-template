@@ -31,7 +31,7 @@ BROWSER = {
                                     "theme/mdbook/**", "theme/site/**", "theme/tokens.json", "theme/generated/**"],
     "test_export_layout.EpubLayoutTest": ["tools/tbook/pandoc.py", "tools/tbook/mathrender.py",
         "tools/filters/**", "theme/epub/**", "tools/tests/epub-layout.mjs"],
-    **{f"test_viz.{name}": ["tools/node/viz*", "theme/viz/**"]
+    **{f"test_viz.{name}": ["tools/tbook/viz.py", "tools/node/viz*", "theme/viz/**", "templates/viz/**"]
        for name in ("RailGate", "StageViewGate", "CitedNoteBar", "KeysGate")},
     "test_viz_runtime.RuntimeRegressions": ["tools/node/viz*", "theme/viz/**", "tools/tests/*harness.mjs"],
     "test_slides.OwnBackgroundBuildTest": ["tools/node/slides*", "theme/slides/**", "templates/slides/**"],
