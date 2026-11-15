@@ -81,7 +81,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 统计图先复用 `stats.collect(book)` 的正式解析结果或本书确定性生成器的共享统计快照，不另写正则计数或固定排名断言。生成索引从统计输入排除；已配置 `[derived]` 时先 `./tbook sync --book <book>`。脚本计算结果未变时生成器不会重写 SVG；已有相同输入的画面检查可按原范围复用，只对实际改变的图补看。数学、布局、配色或标签发生变化时仍按下面要求看图。
 
 ```bash
-./tbook fig build --book <book> [<name> …]     # 每种语言生成 figures/<name>.<语言>.svg，提交入库
+./tbook fig build --book <book> [<name> …]     # 每种语言生成 figures/<name>.<语言>.svg，不提交产物
 ./tbook fig shots <book> <name> [<name> …]     # 深色、浅色、手机、印刷四种画面，中英各一，写到 build/fig-shots/<book>/
 ```
 
@@ -112,7 +112,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 ### 5. 检查
 
 ```bash
-./tbook check          # 图注为空或只有编号（错误）；提交的 SVG（含演示文稿 img/ 里的同名副本）与脚本不一致（错误）；各语言的图序列不一致（错误）；
+./tbook check          # 图注为空或只有编号（错误）；本地生成的 SVG（含演示文稿 img/ 里的同名副本）与脚本不一致（错误）；各语言的图序列不一致（错误）；
                        # assets/ 里没有被引用的文件、没有脚本的 SVG、没有章节引用的图（警告）；
                        # 手机上最小标签不到 10 px 的图（警告，site.toml 可升为错误）；图片语法引用的手绘 SVG、
                        # 两种语言共用的带字 SVG、只隔着空行相邻的两块媒体（警告）
@@ -145,7 +145,7 @@ def draw(fig):                           # 在 fig 上画；fig.t("中文", "Eng
 | 现象 | 处理 |
 | --- | --- |
 | `text '…' runs past the right edge` | 标签比估计的画布宽：换位置、换短说法或加宽 `SIZE`；英文常比中文长 |
-| `is stale: its script draws something else` | 改了脚本没有重新生成：`./tbook fig build --book <book>` 后提交 SVG |
+| `is stale: its script draws something else` | 改了脚本没有重新生成：`./tbook fig build --book <book>` 后提交脚本，SVG 留在本地 |
 | `no figure books/<book>/figures/<name>.py` | 章节引用的名字不存在；核对拼写，各语言一致 |
 | `figure … has a placeholder caption` | 图注写成一句说明这张图的话 |
 | 手机上分栏的图挤成一行 | 脚本里加 `WRAP = True`，并把所有内容画进各栏 |

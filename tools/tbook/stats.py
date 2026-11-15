@@ -17,7 +17,10 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
     lock = lean.Lock.load() if lock is None else lock
     if exclude is None:
         exclude = tuple(book.raw.get("statistics", {}).get("exclude", []))
-    ed = model.load_edition(book.editions[0])
+    edition = book.editions[0]
+    templates = book.raw.get("statistics", {}).get("templates", {})
+    sources = {name: book.dir / template.format(lang=edition.lang) for name, template in templates.items()}
+    ed = model.load_edition(edition, sources=sources)
     errors = [i.format() for i in ed.issues if i.severity == "error"]
     if errors:
         raise config.ConfigError("\n".join(errors))

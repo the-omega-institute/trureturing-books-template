@@ -227,7 +227,7 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
     seen.add(v.id);
     if (!ID_RE.test(v.id || '')) continue;
     const dir = path.join(vdir, v.id), page = path.join(dir, 'index.html');
-    if (on('thumbs') && live && nonEmpty(v.thumbnail) && !fs.existsSync(path.join(vdir, v.thumbnail))) {
+    if (on('thumbs') && live && nonEmpty(v.thumbnail) && v.thumbnail !== `${v.id}/thumb.jpg` && !fs.existsSync(path.join(vdir, v.thumbnail))) {
       err(path.join(vdir, v.thumbnail), `${at}: thumbnail does not exist (run node tools/node/viz-thumbs.mjs ${book.slug} ${v.id})`);
     }
     if (on('tests') && live && !fs.existsSync(path.join(vdir, 'tests', `${v.id}.test.mjs`))) {

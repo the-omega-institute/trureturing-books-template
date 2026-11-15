@@ -249,6 +249,10 @@ runs:
         path: .cache/film/models
         key: ${{ steps.film-models-cache.outputs.cache-primary-key }}
 
+    - name: Generate theme tokens
+      shell: bash
+      run: PYTHONPATH=tools python -c 'from tbook import theme; theme.write()'
+
     - name: Toolchain versions
       shell: bash
       run: |

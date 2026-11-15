@@ -15,7 +15,7 @@
 
 ```
 site.toml                 站点配置（下游所有）
-trureturing.lock.json     所钉的 trureturing 提交与已解析的声明（由 ./tbook pin 生成，提交入库）
+trureturing.lock.json     所钉的 trureturing 提交与已解析的声明（由 ./tbook pin 生成，本地使用、不提交）
 template.toml             模板版本与托管路径（模板所有）
 template-manifest.json    托管文件清单与 sha256（模板发布时生成，用于检测下游本地改动）
 tbook                     CLI 入口（bash → python3 -m tbook）
@@ -23,7 +23,7 @@ books/<slug>/
   book.toml               书的元数据、语言版本、输出开关
   <lang>/SUMMARY.md       每个语言版本一个目录，mdBook SUMMARY 格式
   <lang>/*.md             章节；各版本文件名相同
-  figures/<name>.py       静态图脚本（tbook.figkit）；figures/<name>.<lang>.svg 是它生成并提交的图
+  figures/<name>.py       静态图脚本（tbook.figkit）；figures/<name>.<lang>.svg 是它生成的本地图
   assets/                 各语言共享的图片等（章节中写 ../assets/x.svg）
   viz/<id>/               交互可视化（trureturing-visualize 方案）
   viz/visualizations.json 本书可视化注册表
@@ -143,7 +143,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 :::
 ```
 
-- 静态图（`tbook.figure`，`skills/book-figure`）：`src` 是图名，对应脚本 `books/<slug>/figures/<name>.py`。脚本定义 `SIZE`、`ALT`（每种语言一条给看不见图的读者的描述）与 `draw(fig)`，用 `tbook.figkit` 画，只写颜色角色（`figkit.ROLES` 把角色对到 `theme/tokens.json` 两套配色里同名的令牌，`ALIASES` 是语义名）。`./tbook fig build` 对每个语言版本运行脚本，写出规范 SVG `figures/<name>.<lang>.svg`（提交入库）：形状用角色类 `ts-<角色>`（描边）、`tf-<角色>`（填充），样式表里是浅色配色，`prefers-color-scheme: dark` 时为深色配色（文件单独打开或在 GitHub 上预览时用）。各端都不直接显示这个文件：
+- 静态图（`tbook.figure`，`skills/book-figure`）：`src` 是图名，对应脚本 `books/<slug>/figures/<name>.py`。脚本定义 `SIZE`、`ALT`（每种语言一条给看不见图的读者的描述）与 `draw(fig)`，用 `tbook.figkit` 画，只写颜色角色（`figkit.ROLES` 把角色对到 `theme/tokens.json` 两套配色里同名的令牌，`ALIASES` 是语义名）。`./tbook fig build` 对每个语言版本运行脚本，写出规范 SVG `figures/<name>.<lang>.svg`（不提交）：形状用角色类 `ts-<角色>`（描边）、`tf-<角色>`（填充），样式表里是浅色配色，`prefers-color-scheme: dark` 时为深色配色（文件单独打开或在 GitHub 上预览时用）。各端都不直接显示这个文件：
   - mdBook：`figure.inline_html()` 去掉样式表与固定尺寸，把图内联进 `<figure class="tr-media tr-figure">`；`tr/tr-figure.css`（`figure.mdbook_css()`，构建时生成）让角色类取页面的 `--tr-*` 令牌，所以图随主题切换、随浏览器打印变成浅色。内联的 SVG 中没有空行（空行会结束 Markdown 的 HTML 块）。脚本写 `WRAP = True` 时各栏（`fig.row()` / `fig.panel()`，规范文件里是嵌套的 `<svg class="tr-fig-panel">`）各成一个 `<svg>`，放在弹性盒里：宽度不小于 700 像素时同一行的各栏并排（一起缩放），否则叠放；各栏排成几行时每行各成一个弹性盒（外层 `tr-fig-rows`），宽屏上行还是行，手机上逐栏叠放。图注是块后的 Markdown，写在 `<figcaption class="tr-media-caption">` 中。
   - Pandoc（PDF/EPUB）：`figure.materialize()` 把一套配色写进样式表，经 `RenderContext.book_texts`（书目录下的相对路径 → 内容）由 `pandoc.stage()` 写到 `_book/figures/`：`<name>.<lang>.svg`（浅色，加不透明底，EPUB 用）、`.print.svg`（浅色）、`.screen.svg`（深色）。块输出为 `::: {.tr-media .tr-figure}`，其中的图片带 `tr-fig=1` 与按自然宽度算出的 `width`（760 单位对应版心宽度）；`tr-book.lua` 在 Typst 输出中把它换成 `image("<…不带扩展名>" + tr-fig-ext, …)`，`theme/typst/book.typ` 的 `tr-fig-ext` 按变体取 `.screen.svg` 或 `.print.svg`，`tr-media(kind: "figure")` 不画面板，只排图与图注。
   - 画图库强制的标准（`figkit.FigureError`）：字号 ≥ 12、线宽 ≥ 1、文字不出画布（按估计的字宽）、角色名已知、宽度 ≤ 760；坐标保留两位小数，输出可复现。
@@ -171,7 +171,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 4. 交叉引用 `[@id]`（正文与环境标题中）指向本版本存在的编号环境。
 5. 多语言对齐：各版本章节文件与顺序相同；每章环境序列（种类、id、Lean 引用、证据状态、证明关联与来源字段）与媒体序列逐条相同；SUMMARY 结构（前言/编号/附录章节、嵌套、草稿条目）一致，使同一章在各语言中编号相同。
 6. Lean：每个被引用的 GID 都在锁文件中；形式结论引用的必须是 `theorem`；在锁定提交上重新读取冻结状态片，名称、种类、模块、`statement_id` 与锁文件一致（防止锁文件过期或被手改）；所钉提交可从 `site.toml` 的 trureturing 分支到达（本地 checkout 用 `git merge-base --is-ancestor`，否则用 GitHub compare API；无法判定时 GitHub Actions 中为错误，本地或 `--offline` 下为警告）；锁文件的 `branch` 与该分支相同，且该分支是分支名而不是 SHA 或 `refs/…`（错误）；未被引用的锁条目（警告；`--book` 时也计入其他书的引用）。
-7. 媒体：`tbook.viz/film/slides/figure.check(book)` 与 `check_ref(book, src)`。静态图：脚本不能运行、提交的 `figures/<name>.<lang>.svg` 与脚本现在画出的不一致或缺失（错误，`./tbook fig build`）；没有脚本的 `figures/*.svg`、没有任何章节引用的图（`check.check_unused_figures`）（警告）；`.figure` 块没有图注，或图注、图片说明（`![…](x.svg)`）只是编号（`figure.caption_problem`，错误）；`assets/` 下没有被任何语言的章节链接、文件名也不出现在本书幻灯片、视频、可视化源文件中的文件（`check.check_unused_assets`，警告）；各语言版本同一章的图片（`![…](…)`）张数不同（`check.check_image_parity`，警告；图片可以是各语言自己的文件，所以只比张数，`.figure` 块则逐条比对）；用图片语法引用、位于 `assets/`、写死颜色（有 `fill`/`stroke`/`stop-color`/`color` 的色值，却既没有 `ts-`/`tf-` 角色类也没有 `prefers-color-scheme`）的 SVG，以及被两种以上语言的章节共用、含 `<text>` 的 SVG（`check.check_drawn_images`，警告；位图不报）；图在手机上的最小标签：取提交的各语言 SVG 中最小的数值 `font-size`（上下标的 `72%` 随所在标签，不另计），乘以 `min(1, 358 / 宽度)`（`WRAP = True` 的分栏图取最宽一栏），低于 10 px（`figure.phone_problem`，默认警告，`[figures] phone_labels` 可升为错误；`./tbook fig build` 同样报出，`./tbook fig list` 列出该值）；两块 `.figure`/`.viz`/`.film`/`.slides` 在同一层只隔着空行或 HTML 注释相邻（`check.check_media_runs`，警告，每一对报在第二块，点名两块的种类、`src`、`preset` 与行号；完整实验室紧跟同一页面的卡时另给隔开的办法）。
+7. 媒体：`tbook.viz/film/slides/figure.check(book)` 与 `check_ref(book, src)`。静态图：脚本不能运行、本地生成的 `figures/<name>.<lang>.svg` 与脚本现在画出的不一致或缺失（错误，`./tbook fig build`）；没有脚本的 `figures/*.svg`、没有任何章节引用的图（`check.check_unused_figures`）（警告）；`.figure` 块没有图注，或图注、图片说明（`![…](x.svg)`）只是编号（`figure.caption_problem`，错误）；`assets/` 下没有被任何语言的章节链接、文件名也不出现在本书幻灯片、视频、可视化源文件中的文件（`check.check_unused_assets`，警告）；各语言版本同一章的图片（`![…](…)`）张数不同（`check.check_image_parity`，警告；图片可以是各语言自己的文件，所以只比张数，`.figure` 块则逐条比对）；用图片语法引用、位于 `assets/`、写死颜色（有 `fill`/`stroke`/`stop-color`/`color` 的色值，却既没有 `ts-`/`tf-` 角色类也没有 `prefers-color-scheme`）的 SVG，以及被两种以上语言的章节共用、含 `<text>` 的 SVG（`check.check_drawn_images`，警告；位图不报）；图在手机上的最小标签：取本地生成的各语言 SVG 中最小的数值 `font-size`（上下标的 `72%` 随所在标签，不另计），乘以 `min(1, 358 / 宽度)`（`WRAP = True` 的分栏图取最宽一栏），低于 10 px（`figure.phone_problem`，默认警告，`[figures] phone_labels` 可升为错误；`./tbook fig build` 同样报出，`./tbook fig list` 列出该值）；两块 `.figure`/`.viz`/`.film`/`.slides` 在同一层只隔着空行或 HTML 注释相邻（`check.check_media_runs`，警告，每一对报在第二块，点名两块的种类、`src`、`preset` 与行号；完整实验室紧跟同一页面的卡时另给隔开的办法）。
 8. 主题：`theme/generated/*` 与 `tokens.json` 同步（`./tbook theme --check`）；幻灯片的打印背景图 `theme/slides/styles/backdrop.jpg` 与 `backdrop.css`、`tokens.css` 同步（`./tbook theme --check` 与 `slides-check` 核对指纹）。
 9. 缓存：`.cache/` 下的文件不得提交入库，`.cache` 本身（例如符号链接）也不得提交（错误；缓存只在本地可信；`git ls-files` 查询字面路径 `.cache`，不解析符号链接）。
 
@@ -227,14 +227,15 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 | `html` | `<slug>/<lang>` | `build/html/<slug>/<lang>/` |
 | `pdf` | `<slug>/<lang>/<variant>` | `build/dist/<slug>/` 下该语言版本、该变体的 PDF |
 | `epub` | `<slug>/<lang>` | `build/dist/<slug>/` 下该语言版本的 EPUB |
+| `viz-stills` | `<slug>/<viz id>` | 本地封面、引用卡静帧与清单 |
 | `slides` | `<slug>` | `build/slides/<slug>/`（全部 deck、语言与 PDF） |
 | `films` | `<slug>/<film id>` | `build/films/<slug>/<film id>/`（单元由 `film.units(site, book)` 给出） |
 
 **键**是单元全部输入（`Inputs`）的 SHA-256，再并入 target 与单元名。输入按“标签 + 摘要”逐项计入：
 
 - 文件：仓库是 git 工作树时，取所列目录下 git 会提交的文件（已跟踪的，以及未跟踪且未被忽略的），构建产物与被忽略的文件不计入；git 整体忽略的目录（如 `.cache/fonts/`）与仓库外的目录逐个文件计入。仓库外的文件记为 `<outside>/<目录名>/<相对路径>`，键与目录所在位置无关。不是 git 工作树时遍历目录，跳过 `build/`、`_site/`、`.cache/`、`node_modules/`、`out/`、`frames/`、`tts/` 等。
-- HTML、PDF、EPUB：`tools/tbook/`、`tools/filters/`、`tools/node/`、`theme/`（不含只供视频用的 `theme/film/`）、`i18n/`、`site.toml`、锁文件、`requirements.txt`、`package-lock.json`，整个书目录 `books/<slug>/`（各语言版本互相引用，改动任一语言都会重建这本书的全部单元），站点地址与仓库、Python 主次版本、Node 主版本。HTML 另计 mdBook 的精确版本；PDF 与 EPUB 另计 Pandoc 与 `typst` 模块的版本系列、`.cache/fonts/` 的字体文件、Typst 找到的字体族（含系统字体，所以构建 PDF/EPUB 的工作流都装同一套字体：`.github/actions/setup` 的 `fonts: 'true'` 包含 Playwright `--with-deps` 会装的字体）与 `$SOURCE_DATE_EPOCH`；EPUB 还计 epubcheck 是否真能运行（`$TBOOK_EPUBCHECK`，以及缺 Java 或 epubcheck 包时记为跳过），未经检查存下的 EPUB 不会恢复到要求检查的构建中。`.cache/fonts-fontsource/` 由构建从 `@fontsource` 包派生，不计入。
-- 幻灯片：书的 `book.toml`、`slides/`、`assets/`，`theme/slides/`、`theme/generated/`、`theme/i18n/`、`i18n/`、`tools/node/`、`tools/tbook/slides.py`、锁文件、`site.toml`、`package-lock.json`，站点基路径与地址，`TBOOK_SLIDES_NO_PDF`、`TBOOK_SLIDES_NO_CHECK`，Node 主版本（Chromium 由 `package-lock.json` 中的 Playwright 决定）。
+- HTML、PDF、EPUB：`tools/tbook/`、`tools/filters/`、`tools/node/`、`tools/figkit/`、`theme/`（不含只供视频用的 `theme/film/`）、`i18n/`、`site.toml`、锁文件、`requirements.txt`、`package-lock.json`，整个书目录 `books/<slug>/`（各语言版本互相引用，改动任一语言都会重建这本书的全部单元），站点地址与仓库、Python 主次版本、Node 主版本。HTML 另计 mdBook 的精确版本；PDF 与 EPUB 另计 Pandoc 与 `typst` 模块的版本系列、`.cache/fonts/` 的字体文件、Typst 找到的字体族（含系统字体，所以构建 PDF/EPUB 的工作流都装同一套字体：`.github/actions/setup` 的 `fonts: 'true'` 包含 Playwright `--with-deps` 会装的字体）与 `$SOURCE_DATE_EPOCH`；EPUB 还计 epubcheck 是否真能运行（`$TBOOK_EPUBCHECK`，以及缺 Java 或 epubcheck 包时记为跳过），未经检查存下的 EPUB 不会恢复到要求检查的构建中。`.cache/fonts-fontsource/` 由构建从 `@fontsource` 包派生，不计入。
+- 幻灯片：整个书目录（包括绘图脚本及其数据源），`tools/figkit/`、`theme/tokens.json`、`theme/slides/`、`theme/generated/`、`theme/i18n/`、`i18n/`、`tools/node/`、`tools/tbook/slides.py`、锁文件、`site.toml`、`package-lock.json`，站点基路径与地址，`TBOOK_SLIDES_NO_PDF`、`TBOOK_SLIDES_NO_CHECK`，Node 主版本（Chromium 由 `package-lock.json` 中的 Playwright 决定）。
 
 工具只按**版本系列**计入（`buildcache.series`：Node 取主版本，Pandoc 与 Typst 取“主.次”，如 Pandoc `3.1`；Chromium 由 `package-lock.json` 中的 Playwright 决定，不单独计入）。决定产物的版本已钉在键覆盖的文件中（`requirements.txt` 钉 Pandoc 与 Typst，`package-lock.json` 钉 Playwright、Slidev 与字体，`theme/film/requirements.txt`）；若这些工具计入精确版本，键就随运行器镜像而变，Node 的一个补丁版本或 Ubuntu 的 ffmpeg 修订就会让全部条目与已发布的 Release 失效。mdBook 例外：各处都装同一个精确版本（`.github/actions/setup` 钉 0.5.4），按精确版本计入，升级它即重建 HTML。
 

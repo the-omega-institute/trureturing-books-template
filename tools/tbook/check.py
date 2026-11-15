@@ -100,7 +100,7 @@ def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
                     problem = mod.check_ref(model.edition.book, env.attrs.get("src"))
                     if not problem and env.kind == "viz" and "preset" in env.attrs.kv:
                         # a cited experiment card: it must exist, and so must its still for this edition
-                        problem = mod.check_preset(model.edition.book, env.attrs.get("src"), env.attrs.get("preset"), model.lang)
+                        problem = mod.check_preset(model.edition.book, env.attrs.get("src"), env.attrs.get("preset"))
                 except Exception as exc:  # noqa: BLE001 - surface any media checker failure
                     problem = f"cannot check {env.kind} src: {exc}"
                 if problem:
@@ -634,6 +634,8 @@ def check_theme(issues: list[Issue]) -> None:
 
 
 def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
+    from . import theme
+    theme.write()
     site = config.load_site()
     issues: list[Issue] = []
     for lang in site.languages:
@@ -652,7 +654,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         from . import derived
 
         try:
-            derived.refresh(book, check=True)
+            derived.refresh(book)
         except config.ConfigError as exc:
             _err(issues, book.dir / "book.toml", 0, str(exc))
         for lang in book.languages:
@@ -661,6 +663,10 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
                      f"edition {lang!r} has no i18n table: add i18n/{lang}.toml (copy theme/i18n/en.toml)")
             if lang not in site.languages:
                 _warn(issues, book.dir / "book.toml", 0, f"edition {lang!r} is not in site.toml languages")
+        from . import figure
+        _changed, figure_errors = figure.build(book)
+        for message in figure_errors:
+            _err(issues, book.dir / "figures", 0, message)
         models = load_book_models(book)
         models_by_book[book.slug] = models
         for model in models.values():

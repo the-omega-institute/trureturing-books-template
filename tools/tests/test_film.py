@@ -1170,6 +1170,15 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(tok["sem"]["now"], tokens["film"]["gold"])
         self.assertEqual(tok["font"]["film-display"][0], "Orbitron")
 
+    def test_standalone_film_restores_missing_palette_from_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            generated = Path(tmp)
+            with mock.patch.object(paths, "GENERATED", generated), \
+                    mock.patch.object(self.build, "TOKENS_MJS", generated / "tokens.mjs"):
+                result = self.build.film_tokens()
+                self.assertTrue((generated / "tokens.mjs").is_file())
+                self.assertEqual(result["film"], json.loads(paths.TOKENS.read_text())["film"])
+
     def test_unicode_ranges(self):
         self.assertEqual(self.build._ranges("U+0000-00FF, U+0131,U+4??"), [(0, 255), (0x131, 0x131), (0x400, 0x4FF)])
 

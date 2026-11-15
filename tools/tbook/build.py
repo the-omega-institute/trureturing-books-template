@@ -73,13 +73,13 @@ def _cached(make_unit, build_fn, out: Path) -> Path:
 
 
 def _figures(book: config.Book) -> None:
-    """Draw the book's figures (``./tbook fig build``): the editions show the committed files, which
+    """Draw the book's figures (``./tbook fig build``): the editions show the generated files, which
     must be what the scripts draw now."""
     from . import figure
 
     changed, errors = figure.build(book)
     for p in changed:
-        print(f"  figure redrawn: {paths.rel(p)} (commit it)", flush=True)
+        print(f"  figure redrawn: {paths.rel(p)}", flush=True)
     if errors:
         raise RuntimeError("; ".join(errors))
 
@@ -104,6 +104,8 @@ def build(targets: list[str], books: list[config.Book], langs: list[str] | None 
           *, pdf_variants: list[str] | None = None, films: list[str] | None = None) -> BuildResult:
     """Build ``targets`` of ``books``. ``films`` (``--film``, with the target ``films`` only): render or restore
     these films; the other films of the books are only restored from the build cache (:func:`tbook.film.only`)."""
+    from . import theme
+    theme.write()
     check_films(targets, books, films)
     unknown = [lang for lang in langs or [] if not any(lang in book.languages for book in books)]
     if unknown:
@@ -121,11 +123,15 @@ def build(targets: list[str], books: list[config.Book], langs: list[str] | None 
     if "all" in want:
         want = set(TARGETS)
     for book in books:
-        if want & {"html", "pdf", "epub"}:
+        if want & {"html", "pdf", "epub", "slides"}:
             from . import figure
 
             if figure.names(book):
                 _timed(f"figures {book.slug}", lambda b=book: _figures(b), result)
+        if want & {"pdf", "epub", "site", "viz"}:
+            _timed(f"visualization images {book.slug}", lambda b=book: derived.images(b), result)
+        if result.failures:
+            continue
         models = load_book_models(book) if want & {"html", "pdf", "epub"} else {}
         for ed in book.editions:
             if langs and ed.lang not in langs:

@@ -3,8 +3,8 @@
 //   node tools/node/viz-thumbs.mjs                          every registered entry of every book
 //   node tools/node/viz-thumbs.mjs example-monograph        every entry of one book (slug or directory)
 //   node tools/node/viz-thumbs.mjs example-monograph golden-carry [more ids]
-// --check checks committed hashes without a browser; --force captures all selected images again.
-// Two kinds of image are written into books/<slug>/viz/<id>/ (commit them):
+// --check checks local hashes without a browser; --force captures all selected images again.
+// Two kinds of image are written into books/<slug>/viz/<id>/ (git-ignored build outputs):
 //   thumb.jpg                 the wordless 1280×720 cover for the hub, the landing page and uncited embeds
 //   fig-<card>.<lang>.jpg     the labelled still (1600×900) of every experiment card that a chapter cites with
 //                             `::: {.viz src="<id>" preset="<card>"}`, one per language edition citing it; PDF and
@@ -20,7 +20,7 @@
 // Adapted from trureturing-visualize/scripts/thumbs.mjs (Apache-2.0, the-omega-institute).
 import path from 'node:path';
 import fs from 'node:fs';
-import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel, citedCards } from './viz-common.mjs';
+import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel, citedCards, vizCitationIndex } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
 import { routeLocalFonts, STILL, stillQuery, prepareStill } from './viz-testkit.mjs';
 
@@ -29,8 +29,8 @@ export const WIDTH = 1280, HEIGHT = 720;
 export { STILL, citedCards };
 import { digest, writeChanged, inputKey, readManifest, fresh } from './viz-still-cache.mjs';
 
-const force = process.argv.includes('--force'), check = process.argv.includes('--check');
-const args = process.argv.slice(2).filter((a) => !['--force', '--check'].includes(a));
+const force = process.argv.includes('--force'), check = process.argv.includes('--check'), plan = process.argv.includes('--plan');
+const args = process.argv.slice(2).filter((a) => !['--force', '--check', '--plan'].includes(a));
 if (force && check) { console.error('--force and --check cannot be combined'); process.exit(2); }
 let books = listBooks(), ids = [];
 if (args.length) {
@@ -49,24 +49,36 @@ if (!jobs.length) { console.error(`no matching registry entries${ids.length ? ` 
 
 // Plan before loading Chromium: an unchanged run does no browser work.
 let stale = 0;
+const citations = new Map();
 for (const job of jobs) {
   const { book, v } = job;
   job.dir = path.join(book.dir, 'viz', v.id);
   job.key = inputKey(book, v);
   job.manifest = readManifest(job.dir);
   job.cover = path.join(book.dir, 'viz', v.thumbnail || `${v.id}/thumb.jpg`);
-  job.cited = citedCards(book, v.id);
+  if (!citations.has(book.dir)) citations.set(book.dir, vizCitationIndex(book));
+  job.cited = citedCards(book, v.id, citations.get(book.dir).get(v.id) || []);
   job.outputs = [{ name: 'cover', file: job.cover }, ...job.cited.map(({ preset, lang }) => ({
     name: `fig-${preset}.${lang}.jpg`, file: path.join(job.dir, `fig-${preset}.${lang}.jpg`)
   }))];
   job.pending = new Set(job.outputs.filter(({ name, file }) => force || !fresh(job.manifest.images[name], job.key, file)).map(({ name }) => name));
   const keep = new Set(job.outputs.map(({ file }) => path.basename(file)));
   job.obsolete = fs.readdirSync(job.dir).filter((n) => /^fig-.*\.jpg$/.test(n) && !keep.has(n));
+  if (plan) continue;
   if (job.pending.size || job.obsolete.length) {
     stale++;
     if (check) console.error(`${book.slug}/${v.id}: stale (${job.pending.size} image(s), ${job.obsolete.length} obsolete); run node tools/node/viz-thumbs.mjs ${book.slug} ${v.id}`);
   } else console.log(`${book.slug}/${v.id}: up to date (${job.outputs.length} images; no browser)`);
 }
+if (plan) {
+  const payload = JSON.stringify(jobs.map((job) => ({
+    id: job.v.id, key: job.key, outputs: [...job.outputs.map(({ file }) => path.relative(bookRoot(job), file)),
+      path.relative(bookRoot(job), path.join(job.dir, '.stills.json'))]
+  }))) + '\n';
+  await new Promise((resolve, reject) => process.stdout.write(payload, (error) => error ? reject(error) : resolve()));
+  process.exit(0);
+}
+function bookRoot(job) { return path.resolve(job.book.dir, '..', '..'); }
 if (check || !stale) process.exit(stale && check ? 1 : 0);
 const chromium = await loadChromium();
 const { server, origin } = await startServer(0);

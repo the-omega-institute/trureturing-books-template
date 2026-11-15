@@ -1055,7 +1055,9 @@ class BuildIntegrationTests(unittest.TestCase):
         first, t_first = build()
         self.assertNotIn("up to date", first)
         built = outputs()
-        units = 10  # zh and en: HTML, screen/print/academic PDF, EPUB
+        captures = sum(v.get("status") == "live" for registry in root.glob("books/*/viz/visualizations.json")
+                       for v in json.loads(registry.read_text())["visualizations"])
+        units = 10 + captures  # zh/en exports, plus each independently cached visualization capture
         self.assertEqual(len([k for k in built if k.startswith("dist/") and k.count("/") == 2]), 8, built.keys())
 
         for lang in ("zh", "en"):

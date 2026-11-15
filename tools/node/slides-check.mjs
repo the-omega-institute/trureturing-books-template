@@ -33,7 +33,7 @@ import {
   DECK_RE, GID_RE, PRIMARY_FILE, ROOT, argParser, bcp47, booksWithDecks, citations, deckLangs, deckNames, editionFile,
   loadLock, primaryLang, readEdition, stripCode, themeRef, toPosix,
 } from './slides-lib.mjs';
-import { backdropState } from './slides-backdrop.mjs';
+import { backdropState, BACKDROP_IMG } from './slides-backdrop.mjs';
 
 const cli = argParser(process.argv.slice(2));
 const bookSlugs = cli.all('--book');
@@ -48,7 +48,7 @@ const ABS_LINK = [
 ];
 
 const backdrop = backdropState();
-if (!backdrop.fresh) fail(backdrop.message);
+if (backdrop.problems.length || (!backdrop.fresh && existsSync(BACKDROP_IMG))) fail(backdrop.message);
 
 // An unknown or hidden (site.toml [books].hide) --book is a usage error.
 function selectBooks() {

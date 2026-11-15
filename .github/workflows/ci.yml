@@ -140,6 +140,9 @@ jobs:
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
         run: python tools/ci/run.py structure --plan-file "$RUNNER_TEMP/ci-plan.json"
 
+      - name: Generated publication files stay out of Git
+        run: ./tbook artifacts check
+
       - name: Theme tokens are up to date
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.theme
         run: ./tbook theme --check
@@ -270,6 +273,7 @@ jobs:
       - name: Set up the toolchain
         uses: ./.github/actions/setup
         with:
+          browsers: ${{ matrix.target != 'html' }}
           fonts: 'true'
           mdbook: 'true'
 

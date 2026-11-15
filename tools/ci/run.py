@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tbook import academic, build, buildcache, config, paths, slides  # noqa: E402
+from tbook import academic, build, buildcache, config, derived, paths, slides, theme  # noqa: E402
 from ci import testing  # noqa: E402
 
 
@@ -26,6 +26,9 @@ def selected_slides(items):
         names = [x.split("/")[1] for x in items if x.split("/")[0] == slug]
         if not names:
             continue
+        theme.write()
+        derived.refresh(book)
+        build._figures(book)
         out = build.slides_dir(slug)
         unit = buildcache.slides_unit(site, book, out)
         if set(names) == set(slides.deck_names(book)):
