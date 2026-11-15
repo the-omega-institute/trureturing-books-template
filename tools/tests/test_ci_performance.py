@@ -1079,11 +1079,15 @@ class SelectedSlidesTest(unittest.TestCase):
                 mock.patch.object(runner.slides, "deck_names", return_value=["a", "b"]), \
                 mock.patch.object(runner.slides, "base_path", return_value="/books/"), \
                 mock.patch.object(runner.slides, "_node", return_value="node"), \
+                mock.patch.object(runner.theme, "write"), \
+                mock.patch.object(runner.derived, "refresh"), \
+                mock.patch.object(runner.build, "_figures") as figures, \
                 mock.patch.object(runner.buildcache, "slides_unit", return_value=unit), \
                 mock.patch.object(runner.buildcache, "run", return_value="missing") as cache, \
                 mock.patch.object(runner, "run") as execute, \
                 mock.patch.object(runner.slides, "build") as whole:
             runner.selected_slides(["book/a"])
+            figures.assert_called_once_with(book)
             cache.assert_called_once_with(unit, None, repo="owner/books")
             command = execute.call_args.args[0]
             self.assertEqual(command[command.index("--deck") + 1:], ["a"])

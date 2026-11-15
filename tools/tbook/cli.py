@@ -145,13 +145,17 @@ def cmd_requests(args) -> int:
 def cmd_cache(args) -> int:
     """./tbook cache status|key|prune|export: the build cache (tools/tbook/buildcache.py,
     docs/ARCHITECTURE.md)."""
-    from . import buildcache
+    from . import buildcache, derived, theme
+    theme.write()
 
     if args.cache_cmd == "key":
         print(buildcache.actions_key())
         return 0
     site = config.load_site()
-    current = buildcache.units(site, _books(args))
+    books = _books(args)
+    for book in books:
+        derived.refresh(book)
+    current = buildcache.units(site, books)
     if args.cache_cmd == "status":
         for unit in current:
             key = unit.key

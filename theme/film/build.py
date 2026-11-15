@@ -47,7 +47,9 @@ FACE_RE = re.compile(r"@font-face\s*\{(?P<body>[^}]*)\}", re.S)
 
 
 def film_tokens() -> dict:
-    """{film, font, sem} from theme/generated/tokens.mjs (the generated, checked-in source of truth)."""
+    """{film, font, sem} from the palette generated from theme/tokens.json."""
+    from tbook import theme
+    theme.write()
     try:
         text = TOKENS_MJS.read_text(encoding="utf-8")
     except OSError as exc:
