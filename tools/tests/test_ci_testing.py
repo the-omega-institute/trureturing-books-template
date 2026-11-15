@@ -148,6 +148,13 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selected["films"], [])
         self.assertEqual(selected["exports"], [])
 
+    def test_local_runner_regressions_follow_the_node_entrypoint(self):
+        self.write("tools/tests/test_ci_testing.py", "import unittest\n"
+                   "class LocalVizRunnerTests(unittest.TestCase):\n def test_runner(self): pass\n")
+        head, old = self.views()
+        selected = testing.select(head, old, ["tools/node/viz-test.mjs"])
+        self.assertIn("test_ci_testing.LocalVizRunnerTests", selected["unit_tests"])
+
     def test_site_browser_regression_is_separate_from_unrelated_python_imports(self):
         self.write("tools/tests/test_site.py", "import unittest\nfrom tbook import cli\n"
                    "class BrowserLayoutTest(unittest.TestCase):\n def test_layout(self): pass\n")
