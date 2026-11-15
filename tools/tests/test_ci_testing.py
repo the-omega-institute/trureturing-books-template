@@ -250,6 +250,26 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 testing.run_tests(["test_export_layout.EpubLayoutTest"], required=True)
 
+    def test_canonical_cache_browser_fixture_requires_a_visible_book(self):
+        self.write("tools/tests/test_buildcache.py", "import unittest\n"
+                   "class BuildIntegrationTests(unittest.TestCase):\n def test_build(self): pass\n")
+        self.write("books/example-monograph/book.toml", '[book]\neditions=["en"]\n')
+        ident = "test_buildcache.BuildIntegrationTests"
+        head, old = self.views()
+        self.assertIn(ident, testing.select(head, old, ["tools/tbook/build.py"])["browser_tests"])
+        for hidden in ('[books]\nhide=["example-*"]\n', '[books]\nhide=["example-monograph"]\n'):
+            self.write("site.toml", hidden)
+            head, old = self.views()
+            for full in (False, True):
+                self.assertNotIn(ident, testing.select(head, old, ["tools/tbook/build.py"], full=full)["browser_tests"])
+        self.write("site.toml", '[site]\nrepo="owner/books"\n')
+        head, old = self.views()
+        self.assertIn(ident, testing.select(head, old, ["site.toml"])["browser_tests"])
+        (self.root / "books/example-monograph/book.toml").unlink()
+        head, old = self.views()
+        self.assertNotIn(ident, testing.select(head, old, ["tools/tbook/build.py"], full=True)["browser_tests"])
+        self.assertTrue(testing.browser_applicable(head, "test_viz.StageViewGate"))
+
     def test_missing_artifact_uses_a_successful_tree_and_preserves_pending_source_changes(self):
         self.write("books/one/viz/a/model.js", "export const n=2;\n")
         self.commit()

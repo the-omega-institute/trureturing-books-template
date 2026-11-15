@@ -29,7 +29,7 @@ EXTRA = {
 }
 BROWSER = {
     "test_slides.PrintBackdropTest": ["tools/node/slides*", "theme/slides/**", "theme/tokens.json"],
-    "test_buildcache.BuildIntegrationTests": ["tools/tbook/build.py", "tools/tbook/buildcache.py", "tools/tbook/derived.py",
+    "test_buildcache.BuildIntegrationTests": ["site.toml", "tools/tbook/build.py", "tools/tbook/buildcache.py", "tools/tbook/derived.py",
         "tools/node/viz*", "theme/**", "books/example-monograph/**"],
     "test_site.BrowserLayoutTest": ["tools/tbook/site.py", "tools/tbook/html.py", "tools/tbook/mathrender.py",
                                     "theme/mdbook/**", "theme/site/**", "theme/tokens.json", "theme/generated/**"],
@@ -49,6 +49,8 @@ BROWSER = {
                                           "tools/tests/figure-shots.mjs"],
 }
 GLOBAL = ("requirements.txt", "package.json", "package-lock.json")
+# This export/cache fixture builds the canonical book, unlike the private browser fixtures.
+BROWSER_BOOKS = {"test_buildcache.BuildIntegrationTests": "example-monograph"}
 RESOURCE_INPUTS = {
     "tools/tbook/pandoc.py": ["tools/filters/**", "theme/typst/**", "theme/epub/**"],
     "tools/tbook/html.py": ["theme/mdbook/**"],
@@ -91,6 +93,16 @@ def python_inputs(tree, source):
     return seen
 
 
+def browser_applicable(tree, ident):
+    slug = BROWSER_BOOKS.get(ident)
+    if not slug:
+        return True
+    hide = tree.toml("site.toml").get("books", {}).get("hide", [])
+    if not isinstance(hide, list) or not all(isinstance(x, str) and x for x in hide):
+        raise ValueError("site.toml: invalid books.hide")
+    return f"books/{slug}/book.toml" in tree.files and not any(fnmatch.fnmatchcase(slug, pat) for pat in hide)
+
+
 def select(tree, previous, changed, *, full=False):
     tests = sorted(p for p in tree.files if p.startswith("tools/tests/test_") and p.endswith(".py"))
     ordinary, browser = [], []
@@ -121,6 +133,8 @@ def select(tree, previous, changed, *, full=False):
                 continue
             ident = module + "." + cls.name
             if ident in BROWSER:
+                if not browser_applicable(tree, ident):
+                    continue
                 helpers = {p for p in sources if p.startswith("tools/tests/")}
                 if full or bool(set(changed) & helpers) or any(fnmatch.fnmatchcase(p, pat)
                         for p in changed for pat in (*GLOBAL, "tools/tbook/doctor.py", "tools/tbook/paths.py",
