@@ -141,6 +141,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selected["browser_tests"], ["test_export_layout.EpubLayoutTest"])
 
     def test_toolchain_image_workflow_edit_has_no_unrelated_browser_consumers(self):
+        self.write(".github/workflows/toolchain-image.yml", "name: Toolchain image\n")
         head, old = self.views()
         selected = planner.impact(head, old, [".github/workflows/toolchain-image.yml"])
         self.assertEqual(selected["browser_tests"], [])
