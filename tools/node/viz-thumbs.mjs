@@ -3,8 +3,8 @@
 //   node tools/node/viz-thumbs.mjs                          every registered entry of every book
 //   node tools/node/viz-thumbs.mjs example-monograph        every entry of one book (slug or directory)
 //   node tools/node/viz-thumbs.mjs example-monograph golden-carry [more ids]
-// --check checks committed hashes without a browser; --force captures all selected images again.
-// Two kinds of image are written into books/<slug>/viz/<id>/ (commit them):
+// --check checks local hashes without a browser; --force captures all selected images again.
+// Two kinds of image are written into books/<slug>/viz/<id>/ (git-ignored build outputs):
 //   thumb.jpg                 the wordless 1280×720 cover for the hub, the landing page and uncited embeds
 //   fig-<card>.<lang>.jpg     the labelled still (1600×900) of every experiment card that a chapter cites with
 //                             `::: {.viz src="<id>" preset="<card>"}`, one per language edition citing it; PDF and
@@ -29,8 +29,8 @@ export const WIDTH = 1280, HEIGHT = 720;
 export { STILL, citedCards };
 import { digest, writeChanged, inputKey, readManifest, fresh } from './viz-still-cache.mjs';
 
-const force = process.argv.includes('--force'), check = process.argv.includes('--check');
-const args = process.argv.slice(2).filter((a) => !['--force', '--check'].includes(a));
+const force = process.argv.includes('--force'), check = process.argv.includes('--check'), plan = process.argv.includes('--plan');
+const args = process.argv.slice(2).filter((a) => !['--force', '--check', '--plan'].includes(a));
 if (force && check) { console.error('--force and --check cannot be combined'); process.exit(2); }
 let books = listBooks(), ids = [];
 if (args.length) {
@@ -62,11 +62,20 @@ for (const job of jobs) {
   job.pending = new Set(job.outputs.filter(({ name, file }) => force || !fresh(job.manifest.images[name], job.key, file)).map(({ name }) => name));
   const keep = new Set(job.outputs.map(({ file }) => path.basename(file)));
   job.obsolete = fs.readdirSync(job.dir).filter((n) => /^fig-.*\.jpg$/.test(n) && !keep.has(n));
+  if (plan) continue;
   if (job.pending.size || job.obsolete.length) {
     stale++;
     if (check) console.error(`${book.slug}/${v.id}: stale (${job.pending.size} image(s), ${job.obsolete.length} obsolete); run node tools/node/viz-thumbs.mjs ${book.slug} ${v.id}`);
   } else console.log(`${book.slug}/${v.id}: up to date (${job.outputs.length} images; no browser)`);
 }
+if (plan) {
+  console.log(JSON.stringify(jobs.map((job) => ({
+    id: job.v.id, key: job.key, outputs: [...job.outputs.map(({ file }) => path.relative(bookRoot(job), file)),
+      path.relative(bookRoot(job), path.join(job.dir, '.stills.json'))]
+  }))));
+  process.exit(0);
+}
+function bookRoot(job) { return path.resolve(job.book.dir, '..', '..'); }
 if (check || !stale) process.exit(stale && check ? 1 : 0);
 const chromium = await loadChromium();
 const { server, origin } = await startServer(0);

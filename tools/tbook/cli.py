@@ -47,6 +47,8 @@ def cmd_check(args) -> int:
 
 
 def cmd_test(args) -> int:
+    from . import theme
+    theme.write()
     from ci import testing
     return testing.local(args)
 
@@ -182,6 +184,8 @@ def _slides_backdrop(check: bool) -> int:
     there is nothing to do."""
     script = paths.ROOT / "tools" / "node" / "slides-backdrop.mjs"
     if not script.exists() or not (paths.THEME / "slides" / "styles" / "backdrop.css").exists():
+        return 0
+    if check and not (paths.THEME / "slides/styles/backdrop.jpg").is_file():
         return 0
     node = shutil.which("node")
     if not node:
@@ -397,6 +401,12 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--exclude", action="append", default=[], help="generated index chapter to exclude")
     c.add_argument("--json", action="store_true", help="include declarations and citation locations")
     c.set_defaults(fn=cmd_stats)
+
+    c = sub.add_parser("artifacts", help="list, untrack or reject generated publication files in Git")
+    c.add_argument("action", choices=["list", "untrack", "check"])
+    c.add_argument("--book", action="append")
+    from . import artifacts
+    c.set_defaults(fn=artifacts.cli)
 
     c = sub.add_parser("sync", help="refresh configured book-owned derived data and images")
     c.add_argument("--book", action="append")

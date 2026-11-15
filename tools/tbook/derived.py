@@ -27,3 +27,15 @@ def refresh(book: config.Book, *, check: bool = False) -> None:
     except (OSError, subprocess.CalledProcessError) as exc:
         raise config.ConfigError(f"{book.slug}: derived data {'check' if check else 'refresh'} failed: {exc}; "
                                  f"run ./tbook sync --book {book.slug}") from exc
+
+
+def images(book: config.Book, ids: list[str] | None = None) -> None:
+    """Materialize local visualization outputs before PDF/EPUB or site publication."""
+    if not (book.viz_dir / "visualizations.json").is_file():
+        return
+    from . import buildcache
+    for unit in buildcache.viz_units(book, ids):
+        vid = unit.name.split("/", 1)[1]
+        buildcache.run(unit, lambda v=vid: subprocess.run(
+            ["node", str(paths.TOOLS / "node/viz-thumbs.mjs"), book.slug, v], cwd=paths.ROOT,
+            env=dict(os.environ, TBOOK_ROOT=str(paths.ROOT)), check=True))

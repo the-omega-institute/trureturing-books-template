@@ -1,5 +1,8 @@
 # 模板升级 · Upgrading the template
 
+1.0.0 改为源文件入库；升级时取消跟踪派生图片并保留工作区副本，自有生成器与旧分支的迁移见 [源文件与派生产物](SOURCE-ONLY.md)。
+
+
 本书库基于 [trureturing-books-template](https://github.com/the-omega-institute/trureturing-books-template)。模板以语义化版本发布（tag `vX.Y.Z`），下游书库通过 `./tbook template update` 升级。
 
 ## 1. 托管与自有

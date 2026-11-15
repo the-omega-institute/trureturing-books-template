@@ -228,7 +228,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 ./tbook build html site --book <book> && ./tbook serve
 ```
 
-完善 `books/<book>/viz/visualizations.json`（`title_en`、`summary`/`summary_en`、`tags`/`tags_en`、`theory`、`lean`），把 `status` 改为 `live`；新引用了 GID 时先 `./tbook pin --refresh`。改了卡片或引用之后运行 `viz-thumbs.mjs`；它核对输入和成品摘要，只补过期或缺失的图片，无变化时不启动浏览器。`.stills.json` 随图片提交，`--check` 只读检查，`--force` 用于有意重采样。首次建立清单必须实际出图。正文措辞变动不要求重画全部卡；数据驱动页面复用正式统计和本书生成器，不手填总数。`./tbook check` 会核对被引用的卡存在、各语言版本引用一致、静态图齐全。只在相关输入和画面不变且原检查范围适用时复用看图证据；舞台、行为与标签变化仍按前文测试和看图。
+完善 `books/<book>/viz/visualizations.json`（`title_en`、`summary`/`summary_en`、`tags`/`tags_en`、`theory`、`lean`），把 `status` 改为 `live`；新引用了 GID 时先 `./tbook pin --refresh`。改了卡片或引用之后运行 `viz-thumbs.mjs`；它核对输入和成品摘要，只补过期或缺失的图片，无变化时不启动浏览器。`.stills.json` 与图片均为本地构建输出，不提交，`--check` 只读检查，`--force` 用于有意重采样。首次建立清单必须实际出图。正文措辞变动不要求重画全部卡；数据驱动页面复用正式统计和本书生成器，不手填总数。`./tbook check` 会核对被引用的卡存在、各语言版本引用一致；导出构建负责生成所需静态图。只在相关输入和画面不变且原检查范围适用时复用看图证据；舞台、行为与标签变化仍按前文测试和看图。
 
 ## kit 速查（`theme/viz/kit.js`，在 `<head>` 里排在 `shell.js` 之后）
 
@@ -278,7 +278,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 | --- | --- |
 | `check` 报 draft 不能嵌入 | 完成登记表与测试，把状态改为 `live` |
 | `no experiment card data-preset="…"` | 章节引用的卡在页面里不存在；核对卡名，各语言版本一致 |
-| `the still of card "…" for <lang> is missing` | 运行 `node tools/node/viz-thumbs.mjs <book> <id>` 并提交生成的 `fig-*.jpg` |
+| `the still of card "…" for <lang> is missing` | 运行 `node tools/node/viz-thumbs.mjs <book> <id>` 生成本地 `fig-*.jpg`，只提交源文件 |
 | 静态图没有停在想要的画面 | 给那张卡写 `still`，把卡片表交给 `kit.cards({ presets })`，并在 `TRV.still` 时跳到它 |
 | 测试警告 `still: card … plays by itself but declares no still frame` | 同上；声明之后用 `openStill` 核对那一帧的读数与图注一致，再重新出图 |
 | `until(… playing && t > 0)` 在 CI 上偶尔 30 秒超时 | 那张卡的播放很短，测试开始看时已经播完：改用 `playsAfter(page, () => 点卡, () => 读 { playing, t })` |
@@ -300,6 +300,6 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 
 ## 完成标准
 
-一句话与每张卡都能在正文里找到对应的句子；看过全部截图并与参照页面比过；会自己播放的卡都声明了停帧（`stageFirstChecks` 没有 `still:` 警告）；被引用卡的静态图与图注逐张对过，测试里用 `openStill` 核对停帧读数；`stageFirstChecks` 与页面自己的检查全部通过；`viz-validate`、`./tbook check` 通过；登记表为 `live`，封面与被引用卡的静态图已提交；各语言章节的引用一致；受影响的站点与 PDF 构建通过，导出页面的额外视觉排查按 [book-export](../book-export/SKILL.md) 的触发条件执行。
+一句话与每张卡都能在正文里找到对应的句子；看过全部截图并与参照页面比过；会自己播放的卡都声明了停帧（`stageFirstChecks` 没有 `still:` 警告）；被引用卡的静态图与图注逐张对过，测试里用 `openStill` 核对停帧读数；`stageFirstChecks` 与页面自己的检查全部通过；`viz-validate`、`./tbook check` 通过；登记表为 `live`，封面与被引用卡的静态图已在本地验收，提交只含源文件；各语言章节的引用一致；受影响的站点与 PDF 构建通过，导出页面的额外视觉排查按 [book-export](../book-export/SKILL.md) 的触发条件执行。
 
 当前版本来自 `trureturing.lock.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。

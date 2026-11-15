@@ -56,7 +56,7 @@ ENTRY = "entry.json"
 VERSION = "2"  # part of every key: bump it to rebuild everything once
 KEEP = 2  # entries kept per unit in the local store
 REMOTE_RELEASES = 5  # newest published releases with a build-cache.json searched for an entry
-TARGETS = ("html", "pdf", "epub", "slides", "films")
+TARGETS = ("html", "pdf", "epub", "slides", "films", "viz-stills")
 TIMEOUT = 300  # seconds per HTTP request
 MAX_JSON = 32 << 20  # bytes: a release list or build-cache.json larger than this is refused
 MAX_ASSET = 8 << 30  # bytes: upper bound for an asset whose size is not declared
@@ -435,12 +435,34 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
     return Unit("slides", book.slug, inputs, [Path(out_dir)])
 
 
+def viz_units(book: config.Book, ids: list[str] | None = None) -> list[Unit]:
+    registry = book.viz_dir / "visualizations.json"
+    if not registry.is_file():
+        return []
+    entries = json.loads(registry.read_text(encoding="utf-8")).get("visualizations", [])
+    selected = ids if ids is not None else [v["id"] for v in entries if v.get("status") == "live"]
+    if not selected:
+        return []
+    result = subprocess.run(["node", str(paths.TOOLS / "node/viz-thumbs.mjs"), book.slug, *selected, "--plan"],
+                            cwd=paths.ROOT, env=dict(os.environ, TBOOK_ROOT=str(paths.ROOT)),
+                            capture_output=True, text=True, check=True)
+    units = []
+    for item in json.loads(result.stdout):
+        outputs = [paths.ROOT / name for name in item["outputs"]]
+        if any(not p.resolve().is_relative_to(book.viz_dir.resolve()) for p in outputs):
+            raise ValueError("visualization capture output outside the book's viz directory")
+        inputs = Inputs().text("capture", item["key"]).text("outputs", item["outputs"])
+        units.append(Unit("viz-stills", f"{book.slug}/{item['id']}", inputs, outputs))
+    return units
+
+
 def units(site: config.Site, books: Iterable[config.Book]) -> list[Unit]:
     """Every unit of ``books`` that ``./tbook build all`` builds, with its current key."""
     from . import build, film, slides
 
     out: list[Unit] = []
     for book in books:
+        out.extend(viz_units(book))
         for ed in book.editions:
             if book.outputs_html:
                 out.append(html_unit(site, book, ed.lang, build.html_dir(book.slug, ed.lang)))

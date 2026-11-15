@@ -15,6 +15,15 @@ import { spawnSync } from 'node:child_process';
 
 // tools/node/slides-lib.mjs -> repository root (TBOOK_ROOT overrides, as in tools/tbook/paths.py)
 export const ROOT = resolve(process.env.TBOOK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
+// Materialize palette derivatives for direct Node commands after a source-only checkout.
+if (existsSync(join(ROOT, 'theme/tokens.json'))) {
+  const python = process.env.TBOOK_PYTHON || (existsSync(join(ROOT, '.venv/bin/python')) ? join(ROOT, '.venv/bin/python') : 'python3');
+  const toolRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const generated = spawnSync(python, ['-c', 'from tbook import theme; theme.write()'], {
+    cwd: ROOT, env: { ...process.env, TBOOK_ROOT: ROOT, PYTHONPATH: [toolRoot, process.env.PYTHONPATH].filter(Boolean).join(sep === '/' ? ':' : ';') }, encoding: 'utf8'
+  });
+  if (generated.status !== 0) throw new Error(`Cannot generate theme tokens: ${generated.stderr || generated.error}`);
+}
 export const BOOKS = join(ROOT, 'books');
 export const THEME_DIR = join(ROOT, 'theme', 'slides');
 export const TEMPLATES = join(ROOT, 'templates', 'slides');

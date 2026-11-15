@@ -9,7 +9,7 @@ A figure is a script that draws on a :class:`tbook.figkit.Figure` (skills/book-f
     def draw(fig): ...                                 # fig.t("中文", "English") picks the label
 
 ``./tbook fig build`` runs every script once per edition and writes the canonical SVG next to it
-(committed, so that ``./tbook check`` can tell when a script and its output have drifted apart). The
+(git-ignored; checks and builds materialize the outputs before use). The
 canonical file paints by role classes (``ts-cyan``, ``tf-ink`` …) and carries both palettes in its
 style sheet. The builds never show it as it is:
 
@@ -150,7 +150,12 @@ def slide_copies(book, name: str, lang: str) -> list[Path]:
     """Copies of figure ``name`` that ``book``'s slide decks show: ``slides/<deck>/img/<name>.<lang>.svg``.
     The decks are dark, and an SVG in an ``<img>`` follows the viewer's colour scheme rather than the
     page, so a copy holds the screen palette only (:func:`slide_svg`); ``build`` keeps it current."""
-    return sorted((book.dir / "slides").glob(f"*/img/{name}.{lang}.svg"))
+    copies = set((book.dir / "slides").glob(f"*/img/{name}.{lang}.svg"))
+    for source in (book.dir / "slides").glob("*/*"):
+        if source.suffix in {".md", ".tex"} and source.is_file():
+            if f"img/{name}.{lang}.svg" in source.read_text(encoding="utf-8"):
+                copies.add(source.parent / "img" / f"{name}.{lang}.svg")
+    return sorted(copies)
 
 
 def slide_svg(svg: str) -> str:
@@ -236,6 +241,7 @@ def build(book, only: list[str] | None = None, *, check: bool = False) -> tuple[
                 if not dst.is_file() or dst.read_text(encoding="utf-8") != text:
                     changed.append(dst)
                     if not check:
+                        dst.parent.mkdir(parents=True, exist_ok=True)
                         dst.write_text(text, encoding="utf-8")
     return changed, errors
 
@@ -319,7 +325,7 @@ def caption_problem(text: str) -> str | None:
 
 
 def check(book) -> list[Issue]:
-    """Scripts that cannot be drawn or whose committed output is stale (errors); outputs without a
+    """Scripts that cannot be drawn or whose local output is stale (errors); outputs without a
     script (warnings). Figures that no chapter cites are :func:`tbook.check.check_unused_figures`'s."""
     issues: list[Issue] = []
     d = figures_dir(book)
@@ -338,7 +344,7 @@ def check(book) -> list[Issue]:
             what = "is not the screen-palette copy of the figure its script draws now (slide decks are dark)"
         else:
             what = "is stale: its script draws something else" if p.is_file() else "has not been generated"
-        issues.append(Issue("error", p, 0, f"{what} (run ./tbook fig build --book {book.slug} and commit the result)"))
+        issues.append(Issue("error", p, 0, f"{what} (run ./tbook fig build --book {book.slug} ; only commit its source)"))
     langs = {ed.lang for ed in book.editions}
     for p in sorted(d.glob("*.svg")):
         stem, _, lang = p.name[:-4].rpartition(".")

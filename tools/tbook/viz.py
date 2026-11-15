@@ -462,7 +462,7 @@ def _ledger_has(ledger: lean.Ledger | None, lock: lean.Lock | None, path: str) -
     return None if data is None else bool(data)
 
 
-def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | None = None) -> list[Issue]:
+def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | None = None, generated: bool = False) -> list[Issue]:
     """Registry, Lean, page-contract, link, directory, thumbnail and test checks (no Node needed)."""
     issues: list[Issue] = []
     vdir = book.viz_dir
@@ -577,7 +577,7 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
         if not ID_RE.match(vid):
             continue
         vpath = vdir / vid
-        if live and isinstance(thumb, str) and thumb.strip() and not (vdir / thumb).exists():
+        if live and isinstance(thumb, str) and thumb.strip() and (generated or thumb != f"{vid}/thumb.jpg") and not (vdir / thumb).exists():
             err(vdir / thumb, 0, f"{at}: thumbnail does not exist (run node tools/node/viz-thumbs.mjs {book.slug} {vid})")
         if live and not (vdir / "tests" / f"{vid}.test.mjs").exists():
             warn(vdir / "tests", 0, f"{at}: a live visualization should have a browser test tests/{vid}.test.mjs")
@@ -1256,7 +1256,7 @@ def build(site, book, out_dir: Path) -> None:
     if not book.viz_dir.exists():
         return
     lock = _lock()
-    problems = [i for i in check_native(book, lock=lock) if i.severity == "error"]
+    problems = [i for i in check_native(book, lock=lock, generated=True) if i.severity == "error"]
     if problems:
         shown = "\n  ".join(i.format() for i in problems[:12])
         more = f"\n  … and {len(problems) - 12} more" if len(problems) > 12 else ""

@@ -1,6 +1,6 @@
 """``./tbook theme``: derive every renderer's palette from ``theme/tokens.json``.
 
-Outputs (committed, checked by ``./tbook check``):
+Outputs (git-ignored, materialized before checks and builds):
 
 * ``theme/generated/tokens.css`` — CSS custom properties. ``:root`` holds the screen
   (dark neon) palette as ``--tr-*``; ``.tr-paper`` / ``[data-tr-palette=paper]`` swap in

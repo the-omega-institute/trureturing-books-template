@@ -200,7 +200,7 @@ class EditionModel:
         return mdscan.sub_outside_code(mdscan.REF_RE, repl, title)
 
 
-def load_edition(edition: config.Edition) -> EditionModel:
+def load_edition(edition: config.Edition, *, sources: dict[str, Path] | None = None) -> EditionModel:
     issues: list[Issue] = []
     model = EditionModel(edition=edition, summary=None, chapters=[], issues=issues)
     if not edition.summary.exists():
@@ -217,7 +217,11 @@ def load_edition(edition: config.Edition) -> EditionModel:
     for chapter in summary.chapters:
         if chapter.draft:
             continue
-        path = edition.dir / chapter.path
+        path = (sources or {}).get(chapter.path, edition.dir / chapter.path)
+        if not path.exists() and sources is None:
+            template = edition.book.raw.get("statistics", {}).get("templates", {}).get(chapter.path)
+            if template:
+                path = edition.book.dir / template.format(lang=edition.lang)
         if not path.exists():
             issues.append(Issue("error", edition.summary, chapter.line, f"chapter file not found: {chapter.path}"))
             continue

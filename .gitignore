@@ -3,8 +3,8 @@
 /_site/
 /.cache/
 # Toolchains
-/node_modules/
-/.venv/
+/node_modules
+/.venv
 __pycache__/
 *.pyc
 # Media produced by film/slides pipelines (published as release assets, not committed)
@@ -16,7 +16,7 @@ __pycache__/
 /books/*/films/*/models/
 /books/*/films/*/fonts/
 # Slidev writes import-glob proxies into the deck directory
-/books/*/slides/*/node_modules/
+/books/*/slides/*/node_modules
 # Lean deep-verification workspace
 /build/lean-verify/
 .lake/
@@ -26,3 +26,14 @@ __pycache__/
 
 # Temporary git worktrees created by agent tooling
 /.claude/worktrees/
+
+# Reproducible publication assets (sources stay in Git)
+/books/*/figures/*.*.svg
+/books/*/viz/*/thumb.jpg
+/books/*/viz/*/fig-*.jpg
+/books/*/viz/*/.stills.json
+/books/*/viz/*/data.generated.json
+/books/*/data/statistics.json
+/theme/generated/
+/theme/slides/styles/backdrop.jpg
+/theme/slides/styles/backdrop.json
