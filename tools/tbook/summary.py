@@ -7,6 +7,8 @@ chapters after the numbered list, and draft chapters (``- [Title]()``).
 
 Theorem numbering uses the top-level chapter: numbered chapters give ``2.3``,
 prefix chapters give ``0.n`` and suffix chapters (appendices) give ``A.n``, ``B.n``…
+An explicit ``unnumbered`` path-to-prefix map excludes whole list chapter trees
+from chapter counting while retaining their hierarchy and a distinct theorem prefix.
 """
 
 from __future__ import annotations
@@ -42,6 +44,11 @@ class Chapter:
     line: int = 0
     children: list["Chapter"] = field(default_factory=list, repr=False)
     title_md: str = ""  # the link text as written (inline Markdown), for Markdown targets (Pandoc)
+    unnumbered_prefix: str = ""  # explicit exclusion from chapter counting, inherited by descendants
+
+    @property
+    def numbered(self) -> bool:
+        return self.section == "numbered" and not self.unnumbered_prefix
 
     @property
     def draft(self) -> bool:
@@ -77,6 +84,8 @@ def _letters(n: int) -> str:
 def chapter_prefix(summary: Summary, chapter: Chapter) -> str:
     """Prefix used in theorem numbers for every environment inside ``chapter``."""
     top = summary.top_level()[chapter.top]
+    if top.unnumbered_prefix:
+        return top.unnumbered_prefix
     if top.section == "numbered":
         return str(top.number[0])
     if top.section == "prefix":
@@ -85,7 +94,8 @@ def chapter_prefix(summary: Summary, chapter: Chapter) -> str:
     return _letters(suffix_tops.index(top))
 
 
-def parse_summary(path: Path, *, text: str | None = None) -> Summary:
+def parse_summary(path: Path, *, text: str | None = None,
+                  unnumbered: dict[str, str] | None = None) -> Summary:
     if text is None:
         text = path.read_text(encoding="utf-8")
     title = ""
@@ -181,7 +191,28 @@ def parse_summary(path: Path, *, text: str | None = None) -> Summary:
             raise SummaryError(path, ch.line, f"chapter path must stay inside the edition: {ch.path}")
         if ch.path and not ch.path.endswith(".md"):
             raise SummaryError(path, ch.line, f"chapter path must be a .md file: {ch.path}")
-    return Summary(path=path, title=title, chapters=chapters)
+    result = Summary(path=path, title=title, chapters=chapters)
+    if unnumbered:
+        for file in unnumbered:
+            matches = [ch for ch in chapters if ch.path == file]
+            if len(matches) != 1 or matches[0].depth != 0 or matches[0].section != "numbered":
+                raise SummaryError(path, matches[0].line if matches else 0,
+                                   f"numbering.unnumbered path must name one top-level list chapter: {file!r}")
+        removed = 0
+        tops = result.top_level()
+        for ch in chapters:
+            top = tops[ch.top]
+            if ch.depth == 0 and ch.path in unnumbered:
+                removed += 1
+            ch.unnumbered_prefix = unnumbered.get(top.path, "")
+            if ch.unnumbered_prefix:
+                ch.number = ()
+            elif ch.number:
+                ch.number = (ch.number[0] - removed, *ch.number[1:])
+        used = {chapter_prefix(result, ch) for ch in tops if not ch.unnumbered_prefix}
+        if used.intersection(unnumbered.values()):
+            raise SummaryError(path, 0, "numbering.unnumbered theorem prefix collides with another chapter")
+    return result
 
 
 def _unescape(s: str) -> str:

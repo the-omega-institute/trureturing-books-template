@@ -354,6 +354,7 @@ class Book:
     epub: dict[str, Any]
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
     editions: list[Edition] = field(default_factory=list)
+    unnumbered: dict[str, str] = field(default_factory=dict)
 
     def edition(self, lang: str) -> Edition:
         for ed in self.editions:
@@ -426,6 +427,20 @@ def load_book(slug_or_dir: str | Path) -> Book:
     title = localized(meta.get("title"), f"{where} book.title")
     if not title:
         raise ConfigError(f"{where}: book.title is required")
+    numbering = raw.get("numbering", {})
+    if not isinstance(numbering, dict):
+        raise ConfigError(f"{where}: numbering must be a table")
+    unnumbered = numbering.get("unnumbered", {})
+    if not isinstance(unnumbered, dict):
+        raise ConfigError(f"{where}: numbering.unnumbered must map chapter paths to theorem prefixes")
+    for chapter, prefix in unnumbered.items():
+        if (not chapter.endswith(".md") or chapter.startswith("/") or "\\" in chapter
+                or any(p in ("", ".", "..") for p in chapter.split("/"))):
+            raise ConfigError(f"{where}: numbering.unnumbered path must stay inside the edition: {chapter!r}")
+        if not isinstance(prefix, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", prefix):
+            raise ConfigError(f"{where}: numbering.unnumbered[{chapter!r}] needs an ASCII letter-led theorem prefix")
+    if duplicates(list(unnumbered.values())):
+        raise ConfigError(f"{where}: numbering.unnumbered theorem prefixes must be distinct")
     book = Book(
         slug=slug,
         dir=bdir,
@@ -445,6 +460,7 @@ def load_book(slug_or_dir: str | Path) -> Book:
         pdf=dict(raw.get("pdf", {})),
         epub=dict(raw.get("epub", {})),
         raw=raw,
+        unnumbered=dict(unnumbered),
     )
     book.editions = [Edition(book, lang) for lang in languages]
     return book

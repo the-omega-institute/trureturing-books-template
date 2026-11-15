@@ -207,7 +207,7 @@ def load_edition(edition: config.Edition) -> EditionModel:
         issues.append(Issue("error", edition.summary, 0, "SUMMARY.md is missing"))
         return model
     try:
-        summary = parse_summary(edition.summary)
+        summary = parse_summary(edition.summary, unnumbered=edition.book.unnumbered)
     except SummaryError as exc:
         issues.append(Issue("error", exc.path, exc.line, exc.message))
         return model

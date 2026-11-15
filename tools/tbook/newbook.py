@@ -102,7 +102,7 @@ def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | N
         if md.exists():
             raise config.ConfigError(f"{paths.rel(md)} already exists")
         try:
-            parsed = parse_summary(ed.summary)
+            parsed = parse_summary(ed.summary, unnumbered=book.unnumbered)
             listed = parsed.files()
         except SummaryError as exc:
             raise config.ConfigError(f"{paths.rel(exc.path)}:{exc.line}: {exc.message}") from None
@@ -144,7 +144,7 @@ def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | N
         summary = "".join(lines)
         # Validate generated Markdown, including title syntax, before touching any edition.
         try:
-            generated = parse_summary(ed.summary, text=summary)
+            generated = parse_summary(ed.summary, text=summary, unnumbered=book.unnumbered)
         except SummaryError as exc:
             raise config.ConfigError(f"invalid chapter title: {exc.message}") from None
         added = [ch for ch in generated.chapters if ch.path == f"{name}.md"]

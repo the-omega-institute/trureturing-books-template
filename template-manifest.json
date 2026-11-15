@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.13.3",
+  "version": "0.14.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -68,11 +68,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "095198b79f05dcc3c731e9f1b2387bf6b2eeeac4d6ce4b47aaa3607ae9261a4b",
+      "sha256": "5c7f23ce0fea878eb9bdb83874b8abc537014f68a29723d9fa339f4a09123336",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "5c19ea36ee4fb4cf2287c60c62007d68f046e8653fd5dc010ae61af281a18b0d",
+      "sha256": "d899bebb19b3bd102ad634921fb4ed2ee546ba1966001b32094e35506e46f1e6",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -704,7 +704,7 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "2bb42054a74a2594b940e4c1d901be593ddfa77c48db479eaa3721c219944d96",
+      "sha256": "b2c62de2acf9f66a54e721e99dc4c34b628f8f40345d83adf42138d10d29d44e",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
@@ -712,7 +712,7 @@
       "mode": "100644"
     },
     "tools/tbook/config.py": {
-      "sha256": "d2192ceaff8b9f522efb2b64527510dba402d8f0bb92894b149fdd6cc818e2c7",
+      "sha256": "fc7d369be0d3223607255f503c23b3d5fb18a393800b8a4f06e098fb63462487",
       "mode": "100644"
     },
     "tools/tbook/cover.py": {
@@ -748,7 +748,7 @@
       "mode": "100644"
     },
     "tools/tbook/html.py": {
-      "sha256": "f8c8d46c4051a0cf6b08f8843ed52667250164c2ef2a5976c73614da65087cc9",
+      "sha256": "951602246bcb883577e4e664089afa6c626c87f49a261f57733f5cdeb0ca798d",
       "mode": "100644"
     },
     "tools/tbook/lean.py": {
@@ -767,20 +767,24 @@
       "sha256": "341356248d6b913cb34f20b2d1210595f68b44f21c455ca4d725a6a308df5015",
       "mode": "100644"
     },
+    "tools/tbook/mdbook_numbering.py": {
+      "sha256": "51f6e5ee997298928c39a70d8775ac2fb66bc07bf09d495afb2b882f870954c3",
+      "mode": "100644"
+    },
     "tools/tbook/mdscan.py": {
       "sha256": "2ae94ba339dcdf1c1d495ea26b0f66eccc46e2e0fd0ea46626f26cf218a58324",
       "mode": "100644"
     },
     "tools/tbook/model.py": {
-      "sha256": "0c6262c675226d49795e3b31bb7dc17e8505c83d95a36c3904cea71b9fcd84f3",
+      "sha256": "bd734f01f77e1b7626e2061603d246be4fc4799789651626b6acf595e7e1b471",
       "mode": "100644"
     },
     "tools/tbook/newbook.py": {
-      "sha256": "54837034e77c415d7c372c0b92c64c3f6ce6244de706d74a9cf644a871d3cf9f",
+      "sha256": "f87d7effe03213df86c4f6fcb7ed307de511f8a123fe8e60a6f8f3111f0a28df",
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "c7498ca7cdf01b4011764fb2478bddc4116a9c6035b712ee70a95d874bc37dbd",
+      "sha256": "dddc1b95c268f6a2cb1b7146449a0874c9ec8e58ab0aa14909d3c55dfd36162d",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -816,7 +820,7 @@
       "mode": "100644"
     },
     "tools/tbook/summary.py": {
-      "sha256": "cf29c6b8d01d8a922034b722d09552eabfdaaa3dab7b390fff930aa194209a2d",
+      "sha256": "b98c5654b8ca1cbee5b5ff5ff8f04b53a9410d4162ac213c8d347a4c8740819b",
       "mode": "100644"
     },
     "tools/tbook/template.py": {
@@ -961,6 +965,10 @@
     },
     "tools/tests/test_newbook.py": {
       "sha256": "17058f1488fff5bf2bcc7defd0a27033fd964d947fe11e271f9d2c20daff69c4",
+      "mode": "100644"
+    },
+    "tools/tests/test_numbering.py": {
+      "sha256": "1934b1899db26a0c06049f3194fe53f73960c2e93d5777dfdc8ffe5d762e926f",
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
