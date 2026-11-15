@@ -1557,6 +1557,13 @@ class PrintBackdropTest(unittest.TestCase):
 
     SCRIPT = ROOT / "tools" / "node" / "slides-backdrop.mjs"
 
+    @classmethod
+    def setUpClass(cls):
+        # A clean checkout contains the CSS and palette source, not a rendered backdrop.
+        result = subprocess.run([NODE, str(cls.SCRIPT)], cwd=ROOT, capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError(result.stdout + result.stderr)
+
     def node(self, root: Path, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run([NODE, *args], cwd=root, env=dict(os.environ, TBOOK_ROOT=str(root)),
                               capture_output=True, text=True)
@@ -1570,7 +1577,7 @@ class PrintBackdropTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return r.stdout
 
-    def test_committed_backdrop_is_up_to_date(self):
+    def test_generated_backdrop_is_up_to_date(self):
         r = self.node(ROOT, str(self.SCRIPT), "--check")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         meta = json.loads((ROOT / "theme" / "slides" / "styles" / "backdrop.json").read_text(encoding="utf-8"))
@@ -1628,12 +1635,15 @@ class PrintBackdropTest(unittest.TestCase):
             (tmp / name).symlink_to(ROOT / name)
         (tmp / "theme").mkdir()
         for child in (ROOT / "theme").iterdir():
-            if child.name != "generated":
+            if child.name == "tokens.json":
+                shutil.copyfile(child, tmp / "theme" / child.name)
+            elif child.name != "generated":
                 (tmp / "theme" / child.name).symlink_to(child)
         shutil.copytree(ROOT / "theme" / "generated", tmp / "theme" / "generated")
-        tokens = tmp / "theme" / "generated" / "tokens.css"
-        tokens.write_text(re.sub(r"(--tr-void\s*:\s*)[^;]*;", r"\g<1>#102030;", tokens.read_text(encoding="utf-8"),
-                                 count=1), encoding="utf-8")
+        tokens = tmp / "theme/tokens.json"
+        palette = json.loads(tokens.read_text(encoding="utf-8"))
+        palette["screen"]["void"] = "#102030"
+        tokens.write_text(json.dumps(palette), encoding="utf-8")
         (tmp / "site.toml").write_text('[site]\ntitle = "t"\nlanguages = ["zh", "en"]\n', encoding="utf-8")
         r = self.node(tmp, str(self.SCRIPT), "--check")
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)

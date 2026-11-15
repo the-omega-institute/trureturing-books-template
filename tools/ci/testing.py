@@ -27,6 +27,7 @@ EXTRA = {
     "test_html": ["theme/mdbook/**", "tools/node/**"],
 }
 BROWSER = {
+    "test_slides.PrintBackdropTest": ["tools/node/slides*", "theme/slides/**", "theme/tokens.json"],
     "test_buildcache.BuildIntegrationTests": ["tools/tbook/build.py", "tools/tbook/buildcache.py", "tools/tbook/derived.py",
         "tools/node/viz*", "theme/**", "books/example-monograph/**"],
     "test_site.BrowserLayoutTest": ["tools/tbook/site.py", "tools/tbook/html.py", "tools/tbook/mathrender.py",

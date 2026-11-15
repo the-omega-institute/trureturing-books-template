@@ -540,7 +540,7 @@
       "mode": "100644"
     },
     "tools/ci/testing.py": {
-      "sha256": "10f768c81936eda39b213bdd558721ee0cf9350ac3891b5cc933673374d30749",
+      "sha256": "cbcfa6dbe4f2811d0586c15c24a999e2549ba6802e517caca488245e7669f6c6",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -996,7 +996,7 @@
       "mode": "100644"
     },
     "tools/tests/test_slides.py": {
-      "sha256": "722a6d99863cb2fbbfabbb7ba69b9cbd8485ff7ff745d450b6452f2e1f45077b",
+      "sha256": "941bad3836c0193413fd4885ddedb92d8a35c2ea082de51668e60aa18df28d74",
       "mode": "100644"
     },
     "tools/tests/test_source_only.py": {
