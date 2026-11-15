@@ -1268,6 +1268,8 @@ def _kicker(model: EditionModel, chapter, book: config.Book) -> str:
     if model.summary is None:
         return ""
     prefix = chapter_prefix(model.summary, chapter)
+    if chapter.unnumbered_prefix:
+        return book.code
     if chapter.section == "numbered":
         return f"§ {int(prefix):02d}" if prefix.isdigit() else f"§ {prefix}"
     if chapter.section == "suffix":
@@ -1344,7 +1346,7 @@ def stage(site: config.Site, book: config.Book, edition: config.Edition, model: 
                 pieces.append(format_heading(1, ch.part, attrs) + "\n")
             prev_part = ch.part
         cid = chapter_ids[posixpath.normpath(ch.path)]
-        classes = ["tr-chapter"] + ([] if ch.section == "numbered" else ["unnumbered"])
+        classes = ["tr-chapter"] + ([] if ch.numbered else ["unnumbered"])
         kv = {"tr-section": ch.section, "tr-depth": str(ch.depth), "tr-kicker": _kicker(model, ch, book) if ch.depth == 0 else ""}
         if ch.depth == 0 and ch.section == "prefix":
             kv["epub:type"] = "preface"

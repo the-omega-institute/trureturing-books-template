@@ -431,6 +431,8 @@ def _placement(summary: Summary, ch: Chapter) -> tuple[str, tuple[int, ...], int
 def _describe(summary: Summary, ch: Chapter) -> str:
     section, number, depth, prefix = _placement(summary, ch)
     nested = f", nested at depth {depth}" if depth else ""
+    if section == "numbered" and not number:
+        return f"an explicitly unnumbered chapter{nested} (theorems {prefix}.n)"
     if section == "numbered":
         return f"numbered chapter {'.'.join(map(str, number))}{nested} (theorems {prefix}.n)"
     if section == "prefix":

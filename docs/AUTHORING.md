@@ -57,6 +57,7 @@ books/<slug>/
 | `book.title` / `subtitle` / `description` | 每种语言一行：`zh = "…"`、`en = "…"` |
 | `book.authors`、`license`、`isbn`（按语言）、`date` | 进入版权页与 EPUB 元数据 |
 | `book.code` | 封面与站点卡片上的代号，形如 `GOLDEN//OBSERVE` |
+| `numbering.unnumbered` | 不参与章节计数的主章路径与独立定理前缀，适用于终章等整棵章节树，见下文 |
 | `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]`；可选加 `"academic"` 导出学术预印本版，省略配置或 `true` 仍只导出原两版 |
 | `pdf.academic_paper` | 学术预印本开本，默认 `a4`；仅影响 `academic`，排印规范见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md) |
 | `pdf.academic_tags` | 预印本的可选 PDF 结构标签，默认 `false` 以控制文件体积；`true` 时保留结构标签 |
@@ -84,6 +85,19 @@ books/<slug>/
 ```
 
 书末的“形式化验证账本”由构建自动追加，不要写进 SUMMARY。章节标题按行内 Markdown 读，转义与数学的显示规则见 §2（`[C\*-代数](ch03.md)` 显示为 C*-代数）。
+
+### 终章不参与编号
+
+需要保留终章的目录层级、同时让它和全部子页面退出章节计数时，在 `book.toml` 中配置：
+
+```toml
+[numbering.unnumbered]
+"coda.md" = "Coda"
+```
+
+键是相对每个语言版本目录的主章路径，必须在各版 `SUMMARY.md` 的列表中恰好出现一次，且位于顶层；子页面自动继承。目录仍使用 `- [终章 …](coda.md)` 和缩进子列表。终章不占章号，之后的普通主章继续连续编号；原有前言的 `0.n` 与书末独立附录的 `A.n` 规则不变。值是独立的定理环境前缀，须以 ASCII 字母开头，只含字母、数字、下划线或连字符，且不与其他主章前缀重复；上例中终章及其子页共享 `Coda.1`、`Coda.2` 等计数。
+
+HTML（包括启用 `[html] section-labels = true` 时的目录）、PDF 与 EPUB 使用同一模型。此配置不改写作者手写的标题编号：请同步移除各版 `SUMMARY.md`、正文标题与入口链接文字中的 `40.x` 等旧章号，并保留已发布的片段 id。不配置时沿用现有编号。
 
 ## 2. 环境
 
