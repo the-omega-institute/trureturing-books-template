@@ -64,7 +64,7 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "a9b9f4dac8a6525f795715a81c035f57dfce55689c088209d00686f8cf0c1560",
+      "sha256": "55817752b6737d2d16d871f344bc013e7876d53e0479a444663c982d539aceb5",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
@@ -692,7 +692,7 @@
       "mode": "100644"
     },
     "tools/tbook/buildcache.py": {
-      "sha256": "8e142721dd52702643bf4c3faf2a12aa5dfe7728e78d53384f3c53b6f00cc6a1",
+      "sha256": "b51321022e8561f124d663003e6838c06fe8382bfee28d46f0b5135f0c79bbea",
       "mode": "100644"
     },
     "tools/tbook/check.py": {
@@ -1000,7 +1000,7 @@
       "mode": "100644"
     },
     "tools/tests/test_source_only.py": {
-      "sha256": "363c2075aa908f707d8bb59ea30eb4278567b5b766018f81d22db1939d52956f",
+      "sha256": "39a22fbf702ab6c5aa99f93b66c5717696bf7f79f56fae3e2e83acb605de0415",
       "mode": "100644"
     },
     "tools/tests/test_stats.py": {

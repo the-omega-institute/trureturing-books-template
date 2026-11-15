@@ -5,15 +5,46 @@ import runpy
 import subprocess
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 from test_newbook import Repo, write
 from test_figure import SCRIPT
+from test_buildcache import Scratch
 from tbook import artifacts, buildcache, config, figure, model, paths, stats
 
 MIGRATION = paths.ROOT / "tools/migrations/v1.0.0.py"
 
 
 class SourceOnlyTests(unittest.TestCase):
+    def test_export_keys_follow_figure_sources_after_rendered_copies_are_ignored(self):
+        from tbook import slides
+        with Scratch(git_repo=True) as repo, \
+                mock.patch.object(paths, "TOKENS", repo.root / "theme/tokens.json"), \
+                mock.patch.object(slides, "deck_names", return_value=[]), \
+                mock.patch.object(slides, "base_path", return_value="/books/"), \
+                mock.patch.object(buildcache, "node_version", return_value="22"):
+            book = SimpleNamespace(slug="demo", dir=repo.root / "books/demo")
+            site = SimpleNamespace(repo="owner/books", base_url="")
+            write(repo.root / ".gitignore", "*.svg\n")
+            script = write(book.dir / "figures/demo.py", "source v1")
+            helper = write(paths.TOOLS / "figkit/draw.py", "renderer v1")
+            palette = write(paths.TOKENS, "palette v1")
+            rendered = write(book.dir / "slides/deck/img/demo.en.svg", "rendered v1")
+
+            def keys():
+                buildcache._clear_memos()
+                return (buildcache.site_inputs(site).files(book.dir).key(),
+                        buildcache.slides_unit(site, book, repo.root / "build/slides/demo").key)
+
+            before = keys()
+            rendered.write_text("rebuilt output")
+            self.assertEqual(keys(), before)
+            for source in (script, helper, palette):
+                before = keys()
+                source.write_text(source.read_text() + " changed")
+                after = keys()
+                self.assertTrue(all(a != b for a, b in zip(before, after)), source)
+
     def test_migration_preserves_sources_and_working_outputs_and_is_idempotent(self):
         with Repo() as repo:
             book = repo.book()
