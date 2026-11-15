@@ -27,6 +27,8 @@ EXTRA = {
     "test_html": ["theme/mdbook/**", "tools/node/**"],
 }
 BROWSER = {
+    "test_buildcache.BuildIntegrationTests": ["tools/tbook/build.py", "tools/tbook/buildcache.py", "tools/tbook/derived.py",
+        "tools/node/viz*", "theme/**", "books/example-monograph/**"],
     "test_site.BrowserLayoutTest": ["tools/tbook/site.py", "tools/tbook/html.py", "tools/tbook/mathrender.py",
                                     "theme/mdbook/**", "theme/site/**", "theme/tokens.json", "theme/generated/**"],
     "test_export_layout.EpubLayoutTest": ["tools/tbook/pandoc.py", "tools/tbook/mathrender.py",
@@ -134,6 +136,8 @@ def run_tests(names, *, required=False):
         return
     import unittest
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
+    from example_inputs import prepare
+    prepare()
     suite = unittest.defaultTestLoader.loadTestsFromNames(names)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful() or (required and (result.skipped or not result.testsRun)):

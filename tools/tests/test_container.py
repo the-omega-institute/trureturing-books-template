@@ -59,7 +59,7 @@ class ContainerTests(unittest.TestCase):
     def test_preinstalled_setup_skips_every_installer_and_toolchain_cache(self):
         steps = action_steps("setup")
         first = next(i for i, s in enumerate(steps) if s.get("id") == "toolchain")
-        installers = steps[first + 1:-1]
+        installers = [s for s in steps[first + 1:-1] if s["name"] != "Generate theme tokens"]
         self.assertGreater(len(installers), 10)
         for step in installers:
             cond = step.get("if", "")

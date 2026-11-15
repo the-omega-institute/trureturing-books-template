@@ -540,7 +540,7 @@
       "mode": "100644"
     },
     "tools/ci/testing.py": {
-      "sha256": "961749b88adeca9a536635cd08684badb26bd24a4c96ab471ec6a3c59cd3f3a2",
+      "sha256": "10f768c81936eda39b213bdd558721ee0cf9350ac3891b5cc933673374d30749",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -835,6 +835,10 @@
       "sha256": "7ca8f4f716a13941ec5a4c7ff69513315fe1ed53c3f0d20a77ba4f5a72926ec7",
       "mode": "100644"
     },
+    "tools/tests/example_inputs.py": {
+      "sha256": "41a7b68fd1077654f2ff8ae3629305b043d93f5d16ce94829ebed705e8105035",
+      "mode": "100644"
+    },
     "tools/tests/example_support.py": {
       "sha256": "165567f49709826e5c600b491218fd19b2ddd680591666fde59c27ff25ffebc9",
       "mode": "100644"
@@ -864,7 +868,7 @@
       "mode": "100644"
     },
     "tools/tests/test_buildcache.py": {
-      "sha256": "b2a4a899bd3a4129568d0867c779abba3b7c080a263eabbfdc869b56ea401604",
+      "sha256": "d58fe8119dc74901ba0f6c03c50892928b344e1467c03724d99fde3aa857cdce",
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
@@ -888,7 +892,7 @@
       "mode": "100644"
     },
     "tools/tests/test_container.py": {
-      "sha256": "e761b362d37fff48c75c34599d05a1b16330d430a9b2175baad912453a184b84",
+      "sha256": "2b6e10e406ad198abb12f4af48c641e2e4659c40325101ca07eff26b8f138e0a",
       "mode": "100644"
     },
     "tools/tests/test_core.py": {
@@ -1020,7 +1024,7 @@
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
-      "sha256": "1a1cfb1f0e63f1b513513d39d83e2678195c384c4d08555b0bfb0afcc2732d91",
+      "sha256": "b8ca81cf1c9ab67868efad76cb62cb70d5f7018532d6ae344a8a611bd60eb29b",
       "mode": "100644"
     },
     "tools/tests/test_viz_kit.py": {

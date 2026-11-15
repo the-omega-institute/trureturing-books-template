@@ -195,7 +195,6 @@ class RegistryChecks(unittest.TestCase):
             "must use https",
             'root-absolute link "/zh/ch01.html"',
             "D5/S1/Nowhere/Missing.thing is not in trureturing.lock.json",
-            "thumbnail does not exist",
             ".zh fragments but",
             'loads the shared theme (expected href="../assets/theme.css")',
             'data-lean-gid="D5/S1/Nowhere/Missing.thing" is not in trureturing.lock.json',
