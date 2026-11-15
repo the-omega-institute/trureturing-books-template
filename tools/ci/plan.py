@@ -1,4 +1,4 @@
-"""Plan CI before setup, using Git trees and successful, trusted coverage artifacts only.
+"""Plan CI before setup, using Git diffs and trusted successful producer records.
 
 No third party Python/Node dependency is needed. Unknown paths widen coverage; malformed
 inventories and selector failures fail the plan job rather than becoming an empty selection.
@@ -22,7 +22,7 @@ import zipfile
 # This constructor is dependency-free and shared with the actual video unit.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import film_inputs, template as template_metadata
-from ci import viz_budget
+from ci import viz_budget, testing
 
 VERSION = 5
 SCHEMA = "tbook-ci-coverage-v1"
@@ -175,9 +175,35 @@ def suite_inputs(tree, slug, book, suite):
     base = f"books/{slug}/viz/"
     ident = PurePosixPath(suite).name.removesuffix(".test.mjs")
     patterns = [base + ident + "/**", base + "visualizations.json", *book["deps"].get(suite, [])]
+    if "@citations" in patterns:
+        patterns.remove("@citations")
+        patterns.extend(citation_inputs(tree, slug, ident))
     roots = [suite, *(p for p in tree.files if p.endswith((".js", ".mjs")) and
                       any(fnmatch.fnmatchcase(p, pat) for pat in patterns))]
     return patterns, imports(tree, *roots)
+
+
+def citation_inputs(tree, slug, ident):
+    """Use the publication block parser, including comments and fences, for chapter readers."""
+    from tbook import mdscan, model
+    if not hasattr(tree, "_citation_inputs"):
+        tree._citation_inputs = {}
+    if slug not in tree._citation_inputs:
+        data = {}
+        meta = tree.toml(f"books/{slug}/book.toml")
+        langs = meta.get("book", {}).get("editions") or tree.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
+        for p in sorted(tree.files):
+            if not any(p.startswith(f"books/{slug}/{lang}/") for lang in langs) or not p.endswith(".md"):
+                continue
+            if PurePosixPath(p).name == "SUMMARY.md":
+                continue
+            for node in mdscan.walk(mdscan.parse_blocks(tree.read(p))):
+                if isinstance(node, mdscan.Div) and model.kind_of(node) == "viz":
+                    data.setdefault((node.attrs.get("src") or "").strip(), set()).add(p)
+        tree._citation_inputs[slug] = data
+    # A changed reading order may add/remove the chapter from publication.
+    summaries = [p for p in tree.files if p.startswith(f"books/{slug}/") and p.endswith("/SUMMARY.md")]
+    return sorted(tree._citation_inputs[slug].get(ident, set())) + summaries
 
 
 def execution_inventory(tree, *, with_workloads=False):
@@ -250,8 +276,46 @@ def _template_version_only(current, previous):
     return versions[0] != versions[1] and remaining[0] == remaining[1]
 
 
+def blob_id(tree, name):
+    if name not in tree.files:
+        return None
+    if hasattr(tree, "sha"):
+        if not hasattr(tree, "_blob_ids"):
+            tree._blob_ids = {}
+            for entry in git(tree.root, "ls-tree", "-r", "-z", tree.sha).split(b"\0"):
+                if entry:
+                    meta, path = entry.split(b"\t", 1)
+                    tree._blob_ids[path.decode()] = meta.split()[2].decode()
+        return tree._blob_ids[name]
+    # The local adapter includes uncommitted binary assets too.
+    data = (tree.root / name).read_bytes()
+    return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+
+
+def adopt_unchanged_summaries(current, previous, now, old):
+    """A corrected complete summary describes both trees when ALL its inputs are equal."""
+    if previous is None:
+        return
+    for slug, book in now.items():
+        prior = old.get(slug)
+        if not prior:
+            continue
+        for suite, deps in book["deps"].items():
+            if prior["deps"].get(suite) == deps or suite not in prior["suites"]:
+                continue
+            view = dict(prior, deps={**prior["deps"], suite: deps})
+            relations = []
+            for tree, metadata in ((current, book), (previous, view)):
+                patterns, closure = suite_inputs(tree, slug, metadata, suite)
+                relations.append(closure | {p for p in tree.files
+                                             if any(fnmatch.fnmatchcase(p, pat) for pat in patterns)})
+            if relations[0] == relations[1] and all(blob_id(current, p) == blob_id(previous, p) for p in relations[0]):
+                prior["deps"][suite] = deps
+
+
 def impact(current, previous, paths, *, full=False, template=False):
     now, old = inventory(current), inventory(previous) if previous else {}
+    adopt_unchanged_summaries(current, previous, now, old)
     all_suites = {s for b in now.values() for s in b["suites"]}
     all_films = {f for b in now.values() for f in b["films"]}
     all_slides = {s for b in now.values() for s in b["slides"]}
@@ -260,6 +324,7 @@ def impact(current, previous, paths, *, full=False, template=False):
                   compat=False, manifest=template)
     reasons, path_reasons = set(), {}
     site = False
+    all_tests = full
 
     def path_reason(prefix, path, suffix=""):
         key = (prefix, suffix)
@@ -282,6 +347,8 @@ def impact(current, previous, paths, *, full=False, template=False):
             slides.update(now[slug]["slides"])
 
     def everything(reason, path=None):
+        nonlocal all_tests
+        all_tests = True
         shared_outputs(reason, path)
         suites.update(all_suites)
         films.update(all_films)
@@ -320,6 +387,10 @@ def impact(current, previous, paths, *, full=False, template=False):
             path_reason("", p, f" -> film {film}")
         if p.startswith(("docs/", "skills/", ".claude/")) or ("/" not in p and p.endswith(".md")) or p in ("LICENSE", "template-manifest.json"):
             continue
+        if p.startswith(("tools/ci/", "tools/tests/")) or p == ".github/workflows/ci.yml":
+            # Planning/test infrastructure has no publication output. Declared
+            # runtime readers were already propagated above, before classification.
+            continue
         if p == "template.toml" and _template_version_only(current, previous):
             # Template fixtures/tooling consume this metadata. Site assembly reads
             # it for footer/manifest attribution; export units do not key on it.
@@ -355,7 +426,7 @@ def impact(current, previous, paths, *, full=False, template=False):
             checks["viz_static"] = checks["slides_static"] = True
             # Unregistered suites have unknown file reads: widen to the owning book's suites.
             for suite in b["suites"]:
-                if suite not in b["deps"] or (slug in old and suite not in old[slug]["deps"]):
+                if local != "viz/tests/dependencies.json" and (suite not in b["deps"] or (slug in old and suite not in old[slug]["deps"])):
                     suites.add(suite)
                     reasons.add(f"unregistered suite dependency -> {suite}")
             for film in set(b["films"]) & uncertain_films:
@@ -374,7 +445,7 @@ def impact(current, previous, paths, *, full=False, template=False):
             elif local.startswith("viz/"):
                 for suite in b["suites"]:
                     ident = PurePosixPath(suite).name.removesuffix(".test.mjs")
-                    if local.startswith(f"viz/{ident}/") or local in ("viz/visualizations.json", "viz/tests/dependencies.json") or local.startswith("viz/assets/"):
+                    if local.startswith(f"viz/{ident}/") or local == "viz/visualizations.json" or local.startswith("viz/assets/"):
                         suites.add(suite)
             elif local.startswith("films/"):
                 film = f"{slug}/{parts[3]}" if len(parts) > 3 else ""
@@ -385,19 +456,19 @@ def impact(current, previous, paths, *, full=False, template=False):
                 if deck in all_slides:
                     slides.add(deck)
             else:
-                # Chapter citation frame geometry (stageFirstChecks) and academic slides read prose.
-                suites.update(b["suites"])
+                # Declared chapter readers above select only their own cited visualization.
                 slides.update(b["slides"])
                 languages = current.toml(f"books/{slug}/book.toml").get("book", {}).get("editions") or current.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
                 if local == "book.toml" or local.split("/")[0] not in languages:
-                    films.update(b["films"])
+                    # Supported film constructors already describe their full reads;
+                    # unknown readers above keep their own conservative responsibility.
                     path_reason("book metadata/resource or unknown local dependency: ", p)
             # Academic decks read chapters, figures and viz, beyond slides/ itself.
             for deck in b["slides"]:
                 if f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
                     slides.add(deck)
             continue
-        if p.startswith(("theme/", "templates/", "i18n/")):
+        if p.startswith(("tools/", "theme/", "templates/", "i18n/")) or p == ".github/workflows/ci.yml":
             shared_outputs("shared consumer input: ", p)
             for slug, b in now.items():
                 for suite in b["suites"]:
@@ -434,18 +505,23 @@ def impact(current, previous, paths, *, full=False, template=False):
     for (prefix, suffix), (first, count) in path_reasons.items():
         more = f" (+{count - 1} more)" if count > 1 else ""
         reasons.add(f"{prefix}{first}{more}{suffix}")
-    return dict(checks=checks, books=sorted(selected_books), suites=sorted(suites), films=sorted(films),
+    test_selection = testing.select(current, previous, paths, full=all_tests)
+    checks["unit"] = bool(test_selection["unit_tests"])
+    checks["browser"] = bool(test_selection["browser_tests"])
+    return dict(**test_selection, checks=checks, books=sorted(selected_books), suites=sorted(suites), films=sorted(films),
                 slides=sorted(slides), exports=exports, site=site, reasons=sorted(reasons))
 
 
 def signature(tree, runtime):
+    if isinstance(runtime, dict):
+        runtime = {k: v for k, v in runtime.items() if k != "ImageVersion"}
     digest = hashlib.sha256(json.dumps([VERSION, runtime], sort_keys=True).encode())
     for entry in git(tree.root, "ls-tree", "-r", "-z", tree.sha).split(b"\0"):
         if not entry:
             continue
         name = entry.split(b"\t", 1)[1].decode()
-        if name.startswith(("tools/", ".github/actions/")) or name in (
-                ".github/workflows/ci.yml", ".github/workflows/pages.yml", "package-lock.json", "requirements.txt", "theme/film/requirements.txt"):
+        if name.startswith(".github/actions/") or name in (
+                "package-lock.json", "requirements.txt", "theme/film/requirements.txt"):
             digest.update(entry + b"\0")
     return digest.hexdigest()
 
@@ -503,7 +579,12 @@ def trusted_baseline(root, repo, branch, workflow, profile, sig, limit, *, get=a
                 archive = subprocess.check_output(["gh", "api", f"repos/{repo}/actions/artifacts/{int(a['id'])}/zip"], timeout=45)
                 with zipfile.ZipFile(io.BytesIO(archive)) as z:
                     record = json.loads(z.read(f"{profile}.json"))
-            if (record.get("schema") == SCHEMA and record.get("profile") == profile and record.get("signature") == sig and
+            comparable = record.get("signature") == sig
+            if not comparable and "runtime" in record:
+                # Older records hashed every tool source. Compare the producer tree's
+                # environment instead; changed source responsibilities come from its diff.
+                comparable = signature(Tree(root, run["head_sha"]), record["runtime"]) == sig
+            if (record.get("schema") == SCHEMA and record.get("profile") == profile and comparable and
                     record.get("sha") == run["head_sha"] and record.get("run_id") == str(run["id"]) and
                     record.get("repository") == repo and record.get("ref") == f"refs/heads/{branch}" and
                     record.get("selector_version") == VERSION and record.get("run_attempt") == str(run.get("run_attempt", 1)) and
@@ -521,8 +602,23 @@ def event_profiles(event, own, slow=False, workflow="ci"):
     return ["normal", "films", *(["slow"] if slow else [])]
 
 
+def trusted_revision(root, repo, branch, workflow, limit):
+    """A successful producer tree remains a diff baseline after artifacts expire."""
+    wf = api(f"repos/{repo}/actions/workflows/{workflow}.yml")
+    if wf.get("path") != f".github/workflows/{workflow}.yml":
+        return None
+    query = urlencode(dict(branch=branch, status="success", per_page=100))
+    for run in api(f"repos/{repo}/actions/workflows/{workflow}.yml/runs?{query}")["workflow_runs"]:
+        if (run.get("workflow_id") == wf["id"] and run.get("head_repository", {}).get("full_name") == repo and
+                run.get("head_branch") == branch and run.get("event") in {"push", "workflow_dispatch", "schedule"} and
+                run.get("status") == "completed" and run.get("conclusion") == "success" and
+                str(run.get("id")) != os.environ.get("GITHUB_RUN_ID") and ancestor(root, run["head_sha"], limit)):
+            return run["head_sha"]
+    return None
+
+
 def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, slow=False,
-         mode="auto", base="", head="", get_baseline=trusted_baseline, runtime="local"):
+         mode="auto", base="", head="", get_baseline=trusted_baseline, get_revision=None, runtime="local"):
     if mode not in ("auto", "full"):
         raise ValueError("mode must be auto or full")
     current = Tree(root, "HEAD")
@@ -569,7 +665,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         try:
             if base and (not record or Tree(root, base).sha != record["sha"]):
                 record = None
-                reasons.append(f"{profile}: full fallback: requested base has no comparable successful coverage")
+                reasons.append(f"{profile}: compare requested Git base; no inherited coverage")
             previous = Tree(root, record["sha"]) if record else None
             paths = changed_paths(root, previous.sha, current.sha) if previous else []
             if pr_base and previous:
@@ -578,19 +674,41 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                 paths = sorted(set(paths) | set(changed_paths(root, merge_base, payload["pull_request"]["head"]["sha"])))
         except subprocess.SubprocessError:
             previous, record, paths = None, None, []
-            reasons.append(f"{profile}: full fallback: incomplete Git comparison history")
-        selected = impact(current, previous, paths, full=previous is None, template=template)
+            reasons.append(f"{profile}: incomplete Git coverage history; determine changed scope")
+        if previous is None and mode != "full":
+            revision = base
+            if not revision and get_revision:
+                try:
+                    revision = get_revision(root, repo, coverage_branch, "pages" if profile == "films" else workflow, limit)
+                except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+                    reasons.append(f"{profile}: revision lookup unavailable ({type(exc).__name__}); use Git event")
+            revision = revision or pr_base or payload.get("before") or "HEAD^"
+            try:
+                previous = Tree(root, revision)
+                if not ancestor(root, previous.sha, current.sha):
+                    raise ValueError("comparison base is not an ancestor of the tested tree")
+                paths = changed_paths(root, previous.sha, current.sha)
+                if pr_base:
+                    merge_base = git(root, "merge-base", pr_base, payload["pull_request"]["head"]["sha"]).decode().strip()
+                    paths = sorted(set(paths) | set(changed_paths(root, merge_base, payload["pull_request"]["head"]["sha"])))
+            except subprocess.SubprocessError as exc:
+                raise ValueError("cannot determine changed scope; provide --base or explicitly request --mode full") from exc
+            reasons.append(f"{profile}: Git diff from {previous.sha}; no inherited coverage")
+        selected = impact(current, previous, paths, full=mode == "full", template=template)
+        if profile == "pages" and not record:
+            # A Git comparison cannot inherit a successful deployment identity.
+            selected["site"] = True
         if not record:
-            reasons.append(f"{profile}: full fallback: no comparable successful baseline" if mode != "full" else f"{profile}: explicit full")
+            reasons.append(f"{profile}: explicit full" if mode == "full" else f"{profile}: changes only, without coverage artifact")
         if profile != "films" or not deferred_films:
             coverage[profile] = dict(schema=SCHEMA, selector_version=VERSION, ref=ref, profile=profile, sha=current.sha, signature=sig, runtime=runtime,
                                      repository=repo, run_id=os.environ.get("GITHUB_RUN_ID", "local"),
                                      run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT", "1"),
                                      inherited={k: record[k] for k in ("sha", "source_run", "artifact_id", "deployment_sha") if k in record} if record else None,
-                                     paths=paths)
+                                     paths=paths, comparison=previous.sha if previous else None)
         if profile in ("normal", "slow"):
             live = {u: src for part in live_execution.values() for u, src in part.items()}
-            raw_hints = cost_record.get("timings", {}) if cost_record else {}
+            raw_hints = cost_record.get("timings", {}) if cost_record and cost_record.get("runtime", runtime) == runtime else {}
             raw_hints = raw_hints if isinstance(raw_hints, dict) else {}
             hints = {u: raw_hints[u] for u, src in live.items() if viz_budget.valid_hint(raw_hints.get(u), src) and
                      isinstance(raw_hints[u].get("workload"), str)}
@@ -687,7 +805,8 @@ def main():
     runtime = {k: os.environ.get(k, "") for k in ("ImageOS", "ImageVersion", "TBOOK_TOOLCHAIN")}
     result = plan(Path.cwd(), event=event, payload=payload, repo=os.environ.get("GITHUB_REPOSITORY", "local/repo"),
                   branch=branch, ref=os.environ.get("GITHUB_REF", "local"), workflow=args.workflow, own=own,
-                  slow=os.environ.get("SLOW_FRAMES") == "true", mode=args.mode, base=args.base, head=args.head, runtime=runtime)
+                  slow=os.environ.get("SLOW_FRAMES") == "true", mode=args.mode, base=args.base, head=args.head, runtime=runtime,
+                  get_revision=trusted_revision)
     Path("ci-plan.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     write_outputs(result)
     print(json.dumps(result, ensure_ascii=False, indent=2))

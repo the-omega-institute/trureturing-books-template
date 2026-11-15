@@ -1213,7 +1213,7 @@ class ExportRegressionWorkflowTests(unittest.TestCase):
         workflow = GITHUB_DIR / "workflows" / "ci.yml"
         steps = workflow_jobs(workflow)["validate"]
         rounds = [i for i, step in enumerate(steps)
-                  if "python -m unittest discover -s tools/tests" in step.get("run", "")]
+                  if 'python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"' in step.get("run", "")]
         self.assertEqual(len(rounds), 3)
         setups = [(i, step) for i, step in enumerate(steps) if step.get("uses") == "./.github/actions/setup"]
         self.assertEqual(len(setups), 2)
@@ -1223,11 +1223,10 @@ class ExportRegressionWorkflowTests(unittest.TestCase):
         self.assertGreater(late, max(rounds))
         self.assertEqual(browser["with"]["browsers"], "true")
         required, = [(i, step) for i, step in enumerate(steps)
-                     if step.get("run") == "python tools/tests/test_export_layout.py"]
+                     if step.get("run") == 'python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json"']
         self.assertGreater(required[0], late)
         self.assertEqual(required[1]["if"], browser["if"])
-        self.assertIn("checks.unit ||", browser["if"])
-        self.assertIn("checks.compat", browser["if"])
+        self.assertEqual(browser["if"], "fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser")
         self.assertNotIn("continue-on-error", required[1])
         validate = workflow.read_text().split("\n  validate:\n", 1)[1].split("\n  build:\n", 1)[0]
         self.assertIn("timeout-minutes: 30", validate)

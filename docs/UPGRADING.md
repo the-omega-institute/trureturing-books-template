@@ -40,7 +40,9 @@ git 历史指 `HEAD` 可达的全部提交，包括以合并提交（merge commi
 
 ```bash
 .venv/bin/pip install -r requirements.txt && npm ci
-./tbook doctor && ./tbook check && ./tbook build all
+./tbook test --list
+./tbook test
+# 另对受影响书籍运行 check --book <slug>，并构建受影响格式。
 ```
 
 ## 3. 自动升级 PR

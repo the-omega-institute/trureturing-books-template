@@ -46,6 +46,11 @@ def cmd_check(args) -> int:
     return 1 if errors else 0
 
 
+def cmd_test(args) -> int:
+    from ci import testing
+    return testing.local(args)
+
+
 def cmd_pin(args) -> int:
     from pathlib import Path
 
@@ -287,6 +292,13 @@ def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="tbook", description="Build and verify trureturing monographs.")
     p.add_argument("--version", action="version", version=f"tbook {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    c = sub.add_parser("test", help="run only tests affected by branch and working-tree changes")
+    c.add_argument("--base", default="origin/main", help="comparison branch/ref (default: origin/main)")
+    c.add_argument("--list", action="store_true", help="show the selection without running tests")
+    c.add_argument("--full", action="store_true", help="explicitly select all tests")
+    c.add_argument("--slow", action="store_true", help="run selected visualization suites with slow frames")
+    c.set_defaults(fn=cmd_test)
 
     c = sub.add_parser("check", help="verify structure, bilingual parity and Lean citations")
     c.add_argument("--book", action="append", help="limit to a book slug (repeatable)")

@@ -27,7 +27,7 @@ description: 升级或完善书库模板本身时使用：把下游书库更新�
    - 本地改过而上游也改了 → **冲突**：保留本地文件，上游版本写在旁边的 `<file>.template-new`。逐个比较合并，然后删除 `.template-new`。若本地改动本该回馈上游，按 B 处理；若只是临时补丁，通常直接采用上游版本。
    - 版本间的迁移脚本 `tools/migrations/v<X.Y.Z>.py` 会自动运行（取自新版本模板，各在新的 Python 进程中运行）；按其输出检查书的内容（例如语法变更）。
 5. 读 `docs/CHANGELOG.md` 中跨越的各版本说明，处理“需要手动操作”的条目。
-6. 重新安装依赖（`pip install -r requirements.txt`、`npm ci`），运行 `./tbook doctor`、`./tbook check`、`./tbook build all`。
+6. 依赖声明变化时重新安装对应依赖；先运行 `./tbook test --list`，再以 `./tbook test` 验证受影响部分。结构检查限受影响书籍，输出只构建受影响格式；浏览器、截图与慢帧只覆盖受影响页面及共享依赖的实际读者，不默认全量测试或 `build all`。
 7. 提交（摘要见 `build/template-update.md`，可直接作 PR 正文），开 PR，CI 通过后合并。若在 PR 中删掉了不需要的新托管文件，用合并提交（merge commit）合并，不要 squash：squash 后这个文件从未进入 `main` 的历史，下次升级会重新安装它（`docs/UPGRADING.md` 第 2 节）。
 
 `template-sync` 工作流每周自动执行 1–4 步并开 PR；合并前仍需完成 4–6 步中的人工部分（冲突、迁移检查、构建核对）。
@@ -48,7 +48,7 @@ description: 升级或完善书库模板本身时使用：把下游书库更新�
 
 不要在书库里长期保留对托管文件的修改——下次升级会产生冲突，其他书库也得不到改进。
 
-1. 在书库中确认改动有效（`./tbook check`、相关构建、单元测试 `PYTHONPATH=tools python3 -m unittest discover -s tools/tests`）。
+1. 在书库中确认改动有效（受影响书籍的 `./tbook check --book <slug>`、相关格式构建及 `./tbook test`；先用 `--list` 确认测试范围）。
 2. 克隆模板仓库：`git clone https://github.com/the-omega-institute/trureturing-books-template ../trureturing-books-template`，新建分支。
 3. 把改动移植过去（只移植托管文件；不要带入书库自己的书、配置或锁文件）。修订 skill 时：
    - 写清触发场景（`description`）与“用/不用”；
@@ -57,7 +57,7 @@ description: 升级或完善书库模板本身时使用：把下游书库更新�
 4. 在模板仓库中：
    - 更新 `docs/CHANGELOG.md`（`## [Unreleased]` 下记录；破坏性变更写明迁移方式）；
    - 需要改书的内容或配置格式时，新增 `tools/migrations/v<下一版本>.py`（`migrate(root) -> list[str]`，幂等）；
-   - `./tbook template manifest` 重新生成清单；`./tbook check`、单元测试、`./tbook build all` 全部通过。
+   - `./tbook template manifest` 重新生成清单；`./tbook test`、受影响书籍的结构检查与相关格式构建通过，不重跑无关浏览器与导出。
 5. 向模板仓库开 PR，说明来源书库与动机。
 6. 合并并发布后（见 D），回到书库按 A 升级，删除书库里的临时改动。
 

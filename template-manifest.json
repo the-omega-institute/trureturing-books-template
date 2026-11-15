@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -20,7 +20,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "055ad54ca2ef52f5940faecef0c123fc9d92c80704443ce40e3bfa1bdcbde50e",
+      "sha256": "0105c9ff944d459374070086cbd9401916aa00dca2530bfa4ecec94c19d78e3a",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -60,7 +60,7 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "16fdf287a206cd6d15c83746e76a8d552331d213b2d57d4317420e31b0c183e1",
+      "sha256": "34dc7728fae2c78f744918a1eb386378fcfa77106b357a31b193287a0708a86a",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "4a217571069c2b6041890b5faa61fcda35b7ef0112cc7d4809e82d7517d146da",
+      "sha256": "92c7320d7ab7cf885b119f7d4e19bcb44c669f4f0b1e054017216a8847ec03cb",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,11 +88,11 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "57845b268f71cba057fc5a6eca912c332cb231b56f4e718d5e59b0254e0f30f4",
+      "sha256": "4c3092b44bfbfbf1b13be884d694167ffe42100faaadada2efcc514a4fe0a704",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
-      "sha256": "7fc118c2561d3d0b83123fb92b6fc21c35ac6813816c570b5be0f4b5e68afcc1",
+      "sha256": "b663107b8716b36d3cf7610378f0e25deb34da6e0c6809972e25a0d76f0258d6",
       "mode": "100644"
     },
     "docs/VERIFICATION.md": {
@@ -136,7 +136,7 @@
       "mode": "100644"
     },
     "skills/book-viz/SKILL.md": {
-      "sha256": "59f813e6df96597e628c8824611b2ab24e23c81daf1ae15218afa0fabc113e67",
+      "sha256": "921988e7b9a28d60ddd6ed83a21d01fca45913cb02452ce6f281612e488ee5ff",
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
@@ -144,7 +144,7 @@
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
-      "sha256": "5a1ac4532eac70bf9d1d7e84a45db8f9e9269302a1023ac9d27abf519538c5e8",
+      "sha256": "14788a92a2de16d13f41c2fd0225cfa8a6d16e7e62667f168567d502cde27d14",
       "mode": "100644"
     },
     "skills/theorem-formalize/SKILL.md": {
@@ -548,11 +548,15 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "4a2c9fe8449f2ec25dc266134263394eddae089f806a1c0fe9f8a562b5cee335",
+      "sha256": "c1b5ee47d9ef85972d2ed34ec2cd8ab4d2a9fe71eed6fc04895c9e37104f290c",
       "mode": "100644"
     },
     "tools/ci/run.py": {
-      "sha256": "10d4b67812eed0da27184b644925ab36a76fff8fefb6bf07fb8817796b7f6dd0",
+      "sha256": "886a5cb0ac6cbae9515e358428da0bf428256205b5c996ca001fa855a4a1cb5f",
+      "mode": "100644"
+    },
+    "tools/ci/testing.py": {
+      "sha256": "fb67cb51b026a9091d875732939669debb9f9afbbe6c6617cad73b9455be814b",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -704,7 +708,7 @@
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
-      "sha256": "4393db53b600c4c2be08ff40e17e25247c6203bdbd157e7097761aa521e3aaf9",
+      "sha256": "b13a08d80e89205a4a58da36514de1befc62742a372fbee932e553a324bef4ec",
       "mode": "100644"
     },
     "tools/tbook/config.py": {
@@ -816,7 +820,7 @@
       "mode": "100644"
     },
     "tools/tbook/template.py": {
-      "sha256": "96a1322d49ce04b709054e1f2c93d7ae4af07ea290f1a6cf3a4d724ebd5ec58e",
+      "sha256": "6fe1ffedf280db37a0ba5b269cbc491e39345a3b6567308e87a326d4ed51a707",
       "mode": "100644"
     },
     "tools/tbook/theme.py": {
@@ -864,15 +868,19 @@
       "mode": "100644"
     },
     "tools/tests/test_buildcache.py": {
-      "sha256": "30aa4aec1b469ac543f03e1a319277b017a6c0bd5a874179d9b2838c4d079c6a",
+      "sha256": "b2a4a899bd3a4129568d0867c779abba3b7c080a263eabbfdc869b56ea401604",
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "6aef911a34da7c1af564a273fba218719a085ec8572f5fb7858de6f2a07c6adf",
+      "sha256": "13180282044d7fe4a509a21aecf109d7a19f5ed6c524cf510af39d01e16f30a9",
+      "mode": "100644"
+    },
+    "tools/tests/test_ci_testing.py": {
+      "sha256": "70bbf31b7085d09512378b0cdcb75e4b340b6f18b9dcb02c7d60c3b7e4169498",
       "mode": "100644"
     },
     "tools/tests/test_ci_transport.py": {
-      "sha256": "aa342bfd0d745e332175ef07945f6aebd671043bebbce3adf5f773cbb5a3e0a4",
+      "sha256": "33b444dfcb0e52b470a41fe7d9f42f2205b2fe4b658ede9ee9cfb154ce2a03a0",
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_budget.py": {
@@ -1004,7 +1012,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "30d65934132c48dce2f528850785f8e5d28da728a6fd5a7bdc99d2dd212a3f2d",
+      "sha256": "8b4c934a2ab35da7a9c410e4dd1cd2ab193fcf8efb57ce9b09186ca60fbfe34b",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
