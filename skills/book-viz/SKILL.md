@@ -193,7 +193,7 @@ node tools/node/viz-shots.mjs <book> <id> --views phone,desk --width 360 --heigh
 
 ### 6. 测试
 
-本地先用 `./tbook test --list` 确认范围，再用 `./tbook test` 与 CI 一样只跑改动影响的测试。`--slow` 仅在修改时钟、异步等待或排查慢帧故障时显式运行所选套件；不因单个页面改动而遍历整本书。额外读取用精确路径声明；正文的实验卡引用依赖用 `@citations`，它按正式块解析器选中引用该页面的章节。直接读取章中文字的测试仍须单独声明对应文件。
+本地先用 `./tbook test --list` 确认范围，再用 `./tbook test` 与 CI 一样只跑改动影响的测试。只跑可视化时，`node tools/node/viz-test.mjs [book ...]` 同样默认按改动选择，书名仅缩小范围；`--list` 预览、`--base <ref>` 更换比较基准，只有显式 `--full` 才跑范围内全量。`--slow` 仅在修改时钟、异步等待或排查慢帧故障时显式运行所选套件；不因单个页面改动而遍历整本书。额外读取用精确路径声明；正文的实验卡引用依赖用 `@citations`，它按正式块解析器选中引用该页面的章节。直接读取章中文字的测试仍须单独声明对应文件。
 
 `books/<book>/viz/tests/<id>.test.mjs`：
 
