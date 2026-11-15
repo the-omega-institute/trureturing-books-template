@@ -103,7 +103,9 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
 
 浏览器非读者仍可能是发布消费者：`publish_assets` 向每本书复制实体、hub 与 vendor 资源。因此上述执行选择不缩减书籍导出、静态检查、slide 或完整 Pages 组装责任。影片站点资源仍复制发布，但不因而重新渲染非读者影片。生产工具源码按完整读取声明传播；`tools/ci/`、`tools/tests/` 和 CI 工作流本身只选择相关测试及已声明的实际读者，不触发出版构建。安装依赖、未知输入与显式 full 保留各自的完整影响范围；缺少可比覆盖时按上述 Git 差异选择。
 
-精确集合通过 JSON 环境变量传给 `viz-test.mjs --selection-env`、`films.py --selection-env`，拒绝不存在、隐藏或重复项。slide 集合按 deck 执行；整书集合沿用原 slides 单元键，部分集合可恢复完整单元，冷构建只运行选中 deck，且不把部分产物写入整书缓存。
+直接运行 `node tools/node/viz-test.mjs [book ...]` 也默认复用上述工作区选择规则；书名仅过滤受影响集合，不会触发整本书。`--base <ref>` 更换比较基准，`--list` 只列所选套件，`--shard` 在所选集合上分片，`--slow` 只降低所选套件的动画帧率。只有显式 `--full` 才运行范围内全部套件；缺少比较历史时报错，不自动回退全量。工具链镜像验收显式使用 `--full`，以保留完整示例覆盖。
+
+精确集合通过 JSON 环境变量传给 `viz-test.mjs --selection-env`、`films.py --selection-env`，拒绝不存在、隐藏或重复项。可视化的显式集合直接执行，不再按本地 Git 差异过滤，也不能与 `--base` 或 `--full` 混用。slide 集合按 deck 执行；整书集合沿用原 slides 单元键，部分集合可恢复完整单元，冷构建只运行选中 deck，且不把部分产物写入整书缓存。
 
 **可选执行分部与时间预算。** 父 suite 的影响选择保持不变。仅对实测过重的 suite，可在书库自有 `books/<slug>/viz/tests/execution-parts.json` 声明有限、非空、不重复的分部：
 

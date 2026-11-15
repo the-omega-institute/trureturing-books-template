@@ -82,7 +82,7 @@ jobs:
               python /opt/tbook/container/prepare.py
               ./tbook check
               PYTHONPATH=tools python -m unittest discover -s tools/tests
-              node tools/node/viz-test.mjs
+              node tools/node/viz-test.mjs --full
               ./tbook build all
             '
 

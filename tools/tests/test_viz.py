@@ -378,7 +378,7 @@ class NodeSuiteRunner(unittest.TestCase):
                 "console.log(`frames=${process.env.VIZ_SLOW_FRAMES || 'none'}`);\n", encoding="utf-8")
             env = {k: v for k, v in os.environ.items() if k != "VIZ_SLOW_FRAMES"}
             env.update(TBOOK_ROOT=str(root), **(env_extra or {}))
-            return subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-test.mjs"), *args], capture_output=True,
+            return subprocess.run([NODE, str(paths.TOOLS / "node" / "viz-test.mjs"), "--full", *args], capture_output=True,
                                   text=True, cwd=root, env=env, timeout=120)
 
     def test_slow_sets_slow_frames(self):

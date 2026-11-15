@@ -1,5 +1,10 @@
 """Affected tests must follow old/new dependencies without launching unrelated browsers."""
 import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
 import unittest
 from unittest import mock
 
@@ -7,6 +12,100 @@ from ci import testing
 import test_ci_performance as fixtures
 
 planner = fixtures.planner
+
+
+@unittest.skipUnless(shutil.which("node"), "node not available")
+class LocalVizRunnerTests(unittest.TestCase):
+    setUp = fixtures.AffectedPlanTest.setUp
+    git = fixtures.AffectedPlanTest.git
+    write = fixtures.AffectedPlanTest.write
+    commit = fixtures.AffectedPlanTest.commit
+
+    def run_viz(self, *args, **env):
+        return subprocess.run(["node", str(Path(__file__).parents[1] / "node/viz-test.mjs"), *args],
+                              cwd=self.root, capture_output=True, text=True, timeout=60,
+                              env={**os.environ, "TBOOK_ROOT": str(self.root), "TBOOK_PYTHON": sys.executable, **env})
+
+    def listed(self, *args):
+        run = self.run_viz(*args, "--list")
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        return run.stdout.strip().splitlines()
+
+    def test_default_limits_committed_changes_and_book_arguments_filter_them(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.write("books/one/viz/a/model.js", "export const n=2;\n")
+        self.commit()
+        owner = "books/one/viz/tests/a.test.mjs"
+        self.assertEqual(self.listed(), [owner])
+        self.assertEqual(self.listed("one"), [owner])
+        self.assertEqual(self.listed("two"), [])
+        self.assertEqual(self.listed("--base", "HEAD"), [])
+        self.assertEqual(self.listed("--shard", "2/2"), [])
+
+    def test_staged_unstaged_and_untracked_inputs_match_the_shared_selector(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.write("books/one/viz/a/model.js", "export const n=2;\n")
+        self.git("add", "books/one/viz/a/model.js")
+        self.write("books/one/viz/b/model.js", "export const n=2;\n")
+        self.write("books/two/viz/a/new.js", "export const n=2;\n")
+        expected = [f"books/{book}/viz/tests/{ident}.test.mjs" for book, ident in
+                    (("one", "a"), ("one", "b"), ("two", "a"))]
+        self.assertEqual(self.listed(), expected)
+        old, current, changed = testing.working_changes(self.root, "origin/main")
+        self.assertEqual(self.listed(), planner.impact(current, old, changed)["suites"])
+
+    def test_shared_module_selects_only_its_actual_readers(self):
+        self.write("theme/viz/shared.js", "export const n=1;\n")
+        self.write("books/two/viz/tests/a.test.mjs", 'import "../../../../theme/viz/shared.js";\n')
+        self.git("update-ref", "refs/remotes/origin/main", self.commit())
+        self.write("theme/viz/shared.js", "export const n=2;\n")
+        self.assertEqual(self.listed(), ["books/two/viz/tests/a.test.mjs"])
+
+    def test_clean_and_documentary_changes_exit_without_starting_suites(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        for edited in (False, True):
+            if edited:
+                self.write("docs/PUBLISHING.md", "新说明\n")
+            run = self.run_viz("--slow")
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            self.assertIn("no affected visualization suites", run.stdout)
+            self.assertNotIn("=== books/", run.stdout)
+
+    def test_default_executes_only_the_affected_child_with_slow_frames_and_report(self):
+        for book in ("one", "two"):
+            for ident in ("a", "b"):
+                self.write(f"books/{book}/viz/tests/{ident}.test.mjs", "throw new Error('unrelated suite ran');\n")
+        owner = "books/one/viz/tests/a.test.mjs"
+        self.write(owner, 'console.log("frames="+process.env.VIZ_SLOW_FRAMES);\n')
+        self.git("update-ref", "refs/remotes/origin/main", self.commit())
+        self.write("books/one/viz/a/model.js", "export const n=2;\n")
+        report = self.root / ".git/result.json"
+        run = self.run_viz("--slow", "--report", str(report))
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("frames=1000", run.stdout)
+        self.assertIn("1/1 suites passed", run.stdout)
+        data = json.loads(report.read_text())
+        self.assertEqual([row["unit"] for row in data["results"]], [owner])
+        self.assertEqual(data["frames"], 1000)
+
+    def test_missing_base_fails_without_full_fallback_and_full_needs_no_git_history(self):
+        run = self.run_viz("--list")
+        self.assertEqual(run.returncode, 2)
+        self.assertIn("--base <ref>", run.stderr)
+        self.assertNotIn("=== books/", run.stdout)
+        self.assertEqual(self.listed("--full", "one"),
+                         [f"books/one/viz/tests/{ident}.test.mjs" for ident in ("a", "b")])
+        shutil.rmtree(self.root / ".git")
+        self.assertEqual(len(self.listed("--full")), 4)
+
+    def test_explicit_ci_selection_bypasses_git_but_rejects_ambiguous_modes(self):
+        owner = "books/two/viz/tests/b.test.mjs"
+        run = self.run_viz("--selection-env", "CI_ITEMS", "--list", CI_ITEMS=json.dumps([owner]))
+        self.assertEqual((run.returncode, run.stdout.strip()), (0, owner), run.stderr)
+        for args in (("--full",), ("--base", "HEAD")):
+            run = self.run_viz("--selection-env", "CI_ITEMS", *args, "--list", CI_ITEMS="[]")
+            self.assertEqual(run.returncode, 2)
+        self.assertEqual(self.run_viz("--base").returncode, 2)
 
 
 class SelectionTests(unittest.TestCase):
@@ -40,6 +139,22 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selected["suites"], [])
         selected = testing.select(head, old, ["theme/epub/style.css"])
         self.assertEqual(selected["browser_tests"], ["test_export_layout.EpubLayoutTest"])
+
+    def test_toolchain_image_workflow_edit_has_no_unrelated_browser_consumers(self):
+        self.write(".github/workflows/toolchain-image.yml", "name: Toolchain image\n")
+        head, old = self.views()
+        selected = planner.impact(head, old, [".github/workflows/toolchain-image.yml"])
+        self.assertEqual(selected["browser_tests"], [])
+        self.assertEqual(selected["suites"], [])
+        self.assertEqual(selected["films"], [])
+        self.assertEqual(selected["exports"], [])
+
+    def test_local_runner_regressions_follow_the_node_entrypoint(self):
+        self.write("tools/tests/test_ci_testing.py", "import unittest\n"
+                   "class LocalVizRunnerTests(unittest.TestCase):\n def test_runner(self): pass\n")
+        head, old = self.views()
+        selected = testing.select(head, old, ["tools/node/viz-test.mjs"])
+        self.assertIn("test_ci_testing.LocalVizRunnerTests", selected["unit_tests"])
 
     def test_site_browser_regression_is_separate_from_unrelated_python_imports(self):
         self.write("tools/tests/test_site.py", "import unittest\nfrom tbook import cli\n"
