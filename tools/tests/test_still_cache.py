@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import unittest
 
 from test_newbook import Repo, write
@@ -14,6 +15,43 @@ SOURCE = paths.ROOT
 
 @unittest.skipUnless(shutil.which('node'), 'Node is required')
 class StillCacheTests(unittest.TestCase):
+    def test_large_plan_flushes_pipe_and_scans_book_once(self):
+        with Repo() as repo:
+            book = repo.book(langs=('en',))
+            ids = ['first', 'last', 'constructor']
+            for vid in ids:
+                write(book.dir / f'viz/{vid}/index.html', '<div class="stage">A</div>')
+            write(book.dir / 'viz/visualizations.json', json.dumps({
+                'visualizations': [{'id': vid} for vid in ids]}))
+            presets = [f'card-{i:05}-' + 'x' * 90 for i in range(9000)]
+            write(book.dir / 'en/ch01.md', '# One\n\n' + ''.join(
+                f'::: {{.viz src="first" preset="{preset}"}}\n:::\n\n' for preset in presets)
+                + '::: {.viz src="last" preset="final"}\n:::\n')
+            # Count real parser launches without replacing its output or its book-reading behavior.
+            launcher = write(repo.root / 'python-launcher', f'#!{sys.executable}\n'
+                             'import os, sys\n'
+                             'with open(os.environ["CITATION_LAUNCH_LOG"], "a") as log: log.write("scan\\n")\n'
+                             'os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n')
+            launcher.chmod(0o755)
+            log = repo.root / 'parser-launches'
+            env = dict(os.environ, TBOOK_ROOT=str(repo.root), PW_CHROMIUM_PATH='/no-browser-installed',
+                       TBOOK_PYTHON=str(launcher), CITATION_LAUNCH_LOG=str(log),
+                       PYTHONPATH=str(SOURCE / 'tools'))
+            result = subprocess.run(['node', str(SOURCE / 'tools/node/viz-thumbs.mjs'), 'demo', '--plan'],
+                                    cwd=repo.root, env=env, capture_output=True, text=True, timeout=120)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertGreater(len(result.stdout.encode()), 1 << 20)
+            plan = json.loads(result.stdout)
+            self.assertEqual([job['id'] for job in plan], ids)
+            self.assertEqual(len(plan[0]['outputs']), len(presets) + 2)
+            self.assertEqual(plan[0]['outputs'][-2], f'books/demo/viz/first/fig-{presets[-1]}.en.jpg')
+            self.assertEqual(plan[1]['outputs'], ['books/demo/viz/last/thumb.jpg',
+                                                'books/demo/viz/last/fig-final.en.jpg',
+                                                'books/demo/viz/last/.stills.json'])
+            self.assertEqual(plan[2]['outputs'], ['books/demo/viz/constructor/thumb.jpg',
+                                                'books/demo/viz/constructor/.stills.json'])
+            self.assertEqual(log.read_text(), 'scan\n')
+
     def test_cache_provenance_corruption_and_no_browser_fast_path(self):
         with Repo() as repo:
             book = repo.book()

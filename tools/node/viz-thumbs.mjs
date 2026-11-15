@@ -20,7 +20,7 @@
 // Adapted from trureturing-visualize/scripts/thumbs.mjs (Apache-2.0, the-omega-institute).
 import path from 'node:path';
 import fs from 'node:fs';
-import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel, citedCards } from './viz-common.mjs';
+import { listBooks, resolveBook, readRegistry, registryPath, chromiumOptions, loadChromium, rel, citedCards, vizCitationIndex } from './viz-common.mjs';
 import { startServer, vizUrl } from './viz-server.mjs';
 import { routeLocalFonts, STILL, stillQuery, prepareStill } from './viz-testkit.mjs';
 
@@ -49,13 +49,15 @@ if (!jobs.length) { console.error(`no matching registry entries${ids.length ? ` 
 
 // Plan before loading Chromium: an unchanged run does no browser work.
 let stale = 0;
+const citations = new Map();
 for (const job of jobs) {
   const { book, v } = job;
   job.dir = path.join(book.dir, 'viz', v.id);
   job.key = inputKey(book, v);
   job.manifest = readManifest(job.dir);
   job.cover = path.join(book.dir, 'viz', v.thumbnail || `${v.id}/thumb.jpg`);
-  job.cited = citedCards(book, v.id);
+  if (!citations.has(book.dir)) citations.set(book.dir, vizCitationIndex(book));
+  job.cited = citedCards(book, v.id, citations.get(book.dir).get(v.id) || []);
   job.outputs = [{ name: 'cover', file: job.cover }, ...job.cited.map(({ preset, lang }) => ({
     name: `fig-${preset}.${lang}.jpg`, file: path.join(job.dir, `fig-${preset}.${lang}.jpg`)
   }))];
@@ -69,10 +71,11 @@ for (const job of jobs) {
   } else console.log(`${book.slug}/${v.id}: up to date (${job.outputs.length} images; no browser)`);
 }
 if (plan) {
-  console.log(JSON.stringify(jobs.map((job) => ({
+  const payload = JSON.stringify(jobs.map((job) => ({
     id: job.v.id, key: job.key, outputs: [...job.outputs.map(({ file }) => path.relative(bookRoot(job), file)),
       path.relative(bookRoot(job), path.join(job.dir, '.stills.json'))]
-  }))));
+  }))) + '\n';
+  await new Promise((resolve, reject) => process.stdout.write(payload, (error) => error ? reject(error) : resolve()));
   process.exit(0);
 }
 function bookRoot(job) { return path.resolve(job.book.dir, '..', '..'); }

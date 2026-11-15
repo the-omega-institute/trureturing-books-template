@@ -718,6 +718,17 @@ class Citations(unittest.TestCase):
         self.assertEqual(viz.citations(book, "other-viz"), [{"lang": "zh", "preset": "other", "height": 560}])
         self.assertEqual(viz.citations(book, "no-such-viz"), [])
 
+    def test_batch_index_preserves_order_and_loads_each_edition_once(self):
+        book = config.load_book(self.book.dir)
+        with mock.patch.object(viz, 'load_edition', wraps=load_edition) as load:
+            index = viz.citation_index(book)
+        self.assertEqual([call.args[0].lang for call in load.call_args_list], ['zh', 'en'])
+        self.assertEqual(index['golden-carry'], CITED)
+        self.assertEqual(index['other-viz'], [{"lang": "zh", "preset": "other", "height": 560}])
+        self.assertEqual(index['trureturing-visualize:golden-carry'],
+                         [{"lang": "zh", "preset": "external", "height": 560}])
+        self.assertNotIn('no-such-viz', index)
+
     def test_the_builds_read_the_same_blocks(self):
         """Every embed of the edition model is a citation or is not a viz of golden-carry; nothing else is."""
         book = config.load_book(self.book.dir)

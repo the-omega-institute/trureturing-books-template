@@ -930,7 +930,12 @@ def citations(book, viz_id: str) -> list[dict]:
     which removes the stills no chapter cites: an edition with a directory whose chapters cannot be selected
     (SUMMARY.md missing or unreadable, a listed chapter missing) raises :class:`VizError` rather than reading as
     citing nothing. An edition without a directory has no text, so it cites nothing (``./tbook check`` reports it)."""
-    out: list[dict] = []
+    return citation_index(book).get(viz_id, [])
+
+
+def citation_index(book) -> dict[str, list[dict]]:
+    """Group published embeds by visualization, loading each edition once; see :func:`citations`."""
+    out: dict[str, list[dict]] = {}
     for edition in book.editions:
         if not edition.dir.is_dir():
             continue
@@ -940,12 +945,14 @@ def citations(book, viz_id: str) -> list[dict]:
             raise VizError(f"cannot read the chapters of {edition.key}: " + "; ".join(broken))
         for doc in model.chapters:
             for env in doc.media:
-                if env.kind != "viz" or (env.attrs.get("src") or "").strip() != viz_id:
+                if env.kind != "viz":
                     continue
+                viz_id = (env.attrs.get("src") or "").strip()
                 preset = (env.attrs.get("preset") or "").strip()
                 height = _frame_height(env.attrs)[0]
-                out.append({"lang": edition.lang, "preset": preset if PRESET_RE.match(preset) else None,
-                            "height": DEFAULT_HEIGHT if height is None else height})
+                out.setdefault(viz_id, []).append({
+                    "lang": edition.lang, "preset": preset if PRESET_RE.match(preset) else None,
+                    "height": DEFAULT_HEIGHT if height is None else height})
     return out
 
 

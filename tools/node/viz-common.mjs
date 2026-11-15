@@ -138,7 +138,8 @@ export function resolveHref(href, lock) {
 // same editions, SUMMARY selection, Markdown grammar, kind and attributes. The interpreter is chosen as ./tbook does.
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CITATIONS_PY = 'import json, sys\nfrom tbook import config, viz\n'
-  + 'json.dump(viz.citations(config.load_book(sys.argv[1]), sys.argv[2]), sys.stdout)\n';
+  + 'read = viz.citations if len(sys.argv) > 2 else viz.citation_index\n'
+  + 'json.dump(read(config.load_book(sys.argv[1]), *sys.argv[2:]), sys.stdout)\n';
 function tbookPython() {
   if (process.env.TBOOK_PYTHON) return process.env.TBOOK_PYTHON;
   const venv = path.join(CODE_ROOT, '.venv', 'bin', 'python');
@@ -147,21 +148,25 @@ function tbookPython() {
 /** Every embed of `vizId` in the published chapters of `book`, as `./tbook build` reads them (tbook.viz.citations):
     [{ lang, preset, height }] by edition (book.toml order), SUMMARY.md chapter and position; preset is null for the
     whole lab, height is the frame height in pixels. Throws when the book tools cannot run or cannot read the book. */
-export function vizCitations(book, vizId) {
+function readCitations(book, vizId) {
   const py = tbookPython();
   const pythonPath = [path.join(CODE_ROOT, 'tools'), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter);
-  const r = spawnSync(py, ['-c', CITATIONS_PY, book.dir, vizId], {
+  const r = spawnSync(py, ['-c', CITATIONS_PY, book.dir, ...(vizId === undefined ? [] : [vizId])], {
     cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26, env: { ...process.env, PYTHONPATH: pythonPath, TBOOK_ROOT: ROOT }
   });
   const why = r.error ? r.error.message : r.status !== 0 ? (r.stderr || `exit ${r.status ?? r.signal}`).trim() : '';
-  const fail = (detail) => new Error(`cannot read the citations of viz "${vizId}" in ${rel(book.dir)} with ${py} (tbook.viz.citations): ${detail}`);
+  const subject = vizId === undefined ? 'all visualizations' : `viz "${vizId}"`;
+  const fail = (detail) => new Error(`cannot read the citations of ${subject} in ${rel(book.dir)} with ${py} (tbook.viz.citations): ${detail}`);
   if (why) throw fail(why);
   try { return JSON.parse(r.stdout); } catch (e) { throw fail(`unreadable output (${e.message})`); }
 }
+export function vizCitations(book, vizId) { return readCitations(book, vizId); }
+/** One scan of every published edition, for tools planning several visualizations in the same book. */
+export function vizCitationIndex(book) { return new Map(Object.entries(readCitations(book))); }
 /** The cards of `vizId` that the chapters of `book` cite: [{ preset, lang }], one per card and language. */
-export function citedCards(book, vizId) {
+export function citedCards(book, vizId, citations = vizCitations(book, vizId)) {
   const out = new Map();
-  for (const { preset, lang } of vizCitations(book, vizId)) if (preset) out.set(`${preset}.${lang}`, { preset, lang });
+  for (const { preset, lang } of citations) if (preset) out.set(`${preset}.${lang}`, { preset, lang });
   return [...out.values()];
 }
 
