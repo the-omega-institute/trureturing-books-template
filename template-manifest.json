@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "3e6b2abb5734fed86fd5ffe27af1507372a80e35db4d1add7e30ed1ba3ea8dc4",
+      "sha256": "92c7320d7ab7cf885b119f7d4e19bcb44c669f4f0b1e054017216a8847ec03cb",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "4f2c1836d8087f75d7c01d0668a86605b0f3b8e25dd6abc317fcd1bd95046d6d",
+      "sha256": "4c3092b44bfbfbf1b13be884d694167ffe42100faaadada2efcc514a4fe0a704",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -548,7 +548,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "5057bdb6a15eee91dad622e6a0c627691cf0c11870cd161f44a6744438ac9750",
+      "sha256": "c1b5ee47d9ef85972d2ed34ec2cd8ab4d2a9fe71eed6fc04895c9e37104f290c",
       "mode": "100644"
     },
     "tools/ci/run.py": {
@@ -556,7 +556,7 @@
       "mode": "100644"
     },
     "tools/ci/testing.py": {
-      "sha256": "a1b60f783876604ce21aa0ec5c4bb96cb54151defb69a04686ad2c59bb77b0b0",
+      "sha256": "fb67cb51b026a9091d875732939669debb9f9afbbe6c6617cad73b9455be814b",
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
@@ -872,11 +872,11 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "3f286235f08b4ac6bc57249606ad6819b53aed94417c438fe0ff83ec7b4e2128",
+      "sha256": "13180282044d7fe4a509a21aecf109d7a19f5ed6c524cf510af39d01e16f30a9",
       "mode": "100644"
     },
     "tools/tests/test_ci_testing.py": {
-      "sha256": "7c6c1a412c707787abf1e7224e10e86807d668aea0a39af9dbb615e3730c0200",
+      "sha256": "70bbf31b7085d09512378b0cdcb75e4b340b6f18b9dcb02c7d60c3b7e4169498",
       "mode": "100644"
     },
     "tools/tests/test_ci_transport.py": {

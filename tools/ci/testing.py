@@ -27,6 +27,8 @@ EXTRA = {
     "test_html": ["theme/mdbook/**", "tools/node/**"],
 }
 BROWSER = {
+    "test_site.BrowserLayoutTest": ["tools/tbook/site.py", "tools/tbook/html.py", "tools/tbook/mathrender.py",
+                                    "theme/mdbook/**", "theme/site/**", "theme/tokens.json", "theme/generated/**"],
     "test_export_layout.EpubLayoutTest": ["tools/tbook/pandoc.py", "tools/tbook/mathrender.py",
         "tools/filters/**", "theme/epub/**", "tools/tests/epub-layout.mjs"],
     **{f"test_viz.{name}": ["tools/node/viz*", "theme/viz/**"]

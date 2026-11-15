@@ -293,7 +293,7 @@ def blob_id(tree, name):
 
 
 def adopt_unchanged_summaries(current, previous, now, old):
-    """A newly declared reader can describe the old tree when ALL its inputs are equal."""
+    """A corrected complete summary describes both trees when ALL its inputs are equal."""
     if previous is None:
         return
     for slug, book in now.items():
@@ -301,7 +301,7 @@ def adopt_unchanged_summaries(current, previous, now, old):
         if not prior:
             continue
         for suite, deps in book["deps"].items():
-            if suite in prior["deps"] or suite not in prior["suites"]:
+            if prior["deps"].get(suite) == deps or suite not in prior["suites"]:
                 continue
             view = dict(prior, deps={**prior["deps"], suite: deps})
             relations = []
@@ -460,7 +460,8 @@ def impact(current, previous, paths, *, full=False, template=False):
                 slides.update(b["slides"])
                 languages = current.toml(f"books/{slug}/book.toml").get("book", {}).get("editions") or current.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
                 if local == "book.toml" or local.split("/")[0] not in languages:
-                    films.update(b["films"])
+                    # Supported film constructors already describe their full reads;
+                    # unknown readers above keep their own conservative responsibility.
                     path_reason("book metadata/resource or unknown local dependency: ", p)
             # Academic decks read chapters, figures and viz, beyond slides/ itself.
             for deck in b["slides"]:

@@ -41,6 +41,17 @@ class SelectionTests(unittest.TestCase):
         selected = testing.select(head, old, ["theme/epub/style.css"])
         self.assertEqual(selected["browser_tests"], ["test_export_layout.EpubLayoutTest"])
 
+    def test_site_browser_regression_is_separate_from_unrelated_python_imports(self):
+        self.write("tools/tests/test_site.py", "import unittest\nfrom tbook import cli\n"
+                   "class BrowserLayoutTest(unittest.TestCase):\n def test_layout(self): pass\n")
+        self.write("tools/tbook/cli.py", "pass\n")
+        head, old = self.views()
+        selected = testing.select(head, old, ["tools/tbook/cli.py"])
+        self.assertNotIn("test_site.BrowserLayoutTest", selected["unit_tests"])
+        self.assertEqual(selected["browser_tests"], [])
+        selected = testing.select(head, old, ["theme/mdbook/tr-book.css"])
+        self.assertEqual(selected["browser_tests"], ["test_site.BrowserLayoutTest"])
+
     def test_citation_dependencies_follow_both_endpoints_and_ignore_fenced_examples(self):
         deps = {"schema": planner.DEPENDENCIES, "suites": {
             "a.test.mjs": ["@citations"], "b.test.mjs": ["@citations"]}}
@@ -66,6 +77,33 @@ class SelectionTests(unittest.TestCase):
         head, old = self.views()
         self.assertEqual(planner.impact(head, old, ["books/one/viz/a/model.js"])["suites"],
                          ["books/one/viz/tests/a.test.mjs"])
+
+    def test_refined_chapter_summary_applies_to_unchanged_old_reader(self):
+        dep = "books/one/viz/tests/dependencies.json"
+        path = "books/one/zh/other.md"
+        self.write(dep, json.dumps({"schema": planner.DEPENDENCIES, "suites": {
+            "a.test.mjs": ["books/one/zh/*.md"], "b.test.mjs": ["books/one/zh/*.md"]}}))
+        self.write(path, '# Other\n::: {.viz src="b"}\n:::\n')
+        self.base = self.commit()
+        self.write(dep, json.dumps({"schema": planner.DEPENDENCIES, "suites": {
+            "a.test.mjs": ["@citations"], "b.test.mjs": ["@citations"]}}))
+        self.write(path, '# Changed other\n::: {.viz src="b"}\n:::\n')
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, [path])["suites"], ["books/one/viz/tests/b.test.mjs"])
+        # An edited reader cannot use the corrected summary to discard its old reads.
+        self.write("books/one/viz/a/model.js", "export const n=3;\n")
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, [path])["suites"],
+                         [f"books/one/viz/tests/{x}.test.mjs" for x in ("a", "b")])
+
+    def test_generated_book_data_only_selects_actual_film_readers(self):
+        path = "books/one/data/statistics.json"
+        self.write(path, '{}\n')
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, [path])["films"], [])
+        self.write("books/one/films/001-film/scenes.js", "const load = url => import(url);\n")
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, [path])["films"], ["one/001-film"])
 
     def test_local_list_includes_staged_unstaged_and_untracked_inputs_without_running(self):
         self.write("tools/test.py", "n=2\n")

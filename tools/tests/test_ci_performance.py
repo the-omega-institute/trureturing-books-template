@@ -521,13 +521,20 @@ class AffectedPlanTest(unittest.TestCase):
         head = planner.Tree(self.root, self.commit())
         expected = ["books/one/viz/tests/b.test.mjs"]
         for current, previous in ((head, old), (old, head)):
-            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"], expected)
+            # Correcting a complete declaration also refines the unchanged old reader.
+            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"],
+                             [] if current is head else expected)
         del data["suites"]["b.test.mjs"]
         self.write(path, json.dumps(data))
         unknown = planner.Tree(self.root, self.commit())
         for current, previous in ((head, unknown), (unknown, head)):
             self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"],
                              [] if current is head else expected)
+        self.write("books/one/viz/b/model.js", "export const n = 2;\n")
+        self.write(path, json.dumps({"schema": planner.DEPENDENCIES, "suites": data["suites"] | {"b.test.mjs": []}}))
+        edited = planner.Tree(self.root, self.commit())
+        for current, previous in ((edited, old), (old, edited)):
+            self.assertEqual(planner.impact(current, previous, ["theme/film/engine.js"])["suites"], expected)
 
     def test_unsupported_inline_module_keeps_only_its_film_uncertain_in_either_tree(self):
         self.shared_readers()
