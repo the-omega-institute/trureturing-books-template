@@ -28,7 +28,7 @@ books/<slug>/
   viz/<id>/               交互可视化（trureturing-visualize 方案）
   viz/visualizations.json 本书可视化注册表
   slides/<deck>/          演示文稿（Slidev，chrono-company-slides 方案）：slides.md（书的第一语言，即 editions 第一项）、slides.<lang>.md（其他语言）
-  films/<NNN>-<name>/     视频（trureturing-film 方案）：film.json、script.json、scenes.js
+  films/<id>/     视频（trureturing-film 方案）：film.json、script.json、scenes.js
 theme/
   tokens.json             设计令牌（唯一来源）
   generated/              由 tokens.json 派生：tokens.css、tokens.typ、tokens.mjs
@@ -151,7 +151,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 - PDF / EPUB：静态缩略图或海报 + 图注 + 在线地址（由 `site.toml` 的 `base_url` 拼出；没有 `base_url` 时视频只有海报）。
 - 书内媒体的源文件：
   - 可视化：`books/<slug>/viz/visualizations.json`（登记表）+ `viz/<id>/`（`index.html`、`style.css`、`main.js`、`thumb.jpg`）与 `viz/tests/<id>.test.mjs`；页面契约见 `templates/viz/README.md`。
-  - 视频：`books/<slug>/films/<NNN>-<name>/`（`film.json`、`script.json`、`scenes.js`、`poster.jpg`）；规范见 `templates/film/README.md`。成片是构建产物（见下文“视频构建”），没有单独的 Release；`film.json` 中旧的 `release_tag`、`published_tag` 不再使用，`./tbook check` 给出警告。
+  - 视频：`books/<slug>/films/<id>/`（`film.json`、`script.json`、`scenes.js`、`poster.jpg`）；规范见 `templates/film/README.md`。成片是构建产物（见下文“视频构建”），没有单独的 Release；`film.json` 中旧的 `release_tag`、`published_tag` 不再使用，`./tbook check` 给出警告。
   - 幻灯片：`books/<slug>/slides/<deck>/slides.md`（第一语言）与 `slides.<lang>.md`，逐页对应；不得有 `slides.<第一语言>.md`（会被 `slides.md` 遮蔽），也不得用 `src:` 导入别的文件的幻灯片（检查无法读取导入的内容），二者都报错；写法见 `theme/slides/README.md`。
 - 媒体中引用的 Lean GID 与章节引用一样必须在锁文件中，由 `./tbook pin --refresh` 解析、`./tbook check` 复核：登记表的 `lean`、页面的 `data-lean-gid`、`film.json` 的 `lean`、幻灯片的 `<LeanBadge>` / `<TheoremCard>`（`<lean-badge>`、`<theorem-card>` 等 Vue 认可的写法同样受检查；代码块之外的每个标签都受检查。代码块指围栏代码块、缩进代码块与 `<<<` 导入，按 Slidev 53 配置下 markdown-exit 的块规则识别：表格、组件 HTML 块、脚注、`$$` 公式块与各容器的规则都在内。Python 的 `slides.code_lines` 与 Node 的 `codeLines` 是同一份移植，测试用 Slidev 构建出的解析器比对二者）。它们显示为绿色 `LEAN ✓`，因此必须是种类为 `theorem` 的声明：页面中的定义用 `data-trureturing-path="<module>.lean"` 链接；幻灯片写 `kind="definition"` 时可以引用 Lean 定义，显示中性的 `LEAN DEF` 而不是绿色 `LEAN ✓`。
 - 可视化页面的绿色对勾 `.okmark` 只在 `.lean` 依据框里；页面里没有 `.lean` 祖先的 `.okmark`，以及脚本里写入 `.okmark`、却没有点名某个位于 `.lean` 框中的元素的那一行，`./tbook check`（`viz.okmarks_outside_lean`）与 `viz-validate`（`okmarksOutsideLean`）给警告；页面自己核对的数用中性的 `.nummark`。
@@ -202,7 +202,7 @@ build/slides/<slug>/<deck>/<lang>/  Slidev 输出；PDF 在 build/slides/<slug>/
                                     decks.<deck>.langs.<lang>.{title,info,blurb,slides,dir,site_path,base,pdf,pdf_name}）；
                                     发布时 base、各语言的 site_path（随书的第一语言而变）或语言集合
                                     与当前不符即为过期，slides.publish 先重新构建
-books/<slug>/films/<NNN>-<name>/out/  视频流水线的工作文件（git 忽略）；入口 theme/film/film.sh <film dir> <step>
+books/<slug>/films/<id>/out/  视频流水线的工作文件（git 忽略）；入口 theme/film/film.sh <film dir> <step>
 build/films/<slug>/<id>/            一部视频的成片：film.json outputs 所列的文件，必有 narrated_720p 与 cover，
                                     列出时另有 narrated、music_only、music_only_720p（构建单元 films <slug>/<id>，
                                     渲染或从缓存恢复）
@@ -302,8 +302,8 @@ manifest.json              机器可读清单（schema trureturing-books.site.v1
 <slug>/<lang>/             mdBook HTML
 <slug>/downloads/          PDF、EPUB
 <slug>/viz/                index.html（可视化索引）、visualizations.json、assets/（共享运行时）、<id>/
-<slug>/films/              index.html、films.json、assets/{tokens.css,films.css,films.js}、<NNN>-<name>/poster.jpg
-                           与 <NNN>-<name>/<outputs 所列的文件>（构建有该视频时；同源托管，iOS Safari 需要正确的
+<slug>/films/              index.html、films.json、assets/{tokens.css,films.css,films.js}、<id>/poster.jpg
+                           与 <id>/<outputs 所列的文件>（构建有该视频时；同源托管，iOS Safari 需要正确的
                            Content-Type 与按字节范围请求；没有时视频页、落地页与章节只显示海报与“视频未构建”）
 <slug>/slides/             index.html；<deck>/（第一语言）、<deck>/<lang>/（其他语言）、
                            <deck>/<slug>-<deck>-<lang>.pdf
