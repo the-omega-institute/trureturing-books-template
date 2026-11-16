@@ -329,6 +329,33 @@ class AffectedPlanTest(unittest.TestCase):
         other = planner.Tree(self.root, self.commit())
         self.assertTrue(planner.impact(other, old, ["template.toml"])["exports"])
 
+    def test_pages_workflow_reuses_book_evidence_but_keeps_assembly_and_explicit_readers(self):
+        import json
+        path = ".github/workflows/pages.yml"
+        self.write(path, "name: Pages\n")
+        self.write("tools/tests/test_ci_performance.py", "import unittest\n"
+                   "class PipelineTest(unittest.TestCase):\n    def test_ok(self): pass\n")
+        old = planner.Tree(self.root, self.commit())
+        self.write(path, "name: Updated Pages\n")
+        head = planner.Tree(self.root, self.commit())
+        for current, previous in ((head, old), (old, head)):
+            result = planner.impact(current, previous, [path])
+            self.assertTrue(result["site"])
+            self.assertIn("test_ci_performance.PipelineTest", result["unit_tests"])
+            for key in ("books", "suites", "films", "slides", "exports", "browser_tests"):
+                self.assertEqual(result[key], [], key)
+        deps = "books/one/viz/tests/dependencies.json"
+        data = json.loads((self.root / deps).read_text())
+        data["suites"]["a.test.mjs"].append(path)
+        self.write(deps, json.dumps(data))
+        self.write("books/one/viz/tests/a.test.mjs",
+                   f'import fs from "node:fs"; fs.readFileSync("{path}", "utf8");\n')
+        reader = planner.Tree(self.root, self.commit())
+        for current, previous in ((reader, old), (old, reader)):
+            result = planner.impact(current, previous, [path])
+            self.assertEqual(result["suites"], ["books/one/viz/tests/a.test.mjs"])
+            self.assertEqual(result["books"], ["one"])
+
     def test_template_metadata_nonversion_invalid_and_absent_inputs_keep_full_fallback(self):
         head, old = self.template_release()
         valid = head.read("template.toml")

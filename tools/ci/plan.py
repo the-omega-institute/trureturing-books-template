@@ -462,6 +462,12 @@ def impact(current, previous, paths, *, full=False, template=False):
             # Planning/test infrastructure has no publication output. Declared
             # runtime readers were already propagated above, before classification.
             continue
+        if p == ".github/workflows/pages.yml":
+            # Validate publication orchestration and exercise assembly/deployment;
+            # unchanged book inputs retain their browser and export evidence.
+            site = True
+            reasons.add(f"publication workflow: {p}")
+            continue
         if p.startswith(".github/ISSUE_TEMPLATE/") or p in (
                 ".github/pull_request_template.md", ".github/workflows/pr-conventions.yml",
                 ".github/workflows/template-sync.yml", ".github/workflows/trureturing-bump.yml"):
