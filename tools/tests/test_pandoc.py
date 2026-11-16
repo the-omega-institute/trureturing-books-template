@@ -262,7 +262,6 @@ class SourceCacheTest(unittest.TestCase):
                     patch.object(tp, "stage", wraps=tp.stage) as stage, \
                     patch.object(tp, "run_pandoc", side_effect=convert) as pandoc, \
                     patch.object(tp, "compile_typst", side_effect=compile) as typst, \
-                    patch.object(tp, "_compact_pdf", side_effect=lambda p: p), \
                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 for variant in config.PDF_VARIANTS:
                     directory = root / f"stage-{variant}"
@@ -677,22 +676,16 @@ class LuaFilterTest(unittest.TestCase):
                 self.assertNotIn("\ufffd", out)
 
     @unittest.skipUnless(have_typst(), "typst not available")
-    def test_inline_math_identities_preserve_heading_anchors(self):
+    def test_inline_math_preserves_heading_anchors(self):
         import typst
 
         out = run_filters("## Math $x$ and $y$ {#public-heading}\n\nBody $z$.\n", "typst", self.META)
-        identities = re.findall(r"<tr-inline-[^>]+>", out)
-        self.assertEqual(len(identities), 3)
-        self.assertEqual(len(set(identities)), 3)
         _, warnings = typst.compile_with_warnings(out.encode())
         self.assertFalse([w for w in warnings if "labelled" in w.message])
         self.assertEqual(json.loads(typst.query(out.encode(), "<public-heading>", field="level")), [2])
-        for identity in identities:
-            self.assertEqual(json.loads(typst.query(out.encode(), identity, field="block")), [False])
 
     def test_typst_output(self):
         out = run_filters(ENV_MD, "typst", self.META)
-        out = re.sub(r"#\[(\$.*?)<tr-inline-[^>]+>\]", r"\1", out, flags=re.S)
         self.assertIn('#tr-env(kind: "theorem", status: "lean", label: "Theorem", number: "1.2", '
                       'ref: "Theorem 1.2", title: [Bound on $c$], badge: "LEAN ✓", '
                       'badge-url: "https://example.org/X.lean#L3", lean: ((gid: "D5/S1/X.y", name: "D5.S1.X.y", url: "https://example.org/X.lean#L3"),), '
@@ -749,8 +742,8 @@ class LuaFilterTest(unittest.TestCase):
         meta = {**self.META, "tr-tex-macros": mathrender.newcommands()}
         typst = run_filters(mathrender.newcommands() + "\n\n" + self.TITLED, "typst", meta)
         self.assertNotIn("\\norm", typst)
-        self.assertRegex(typst, r"for\s+#\[\$lr\(bar.v.double v bar.v.double\)\$<tr-inline-tr-env-\d+>\]\]")
-        self.assertRegex(typst, r"Body #\[\$lr\(bar.v.double w bar.v.double\)\$<tr-inline-tr-book-\d+>\]\.")
+        self.assertRegex(typst, r"for\s+\$lr\(bar.v.double v bar.v.double\)\$\]")
+        self.assertRegex(typst, r"Body \$lr\(bar.v.double w bar.v.double\)\$\.")
         html = run_filters(mathrender.newcommands() + "\n\n" + self.TITLED, "html5", meta)
         self.assertNotIn("\\norm", html)
         self.assertNotIn("newcommand", html)
@@ -796,7 +789,7 @@ class TypstSymbolTest(unittest.TestCase):
               'tr-number="1.1" tr-ref="Remark 1.1" tr-title="On $A \\\\cap B$"}\nBody.\n::::::\n')
         out = run_filters(md, "typst", self.META)
         for new in ("A inter B", "inter.big", "inter.double", "inter.sq", "dot.o", "dot.o.big", "times.o",
-                    "times.o.big", "minus.o", "dash.o", 'title: [On #[$A inter B$', 'upright("sect")/**/inter x'):
+                    "times.o.big", "minus.o", "dash.o", 'title: [On $A inter B$', 'upright("sect")/**/inter x'):
             self.assertIn(new, out)
         self.assertNotRegex(re.sub(r'"[^"]*"', "", out), r"\bsect\b|\.circle\b")
         self.assertIn("upright(i n t e r s e c t)", out)  # letters, not the name sect
@@ -1046,9 +1039,8 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn("#cite", main)
         # Macros are expanded in math (no raw TeX fallback), titles included.
         self.assertNotIn("\\norm", main)
-        expressions = re.sub(r"#\[(\$.*?)<tr-inline-[^>]+>\]", r"\1", main, flags=re.S)
-        self.assertIn("a norm $lr(bar.v.double x bar.v.double)$ and $⌊y⌋$", expressions)
-        self.assertIn("== Bound $x^2$ for $lr(bar.v.double x bar.v.double)$", expressions)
+        self.assertIn("a norm $lr(bar.v.double x bar.v.double)$ and $⌊y⌋$", main)
+        self.assertIn("== Bound $x^2$ for $lr(bar.v.double x bar.v.double)$", main)
         # b.md#summary reaches B's "Summary", not A's.
         self.assertIn("#link(<ch-b--summary>)[the summary of B]", main)
         self.assertRegex(main, r"== Summary\s*<ch-b--summary>")
@@ -1057,30 +1049,6 @@ class BuildTest(unittest.TestCase):
     def test_pdf_rejects_unknown_variant(self):
         with self.assertRaises(tp.PandocError):
             tp.build_pdf(self.site, self.book, self.ed, self.model, None, "glossy", self.tmp / "x.pdf")
-
-    def test_pdf_compaction_preserves_content_and_links(self):
-        import pikepdf
-
-        path = self.tmp / "compact.pdf"
-        with pikepdf.Pdf.new() as pdf:
-            pdf.docinfo["/Title"] = "Lossless academic PDF"
-            for i in range(100):
-                page = pdf.add_blank_page()
-                page.Contents = pdf.make_stream(f"q 1 0 0 1 {i} 0 cm Q".encode())
-                page.Annots = [pdf.make_indirect(pikepdf.Dictionary(
-                    Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Link,
-                    Rect=[0, 0, 10, 10],
-                    A=pikepdf.Dictionary(S=pikepdf.Name.URI, URI=f"https://example.org/{i}")))]
-            pdf.save(path, object_stream_mode=pikepdf.ObjectStreamMode.disable)
-        before = path.stat().st_size
-        self.assertEqual(tp._compact_pdf(path), path)
-        self.assertLess(path.stat().st_size, before)
-        with pikepdf.open(path) as pdf:
-            self.assertEqual(str(pdf.docinfo["/Title"]), "Lossless academic PDF")
-            self.assertEqual(len(pdf.pages), 100)
-            for i, page in enumerate(pdf.pages):
-                self.assertEqual(page.Contents.read_bytes(), f"q 1 0 0 1 {i} 0 cm Q".encode())
-                self.assertEqual(str(page.Annots[0].A.URI), f"https://example.org/{i}")
 
     def test_epub(self):
         old = os.environ.get("TBOOK_EPUBCHECK")

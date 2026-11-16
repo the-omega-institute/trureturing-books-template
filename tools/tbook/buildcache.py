@@ -56,7 +56,7 @@ ENTRY = "entry.json"
 VERSION = "2"  # part of every key: bump it to rebuild everything once
 KEEP = 2  # entries kept per unit in the local store
 REMOTE_RELEASES = 5  # newest published releases with a build-cache.json searched for an entry
-TARGETS = ("html", "pandoc", "typst", "pdf", "epub", "slides", "films", "viz-stills", "figures", "covers")
+TARGETS = ("html", "pandoc", "typst", "pdf", "epub", "slides", "films", "viz-stills", "covers")
 TIMEOUT = 300  # seconds per HTTP request
 MAX_JSON = 32 << 20  # bytes: a release list or build-cache.json larger than this is refused
 MAX_ASSET = 8 << 30  # bytes: upper bound for an asset whose size is not declared
@@ -523,12 +523,11 @@ def viz_units(book: config.Book, ids: list[str] | None = None) -> list[Unit]:
 
 def units(site: config.Site, books: Iterable[config.Book]) -> list[Unit]:
     """Every unit of ``books`` that ``./tbook build all`` builds, with its current key."""
-    from . import build, cover, figure, film, pandoc, slides
+    from . import build, cover, film, pandoc, slides
 
     out: list[Unit] = []
     for book in books:
         out.extend(cover.units(site, book))
-        out.extend(figure.units(book))
         out.extend(viz_units(book))
         for ed in book.editions:
             if book.outputs_html:

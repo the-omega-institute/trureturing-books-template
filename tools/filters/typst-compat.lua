@@ -1185,11 +1185,6 @@ function M.rename(code)
   return table.concat(out)
 end
 
--- Stable, document-local identities let the layout look up just one formula's width.
--- Both filters load this module separately, so keep their namespaces distinct.
-local inline_index = 0
-local inline_namespace = pandoc.path.filename(PANDOC_SCRIPT_FILE):gsub("%.lua$", "")
-
 local function write(el)
   local typ = pandoc.write(pandoc.Pandoc({ pandoc.Plain({ el }) }), "typst", { wrap_text = "wrap-none" })
   return (typ:gsub("[ \t\r\n]+$", ""))
@@ -1212,12 +1207,6 @@ function M.math(el)
   if source ~= el and (fixed:find("\238[\128-\135][\128-\191]") or fixed:find("#h%([3-6]%d%d%dem%)")) then
     source, typ = el, write(el)
     fixed = M.rename(typ)
-  end
-  if el.mathtype == "InlineMath" then
-    inline_index = inline_index + 1
-    -- Group the identity with its equation: in shorthand headings a bare label
-    -- would otherwise attach to the heading and replace its public anchor.
-    return pandoc.RawInline("typst", "#[" .. fixed .. "<tr-inline-" .. inline_namespace .. "-" .. inline_index .. ">]")
   end
   if fixed == typ and source == el then return nil end
   return pandoc.RawInline("typst", fixed)

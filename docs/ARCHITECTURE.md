@@ -229,7 +229,6 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 | `typst` | `<slug>/<lang>` | Pandoc 转换后的 `main.typ` |
 | `pdf` | `<slug>/<lang>/<variant>` | `build/dist/<slug>/` 下该语言版本、该变体的 PDF |
 | `epub` | `<slug>/<lang>` | `build/dist/<slug>/` 下该语言版本的 EPUB |
-| `figures` | `<slug>/<figure>/<lang>` | 预期 SVG；生成时再比较、写入本地图片及幻灯片副本 |
 | `covers` | `<slug>/<lang>/<variant>/<width>/<format>` | 站点与 EPUB 共用机制生成的书封 |
 | `viz-stills` | `<slug>/<viz id>` | 本地封面、引用卡静帧与清单 |
 | `slides` | `<slug>` | `build/slides/<slug>/`（全部 deck、语言与 PDF） |
@@ -242,7 +241,7 @@ PDF 按完整文档编译，页码、目录、交叉引用和分页共同决定�
 - 文件：仓库是 git 工作树时，取所列目录下 git 会提交的文件（已跟踪的，以及未跟踪且未被忽略的），构建产物与被忽略的文件不计入；git 整体忽略的目录（如 `.cache/fonts/`）与仓库外的目录逐个文件计入。仓库外的文件记为 `<outside>/<目录名>/<相对路径>`，键与目录所在位置无关。不是 git 工作树时遍历目录，跳过 `build/`、`_site/`、`.cache/`、`node_modules/`、`out/`、`frames/`、`tts/` 等。
 - HTML、PDF、EPUB：`tools/tbook/`、`tools/filters/`、`tools/node/`、`tools/figkit/`、`theme/`（不含只供视频用的 `theme/film/`）、`i18n/`、`site.toml`、锁文件、`requirements.txt`、`package-lock.json`，整个书目录 `books/<slug>/`（各语言版本互相引用，改动任一语言都会重建这本书的全部单元），站点地址与仓库、Python 主次版本、Node 主版本。HTML 另计 mdBook 的精确版本；PDF 与 EPUB 另计 Pandoc 与 `typst` 模块的版本系列、`.cache/fonts/` 的字体文件、Typst 找到的字体族（含系统字体，所以构建 PDF/EPUB 的工作流都装同一套字体：`.github/actions/setup` 的 `fonts: 'true'` 包含 Playwright `--with-deps` 会装的字体）与 `$SOURCE_DATE_EPOCH`；EPUB 还计 epubcheck 是否真能运行（`$TBOOK_EPUBCHECK`，以及缺 Java 或 epubcheck 包时记为跳过），未经检查存下的 EPUB 不会恢复到要求检查的构建中。`.cache/fonts-fontsource/` 由构建从 `@fontsource` 包派生，不计入。
 - 幻灯片：整个书目录（包括绘图脚本及其数据源），`tools/figkit/`、`theme/tokens.json`、`theme/slides/`、`theme/generated/`、`theme/i18n/`、`i18n/`、`tools/node/`、`tools/tbook/slides.py`、锁文件、`site.toml`、`package-lock.json`，站点基路径与地址，`TBOOK_SLIDES_NO_PDF`、`TBOOK_SLIDES_NO_CHECK`，Node 主版本（Chromium 由 `package-lock.json` 中的 Playwright 决定）。
-- 静态图：默认包含书籍源码及声明的派生数据，排除生成图片，脚本可用字面量 `INPUTS` 声明完整数据依赖以缩小失效范围；脚本、辅助模块、绘图工具、配色与冻结锁始终计入。检查命中缓存时仍比较本地 SVG，不会以恢复掩盖损坏。书封按实际绘制元数据、模板、配色、字体、导出尺寸与时间戳计算键；正文变化而这些输入相同时可复用。
+- 书封：按实际绘制元数据、模板、配色、字体、导出尺寸与时间戳计算键；正文变化而这些输入相同时可复用。静态 SVG 直接运行脚本生成，不建立单独缓存单元。
 
 `@fontsource` 的拉丁回退字体转换为 `.cache/fonts-fontsource/` 下的 TTF，每个映射字重在相邻的 `.ttf.json` 中记录 WOFF 与 TTF 的 SHA-256。源文件可用时，只有两者摘要都匹配才复用；源字节变化、旧缓存没有记录或 TTF 损坏都会重新转换。当前源转换失败时移除旧 TTF，避免 PDF、EPUB 或封面继续使用旧字体；未安装 npm 源包时仍保留已有 TTF 供离线使用。
 
@@ -399,8 +398,7 @@ def generate(out_dir) -> Path
 | Python | ≥ 3.11 | 系统 / `actions/setup-python` |
 | Pandoc | 3.9（`pypandoc_binary==1.17`） | `requirements.txt` |
 | Typst | `typst==0.15.2`（Python 模块） | `requirements.txt` |
-| pikepdf / QPDF | `pikepdf==10.0.2` | `requirements.txt`；无损 PDF 对象流打包 |
-| Zopfli | `zopfli==0.4.3` | `requirements.txt`；无损 PDF 页面 Deflate 编码 |
+| pikepdf / QPDF | `pikepdf==10.0.2` | `requirements.txt`；PDF 导出测试的结构与内容独立校验 |
 | epubcheck | 5.3.0（Python 包内含 jar，需 Java） | `requirements.txt` |
 | mdBook | 0.5.4 | CI 用 `taiki-e/install-action`；本地 `cargo install mdbook --version 0.5.4 --locked` |
 | Node | ≥ 22.12 | `package.json` |
