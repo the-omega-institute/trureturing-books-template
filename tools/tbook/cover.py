@@ -28,6 +28,38 @@ COVER_IN = (5, 8)
 FORMATS = ("png", "pdf", "svg")
 
 
+def cache_unit(site, book, edition, *, fmt="png", variant="screen", width_px=COVER_PX[0], meta=None):
+    """A cover depends on its rendered metadata, template, fonts and export settings."""
+    from . import buildcache, pandoc
+
+    meta = meta if meta is not None else cover_meta(site, book, edition)
+    inputs = (buildcache.Inputs()
+              .files(paths.TOOLS / "tbook", paths.THEME / "typst" / "cover.typ",
+                     paths.GENERATED / "tokens.typ", pandoc.THEME_FONTS,
+                     paths.ROOT / "requirements.txt", paths.ROOT / "package-lock.json")
+              .add(buildcache._fonts())
+              .text("meta", meta).text("format", fmt).text("variant", variant)
+              .text("width", width_px).text("timestamp", pandoc.source_date_epoch(book))
+              .text("typst", buildcache.package_version("typst")))
+    name = f"{book.slug}/{edition.lang}/{variant}/{width_px}/{fmt}"
+    output = paths.CACHE / "covers" / book.slug / edition.lang / f"{variant}-{width_px}.{fmt}"
+    return buildcache.Unit("covers", name, inputs, [output], required=False)
+
+
+def units(site, book):
+    """The PNGs consumed by the site and EPUB; ad hoc cover exports remain locally reusable."""
+    from . import site as site_mod
+
+    result = []
+    for edition in book.editions:
+        meta = cover_meta(site, book, edition)
+        widths = {site_mod.COVER_WIDTH}
+        if book.outputs_epub:
+            widths.add(COVER_PX[0])
+        result.extend(cache_unit(site, book, edition, width_px=width, meta=meta) for width in sorted(widths))
+    return result
+
+
 def cover_meta(site: config.Site, book: config.Book, edition: config.Edition, *, model=None, lock=None) -> dict:
     """The metadata dictionary shared with the PDF (see tbook.pandoc.book_meta)."""
     from . import pandoc
@@ -49,7 +81,7 @@ def render_cover(site, book, edition, out_path: Path, *, fmt: str = "png", varia
     ``model``/``lock``/``meta`` may be passed to avoid reloading them; ``width_px`` scales
     the PNG (default 1600 → 1600×2560; e.g. 480 for a 480×768 web card).
     """
-    from . import pandoc
+    from . import buildcache
 
     if fmt not in FORMATS:
         raise ValueError(f"cover format must be one of {FORMATS}, got {fmt!r}")
@@ -57,6 +89,23 @@ def render_cover(site, book, edition, out_path: Path, *, fmt: str = "png", varia
         raise ValueError(f"cover variant must be one of {config.PDF_VARIANTS}, got {variant!r}")
     meta = meta or cover_meta(site, book, edition, model=model, lock=lock)
     out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if not buildcache.enabled():
+        return _render(book, out_path, fmt=fmt, variant=variant, width_px=width_px, meta=meta)
+    try:
+        unit = cache_unit(site, book, edition, fmt=fmt, variant=variant, width_px=width_px, meta=meta)
+        cached = unit.outputs[0]
+        buildcache.run(unit, lambda: _render(book, cached, fmt=fmt, variant=variant, width_px=width_px, meta=meta),
+                       repo=site.repo or None)
+        shutil.copy2(cached, out_path)
+    except OSError:
+        return _render(book, out_path, fmt=fmt, variant=variant, width_px=width_px, meta=meta)
+    return out_path
+
+
+def _render(book, out_path: Path, *, fmt, variant, width_px, meta) -> Path:
+    from . import pandoc
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "pdf":
         paper = meta.get("academic_paper", "a4") if variant == "academic" else meta["paper"]

@@ -6,7 +6,7 @@
 #       mode: restore
 #       pages-url: ${{ steps.pages.outputs.base_url }}   # actions/configure-pages; may be empty
 #   - run: ./tbook build all                     # with TBOOK_CACHE_REMOTE=1 and GITHUB_TOKEN
-#   - uses: ./.github/actions/build-cache       # after the build (only pages.yml saves)
+#   - uses: ./.github/actions/build-cache       # after the build or successful CI aggregation
 #     with:
 #       mode: save
 #
@@ -21,6 +21,8 @@
 # unchanged store is not uploaded again). The run suffix makes every saved key new: cache keys are
 # immutable, so a store that returns to an earlier content (a revert) could not be saved under that
 # earlier key again, and restore, which takes the newest entry of the prefix, would keep the newer one.
+# The CI aggregate uses prune=false: it verifies entries and keeps each unit's newest two keys, without
+# calculating publishing keys from Check's different fonts. It runs only after the planned checks pass.
 #
 # Trust. A restored entry replaces a build: its files go into the site and the releases as they are.
 # So the store is saved only from runs of the default branch's own code: push to the default branch,
@@ -29,13 +31,13 @@
 # the workflows, so one push can save a planted entry in the pull request's cache scope and the next push,
 # with a clean final diff, would restore it (restore looks in that scope first). Runs of other branches and
 # tags read their own scope (which only their own code can write) and then the default branch's.
-# Pull-request runs restore the tbook-build-store artifact from a successful default-branch Pages run
+# Pull-request runs restore the tbook-build-store artifact from a successful default-branch CI/Pages run
 # (tools/ci/trusted_cache.py verifies its workflow ID, repository, branch, event and outcome; requires
 # actions: read). No PR-produced artifact is read. Missing or expired artifacts are cache misses.
 # Pull-request runs may also restore from published releases (TBOOK_CACHE_REMOTE=1), which only the
 # tag workflows (release.yml, template-release.yml; contents: write) create: docs/VERIFICATION.md §2.
 name: tbook build cache
-description: Restore the build store from Actions caches or trusted Pages artifacts; save on the default branch.
+description: Restore the build store from Actions caches or trusted CI/Pages artifacts; save on the default branch.
 
 inputs:
   mode:
@@ -45,6 +47,10 @@ inputs:
     description: restore only. The Pages URL (actions/configure-pages base_url), or empty when Pages is not set up.
     required: false
     default: ''
+  prune:
+    description: save only. Recompute current keys; false is reserved for the successful CI check aggregate.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -56,6 +62,13 @@ runs:
         MODE: ${{ inputs.mode }}
       run: |
         echo "::error title=build-cache::mode must be restore or save, got '$MODE'"
+        exit 1
+
+    - name: Require the CI aggregate for toolchain-free maintenance
+      if: inputs.mode == 'save' && inputs.prune == 'false' && github.job != 'check'
+      shell: bash
+      run: |
+        echo "::error title=build-cache::prune=false is reserved for the successful CI check aggregate"
         exit 1
 
     - name: Use the Pages URL for absolute links and cache keys
@@ -88,7 +101,7 @@ runs:
         echo "TBOOK_BUILD_CACHE_RESTORED=$MATCHED" >> "$GITHUB_ENV"
         if [ -n "$MATCHED" ]; then echo "restored $MATCHED"; else echo "no build cache restored"; fi
 
-    - name: Find the default branch Pages cache artifact
+    - name: Find a default branch CI/Pages cache artifact
       id: trusted
       if: inputs.mode == 'restore' && startsWith(github.event_name, 'pull_request')
       shell: bash
@@ -97,7 +110,7 @@ runs:
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: python3 tools/ci/trusted_cache.py
 
-    - name: Restore the trusted Pages artifact
+    - name: Restore the trusted CI/Pages artifact
       if: inputs.mode == 'restore' && steps.trusted.outputs.artifact-id != ''
       continue-on-error: true
       uses: actions/download-artifact@v7
@@ -117,9 +130,16 @@ runs:
         ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
       shell: bash
+      env:
+        PRUNE: ${{ inputs.prune }}
       run: |
         set -euo pipefail
-        ./tbook cache prune
+        if [ "${PRUNE:-true}" = "false" ]; then
+          # The CI aggregate has no publishing fonts or tools; only complete verified entries survive.
+          python3 tools/ci/cache_store.py maintain
+        else
+          ./tbook cache prune
+        fi
         content="$(./tbook cache key)"
         restored="${TBOOK_BUILD_CACHE_RESTORED:-}"
         restored="${restored%-r*}"

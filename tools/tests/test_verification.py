@@ -1315,7 +1315,7 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         """Every job that builds restores the store first (outside pull requests: the action decides), looks
         missing units up in releases, and builds for the Pages URL as pages.yml does, so that all of them share
         keys; jobs that build films install the film toolchain and fail when a film cannot be rendered; only
-        pages.yml saves the store, after its build ran."""
+        pages.yml saves after building; CI saves only after the successful aggregate merges shards."""
         jobs = self.building_jobs()
         self.assertEqual(set(jobs), {("ci.yml", "build"), ("ci.yml", "media"), ("ci.yml", "films"), ("pages.yml", "build"),
                                      ("release.yml", "build"), ("template-release.yml", "site")})
@@ -1369,7 +1369,29 @@ class BuildCacheWorkflowTests(unittest.TestCase):
                 self.assertFalse(gha_if(cond, event="push", ref="refs/heads/main", cancelled=True,
                                         context={"steps.build.outcome": "failure"}))
             else:
-                self.assertEqual(saves, [], f"{where}: only pages.yml saves the store")
+                self.assertEqual(saves, [], f"{where}: only Pages and the successful CI aggregate save the store")
+
+    def test_ci_aggregation_saves_verified_entries_without_publishing_fonts(self):
+        steps = workflow_jobs(self.WORKFLOWS / "ci.yml")["check"]
+        save = next(s for s in steps if s.get("uses") == "./.github/actions/build-cache"
+                    and s["with"].get("mode") == "save")
+        self.assertEqual(save["with"].get("prune"), "false")
+        aggregate_guard = next(s for s in action_steps("build-cache")
+                               if "prune=false is reserved" in s.get("run", ""))
+        for job, denied in (("check", False), ("build", True), ("media", True)):
+            self.assertEqual(gha_if(aggregate_guard["if"], event="push", ref="refs/heads/main", context={
+                "inputs.mode": "save", "inputs.prune": "false", "github.job": job}), denied)
+        merge = next(s for s in steps if "cache_store.py merge" in s.get("run", ""))
+        verify = next(s for s in steps if "--verify --needs-file" in s.get("run", ""))
+        self.assertLess(steps.index(verify), steps.index(merge))
+        self.assertLess(steps.index(merge), steps.index(save))
+        self.assertNotIn("always()", merge.get("if", ""), "a failed planned job must skip cache publication")
+        prune = next(s for s in action_steps("build-cache") if s.get("id") == "prune")
+        # The action still applies its own trusted-event/ref gate, including prune=false.
+        for event, ref in (("pull_request", "refs/pull/7/merge"), ("pull_request_target", "refs/heads/main"),
+                           ("workflow_dispatch", "refs/heads/feature")):
+            self.assertFalse(gha_if(prune["if"], event=event, ref=ref,
+                                    context={"inputs.mode": "save", "inputs.prune": "false"}))
 
     def test_pdf_and_epub_jobs_see_the_same_system_fonts(self):
         """PDF and EPUB keys include the font families Typst finds on the system, so every job that builds them
