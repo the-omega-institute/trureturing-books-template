@@ -24,11 +24,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import film_inputs, template as template_metadata
 from ci import viz_budget, testing
 
-VERSION = 5
+VERSION = 6
 SCHEMA = "tbook-ci-coverage-v1"
 DEPENDENCIES = "tbook-ci-dependencies-v1"
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-JOBS = ("validate", "build", "viz", "viz-slow", "media", "films")
+JOBS = ("validate", "stills", "build", "viz", "viz-slow", "media", "films")
 
 
 def git(root, *args):
@@ -39,13 +39,37 @@ class Tree:
     def __init__(self, root, ref):
         self.root = Path(root)
         self.sha = git(root, "rev-parse", "--verify", ref + "^{commit}").decode().strip()
-        self.files = set(git(root, "ls-tree", "-r", "--name-only", "-z", self.sha).decode().rstrip("\0").split("\0")) - {""}
+        self.objects = {}
+        for entry in git(root, 'ls-tree', '-r', '-z', self.sha).split(b'\0'):
+            if entry:
+                meta, name = entry.split(b'\t', 1)
+                self.objects[name.decode()] = meta.split()[-1].decode()
+        self.files = set(self.objects)
         self.cache = {}
+        self.reader = None
 
     def read(self, name):
         if name not in self.cache:
-            self.cache[name] = git(self.root, "show", f"{self.sha}:{name}").decode()
+            if self.reader is None:
+                self.reader = subprocess.Popen(['git', '-C', str(self.root), 'cat-file', '--batch'],
+                                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            # Object IDs, never filenames, enter the line-based protocol; unusual paths stay inert.
+            self.reader.stdin.write((self.objects[name] + '\n').encode())
+            self.reader.stdin.flush()
+            header = self.reader.stdout.readline().split()
+            if len(header) != 3 or header[1] != b'blob':
+                raise ValueError(f'cannot read Git blob: {name}')
+            self.cache[name] = self.reader.stdout.read(int(header[2])).decode()
+            if self.reader.stdout.read(1) != b'\n':
+                raise ValueError('invalid Git object stream')
         return self.cache[name]
+
+    def __del__(self):
+        reader = getattr(self, 'reader', None)
+        if reader is not None:
+            reader.stdin.close()
+            reader.stdout.close()
+            reader.wait()
 
     def json(self, name):
         return json.loads(self.read(name))
@@ -175,12 +199,39 @@ def suite_inputs(tree, slug, book, suite):
     base = f"books/{slug}/viz/"
     ident = PurePosixPath(suite).name.removesuffix(".test.mjs")
     patterns = [base + ident + "/**", base + "visualizations.json", *book["deps"].get(suite, [])]
+    # The author declares these lock reads are solely the shared evidence-link gate.
+    # Structural/static validation still checks them on every lock change.
+    if "@lean-links" in patterns:
+        patterns.remove("@lean-links")
+    if '@registry-entry' in patterns:
+        patterns.remove('@registry-entry')
+        patterns.remove(base + 'visualizations.json')
     if "@citations" in patterns:
         patterns.remove("@citations")
         patterns.extend(citation_inputs(tree, slug, ident))
     roots = [suite, *(p for p in tree.files if p.endswith((".js", ".mjs")) and
                       any(fnmatch.fnmatchcase(p, pat) for pat in patterns))]
     return patterns, imports(tree, *roots)
+
+
+def registry_entry(tree, slug, ident):
+    if tree is None:
+        return None
+    name = f'books/{slug}/viz/visualizations.json'
+    if name not in tree.files:
+        return None
+    if not hasattr(tree, '_registry_entries'):
+        tree._registry_entries = {}
+    if name not in tree._registry_entries:
+        data = tree.json(name)
+        entries = data['visualizations']
+        if not isinstance(entries, list) or any(not isinstance(v, dict) or not SLUG.fullmatch(v.get('id', '')) for v in entries):
+            raise ValueError(f'invalid visualization registry: {name}')
+        values = {v['id']: v for v in entries}
+        if len(values) != len(entries):
+            raise ValueError(f'duplicate visualization registry ID: {name}')
+        tree._registry_entries[name] = values
+    return tree._registry_entries[name].get(ident)
 
 
 def citation_inputs(tree, slug, ident):
@@ -385,6 +436,13 @@ def impact(current, previous, paths, *, full=False, template=False):
             for suite, (patterns, closure) in suite_reads.items():
                 if suite in all_suites and (p in closure or any(fnmatch.fnmatchcase(p, pat) for pat in patterns)):
                     matched_suites.add(suite)
+            for slug, book in books.items():
+                if p == f'books/{slug}/viz/visualizations.json':
+                    for suite in book['suites']:
+                        ident = PurePosixPath(suite).name.removesuffix('.test.mjs')
+                        if (suite in all_suites and '@registry-entry' in book['deps'].get(suite, []) and
+                                registry_entry(current, slug, ident) != registry_entry(previous, slug, ident)):
+                            matched_suites.add(suite)
             for film, (scopes, sources, uncertain) in video_reads.items():
                 if film in all_films and (p in sources or any(scope_contains(p, src) and
                         not any(skip in "/" + p for skip in exclude) for src, exclude in scopes)):
@@ -464,7 +522,9 @@ def impact(current, previous, paths, *, full=False, template=False):
             elif local.startswith("viz/"):
                 for suite in b["suites"]:
                     ident = PurePosixPath(suite).name.removesuffix(".test.mjs")
-                    if local.startswith(f"viz/{ident}/") or local == "viz/visualizations.json" or local.startswith("viz/assets/"):
+                    if (local.startswith(f"viz/{ident}/") or
+                            (local == "viz/visualizations.json" and '@registry-entry' not in b['deps'].get(suite, [])) or
+                            local.startswith("viz/assets/")):
                         suites.add(suite)
             elif local.startswith("films/"):
                 film = f"{slug}/{parts[3]}" if len(parts) > 3 else ""
@@ -502,6 +562,14 @@ def impact(current, previous, paths, *, full=False, template=False):
             films.update(uncertain_films)
             reasons.update(f"unknown shared film reads -> {film}" for film in uncertain_films)
             continue
+        if p == "trureturing.lock.json":
+            shared_outputs("evidence lock: ", p)
+            # Ordinary declared lock readers above still run. Only explicit link-only
+            # readers delegate the unchanged browser behavior to static evidence checks.
+            for b in now.values():
+                suites.update(s for s in b['suites'] if s not in b['deps'])
+            films.update(uncertain_films)
+            continue
         if p.startswith(("tools/", "theme/", "templates/", ".github/", "i18n/")) or p in (
                 "site.toml", "trureturing.lock.json", "package.json", "package-lock.json", "requirements.txt", "template.toml", "tbook"):
             everything("shared input: ", p)
@@ -529,6 +597,18 @@ def impact(current, previous, paths, *, full=False, template=False):
     checks["browser"] = bool(test_selection["browser_tests"])
     return dict(**test_selection, checks=checks, books=sorted(selected_books), suites=sorted(suites), films=sorted(films),
                 slides=sorted(slides), exports=exports, site=site, reasons=sorted(reasons))
+
+
+def image_shards(tree, exports):
+    """Disjoint cold-capture work, shared across all PDF variants and EPUB."""
+    slugs = {item['book'] for item in exports if item['target'] in ('pdf', 'epub')}
+    items = []
+    for slug in sorted(slugs):
+        name = f'books/{slug}/viz/visualizations.json'
+        if name in tree.files:
+            items.extend(f"{slug}/{v['id']}" for v in tree.json(name).get('visualizations', [])
+                         if v.get('status') == 'live')
+    return shards(items, 12)
 
 
 def signature(tree, runtime):
@@ -582,7 +662,7 @@ def trusted_baseline(root, repo, branch, workflow, profile, sig, limit, *, get=a
     runs = get(f"repos/{repo}/actions/workflows/{workflow}.yml/runs?{query}")["workflow_runs"]
     for run in runs:
         if not (run.get("workflow_id") == wf["id"] and run.get("head_repository", {}).get("full_name") == repo and
-                run.get("head_branch") == branch and run.get("event") in {"push", "workflow_dispatch", "schedule"} and
+                run.get("head_branch") == branch and run.get("event") in ({"push", "workflow_dispatch", "schedule"} | ({"workflow_run"} if workflow == "pages" else set())) and
                 run.get("status") == "completed" and run.get("conclusion") == "success" and
                 str(run.get("id")) != os.environ.get("GITHUB_RUN_ID")):
             continue
@@ -629,7 +709,7 @@ def trusted_revision(root, repo, branch, workflow, limit):
     query = urlencode(dict(branch=branch, status="success", per_page=100))
     for run in api(f"repos/{repo}/actions/workflows/{workflow}.yml/runs?{query}")["workflow_runs"]:
         if (run.get("workflow_id") == wf["id"] and run.get("head_repository", {}).get("full_name") == repo and
-                run.get("head_branch") == branch and run.get("event") in {"push", "workflow_dispatch", "schedule"} and
+                run.get("head_branch") == branch and run.get("event") in ({"push", "workflow_dispatch", "schedule"} | ({"workflow_run"} if workflow == "pages" else set())) and
                 run.get("status") == "completed" and run.get("conclusion") == "success" and
                 str(run.get("id")) != os.environ.get("GITHUB_RUN_ID") and ancestor(root, run["head_sha"], limit)):
             return run["head_sha"]
@@ -743,15 +823,18 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         # Pages builds all consumers, including strict films, even when deployment is disabled.
         # A no-op Pages run must not advance film coverage using deployment coverage alone.
         coverage["films"] = dict(coverage["pages"], profile="films", inherited=None)
-    film_items = [] if deferred_films else normal.get("films", [])
+    film_items = (selections['pages']['films'] if workflow == 'pages' and selections['pages']['site']
+                  else [] if deferred_films else normal.get("films", []))
     tasks = dict(validate=bool(normal and any(normal["checks"].values())), build=bool(normal.get("exports")),
+                 stills=bool(image_shards(current, normal.get('exports', []))),
                  viz=bool(normal.get("suites")), **{"viz-slow": bool(selections.get("slow", {}).get("suites"))},
                  media=bool(normal.get("slides")), films=bool(film_items))
     result = dict(version=VERSION, event=event, entry="own" if own else "call", sha=current.sha, mode=mode,
                   profiles=profiles, coverage=coverage, selections=selections, tasks=tasks,
                   viz=matrices.get("normal", []), slow=matrices.get("slow", []), execution=execution, workloads=workloads,
                   browser_budget=dict(target=viz_budget.TARGET, ceiling=viz_budget.CEILING, reserve=viz_budget.RESERVE, margin=viz_budget.MARGIN),
-                  films=shards(film_items, 4), exports=export_matrix(normal.get("exports", [])), slides=normal.get("slides", []),
+                  films=shards(film_items, 4), stills=image_shards(current, normal.get('exports', [])),
+                  exports=export_matrix(normal.get("exports", [])), slides=normal.get("slides", []),
                   site=selections.get("pages", {}).get("site", False), deferred_films=normal.get("films", []) if deferred_films else [],
                   publish=own and not event.startswith("pull_request") and (ref == f"refs/heads/{branch}" or
                           (event == "workflow_dispatch" and ref.startswith("refs/heads/"))), baseline_branch=coverage_branch, reasons=reasons)
@@ -760,7 +843,8 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
 
 def verify_results(plan, results, *, pages=False, pages_enabled=True):
     expected = {"plan": True}
-    expected.update({"probe": True, "build": plan["site"], "deploy": plan["site"] and pages_enabled} if pages else plan["tasks"])
+    expected.update({"probe": True, "films": bool(plan.get('films')), "build": plan["site"],
+                     "deploy": plan["site"] and pages_enabled} if pages else plan["tasks"])
     failures = [f"{job}: expected success, got {results.get(job, {}).get('result', 'missing')}"
                 for job, selected in expected.items() if selected and results.get(job, {}).get("result") != "success"]
     if failures:
@@ -773,7 +857,8 @@ def write_outputs(result):
         fields = dict(plan=result, site=result["site"], publish=result["publish"],
                       **{k.replace("-", "_"): v for k, v in result["tasks"].items()},
                       build_matrix={"include": result["exports"]}, viz_matrix={"include": result["viz"]},
-                      slow_matrix={"include": result["slow"]}, film_matrix={"include": result["films"]})
+                      slow_matrix={"include": result["slow"]}, film_matrix={"include": result["films"]},
+                      still_matrix={"include": result["stills"]})
         with open(output, "a", encoding="utf-8") as f:
             for key, value in fields.items():
                 f.write(f"{key}={json.dumps(value, ensure_ascii=False, separators=(',', ':'))}\n")

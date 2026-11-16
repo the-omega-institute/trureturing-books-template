@@ -36,7 +36,10 @@ export function inputKey(book, v) {
   add(dir, 'page');
   add(THEME_VIZ, 'runtime');
   add(TOKENS_CSS, 'tokens');
-  add(path.join(ROOT, 'trureturing.lock.json'), 'lock');
+  // Opt-in constructor contract: the lock is used only to pin anchor hrefs,
+  // never fetched or displayed. Evidence is validated separately before publication.
+  if (v.capture_lock !== undefined && !['all', 'links'].includes(v.capture_lock)) throw new Error(`invalid capture_lock for ${v.id}`);
+  if (v.capture_lock !== 'links') add(path.join(ROOT, 'trureturing.lock.json'), 'lock');
   add(path.join(ROOT, 'package-lock.json'), 'packages');
   // Common book assets may be referenced from page CSS, SVG or JavaScript.
   add(path.join(book.dir, 'assets'), 'book-assets');
@@ -44,7 +47,7 @@ export function inputKey(book, v) {
   for (const name of ['viz-thumbs.mjs', 'viz-still-cache.mjs', 'viz-common.mjs', 'viz-server.mjs', 'viz-testkit.mjs']) {
     add(fileURLToPath(new URL(name, import.meta.url)), `capture/${name}`);
   }
-  hash.update(JSON.stringify({ schema: 1, thumbnail: v.thumbnail || null }));
+  hash.update(JSON.stringify({ schema: 2, thumbnail: v.thumbnail || null, capture_lock: v.capture_lock || 'all' }));
   return hash.digest('hex');
 }
 

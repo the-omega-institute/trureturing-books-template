@@ -97,7 +97,7 @@ class PlanOutputBudgetTest(unittest.TestCase):
             self.assertEqual(sorted(plan["execution"][profile]), suites)
             self.assertEqual(sorted(plan["workloads"][profile]), suites)
             self.assertEqual(sorted(item for shard in matrix for item in shard["items"]), suites)
-        self.assertEqual(plan["tasks"], dict(validate=True, build=True, viz=True, **{"viz-slow": True}, media=True, films=False))
+        self.assertEqual(plan["tasks"], dict(validate=True, stills=False, build=True, viz=True, **{"viz-slow": True}, media=True, films=False))
         output, summary = self.outputs(plan)
         self.assertIn(paths[0], output)
         self.assertNotIn("\\u7ae0", output)
@@ -166,7 +166,7 @@ class LargePlanTransportTest(unittest.TestCase):
         self.assertEqual(json.loads(outputs["plan"]), plan)
         for field, key in (("build", "exports"), ("viz", "viz"), ("slow", "slow"), ("film", "films")):
             self.assertEqual(json.loads(outputs[field + "_matrix"]), {"include": plan[key]})
-        selected = ({"probe": True, "build": plan["site"], "deploy": plan["site"] and enabled}
+        selected = ({"probe": True, "films": bool(plan.get('films')), "build": plan["site"], "deploy": plan["site"] and enabled}
                     if pages else plan["tasks"])
         return {"plan": {"result": "success", "outputs": outputs}, **{
             job: {"result": "success" if chosen else "skipped",
@@ -281,6 +281,8 @@ class LargePlanTransportTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         # Every selected job, including plan, must still succeed.
         for job in needs:
+            if job != 'plan' and not plan['tasks'][job]:
+                continue
             for status in ("failure", "cancelled", "skipped", None):
                 bad = copy.deepcopy(needs)
                 if status is None:

@@ -52,7 +52,7 @@ class TrustedCacheTest(unittest.TestCase):
 
     def test_pr_fork_other_workflow_branch_and_failed_runs_cannot_supply_cache(self):
         for changes in ({"event": "pull_request"}, {"event": "pull_request_target"},
-                        {"event": "workflow_run"}, {"head_branch": "feature"},
+                        {"head_branch": "feature"},
                         {"head_repository": {"full_name": "fork/books"}},
                         {"workflow_id": 4}, {"conclusion": "failure"}, {"status": "in_progress"}):
             original = copy.deepcopy(self.run)
@@ -384,8 +384,58 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assertIn(expected, result["suites"])
                 self.assertTrue(result["checks"]["structure"])
                 if path == "trureturing.lock.json":
-                    self.assertEqual(len(result["suites"]), 4)
+                    self.assertEqual(len(result["suites"]), 2)
                     self.assertEqual(result["films"], ["one/001-film", "two/001-film"])
+
+    def test_link_only_reader_keeps_static_evidence_check_without_unrelated_browser_work(self):
+        import json
+        name = 'books/one/viz/tests/dependencies.json'
+        self.write(name, json.dumps({'schema': planner.DEPENDENCIES, 'suites': {
+            'a.test.mjs': ['@lean-links'], 'b.test.mjs': ['trureturing.lock.json']}}))
+        tree = planner.Tree(self.root, self.commit())
+        result = planner.impact(tree, tree, ['trureturing.lock.json'])
+        self.assertNotIn('books/one/viz/tests/a.test.mjs', result['suites'])
+        self.assertIn('books/one/viz/tests/b.test.mjs', result['suites'])
+        self.assertTrue(result['checks']['structure'])
+        self.assertTrue(result['checks']['viz_static'])
+        self.assertFalse(result['checks']['browser'])
+
+    def test_image_shards_cover_each_live_page_once_across_all_export_variants(self):
+        import json
+        for slug in ('one', 'two'):
+            self.write(f'books/{slug}/viz/visualizations.json', json.dumps({'visualizations': [
+                {'id': 'a', 'status': 'live'}, {'id': 'b', 'status': 'draft'}]}))
+        tree = planner.Tree(self.root, self.commit())
+        exports = [dict(book=slug, target=target) for slug in ('one', 'two')
+                   for target in ('html', 'pdf', 'pdf', 'epub')]
+        rows = planner.image_shards(tree, exports)
+        self.assertEqual(sorted(i for row in rows for i in row['items']), ['one/a', 'two/a'])
+        self.assertEqual(planner.image_shards(tree, [dict(book='one', target='html')]), [])
+
+    def test_registry_entry_reader_skips_other_entries_but_whole_registry_reader_still_runs(self):
+        import json
+        registry = 'books/one/viz/visualizations.json'
+        self.write(registry, json.dumps({'visualizations': [{'id': 'a'}, {'id': 'b'}]}))
+        self.write('books/one/viz/tests/dependencies.json', json.dumps({'schema': planner.DEPENDENCIES,
+                    'suites': {'a.test.mjs': ['@registry-entry'], 'b.test.mjs': [registry]}}))
+        old = planner.Tree(self.root, self.commit())
+        self.write(registry, json.dumps({'visualizations': [{'id': 'a'}, {'id': 'b', 'title': 'updated'}]}))
+        new = planner.Tree(self.root, self.commit())
+        selected = planner.impact(new, old, [registry])
+        self.assertNotIn('books/one/viz/tests/a.test.mjs', selected['suites'])
+        self.assertIn('books/one/viz/tests/b.test.mjs', selected['suites'])
+        self.write(registry, json.dumps({'visualizations': [{'id': 'a', 'title': 'updated'}, {'id': 'b'}]}))
+        new = planner.Tree(self.root, self.commit())
+        self.assertIn('books/one/viz/tests/a.test.mjs', planner.impact(new, old, [registry])['suites'])
+
+    def test_batch_object_reader_preserves_newlines_in_paths_and_large_contents(self):
+        name = 'docs/line\nbreak.md'
+        content = 'large\n' * 50000
+        self.write(name, content)
+        tree = planner.Tree(self.root, self.commit())
+        self.assertEqual(tree.read(name), content)
+        self.assertEqual(tree.read('docs/PUBLISHING.md'), '说明\n')
+        self.assertEqual(tree.read(name), content)
 
     def test_undeclared_suite_widens_book_not_other_books(self):
         (self.root / "books/one/viz/tests/dependencies.json").unlink()
@@ -875,6 +925,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
                 job: {"result": "success" if selected else "skipped"} for job, selected in result["tasks"].items()}}
         else:
             results = {"plan": {"result": "success"}, "probe": {"result": "success"},
+                       "films": {"result": "success" if result.get('films') else "skipped"},
                        "build": {"result": outcome if result["site"] else "skipped"},
                        "deploy": {"result": "success" if result["site"] and enabled else "skipped"}}
         results["plan"]["outputs"] = {"plan": json.dumps(result)}

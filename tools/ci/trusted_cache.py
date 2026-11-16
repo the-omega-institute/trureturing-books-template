@@ -17,7 +17,7 @@ def api(endpoint: str):
     return json.loads(result.stdout)
 
 
-def find(repo: str, branch: str, get=api) -> tuple[int, int] | None:
+def find(repo: str, branch: str, get=api, *, artifact_name="tbook-build-store") -> tuple[int, int] | None:
     query = urlencode({"branch": branch, "status": "success", "per_page": 20})
     runs = []
     for name in ("ci.yml", "pages.yml"):
@@ -28,7 +28,7 @@ def find(repo: str, branch: str, get=api) -> tuple[int, int] | None:
             found = get(f"repos/{repo}/actions/workflows/{name}/runs?{query}").get("workflow_runs", [])
         except (OSError, ValueError, subprocess.SubprocessError):
             continue
-        events = {"push", "workflow_dispatch", *({"schedule"} if name == "ci.yml" else set())}
+        events = {"push", "workflow_dispatch", *({"schedule"} if name == "ci.yml" else {"workflow_run"})}
         runs += [run for run in found if (
             run.get("workflow_id") == workflow["id"] and
             run.get("head_repository", {}).get("full_name") == repo and
@@ -37,14 +37,17 @@ def find(repo: str, branch: str, get=api) -> tuple[int, int] | None:
     for run in sorted(runs, key=lambda r: (r.get("created_at", ""), int(r["id"])), reverse=True):
         artifacts = get(f"repos/{repo}/actions/runs/{int(run['id'])}/artifacts?per_page=100")
         for artifact in artifacts.get("artifacts", []):
-            if artifact.get("name") == "tbook-build-store" and not artifact.get("expired", True):
+            if artifact.get("name") == artifact_name and not artifact.get("expired", True):
                 return int(run["id"]), int(artifact["id"])
     return None
 
 
 def main() -> None:
     try:
-        found = find(os.environ["GITHUB_REPOSITORY"], os.environ["DEFAULT_BRANCH"])
+        name = os.environ.get('CACHE_ARTIFACT', 'tbook-build-store')
+        if name not in ('tbook-build-store', 'tbook-image-store'):
+            raise ValueError('invalid cache artifact name')
+        found = find(os.environ["GITHUB_REPOSITORY"], os.environ["DEFAULT_BRANCH"], artifact_name=name)
     except (KeyError, ValueError, OSError, subprocess.SubprocessError) as exc:
         print(f"trusted build cache unavailable ({type(exc).__name__}); building missing units")
         return

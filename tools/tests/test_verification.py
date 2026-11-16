@@ -1248,8 +1248,10 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         save, = [s for s in steps if s.get("uses", "").startswith("actions/cache/save@")]
         prune = next(s for s in steps if s.get("id") == "prune")
         self.assertFalse([s for s in steps if re.match(r"actions/cache@", s.get("uses", ""))])
-        self.assertEqual(restore["with"], {"path": ".cache/artifacts", "key": "build-cache-v1-${{ github.run_id }}",
-                                           "restore-keys": "build-cache-v1-"})
+        self.assertIn("inputs.scope == 'images'", restore["with"]["path"])
+        self.assertIn(".cache/artifacts/viz-stills", restore["with"]["path"])
+        self.assertIn("image-cache-v1-", restore["with"]["key"])
+        self.assertIn("build-cache-v1-", restore["with"]["key"])
         self.assertEqual(save["with"], {"path": ".cache/artifacts", "key": "${{ steps.prune.outputs.key }}"})
         self.assertLess(steps.index(prune), steps.index(save))
         default = [dict(event="push", ref="refs/heads/main"), dict(event="workflow_dispatch", ref="refs/heads/main"),

@@ -43,6 +43,10 @@ inputs:
   mode:
     description: restore (before ./tbook build) or save (after it).
     required: true
+  scope:
+    description: Restore the complete store (all) or only visualization images (images).
+    required: false
+    default: all
   pages-url:
     description: restore only. The Pages URL (actions/configure-pages base_url), or empty when Pages is not set up.
     required: false
@@ -88,9 +92,9 @@ runs:
       if: inputs.mode == 'restore' && !startsWith(github.event_name, 'pull_request')
       uses: actions/cache/restore@v5
       with:
-        path: .cache/artifacts
-        key: build-cache-v1-${{ github.run_id }}
-        restore-keys: build-cache-v1-
+        path: ${{ inputs.scope == 'images' && '.cache/artifacts/viz-stills' || '.cache/artifacts' }}
+        key: ${{ inputs.scope == 'images' && 'image-cache-v1-' || 'build-cache-v1-' }}${{ github.run_id }}
+        restore-keys: ${{ inputs.scope == 'images' && 'image-cache-v1-' || 'build-cache-v1-' }}
 
     - name: Remember the restored store
       if: inputs.mode == 'restore'
@@ -108,6 +112,7 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        CACHE_ARTIFACT: ${{ inputs.scope == 'images' && 'tbook-image-store' || 'tbook-build-store' }}
       run: python3 tools/ci/trusted_cache.py
 
     - name: Restore the trusted CI/Pages artifact
@@ -119,7 +124,7 @@ runs:
         run-id: ${{ steps.trusted.outputs.run-id }}
         github-token: ${{ github.token }}
         repository: ${{ github.repository }}
-        path: .cache/artifacts
+        path: ${{ inputs.scope == 'images' && '.cache/artifacts/viz-stills' || '.cache/artifacts' }}
         merge-multiple: true
 
     - name: Prune the build cache
@@ -127,7 +132,7 @@ runs:
       if: >-
         !cancelled() && inputs.mode == 'save' &&
         (github.event_name == 'schedule' ||
-        ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        ((github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') &&
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
       shell: bash
       env:
@@ -155,7 +160,7 @@ runs:
       if: >-
         !cancelled() && inputs.mode == 'save' && steps.prune.outputs.changed == 'true' &&
         (github.event_name == 'schedule' ||
-        ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        ((github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') &&
         github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
       uses: actions/cache/save@v5
       with:

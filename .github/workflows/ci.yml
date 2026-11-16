@@ -66,6 +66,8 @@ jobs:
       viz_slow: ${{ steps.plan.outputs.viz_slow }}
       media: ${{ steps.plan.outputs.media }}
       films: ${{ steps.plan.outputs.films }}
+      stills: ${{ steps.plan.outputs.stills }}
+      still_matrix: ${{ steps.plan.outputs.still_matrix }}
       build_matrix: ${{ steps.plan.outputs.build_matrix }}
       viz_matrix: ${{ steps.plan.outputs.viz_matrix }}
       slow_matrix: ${{ steps.plan.outputs.slow_matrix }}
@@ -252,10 +254,56 @@ jobs:
           PYTHONPATH: tools
         run: python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json"
 
+  stills:
+    name: Prepare visualization images (${{ matrix.shard }})
+    needs: plan
+    if: needs.plan.outputs.stills == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.still_matrix) }}
+    permissions:
+      contents: read
+      actions: read
+      pages: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - name: Set up capture tools
+        uses: ./.github/actions/setup
+        with:
+          browsers: 'true'
+          fonts: 'true'
+          mdbook: 'false'
+      - name: Restore reusable images
+        uses: ./.github/actions/build-cache
+        with:
+          mode: restore
+          scope: images
+      - name: Prepare selected images
+        env:
+          TBOOK_CACHE_REMOTE: '1'
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cat <<'TBOOK_IMAGES_JSON' > "$RUNNER_TEMP/images.json"
+          ${{ toJSON(matrix.items) }}
+          TBOOK_IMAGES_JSON
+          python3 tools/ci/stills.py --items-file "$RUNNER_TEMP/images.json" --out "$RUNNER_TEMP/prepared-images"
+      - name: Share complete image entries with every export
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-stills-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/prepared-images
+          include-hidden-files: true
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
   build:
     name: Build books (${{ matrix.name }})
-    if: needs.plan.outputs.build == 'true'
-    needs: plan
+    if: always() && !cancelled() && needs.plan.outputs.build == 'true' && (needs.stills.result == 'success' || needs.stills.result == 'skipped')
+    needs: [plan, stills]
     runs-on: ubuntu-24.04
     # Cold exports of large books capture all cited visualization stills before typesetting.
     timeout-minutes: 120
@@ -274,9 +322,9 @@ jobs:
       - name: Set up the toolchain
         uses: ./.github/actions/setup
         with:
-          browsers: ${{ matrix.target != 'html' }}
+          browsers: 'false'
           fonts: 'true'
-          mdbook: 'true'
+          mdbook: ${{ matrix.target == 'html' }}
 
       - name: Configure Pages
         # The site's address is part of every cache key. Without Pages (not enabled, or not readable) this
@@ -291,6 +339,16 @@ jobs:
           mode: restore
           pages-url: ${{ steps.pages.outputs.base_url }}
 
+      - name: Download prepared visualization images
+        if: matrix.target != 'html' && needs.plan.outputs.stills == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: tbook-stills-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/prepared-image-shards
+      - name: Import verified image entries
+        if: matrix.target != 'html' && needs.plan.outputs.stills == 'true'
+        run: python3 tools/ci/cache_store.py merge "$RUNNER_TEMP"/prepared-image-shards/*
+
       - name: Snapshot restored build-cache entries
         if: >-
           github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
@@ -302,6 +360,7 @@ jobs:
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
+          TBOOK_STILLS_REQUIRE_CACHE: '1'
           TARGET: ${{ matrix.target }}
           BOOKS_JSON: ${{ toJSON(matrix.books) }}
           VARIANT: ${{ matrix.variant }}
@@ -582,7 +641,7 @@ jobs:
 
   check:
     name: Check
-    needs: [plan, validate, build, viz, viz-slow, media, films]
+    needs: [plan, validate, stills, build, viz, viz-slow, media, films]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -656,6 +715,16 @@ jobs:
           pattern: tbook-build-shard-${{ github.run_attempt }}-*
           path: ${{ runner.temp }}/build-cache-shards
 
+      - name: Download prepared images for the trusted aggregate
+        if: >-
+          steps.verified.outcome == 'success' && needs.plan.outputs.stills == 'true' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+        uses: actions/download-artifact@v7
+        with:
+          pattern: tbook-stills-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/build-cache-shards
+
       - name: Merge verified complete build-cache entries
         id: cache-merge
         if: >-
@@ -694,4 +763,27 @@ jobs:
           include-hidden-files: true
           compression-level: 0
           if-no-files-found: warn
+          retention-days: 7
+
+      - name: Save the visualization image cache
+        if: >-
+          steps.verified.outcome == 'success' && needs.plan.outputs.stills == 'true' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+        uses: actions/cache/save@v5
+        with:
+          path: .cache/artifacts/viz-stills
+          key: image-cache-v1-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Publish reusable visualization images
+        if: >-
+          steps.verified.outcome == 'success' && needs.plan.outputs.stills == 'true' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-image-store
+          path: .cache/artifacts/viz-stills
+          include-hidden-files: true
+          compression-level: 0
+          if-no-files-found: error
           retention-days: 7

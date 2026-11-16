@@ -510,6 +510,8 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
         thumb = v.get("thumbnail")
         if isinstance(thumb, str) and thumb.strip() and (not thumb.startswith(f"{vid}/") or not thumb.lower().endswith(THUMB_EXT)):
             err(reg_file, line, f'{at}: thumbnail must be an image in {vid}/ (normally "{vid}/thumb.jpg")')
+        if v.get("capture_lock", "all") not in ("all", "links"):
+            err(reg_file, line, f"{at}: capture_lock must be all or links")
         if v.get("status") not in STATUSES:
             err(reg_file, line, f"{at}: status must be one of {', '.join(STATUSES)}")
         if not DATE_RE.match(str(v.get("added", ""))):
