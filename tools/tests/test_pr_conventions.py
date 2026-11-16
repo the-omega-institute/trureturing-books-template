@@ -7,10 +7,26 @@ import sys
 import tempfile
 import unittest
 
+import yaml
+
 from ci import pr_conventions as policy
 
 
 class PullRequestConventionsTests(unittest.TestCase):
+    def test_workflow_reads_current_target_even_when_the_pr_predates_adoption(self):
+        path = Path(__file__).resolve().parents[2] / ".github/workflows/pr-conventions.yml"
+        workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
+        self.assertIn("pull_request_target", workflow["on"])
+        self.assertEqual(workflow["permissions"], {"contents": "read"})
+        steps = workflow["jobs"]["conventions"]["steps"]
+        checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
+        # An existing PR's base SHA can precede the checker. Follow the current
+        # target branch, while keeping the untrusted head out of the checkout.
+        self.assertEqual(checkout["with"]["ref"], "${{ github.event.pull_request.base.ref }}")
+        self.assertEqual(checkout["with"]["persist-credentials"], "false")
+        self.assertEqual(checkout["with"]["sparse-checkout"], "tools/ci/pr_conventions.py")
+        self.assertEqual([step["run"] for step in steps if "run" in step], ["python3 tools/ci/pr_conventions.py"])
+
     def pr(self, title="fix(ch19): 修正证明范围", branch="fix/ch19-proof-scope", created="2026-11-17T00:00:00Z"):
         return {"title": title, "head": {"ref": branch}, "created_at": created}
 
