@@ -63,6 +63,7 @@ from ``book.date``).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import posixpath
@@ -285,6 +286,29 @@ def _families(dirs: list[Path]) -> set[str]:
     return _FAMILIES[key]
 
 
+def _fontsource_ttf(src: Path, dst: Path) -> None:
+    """Reuse a conversion only while both its WOFF source and TTF bytes still match."""
+    data = src.read_bytes()
+    provenance = dst.with_suffix(".ttf.json")
+    source_hash = hashlib.sha256(data).hexdigest()
+    try:
+        record = json.loads(provenance.read_text(encoding="utf-8"))
+        if record == {"schema": 1, "woff_sha256": source_hash,
+                      "ttf_sha256": hashlib.sha256(dst.read_bytes()).hexdigest()}:
+            return
+    except (OSError, ValueError):
+        pass
+    font = _woff_to_sfnt(data)
+    record = {"schema": 1, "woff_sha256": source_hash, "ttf_sha256": hashlib.sha256(font).hexdigest()}
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".fontsource-", dir=dst.parent) as tmp:
+        converted, stamp = Path(tmp) / "font", Path(tmp) / "provenance"
+        converted.write_bytes(font)
+        stamp.write_text(json.dumps(record), encoding="utf-8")
+        converted.replace(dst)
+        stamp.replace(provenance)
+
+
 def font_dirs() -> list[Path]:
     """Font directories handed to Typst: .cache/fonts, theme/typst/fonts, fontsource fallbacks."""
     dirs = [d for d in (FONT_CACHE, THEME_FONTS) if d.is_dir()]
@@ -297,16 +321,16 @@ def font_dirs() -> list[Path]:
         for w in weights:
             src = fs_root / pkg / "files" / f"{pkg}-latin-{w}-normal.woff"
             dst = FONTSOURCE_CACHE / f"{stem}-{w}.ttf"
-            if dst.exists():
-                use_fallback = True
-                continue
             if not src.exists():
+                use_fallback = use_fallback or dst.is_file()  # retain fonts for offline use without npm
                 continue
             try:
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_bytes(_woff_to_sfnt(src.read_bytes()))
+                _fontsource_ttf(src, dst)
                 use_fallback = True
-            except (OSError, ValueError, zlib.error) as exc:
+            except (OSError, ValueError, struct.error, zlib.error) as exc:
+                # A failed current source must not leave an older font for Typst or EPUB to pick up.
+                dst.unlink(missing_ok=True)
+                dst.with_suffix(".ttf.json").unlink(missing_ok=True)
                 print(f"  fonts: cannot convert {src.name}: {exc}", file=sys.stderr)
     return dirs + ([FONTSOURCE_CACHE] if use_fallback else [])
 

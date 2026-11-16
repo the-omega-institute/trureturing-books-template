@@ -244,6 +244,8 @@ PDF 按完整文档编译，页码、目录、交叉引用和分页共同决定�
 - 幻灯片：整个书目录（包括绘图脚本及其数据源），`tools/figkit/`、`theme/tokens.json`、`theme/slides/`、`theme/generated/`、`theme/i18n/`、`i18n/`、`tools/node/`、`tools/tbook/slides.py`、锁文件、`site.toml`、`package-lock.json`，站点基路径与地址，`TBOOK_SLIDES_NO_PDF`、`TBOOK_SLIDES_NO_CHECK`，Node 主版本（Chromium 由 `package-lock.json` 中的 Playwright 决定）。
 - 静态图：默认包含书籍源码及声明的派生数据，排除生成图片，脚本可用字面量 `INPUTS` 声明完整数据依赖以缩小失效范围；脚本、辅助模块、绘图工具、配色与冻结锁始终计入。检查命中缓存时仍比较本地 SVG，不会以恢复掩盖损坏。书封按实际绘制元数据、模板、配色、字体、导出尺寸与时间戳计算键；正文变化而这些输入相同时可复用。
 
+`@fontsource` 的拉丁回退字体转换为 `.cache/fonts-fontsource/` 下的 TTF，每个映射字重在相邻的 `.ttf.json` 中记录 WOFF 与 TTF 的 SHA-256。源文件可用时，只有两者摘要都匹配才复用；源字节变化、旧缓存没有记录或 TTF 损坏都会重新转换。当前源转换失败时移除旧 TTF，避免 PDF、EPUB 或封面继续使用旧字体；未安装 npm 源包时仍保留已有 TTF 供离线使用。
+
 工具只按**版本系列**计入（`buildcache.series`：Node 取主版本，Pandoc 与 Typst 取“主.次”，如 Pandoc `3.1`；Chromium 由 `package-lock.json` 中的 Playwright 决定，不单独计入）。决定产物的版本已钉在键覆盖的文件中（`requirements.txt` 钉 Pandoc 与 Typst，`package-lock.json` 钉 Playwright、Slidev 与字体，`theme/film/requirements.txt`）；若这些工具计入精确版本，键就随运行器镜像而变，Node 的一个补丁版本或 Ubuntu 的 ffmpeg 修订就会让全部条目与已发布的 Release 失效。mdBook 例外：各处都装同一个精确版本（`.github/actions/setup` 钉 0.5.4），按精确版本计入，升级它即重建 HTML。
 
 `buildcache.VERSION` 也计入每个键，改动它即全部重建一次。

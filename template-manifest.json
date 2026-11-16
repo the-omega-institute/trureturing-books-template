@@ -64,7 +64,7 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "113e7755d1e7c695ff36d37a1436ef799e0f8b8fc1daa25d2f901e1df3c3df42",
+      "sha256": "6dfbc7b1c0ea4498c950271e051b435b8e75a7615aff13e764b6224f0ee7bd77",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "b5416ec7eb1c9bce5935f04b1d6c6b8e8a2e5f6483a54cd5e0a211caf89316b1",
+      "sha256": "247ad2f621011f8c3f8c0f589003e43ba5b5460f4e252b37925b634d80e5c98a",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -780,7 +780,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "45c26df0c3552ec3e4b641ba39a779f3a23916f66dcef5a5c2cdb7ae81e6e158",
+      "sha256": "ff8c98ab49bfd006f22cb4c5db0daecd8bd174ea45545c7957b0441b5d495205",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -908,7 +908,7 @@
       "mode": "100644"
     },
     "tools/tests/test_cover_cache.py": {
-      "sha256": "dd03990615704418bbcc1aedb12f4d8c446380b4e3a59e45bd3fda281d9b9eb3",
+      "sha256": "8d7c1536cc7e2cdbe8a54bc56df7f3922e7074474b4b0932529a1154567097fe",
       "mode": "100644"
     },
     "tools/tests/test_export_layout.py": {
