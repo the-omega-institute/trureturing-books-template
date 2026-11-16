@@ -5,9 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from textwrap import dedent
 import unittest
-
-import yaml
 
 from ci import pr_conventions as policy
 
@@ -15,18 +14,16 @@ from ci import pr_conventions as policy
 class PullRequestConventionsTests(unittest.TestCase):
     def test_workflow_reads_current_target_even_when_the_pr_predates_adoption(self):
         path = Path(__file__).resolve().parents[2] / ".github/workflows/pr-conventions.yml"
-        workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
-        self.assertIn("pull_request", workflow["on"])
-        self.assertNotIn("pull_request_target", workflow["on"])
-        self.assertEqual(workflow["permissions"], {"contents": "read"})
-        steps = workflow["jobs"]["conventions"]["steps"]
-        checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
+        workflow = path.read_text()
+        self.assertIn("\n  pull_request:\n", workflow)
+        self.assertNotIn("pull_request_target:", workflow)
+        self.assertIn("\npermissions:\n  contents: read\n", workflow)
         # An existing PR's base SHA can precede the checker. Follow the current
         # target branch, while keeping the untrusted head out of the checkout.
-        self.assertEqual(checkout["with"]["ref"], "${{ github.event.pull_request.base.ref }}")
-        self.assertEqual(checkout["with"]["persist-credentials"], "false")
-        self.assertEqual(checkout["with"]["sparse-checkout"], "tools/ci/pr_conventions.py")
-        script = next(step["run"] for step in steps if "run" in step)
+        self.assertIn("ref: ${{ github.event.pull_request.base.ref }}", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("sparse-checkout: tools/ci/pr_conventions.py", workflow)
+        script = dedent(workflow.split("        run: |\n", 1)[1])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             event = root / "event.json"
