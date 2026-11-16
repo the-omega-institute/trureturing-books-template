@@ -1,5 +1,7 @@
 # trureturing-books-template
 
+提交 Issue、PR 和创建工作分支前，请阅读 [贡献与协作规范](CONTRIBUTING.md)。
+
 **出版显式区分 Lean 内核验证、书面证明与开放问题的专著。** 一个仓库容纳多本书、多种语言（默认中文与英文），一次编写，导出为在线 HTML、PDF（深色屏幕版 / 白底印刷版）与 Apple Books 兼容的 EPUB，配交互可视化、视频与演示文稿，经 GitHub Pages 与 Release 自动发布。
 
 *Publish monographs that distinguish kernel-verified Lean results, written proofs and open questions. Multiple books, multiple languages (Chinese and English by default), one source exported to HTML, PDF (screen and print) and EPUB for Apple Books, with interactive visualizations, films and slides, published automatically to GitHub Pages and Releases.*

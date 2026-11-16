@@ -251,7 +251,7 @@ def film_reads(tree, slug, film, meta):
 
 
 def _template_version_only(current, previous):
-    """Prove a release-metadata change using the tool's existing config contract.
+    """Prove release metadata or collaboration ownership changes without output readers.
 
     Keep every other parsed field (including unknown fields) in the comparison.
     Missing/invalid inputs cannot establish this narrower responsibility class.
@@ -259,7 +259,7 @@ def _template_version_only(current, previous):
     name = template_metadata.TEMPLATE_TOML
     if previous is None or any(name not in tree.files for tree in (current, previous)):
         return False
-    versions, remaining = [], []
+    versions, remaining, ownership = [], [], []
     try:
         for tree in (current, previous):
             text = tree.read(name)
@@ -268,12 +268,24 @@ def _template_version_only(current, previous):
                 return False
             data = tomllib.loads(text)
             versions.append(data["template"].pop("version"))
+            # These paths describe collaboration metadata, never publication inputs.
+            # Keep every other ownership change conservative, and still propagate
+            # explicitly declared consumers before this classification.
+            metadata_paths = {"CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/", ".github/pull_request_template.md"}
+            metadata_excludes = {".github/ISSUE_TEMPLATE/local-"}
+            managed = data.get("managed", {})
+            ownership.append((managed.get("paths", []), managed.get("exclude", [])))
+            for key, metadata in (("paths", metadata_paths), ("exclude", metadata_excludes)):
+                if key in managed:
+                    managed[key] = [p for p in managed[key] if p not in metadata]
+                    if not managed[key]:
+                        managed.pop(key)
             # Preserve TOML value types (e.g. true != 1); unsupported values widen.
             remaining.append(json.dumps(data, sort_keys=True))
     except (template_metadata.TemplateError, ValueError, TypeError, AttributeError, KeyError,
             subprocess.SubprocessError):
         return False
-    return versions[0] != versions[1] and remaining[0] == remaining[1]
+    return (versions[0] != versions[1] or ownership[0] != ownership[1]) and remaining[0] == remaining[1]
 
 
 def blob_id(tree, name):
@@ -391,6 +403,12 @@ def impact(current, previous, paths, *, full=False, template=False):
                 ".github/workflows/ci.yml", ".github/workflows/toolchain-image.yml"):
             # Planning/test infrastructure has no publication output. Declared
             # runtime readers were already propagated above, before classification.
+            continue
+        if p.startswith(".github/ISSUE_TEMPLATE/") or p in (
+                ".github/pull_request_template.md", ".github/workflows/pr-conventions.yml",
+                ".github/workflows/template-sync.yml", ".github/workflows/trureturing-bump.yml"):
+            # Collaboration and PR producers have no publication output. Any
+            # declared runtime readers and test-file reads remain selected.
             continue
         if p == "template.toml" and _template_version_only(current, previous):
             # Template fixtures/tooling consume this metadata. Site assembly reads
