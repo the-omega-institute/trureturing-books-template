@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -92,15 +92,15 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "fd1c952e832f4947902640163043c411760f3d0babbd792aa08f4ab1693ce6ed",
+      "sha256": "16605e002dc3501e72753cac9347fd3ebef113fa814ee4a7eb0d2790f191417f",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "4fb1a791fd205d7e05d3858235b10084db54a4f1cdf0018eb65668e6f02095db",
+      "sha256": "14b1cc43087aca413394b9d3aad083f99a03915006b82ef24102492afb33737a",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "a1030a49514214d8d49fbda0ae80f4508e4756351572079fa185259391a34e18",
+      "sha256": "1c7dab65871d07d97d98da082cf84e251f271a57af049aa518c310b603c2eb33",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "ad918744272b2100a69da7eba41479697547effe273962d32145d70caf1dbc9b",
+      "sha256": "3985a8e6835962092c01b9af937a55a52da3120f6b31b96430c9a69e285b5c51",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
