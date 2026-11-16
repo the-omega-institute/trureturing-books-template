@@ -5,12 +5,42 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from textwrap import dedent
 import unittest
 
 from ci import pr_conventions as policy
 
 
 class PullRequestConventionsTests(unittest.TestCase):
+    def test_workflow_reads_current_target_even_when_the_pr_predates_adoption(self):
+        path = Path(__file__).resolve().parents[2] / ".github/workflows/pr-conventions.yml"
+        workflow = path.read_text()
+        self.assertIn("\n  pull_request:\n", workflow)
+        self.assertNotIn("pull_request_target:", workflow)
+        self.assertIn("\npermissions:\n  contents: read\n", workflow)
+        # An existing PR's base SHA can precede the checker. Follow the current
+        # target branch, while keeping the untrusted head out of the checkout.
+        self.assertIn("ref: ${{ github.event.pull_request.base.ref }}", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("sparse-checkout: tools/ci/pr_conventions.py", workflow)
+        script = dedent(workflow.split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            event = root / "event.json"
+            checker = root / "tools/ci/pr_conventions.py"
+            env = {**os.environ, "GITHUB_EVENT_PATH": str(event), "PR_CONVENTIONS_SINCE": ""}
+            # A first adoption PR has no checker on its target branch yet. Later
+            # PRs must run the current target's checker and reject invalid metadata.
+            for installed, title, expected in ((False, "Historical title", 0),
+                                               (True, "fix(ci): Adopt policy", 0),
+                                               (True, "Invalid title", 1)):
+                if installed:
+                    checker.parent.mkdir(parents=True, exist_ok=True)
+                    checker.write_text(Path(policy.__file__).read_text())
+                event.write_text(json.dumps({"pull_request": self.pr(title=title)}))
+                run = subprocess.run(["bash", "-e", "-c", script], cwd=root, env=env, capture_output=True, text=True)
+                self.assertEqual(run.returncode, expected, run.stdout + run.stderr)
+
     def pr(self, title="fix(ch19): 修正证明范围", branch="fix/ch19-proof-scope", created="2026-11-17T00:00:00Z"):
         return {"title": title, "head": {"ref": branch}, "created_at": created}
 
