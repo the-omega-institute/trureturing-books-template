@@ -250,7 +250,7 @@ jobs:
           fi
           if [ -n "${CHECK_RC:-}" ] && [ "$CHECK_RC" != "0" ]; then draft=true; flags="${flags}[check fails] "; fi
           if grep -q "statement digest changed" build/pin.md; then flags="${flags}[review statements] "; fi
-          title="${flags}trureturing: pin $short"
+          title="chore(trureturing): ${flags}pin $short"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -258,11 +258,11 @@ jobs:
           if [ "$PIN_RC" = "0" ]; then
             git add trureturing.lock.json
             git add --all -- books
-            git commit -q -m "Pin trureturing $short" -m "$(head -n 1 build/pin.md)"
+            git commit -q -m "chore(trureturing): pin $short" -m "$(head -n 1 build/pin.md)"
           else
             # Nothing is staged: ./tbook pin writes the lock only when it succeeds, so this pull request
             # changes no file and only carries the report.
-            git commit -q --allow-empty -m "trureturing $short: $what; lock not written" \
+            git commit -q --allow-empty -m "chore(trureturing): $short $what; lock not written" \
               -m "./tbook pin $TARGET exited with $PIN_RC; see the pull request description."
           fi
 

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 定理形式化请求
+    url: https://github.com/the-omega-institute/trureturing-requests/issues
+    about: 按形式化请求规范，在专用仓库使用英文提交或复用已有请求。

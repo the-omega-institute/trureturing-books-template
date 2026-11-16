@@ -1,0 +1,30 @@
+name: 内容校正
+description: 报告陈述、证明、译文、来源或媒体内容问题。
+title: "docs: "
+body:
+  - type: input
+    id: location
+    attributes:
+      label: 书籍与定位
+      description: 书籍 slug、语言、章节路径、环境 id 或媒体卡名。
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: 当前内容与问题
+      description: 引用需要核对的原文或公式，并说明疑点。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 建议修正与依据
+      description: 给出推导、原文定位、DOI 或冻结声明 GID；区分已验证、书面证明与开放问题。
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: 同步范围与关联事项
+      description: 注明其他语言、相关媒体及上下游 Issue/PR 完整链接；新形式化需求提交专用请求仓库。

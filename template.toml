@@ -4,7 +4,7 @@
 [template]
 name = "trureturing-books-template"
 repo = "the-omega-institute/trureturing-books-template"
-version = "1.2.1"
+version = "1.3.0"
 # 模板发布 tag 的格式（`v<version>`）。
 tag_prefix = "v"
 
@@ -19,6 +19,9 @@ paths = [
   "docs/",
   ".github/workflows/",
   ".github/actions/",
+  ".github/ISSUE_TEMPLATE/",
+  ".github/pull_request_template.md",
+  "CONTRIBUTING.md",
   ".claude/",
   "CLAUDE.md",
   "AGENTS.md",
@@ -44,6 +47,8 @@ owned = [
 ]
 # 托管路径中的例外：即使位于托管目录内，也属于下游。
 exclude = [
+  # 下游额外的 Issue 表单使用 local- 前缀。
+  ".github/ISSUE_TEMPLATE/local-",
   # 下游自己的 skill 放在 skills/local-<name>/（前缀匹配），模板更新不会触碰。
   "skills/local-",
   # 为模板层预留的命名空间；每层只拥有与其名称对应的前缀。

@@ -13,6 +13,8 @@
 - **例外**（`[managed].exclude`）：`skills/local-*`（书库自己的 skill）、`docs/project/`（书库自己的文档）。
 - **自有**：`books/`、`site.toml`、`trureturing.lock.json`、`i18n/`、`PROJECT.md`、`README.md`、`LICENSE`，以及任何不在托管路径下的文件。升级永不触碰。
 
+`CONTRIBUTING.md`、`.github/ISSUE_TEMPLATE/` 与 `.github/pull_request_template.md` 同样由模板托管；下游额外的 Issue 表单使用 `.github/ISSUE_TEMPLATE/local-*`。升级会安装 PR 命名检查；分支保护与历史 PR 迁移变量需在各仓库分别设置，见 [贡献规范](../CONTRIBUTING.md)。
+
 `template-manifest.json` 记录当前版本每个托管文件的 sha256 与权限位，用来判断“本地是否改过”。
 
 ## 2. 升级
@@ -52,7 +54,7 @@ git 历史指 `HEAD` 可达的全部提交，包括以合并提交（merge commi
 
 ## 3. 自动升级 PR
 
-`.github/workflows/template-sync.yml` 每周检查模板的新版本，执行升级并开 PR（分支 `template-update/<version>`）；有冲突时 PR 标题以 `[conflicts]` 开头，`.template-new` 文件一并提交供合并。没有更新的发布时（见第 2 节，不会倒退）什么也不改，不开 PR。在 PR 分支上删掉了不需要的新托管文件时，用合并提交合入，不要 squash（见第 2 节），否则下一次运行会重新安装它并再开 PR。模板仓库至少发布过一个版本（tag `vX.Y.Z`）后它才会工作。
+`.github/workflows/template-sync.yml` 每周检查模板的新版本，执行升级并开 PR（分支 `template-update/<version>`）；PR 标题使用 `chore(template): …`，有冲突时在摘要中标注 `[conflicts]`，`.template-new` 文件一并提交供合并。没有更新的发布时（见第 2 节，不会倒退）什么也不改，不开 PR。在 PR 分支上删掉了不需要的新托管文件时，用合并提交合入，不要 squash（见第 2 节），否则下一次运行会重新安装它并再开 PR。模板仓库至少发布过一个版本（tag `vX.Y.Z`）后它才会工作。
 
 令牌：
 

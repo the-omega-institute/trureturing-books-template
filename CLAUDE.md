@@ -30,6 +30,10 @@
 
 11. **源文件入库，派生产物按需生成。** SVG、可视化封面/静帧与 `.stills.json`、主题令牌及打印背景均不提交；校验与构建从源文件准备所需输出。书库自己的生成器在 `[derived].outputs` 列出输出，并用书内 `.gitignore` 忽略。锁文件、稳定编号与模板同步基线仍是必须提交的证据或身份数据。迁移与命令见 `docs/SOURCE-ONLY.md`；`./tbook artifacts check` 拒绝重新跟踪产物。
 
+## 协作流程
+
+协作遵循 [CONTRIBUTING.md](CONTRIBUTING.md)：Issue 与 PR 使用 `type(scope): 摘要`，普通分支使用 `<type>/<lowercase-topic>`；自动模板升级与钉版保留规范中列出的专用分支。所有修改通过 PR 合入 `main`，不得直接推送。
+
 ## 常用命令
 
 ```bash
