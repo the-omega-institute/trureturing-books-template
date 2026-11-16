@@ -176,9 +176,12 @@ def cmd_cache(args) -> int:
         return 0
     if args.cache_cmd == "export":
         manifest = buildcache.export(Path(args.dir), current, repo=site.repo or "")
-        n = len(json.loads(manifest.read_text(encoding="utf-8"))["entries"])
+        entries = json.loads(manifest.read_text(encoding="utf-8"))["entries"]
+        n = len(entries)
+        have = {(e["target"], e["unit"], e["key"]) for e in entries}
+        complete = all((u.target, u.name, u.key) in have for u in current if u.required)
         print(f"wrote {n} of {len(current)} unit(s) and {paths.rel(manifest)}")
-        return 0 if n == len(current) else 1
+        return 0 if complete else 1
     return 2
 
 

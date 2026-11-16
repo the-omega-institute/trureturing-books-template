@@ -8,6 +8,9 @@ stroke and fill names a role. Run `./tbook fig build` after each change and look
 
 import math
 
+# Additional files read by this script, relative to figures/; local static imports are tracked too.
+INPUTS = []
+
 # natural size in CSS pixels: the largest the figure is ever shown (≤ 760 wide; text ≥ 12, lines ≥ 1).
 # A phone shows it 358 px wide, so the smallest label × min(1, 358 / width) should stay ≥ 10 (here 14 × 358 / 480).
 SIZE = (480, 290)

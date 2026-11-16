@@ -389,6 +389,23 @@ class StoreTests(unittest.TestCase):
             self.assertEqual(result, "built")
             self.assertIn("other output paths", out)
 
+    def test_relocatable_intermediates_restore_to_the_requested_stage(self):
+        with Scratch() as s:
+            write(s.root / "src" / "a.md", "a")
+            unit = s.unit(target="pandoc")
+            unit.relocatable = True
+            quiet(buildcache.run, unit, Builder(unit))
+            moved = s.unit(target="pandoc", outputs=("build/moved/source", "build/moved/main.typ"))
+            moved.relocatable = True
+            builder = Builder(moved)
+            result, _ = quiet(buildcache.run, moved, builder)
+            self.assertEqual((result, builder.calls), ("cached", 0))
+            self.assertEqual(tree(moved.outputs[0]), tree(unit.outputs[0]))
+            self.assertEqual(moved.outputs[1].read_bytes(), unit.outputs[1].read_bytes())
+            wrong = s.unit(target="pandoc", outputs=("build/wrong",))
+            wrong.relocatable = True
+            self.assertFalse(buildcache.restore_local(wrong), "relocation never changes the output count")
+
     def test_keeps_the_newest_entries(self):
         with Scratch() as s:
             keys = []
@@ -433,6 +450,29 @@ class StoreTests(unittest.TestCase):
             self.assertTrue(fresh_tmp.exists(), "a temporary directory of a running build stays")
             self.assertFalse((buildcache.store_root() / "html" / "other").exists(), "empty directories go")
             self.assertEqual(tree(current.entry_dir() / "files" / "0"), tree(current.outputs[0]))
+
+    def test_export_requires_final_outputs_but_allows_absent_intermediates(self):
+        from tbook import cli, theme
+
+        with Scratch() as s:
+            write(s.root / "src" / "a.md", "a")
+            final = s.unit()
+            optional = s.unit("demo/zh/source", target="pandoc")
+            optional.required = False
+            quiet(buildcache.run, final, Builder(final))
+            self.assertEqual(quiet(buildcache.run, final, Builder(final))[0], "cached")
+            args = SimpleNamespace(cache_cmd="export", dir=str(s.root / "export"), book=None)
+            with mock.patch.object(cli, "_books", return_value=[]), \
+                    mock.patch.object(config, "load_site", return_value=SimpleNamespace(repo="")), \
+                    mock.patch.object(theme, "write"), \
+                    mock.patch.object(buildcache, "units", return_value=[final, optional]):
+                code, out = quiet(cli.cmd_cache, args)
+                self.assertEqual(code, 0, out)
+                self.assertNotIn("build it first", out)
+                optional.required = True
+                code, out = quiet(cli.cmd_cache, args)
+                self.assertEqual(code, 1, out)
+                self.assertIn("pandoc demo/zh/source is not in the store", out)
 
     def test_actions_key(self):
         with Scratch() as s:
@@ -1053,7 +1093,8 @@ class BuildIntegrationTests(unittest.TestCase):
                     **{f"dist/{k}": v for k, v in tree(root / "build" / "dist").items()}}
 
         first, t_first = build()
-        self.assertNotIn("up to date", first)
+        self.assertNotRegex(first, r"cache: (?:html|pdf|epub) \S+ is up to date",
+                            "a cold build may already reuse staging between its PDF variants")
         built = outputs()
         captures = sum(v.get("status") == "live" for registry in root.glob("books/*/viz/visualizations.json")
                        for v in json.loads(registry.read_text())["visualizations"])
@@ -1078,7 +1119,12 @@ class BuildIntegrationTests(unittest.TestCase):
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 1, "the slides were not built: " + r.stdout + r.stderr)
         assets = {p.name: p.read_bytes() for p in exported.iterdir()}
-        self.assertEqual(len(json.loads(assets["build-cache.json"])["entries"]), units)
+        entries = json.loads(assets["build-cache.json"])["entries"]
+        final = [e for e in entries if e["target"] in ("html", "pdf", "epub", "viz-stills")]
+        self.assertEqual(len(final), units)
+        self.assertEqual(sum(e["target"] == "pandoc" for e in entries), 2)
+        self.assertEqual(sum(e["target"] == "typst" for e in entries), 2)
+        self.assertTrue(any(e["target"] == "figures" for e in entries))
 
         gh = FakeGitHub()
         self.addCleanup(gh.close)

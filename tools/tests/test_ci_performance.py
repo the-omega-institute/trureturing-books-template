@@ -27,12 +27,17 @@ class TrustedCacheTest(unittest.TestCase):
         self.run = dict(id=17, workflow_id=3, head_repository={"full_name": "owner/books"},
                         head_branch="main", event="push", status="completed", conclusion="success")
         self.artifact = dict(id=42, name="tbook-build-store", expired=False)
+        self.ci_runs = []
         self.calls = []
 
     def api(self, endpoint):
         self.calls.append(endpoint)
         if endpoint.endswith("/pages.yml"):
             return dict(id=3, path=".github/workflows/pages.yml")
+        if endpoint.endswith("/ci.yml"):
+            return dict(id=4, path=".github/workflows/ci.yml")
+        if "/ci.yml/runs?" in endpoint:
+            return {"workflow_runs": self.ci_runs}
         if "/runs?" in endpoint:
             return {"workflow_runs": [self.run]}
         if "/runs/17/artifacts?" in endpoint:
@@ -55,7 +60,8 @@ class TrustedCacheTest(unittest.TestCase):
             self.calls.clear()
             with self.subTest(changes=changes):
                 self.assertIsNone(trusted_cache.find("owner/books", "main", self.api))
-                self.assertEqual(len(self.calls), 2, "untrusted run's artifacts must never be read")
+                self.assertFalse(any("/artifacts?" in endpoint for endpoint in self.calls),
+                                 "untrusted run's artifacts must never be read")
             self.run = original
 
     def test_expired_or_differently_named_artifact_is_a_miss(self):
@@ -70,6 +76,36 @@ class TrustedCacheTest(unittest.TestCase):
                 return {"workflow_runs": [dict(self.run, id=18), self.run]}
             if "/runs/18/artifacts?" in endpoint:
                 return {"artifacts": []}
+            return self.api(endpoint)
+        self.assertEqual(trusted_cache.find("owner/books", "main", api), (17, 42))
+
+    def test_newest_successful_ci_or_pages_store_is_selected(self):
+        self.ci_runs = [dict(self.run, id=20, workflow_id=4, created_at="2026-11-16T02:00:00Z")]
+        self.run["created_at"] = "2026-11-16T01:00:00Z"
+        def api(endpoint):
+            if "/runs/20/artifacts?" in endpoint:
+                return {"artifacts": [dict(self.artifact, id=43)]}
+            return self.api(endpoint)
+        self.assertEqual(trusted_cache.find("owner/books", "main", api), (20, 43))
+        self.run["created_at"] = "2026-11-16T03:00:00Z"
+        self.assertEqual(trusted_cache.find("owner/books", "main", api), (17, 42))
+
+    def test_ci_store_has_the_same_source_and_success_requirements(self):
+        original = dict(self.run, id=20, workflow_id=4)
+        self.run["conclusion"] = "failure"
+        for changes in ({"event": "pull_request"}, {"event": "pull_request_target"},
+                        {"head_repository": {"full_name": "fork/books"}}, {"head_branch": "feature"},
+                        {"workflow_id": 99}, {"conclusion": "failure"}, {"status": "in_progress"}):
+            self.ci_runs = [dict(original, **changes)]
+            self.calls.clear()
+            with self.subTest(changes=changes):
+                self.assertIsNone(trusted_cache.find("owner/books", "main", self.api))
+                self.assertFalse(any("/artifacts?" in endpoint for endpoint in self.calls))
+
+    def test_missing_ci_workflow_does_not_hide_a_pages_store(self):
+        def api(endpoint):
+            if endpoint.endswith("/ci.yml"):
+                raise OSError("not present")
             return self.api(endpoint)
         self.assertEqual(trusted_cache.find("owner/books", "main", api), (17, 42))
 

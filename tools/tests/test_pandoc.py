@@ -26,7 +26,7 @@ from unittest.mock import patch
 
 from example_support import example_shown
 
-from tbook import config, cover, lean, mathrender, paths
+from tbook import buildcache, config, cover, lean, mathrender, paths
 from tbook import pandoc as tp
 from tbook.model import load_edition
 
@@ -235,6 +235,114 @@ BASE_URL = "https://example.org/books/"
 def fixture_site() -> config.Site:
     """The repository's site with a fixed base URL (links to files point there)."""
     return dataclasses.replace(config.load_site(), base_url=BASE_URL)
+
+
+class SourceCacheTest(unittest.TestCase):
+    """Expensive shared inputs survive fresh staging directories; EPUB keeps its own converter."""
+
+    def test_pdf_variants_share_staging_and_conversion_and_invalidate_changed_sources(self):
+        with tempfile.TemporaryDirectory(prefix="tbook-source-cache-") as tmp:
+            root = Path(tmp)
+            book = make_book(root)
+            site, edition = fixture_site(), book.edition("en")
+            model = load_edition(edition)
+            stages = []
+
+            def convert(args, *, cwd, env):
+                self.assertEqual(args[args.index("--to") + 1], "typst")
+                (cwd / "main.typ").write_text('Converted ' + (cwd / "book.md").read_text(), encoding="utf-8")
+
+            def compile(main, output, **kwargs):
+                self.assertTrue(main.is_file())
+                output.write_bytes(b"%PDF-test")
+                return output
+
+            with patch.object(paths, "CACHE", root / "cache"), \
+                    patch.dict(os.environ, {"TBOOK_CACHE": "1", "TBOOK_CACHE_REMOTE": "0"}), \
+                    patch.object(tp, "stage", wraps=tp.stage) as stage, \
+                    patch.object(tp, "run_pandoc", side_effect=convert) as pandoc, \
+                    patch.object(tp, "compile_typst", side_effect=compile) as typst, \
+                    patch.object(tp, "_compact_pdf", side_effect=lambda p: p), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                for variant in config.PDF_VARIANTS:
+                    directory = root / f"stage-{variant}"
+                    tp.build_pdf(site, book, edition, model, None, variant, root / f"{variant}.pdf",
+                                 stage_dir=directory)
+                    stages.append(directory)
+                self.assertEqual((stage.call_count, pandoc.call_count, typst.call_count), (1, 1, 3))
+                self.assertEqual(len({(d / "main.typ").read_bytes() for d in stages}), 1)
+                stored = buildcache.pandoc_unit(site, book, edition.lang, stages[0], lock=None).entry_dir()
+                self.assertFalse((stored / "files/0/main.typ").exists(), "only source staging is cached here")
+                restored = tp.publication_stage(site, book, edition, model, None, out_dir=root / "moved-stage")
+                self.assertEqual(restored.dir, root / "moved-stage")
+                self.assertEqual(restored.book_md, restored.dir / "book.md")
+                self.assertTrue(restored.chapters)
+                self.assertTrue(restored.files)
+                self.assertTrue(restored.warnings)
+                self.assertEqual(restored.meta["title"], edition.title)
+                self.assertFalse((restored.dir / "main.typ").exists())
+                chapter = edition.dir / "a.md"
+                chapter.write_text(chapter.read_text() + "\nChanged publication text.\n", encoding="utf-8")
+                tp.build_pdf(site, book, edition, load_edition(edition), None, "screen", root / "changed.pdf",
+                             stage_dir=root / "changed-stage")
+                self.assertEqual((stage.call_count, pandoc.call_count), (2, 2))
+                self.assertIn("Changed publication text.", (root / "changed-stage/main.typ").read_text())
+                resized = dataclasses.replace(book, pdf={**book.pdf, "paper": "a4"})
+                changed = tp.publication_stage(site, resized, edition, load_edition(edition), None,
+                                               out_dir=root / "resized-stage")
+                self.assertEqual(changed.meta["paper"], "a4")
+                self.assertEqual(stage.call_count, 3)
+                lock = lean.Lock(repo="test/repo", branch="dev", commit="a" * 40)
+                changed = tp.publication_stage(site, resized, edition, load_edition(edition), lock,
+                                               out_dir=root / "repinned-stage")
+                self.assertEqual(changed.meta["trureturing"]["commit"], "a" * 40)
+                self.assertEqual(stage.call_count, 4)
+                custom_model = load_edition(edition)
+                custom_model.envs["def-a"].title = "A distinct in-memory title"
+                changed = tp.publication_stage(site, resized, edition, custom_model, None,
+                                               out_dir=root / "model-stage")
+                self.assertIn("A distinct in-memory title", changed.book_md.read_text())
+                self.assertEqual(stage.call_count, 5)
+                inventory = buildcache.pandoc_unit(site, book, edition.lang, root / "inventory")
+                explicit = buildcache.pandoc_unit(site, book, edition.lang, root / "explicit",
+                                                  lock=lean.Lock.load(), model=load_edition(edition))
+                self.assertEqual(inventory.key, explicit.key, "disk inputs and the normal build share one key")
+
+    def test_epub_uses_the_shared_stage_without_typst_conversion(self):
+        with tempfile.TemporaryDirectory(prefix="tbook-epub-source-cache-") as tmp:
+            root = Path(tmp)
+            book = make_book(root)
+            site, edition = fixture_site(), book.edition("en")
+            model = load_edition(edition)
+
+            def epub_inputs(*args):
+                staged = args[-1]
+                (staged.dir / "epub").mkdir()
+                cover = staged.dir / "cover.png"
+                cover.write_bytes(b"cover")
+                return {"cover": cover, "fonts": []}
+
+            def convert(args, *, cwd, env):
+                self.assertEqual(args[args.index("--to") + 1], "epub3")
+                (cwd / "epub/pandoc.epub").write_bytes(b"raw epub")
+
+            def finalize(src, dst, **kwargs):
+                dst.write_bytes(src.read_bytes())
+                return dst
+
+            with patch.object(paths, "CACHE", root / "cache"), \
+                    patch.dict(os.environ, {"TBOOK_CACHE": "1", "TBOOK_CACHE_REMOTE": "0", "TBOOK_EPUBCHECK": "0"}), \
+                    patch.object(tp, "stage", wraps=tp.stage) as stage, \
+                    patch.object(tp, "stage_epub", side_effect=epub_inputs), \
+                    patch.object(tp, "run_pandoc", side_effect=convert) as pandoc, \
+                    patch.object(tp, "finalize_epub", side_effect=finalize), \
+                    patch.object(tp, "compile_typst") as typst, \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                source = tp.publication_stage(site, book, edition, model, None, out_dir=root / "prepared")
+                tp.build_epub(site, book, edition, model, None, root / "book.epub", stage_dir=root / "epub-stage")
+                self.assertEqual((stage.call_count, pandoc.call_count), (1, 1))
+                typst.assert_not_called()
+                self.assertEqual((root / "epub-stage/book.md").read_bytes(), source.book_md.read_bytes())
 
 
 class StagingTest(unittest.TestCase):

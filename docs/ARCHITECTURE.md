@@ -225,17 +225,26 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 | target | 单元名 | 产物 |
 | --- | --- | --- |
 | `html` | `<slug>/<lang>` | `build/html/<slug>/<lang>/` |
+| `pandoc` | `<slug>/<lang>` | 共享正文、媒体、主题与元数据的暂存目录 |
+| `typst` | `<slug>/<lang>` | Pandoc 转换后的 `main.typ` |
 | `pdf` | `<slug>/<lang>/<variant>` | `build/dist/<slug>/` 下该语言版本、该变体的 PDF |
 | `epub` | `<slug>/<lang>` | `build/dist/<slug>/` 下该语言版本的 EPUB |
+| `figures` | `<slug>/<figure>/<lang>` | 预期 SVG；生成时再比较、写入本地图片及幻灯片副本 |
+| `covers` | `<slug>/<lang>/<variant>/<width>/<format>` | 站点与 EPUB 共用机制生成的书封 |
 | `viz-stills` | `<slug>/<viz id>` | 本地封面、引用卡静帧与清单 |
 | `slides` | `<slug>` | `build/slides/<slug>/`（全部 deck、语言与 PDF） |
 | `films` | `<slug>/<film id>` | `build/films/<slug>/<film id>/`（单元由 `film.units(site, book)` 给出） |
+
+PDF 按完整文档编译，页码、目录、交叉引用和分页共同决定结果。三个变体共用 `pandoc` 暂存和 `typst` 转换缓存，再分别缓存最终 PDF；EPUB 只共用暂存，不需要 Typst 正文转换。暂存缓存保存相对链接和完整阶段元数据，恢复时绑定当前目录，不混入封面、最终 PDF 或 EPUB 工作文件。
 
 **键**是单元全部输入（`Inputs`）的 SHA-256，再并入 target 与单元名。输入按“标签 + 摘要”逐项计入：
 
 - 文件：仓库是 git 工作树时，取所列目录下 git 会提交的文件（已跟踪的，以及未跟踪且未被忽略的），构建产物与被忽略的文件不计入；git 整体忽略的目录（如 `.cache/fonts/`）与仓库外的目录逐个文件计入。仓库外的文件记为 `<outside>/<目录名>/<相对路径>`，键与目录所在位置无关。不是 git 工作树时遍历目录，跳过 `build/`、`_site/`、`.cache/`、`node_modules/`、`out/`、`frames/`、`tts/` 等。
 - HTML、PDF、EPUB：`tools/tbook/`、`tools/filters/`、`tools/node/`、`tools/figkit/`、`theme/`（不含只供视频用的 `theme/film/`）、`i18n/`、`site.toml`、锁文件、`requirements.txt`、`package-lock.json`，整个书目录 `books/<slug>/`（各语言版本互相引用，改动任一语言都会重建这本书的全部单元），站点地址与仓库、Python 主次版本、Node 主版本。HTML 另计 mdBook 的精确版本；PDF 与 EPUB 另计 Pandoc 与 `typst` 模块的版本系列、`.cache/fonts/` 的字体文件、Typst 找到的字体族（含系统字体，所以构建 PDF/EPUB 的工作流都装同一套字体：`.github/actions/setup` 的 `fonts: 'true'` 包含 Playwright `--with-deps` 会装的字体）与 `$SOURCE_DATE_EPOCH`；EPUB 还计 epubcheck 是否真能运行（`$TBOOK_EPUBCHECK`，以及缺 Java 或 epubcheck 包时记为跳过），未经检查存下的 EPUB 不会恢复到要求检查的构建中。`.cache/fonts-fontsource/` 由构建从 `@fontsource` 包派生，不计入。
 - 幻灯片：整个书目录（包括绘图脚本及其数据源），`tools/figkit/`、`theme/tokens.json`、`theme/slides/`、`theme/generated/`、`theme/i18n/`、`i18n/`、`tools/node/`、`tools/tbook/slides.py`、锁文件、`site.toml`、`package-lock.json`，站点基路径与地址，`TBOOK_SLIDES_NO_PDF`、`TBOOK_SLIDES_NO_CHECK`，Node 主版本（Chromium 由 `package-lock.json` 中的 Playwright 决定）。
+- 静态图：默认包含书籍源码及声明的派生数据，排除生成图片，脚本可用字面量 `INPUTS` 声明完整数据依赖以缩小失效范围；脚本、辅助模块、绘图工具、配色与冻结锁始终计入。检查命中缓存时仍比较本地 SVG，不会以恢复掩盖损坏。书封按实际绘制元数据、模板、配色、字体、导出尺寸与时间戳计算键；正文变化而这些输入相同时可复用。
+
+`@fontsource` 的拉丁回退字体转换为 `.cache/fonts-fontsource/` 下的 TTF，每个映射字重在相邻的 `.ttf.json` 中记录 WOFF 与 TTF 的 SHA-256。源文件可用时，只有两者摘要都匹配才复用；源字节变化、旧缓存没有记录或 TTF 损坏都会重新转换。当前源转换失败时移除旧 TTF，避免 PDF、EPUB 或封面继续使用旧字体；未安装 npm 源包时仍保留已有 TTF 供离线使用。
 
 工具只按**版本系列**计入（`buildcache.series`：Node 取主版本，Pandoc 与 Typst 取“主.次”，如 Pandoc `3.1`；Chromium 由 `package-lock.json` 中的 Playwright 决定，不单独计入）。决定产物的版本已钉在键覆盖的文件中（`requirements.txt` 钉 Pandoc 与 Typst，`package-lock.json` 钉 Playwright、Slidev 与字体，`theme/film/requirements.txt`）；若这些工具计入精确版本，键就随运行器镜像而变，Node 的一个补丁版本或 Ubuntu 的 ffmpeg 修订就会让全部条目与已发布的 Release 失效。mdBook 例外：各处都装同一个精确版本（`.github/actions/setup` 钉 0.5.4），按精确版本计入，升级它即重建 HTML。
 
@@ -245,7 +254,7 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 
 **查找顺序**（`buildcache.run(unit, build)`）：
 
-1. 本地存储：逐个文件核对 `entry.json` 记下的摘要、目录与产物形状（没有多余文件，没有符号链接），记下的产物路径须与当前一致；不符即删除该条目并构建。
+1. 本地存储：逐个文件核对 `entry.json` 记下的摘要、目录与产物形状（没有多余文件，没有符号链接），记下的产物路径须与当前一致；只有显式声明可迁移的暂存与 Typst 中间产物允许恢复到新的阶段目录。不符即删除该条目并构建。
 2. `TBOOK_CACHE_REMOTE=1` 时，查仓库（`site.toml` 的 `repo`、`TBOOK_REPO` 或 `GITHUB_REPOSITORY`）最新 5 个附有 `build-cache.json` 的已发布 Release（草稿与没有该文件的 Release，例如手工发的，不算在内；只看最新的 100 个 Release）中的 `build-cache.json`，从新到旧取第一个有该键的条目：设置了 `GITHUB_TOKEN` 或 `GH_TOKEN` 时经 API 的资产地址下载（私有仓库也可用；跳转到存储地址时不带令牌），否则用公开下载地址；核对大小不超过声明值、SHA-256 与 `build-cache.json` 和 GitHub 报告的 `digest` 一致；只解出 `entry.json` 与 `files/` 下的普通文件和目录，链接、设备文件、`..`、绝对路径、重复成员一律拒绝（逐个写出，不依赖 Python 3.11.4 才有的解包过滤器）；再按第 1 步校验后放入本地存储并恢复。API 地址取 `$GITHUB_API_URL`（默认 `https://api.github.com`）。
 3. 都没有：构建，成功后存入；构建失败则什么也不存，构建声明的产物缺失是错误。
 
@@ -262,7 +271,7 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 ./tbook cache prune                        只留各单元当前键的条目；删除损坏条目、中断留下的临时目录与空目录
 ./tbook cache export DIR [--book <slug>]   把各单元当前键的条目写成 DIR/cache-<target>-<unit>-<键前 16 位>.tar
                                            与 DIR/build-cache.json（unit、key、asset、sha256、size）；
-                                           有单元不在本地存储中时列出它们，退出码为 1
+                                           缺少最终出版单元时退出码为 1；可重建辅助单元只导出已有条目
 ```
 
 导出的 tar 可复现：成员排序，不含属主与时间，权限只有 0644/0755。工作流如何保存、恢复本地存储，整站 Release 如何附带这些文件，见 `docs/PUBLISHING.md`。
@@ -271,10 +280,11 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 
 ```python
 Inputs().files(*paths, exclude=()).text(label, value).add(other)   # .key()；text 的值按 JSON 计入
-Unit(target, name, inputs, outputs: list[Path])                     # .key、.label、.entry_dir()
-run(unit, build_fn, *, repo=None) -> "cached" | "release" | "built"
+Unit(target, name, inputs, outputs: list[Path], relocatable=False, required=True)
+                                     # .key、.label、.entry_dir()；辅助单元 required=False
+run(unit, build_fn, *, repo=None, announce=True) -> "cached" | "release" | "built"
 run(unit, None) -> "cached" | "release" | "missing"                 # 只恢复，不构建
-units(site, books) -> list[Unit]       # html/pdf/epub/slides 单元，加上 film.units(site, book)
+units(site, books) -> list[Unit]       # 最终输出、图片与共享中间产物，加上 film.units(site, book)
 tool_version(*cmd), package_version(name), series(version, parts=2), node_version()
 store(unit), restore_local(unit), restore_remote(unit, repo), stored(), prune(units), actions_key(), export(dir, units)
 ```

@@ -43,7 +43,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator
@@ -56,7 +56,7 @@ ENTRY = "entry.json"
 VERSION = "2"  # part of every key: bump it to rebuild everything once
 KEEP = 2  # entries kept per unit in the local store
 REMOTE_RELEASES = 5  # newest published releases with a build-cache.json searched for an entry
-TARGETS = ("html", "pdf", "epub", "slides", "films", "viz-stills")
+TARGETS = ("html", "pandoc", "typst", "pdf", "epub", "slides", "films", "viz-stills", "figures", "covers")
 TIMEOUT = 300  # seconds per HTTP request
 MAX_JSON = 32 << 20  # bytes: a release list or build-cache.json larger than this is refused
 MAX_ASSET = 8 << 30  # bytes: upper bound for an asset whose size is not declared
@@ -68,6 +68,7 @@ SKIP_DIRS = frozenset({".git", "__pycache__", "node_modules", ".slidev", ".vite"
                        "build", "_site"})
 _KEY_RE = re.compile(r"[0-9a-f]{64}")
 _REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+_DEFAULT_LOCK = object()
 
 
 class MissingOutput(FileNotFoundError):
@@ -93,6 +94,7 @@ def _say(msg: str) -> None:
 def _clear_memos() -> None:
     """Forget what this process memoized (git listings, digests, tool versions, release indexes)."""
     _DIGESTS.clear()
+    _MODEL_KEYS.clear()
     _git_files.cache_clear()
     _git_ignored.cache_clear()
     tool_version.cache_clear()
@@ -102,6 +104,7 @@ def _clear_memos() -> None:
 # --------------------------------------------------------------------------- inputs and keys
 
 _DIGESTS: dict[tuple[str, int, int, int, int], str] = {}
+_MODEL_KEYS: dict[tuple[str, str, str], str] = {}
 
 
 def _sha256_file(path: Path) -> str:
@@ -318,6 +321,8 @@ class Unit:
     name: str  # "<slug>/<lang>", "<slug>/<lang>/<variant>", "<slug>", "<slug>/<film id>"
     inputs: Inputs
     outputs: list[Path]  # the files and directories the build writes, under the repository root
+    relocatable: bool = False  # source intermediates contain only relative links and can move between stages
+    required: bool = True  # final deliverables must be present for a complete cache export
 
     @property
     def key(self) -> str:
@@ -371,9 +376,68 @@ def _dated(inputs: Inputs) -> Inputs:
 
 
 def pdf_unit(site: config.Site, book: config.Book, lang: str, variant: str, out_file: Path) -> Unit:
-    inputs = site_inputs(site).files(book.dir).add(_fonts())
-    inputs.text("pandoc", _pandoc_version()).text("typst", series(package_version("typst"))).text("node", node_version())
+    source = typst_unit(site, book, lang, Path(out_file))
+    inputs = Inputs().text("typst source", source.key).add(_fonts())
+    inputs.text("typst", series(package_version("typst")))
     return Unit("pdf", f"{book.slug}/{lang}/{variant}", _dated(inputs), [Path(out_file)])
+
+
+def _publication_model_key(book: config.Book, lang: str, model: Any, inputs_key: str) -> str:
+    """Fingerprint the parsed input actually supplied to staging; memoize disk-parsed models only."""
+    from . import model as models
+
+    memo_key = (str(book.dir), lang, inputs_key)
+    if model is None and memo_key in _MODEL_KEYS:
+        return _MODEL_KEYS[memo_key]
+    supplied = model is not None
+    model = model if supplied else models.load_edition(book.edition(lang))
+
+    def chapter(ch):
+        return {k: v for k, v in vars(ch).items() if k != "children"}
+
+    def env(e):
+        return {"kind": e.kind, "id": e.id, "title": e.title, "lean": e.lean, "number": e.number,
+                "line": e.line, "attrs": asdict(e.attrs), "chapter": chapter(e.chapter),
+                "div": asdict(e.div) if e.div else None}
+
+    data = {"summary": ([chapter(c) for c in model.summary.chapters] if model.summary else None),
+            "chapters": [{"chapter": chapter(doc.chapter), "path": _item_label(doc.path), "text": doc.text,
+                          "blocks": [asdict(b) for b in doc.blocks], "envs": [env(e) for e in doc.envs],
+                          "media": [env(e) for e in doc.media], "refs": doc.refs, "lean_links": doc.lean_links}
+                         for doc in model.chapters],
+            "envs": {key: env(e) for key, e in model.envs.items()}}
+    key = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    if not supplied:
+        _MODEL_KEYS[memo_key] = key
+    return key
+
+
+def pandoc_unit(site: config.Site, book: config.Book, lang: str, out_dir: Path, *,
+                lock: Any = _DEFAULT_LOCK, model: Any = None) -> Unit:
+    """Variant-independent staging shared by all PDF variants and the EPUB of an edition.
+
+    Staging needs the renderer and Node, but no font discovery, Typst compilation or EPUB validation.
+    Those remain inputs of the final PDF/EPUB units.
+    """
+    from . import lean
+
+    if lock is _DEFAULT_LOCK:
+        lock = lean.Lock.load()
+    inputs = site_inputs(site).files(book.dir).text("node", node_version())
+    inputs.text("book settings", {k: v for k, v in vars(book).items() if k not in ("dir", "editions", "raw")})
+    inputs.text("book raw metadata", json.dumps(book.raw, sort_keys=True, ensure_ascii=False, default=str))
+    inputs.text("site metadata", [site.title, site.trureturing_repo, site.trureturing_branch])
+    inputs.text("resolved lock", asdict(lock) if lock is not None else None)
+    inputs.text("publication model", _publication_model_key(book, lang, model, inputs.key()))
+    return Unit("pandoc", f"{book.slug}/{lang}", _dated(inputs), [Path(out_dir)], relocatable=True, required=False)
+
+
+def typst_unit(site: config.Site, book: config.Book, lang: str, out_file: Path, *,
+               lock: Any = _DEFAULT_LOCK, model: Any = None) -> Unit:
+    """Pandoc's Typst source, converted once per edition and shared by all PDF variants."""
+    inputs = pandoc_unit(site, book, lang, Path(out_file).parent, lock=lock, model=model).inputs
+    inputs.text("pandoc", _pandoc_version())
+    return Unit("typst", f"{book.slug}/{lang}", inputs, [Path(out_file)], relocatable=True, required=False)
 
 
 def _epubcheck_mode() -> str:
@@ -396,8 +460,9 @@ def _epubcheck_mode() -> str:
 
 
 def epub_unit(site: config.Site, book: config.Book, lang: str, out_file: Path) -> Unit:
-    inputs = site_inputs(site).files(book.dir).add(_fonts())
-    inputs.text("pandoc", _pandoc_version()).text("typst", series(package_version("typst"))).text("node", node_version())
+    source = pandoc_unit(site, book, lang, Path(out_file).parent)
+    inputs = Inputs().text("pandoc stage", source.key).add(_fonts())
+    inputs.text("pandoc", _pandoc_version()).text("typst", series(package_version("typst")))
     inputs.text("epubcheck", _epubcheck_mode())
     return Unit("epub", f"{book.slug}/{lang}", _dated(inputs), [Path(out_file)])
 
@@ -458,14 +523,20 @@ def viz_units(book: config.Book, ids: list[str] | None = None) -> list[Unit]:
 
 def units(site: config.Site, books: Iterable[config.Book]) -> list[Unit]:
     """Every unit of ``books`` that ``./tbook build all`` builds, with its current key."""
-    from . import build, film, slides
+    from . import build, cover, figure, film, pandoc, slides
 
     out: list[Unit] = []
     for book in books:
+        out.extend(cover.units(site, book))
+        out.extend(figure.units(book))
         out.extend(viz_units(book))
         for ed in book.editions:
             if book.outputs_html:
                 out.append(html_unit(site, book, ed.lang, build.html_dir(book.slug, ed.lang)))
+            if book.outputs_pdf or book.outputs_epub:
+                out.append(pandoc_unit(site, book, ed.lang, pandoc.stage_dir_for(book, ed)))
+            if book.outputs_pdf:
+                out.append(typst_unit(site, book, ed.lang, pandoc.stage_dir_for(book, ed) / "main.typ"))
             for variant in book.outputs_pdf:
                 out.append(pdf_unit(site, book, ed.lang, variant,
                                     build.dist_dir(book.slug) / book.artifact(ed.lang, "pdf", variant)))
@@ -674,7 +745,9 @@ def restore_local(unit: Unit, key: str | None = None) -> bool:
             why = "no valid entry.json"
         elif (data["target"], data["unit"], data["key"]) != (unit.target, unit.name, key):
             why = "it belongs to another unit"
-        elif [o.get("path") if isinstance(o, dict) else None for o in data["outputs"]] != [
+        elif len(data["outputs"]) != len(unit.outputs):
+            why = "it was stored for a different number of outputs"
+        elif not unit.relocatable and [o.get("path") if isinstance(o, dict) else None for o in data["outputs"]] != [
                 _out_path(Path(o)) for o in unit.outputs]:
             why = "it was stored for other output paths"
         else:
@@ -867,7 +940,7 @@ def _safe_extract(tar_path: Path, dest: Path) -> None:
                 shutil.copyfileobj(src, fh)
 
 
-def restore_remote(unit: Unit, repo: str) -> bool:
+def restore_remote(unit: Unit, repo: str, *, announce: bool = True) -> bool:
     """Fetch ``unit``'s entry for its current key from a release into the store and restore it. False (with
     one line saying why, when there was something to fetch) on any failure."""
     key = unit.key
@@ -909,14 +982,15 @@ def restore_remote(unit: Unit, repo: str) -> bool:
         shutil.rmtree(work, ignore_errors=True)
     if not restore_local(unit, key):
         return False
-    _say(f"cache: {unit.label} restored from release {tag} ({key[:12]})")
+    if announce:
+        _say(f"cache: {unit.label} restored from release {tag} ({key[:12]})")
     return True
 
 
 # --------------------------------------------------------------------------- the build step
 
 
-def run(unit: Unit, build: Callable[[], Any] | None, *, repo: str | None = None) -> str:
+def run(unit: Unit, build: Callable[[], Any] | None, *, repo: str | None = None, announce: bool = True) -> str:
     """Build ``unit`` with ``build()`` unless its key is cached. Returns 'cached' (local store), 'release'
     (restored from a release) or 'built'. With ``build`` None the unit is only restored: 'missing' when it
     is not cached. Errors of ``build()`` propagate (nothing is stored); a store that fails for lack of
@@ -928,7 +1002,8 @@ def run(unit: Unit, build: Callable[[], Any] | None, *, repo: str | None = None)
         return "built"
     key = unit.key
     if restore_local(unit, key):
-        _say(f"cache: {unit.label} is up to date ({key[:12]})")
+        if announce:
+            _say(f"cache: {unit.label} is up to date ({key[:12]})")
         return "cached"
     if remote_enabled():
         if repo is None:
@@ -937,7 +1012,7 @@ def run(unit: Unit, build: Callable[[], Any] | None, *, repo: str | None = None)
             except Exception:  # noqa: BLE001
                 repo = None
         try:
-            if repo and restore_remote(unit, repo):
+            if repo and restore_remote(unit, repo, announce=announce):
                 return "release"
         except Exception as exc:  # noqa: BLE001 - never fail a build because a release is unreachable
             _say(f"cache: cannot restore {unit.label} from a release ({_why(exc)}); building it")
@@ -1067,7 +1142,8 @@ def export(dest: Path, current: Iterable[Unit], *, repo: str = "") -> Path:
         entry = unit.entry_dir(key)
         why = verify(entry) if entry.is_dir() else "not stored"
         if why:
-            print(f"cache export: {unit.label} is not in the store ({why}); build it first", flush=True)
+            if unit.required:
+                print(f"cache export: {unit.label} is not in the store ({why}); build it first", flush=True)
             continue
         name = asset_name(unit.target, unit.name, key)
         tmp = dest / f".{name}.tmp"
