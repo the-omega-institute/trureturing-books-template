@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from tbook import doctor, pandoc as tp, paths
 from tbook.model import load_edition
