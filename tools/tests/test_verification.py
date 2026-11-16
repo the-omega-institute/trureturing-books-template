@@ -996,7 +996,9 @@ class PullRequestCacheTests(unittest.TestCase):
                      dict(event="pull_request_target", ref="refs/heads/main"),
                      dict(event="push", ref="refs/heads/feature"),
                      dict(event="workflow_dispatch", ref="refs/heads/feature")]
-        runs = {"ci.yml": trusted[:4], "pages.yml": trusted[:2], "release.yml": trusted[2:4],
+        runs = {"ci.yml": trusted[:4],
+                "pages.yml": [trusted[1], dict(event="workflow_run", ref="refs/heads/main")],
+                "release.yml": trusted[2:4],
                 "trureturing-bump.yml": [trusted[1], trusted[4]]}
         for name, ok in runs.items():
             text = (self.WORKFLOWS / name).read_text(encoding="utf-8")
@@ -1118,6 +1120,7 @@ class PullRequestCacheTests(unittest.TestCase):
                     # a skipped restore step leaves its outputs empty
                     context = {k: "" for k in re.findall(r"steps\.[\w-]+\.outputs\.[\w-]+", cond)}
                     context["fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure"] = True
+                    context.update({"steps.verified.outcome": "success", "needs.plan.outputs.stills": "true"})
                     for event in pr_events:
                         self.assertFalse(gha_if(cond, event=event, ref="refs/pull/7/merge", context=context),
                                          f"{name}: {uses} on {event}")

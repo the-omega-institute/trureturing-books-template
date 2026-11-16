@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "d765da8c4e8cb23a07d6e62517266bcf905a8ca3199d4a358abadcbadb74bebf",
+      "sha256": "b186f4c254463402a32ef556cd3559f4624344b25c0cc043b7d4c4ca2354f8c6",
       "mode": "100644"
     },
     ".github/workflows/pr-conventions.yml": {
@@ -1068,7 +1068,7 @@
       "mode": "100644"
     },
     "tools/tests/test_template.py": {
-      "sha256": "da143a51e5c80220a2facd6b6b63781f11c2ad40879c21a505cd3befa63e2f91",
+      "sha256": "02befa607e00b75ae260148ceff6ae23f71e5a5469568d74eea610d402cbb0e5",
       "mode": "100644"
     },
     "tools/tests/test_template_layers.py": {
@@ -1076,7 +1076,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "b1e22dd0c2275e0555bd58272521f0957b04927c9192d43dd9e6a787fa47bde4",
+      "sha256": "350b9d183c70b02955b9b4c238600d47223336bd60d191de4ef06c63d6c58d86",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {

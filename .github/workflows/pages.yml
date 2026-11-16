@@ -5,9 +5,9 @@
 # Until then the probe job warns and the site is built but not deployed.
 #
 # Build cache (docs/PUBLISHING.md §5): a unit whose inputs did not change is restored, from the Actions
-# cache that earlier runs of this workflow saved or else from the newest published releases, instead of
-# being built again. This is the only workflow that saves the Actions cache (on the default branch), and
-# the group "pages" runs it one at a time, so two runs never render the same film for the same entry.
+# cache that successful default-branch CI/Pages runs saved or from published releases. Automatic Pages
+# waits for CI's prepared exports; film shards prepare missing videos before site assembly. The group
+# "pages" runs one publication at a time.
 name: Pages
 
 on:
