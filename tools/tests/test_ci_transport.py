@@ -27,6 +27,12 @@ class PlanOutputBudgetTest(unittest.TestCase):
     commit = fixtures.AffectedPlanTest.commit
     make_plan = fixtures.AffectedPlanTest.make_plan
 
+    def test_plain_film_name_is_selected_without_metadata_identifiers(self):
+        self.write("books/one/films/explanation/film.json", json.dumps({"title": "Explanation"}))
+        tree = planner.Tree(self.root, self.commit())
+        selected = planner.impact(tree, tree, ["books/one/films/explanation/scenes.js"])
+        self.assertEqual(selected["films"], ["one/explanation"])
+
     def outputs(self, plan):
         output, summary = self.root / "output.txt", self.root / "summary.md"
         for path in (output, summary):

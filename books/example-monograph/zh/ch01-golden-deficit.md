@@ -243,6 +243,6 @@ $$
 
 视频把同一个故事从头讲一遍：先看两个表示怎样逐位相加、进位，再看亏量为什么跳不出这三个值。
 
-::: {.film src="001-golden-deficit"}
+::: {.film src="golden-deficit"}
 动画：两个 Zeckendorf 表示相加、进位，以及亏量为什么只取 $-1, 0, 1$（[@thm-deficit-three-valued]）。
 :::

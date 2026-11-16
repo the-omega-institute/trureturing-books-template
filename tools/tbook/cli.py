@@ -337,7 +337,7 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--book", action="append")
     c.add_argument("--lang", action="append", help="limit to an edition language (repeatable)")
     c.add_argument("--variant", action="append", choices=list(config.PDF_VARIANTS), help="limit PDF variants")
-    c.add_argument("--film", action="append", metavar="NNN-NAME",
+    c.add_argument("--film", action="append", metavar="NAME",
                    help="with `build films`: render or restore only this film (repeatable); the others are only "
                         "restored from the build cache")
     c.set_defaults(fn=cmd_build)

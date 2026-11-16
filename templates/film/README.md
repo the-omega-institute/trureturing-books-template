@@ -1,17 +1,19 @@
 # 视频模板 · Film template
 
-本目录是 `./tbook film new` 的起始模板；每部视频按 [trureturing-film](https://github.com/the-omega-institute/trureturing-film) 的方案完全由代码生成：确定性的 Canvas 动画、本地合成的英文旁白（Kokoro-82M）、程序化配乐，内嵌中英双语字幕。仓库只存源码；成片与 PDF 一样是构建产物：`./tbook build films|site|all` 渲染（输入未变时从缓存恢复）到 `build/films/<slug>/<id>/`，站点托管在 `<slug>/films/<id>/`，书中以 `<video>` 嵌入。
+本目录是 `./tbook film new` 的起始模板；每部视频按 [trureturing-film](https://github.com/the-omega-institute/trureturing-film) 的方案完全由代码生成：确定性的 Canvas 动画、本地合成的英文旁白（Kokoro-82M）、程序化配乐，内嵌中英双语字幕。仓库只存源码；成片与 PDF 一样是构建产物：`./tbook build films|site|all` 渲染（输入未变时从缓存恢复）到 `build/films/<slug>/<name>/`，站点托管在 `<slug>/films/<name>/`，书中以 `<video>` 嵌入。
 
-This directory is the starting point of `./tbook film new`. Every film follows the trureturing-film scheme and is generated entirely by code: a deterministic Canvas animation, English narration synthesized locally with Kokoro-82M, a procedural score, and burned-in Chinese and English subtitles. The repository holds source only; the videos are build outputs like the PDFs: `./tbook build films|site|all` renders them (or restores them from the build cache when nothing they depend on changed) into `build/films/<slug>/<id>/`, the site hosts them at `<slug>/films/<id>/`, and the book embeds them.
+This directory is the starting point of `./tbook film new`. Every film follows the trureturing-film scheme and is generated entirely by code: a deterministic Canvas animation, English narration synthesized locally with Kokoro-82M, a procedural score, and burned-in Chinese and English subtitles. The repository holds source only; the videos are build outputs like the PDFs: `./tbook build films|site|all` renders them (or restores them from the build cache when nothing they depend on changed) into `build/films/<slug>/<name>/`, the site hosts them at `<slug>/films/<name>/`, and the book embeds them.
+
+视频目录直接使用具体片名的 kebab-case 写法，例如 `golden-deficit`；不另填视频 ID 或所属章节，也不显示视频编号。A film uses its concrete name, with no separate identifier, chapter field or serial number.
 
 ## 新建 · Create
 
 ```bash
-./tbook film new example-monograph 002-carry-rules "进位规则" "The Carry Rules"
+./tbook film new example-monograph carry-rules "进位规则" "The Carry Rules"
 ./tbook film list
 ```
 
-`books/<slug>/films/<NNN>-<name>/` 只放这些源文件 · a film directory holds only:
+`books/<slug>/films/<name>/` 只放这些源文件 · a film directory holds only:
 
 | 文件 File | 作用 Purpose |
 | --- | --- |
@@ -22,13 +24,12 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 | `poster.jpg` | 提交入库的小海报（≤ 300 KB，手工运行 `film.sh <dir> poster` 生成；构建从不改写它） · the committed poster, written by hand with the `poster` step, never by the build |
 | `README.md` | 可选：场景说明、每条论断的出处 · optional notes, the source of every claim |
 
-流水线的工作文件都在 `<dir>/out/`（已被 `.gitignore` 忽略），构建把成片复制到 `build/films/<slug>/<id>/`。The pipeline works in `<dir>/out/` (git-ignored); the build copies the videos to `build/films/<slug>/<id>/`.
+流水线的工作文件都在 `<dir>/out/`（已被 `.gitignore` 忽略），构建把成片复制到 `build/films/<slug>/<name>/`。The pipeline works in `<dir>/out/` (git-ignored); the build copies the videos to `build/films/<slug>/<name>/`.
 
 ## film.json
 
 ```json
 {
-  "id": "001-golden-deficit",
   "title": "The Golden Deficit",
   "title_zh": "黄金亏量",
   "summary": "Zeckendorf digits, golden carries and the deficit of beta …",
@@ -43,15 +44,14 @@ This directory is the starting point of `./tbook film new`. Every film follows t
   "subtitles": ["zh", "en"],
   "lean": ["D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"],
   "outputs": {
-    "narrated_720p": "example-monograph_001_720p_narrated.mp4",
-    "cover": "example-monograph_001_cover.jpg"
+    "narrated_720p": "example-monograph_golden-deficit_720p_narrated.mp4",
+    "cover": "example-monograph_golden-deficit_cover.jpg"
   }
 }
 ```
 
 | 字段 Field | 规则 Rule |
 | --- | --- |
-| `id` | 等于目录名 `<NNN>-<name>` · equals the directory name |
 | `title`, `title_zh` | 英文、中文标题，各一行 · English and Chinese titles, one line each |
 | `summary`, `summary_zh` | 可选，一段简介（落地页与视频页） · optional one-paragraph blurbs |
 | `publication_basis` | 新视频填 `"pinned"`：当前出版依据、精确链接与构建数据由锁文件解析；钉版后仍须复核旁白 · current publication follows the lock; review narration after re-pinning |
@@ -62,7 +62,7 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 | `lean` | 片中引用的定理 GID，必须都在锁文件中且种类为 `theorem`；片中与视频页都以 LEAN ✓ 链接到所钉提交 · theorems cited by the film; each must be in the lock with kind `theorem` |
 | `solid` | 可选，`true`：视频有实体镜头（见“实体镜头”），页面加载造型核心与 three.js · optional: the film has solid shots |
 | `scripts` | 可选，书里的经典脚本（相对 `books/<slug>/`，如 `viz/<id>/model.js`），内联在 `scenes.js` 之前，计入构建键 · optional book scripts inlined before `scenes.js` |
-| `outputs` | 构建产出的文件，键为输出、值为文件名；列出什么就构建、托管、链接什么。必需：`narrated_720p`（720p 旁白版，播放器播放它）与 `cover`（1920×1080 封面）；可选，列出才构建：`narrated`（1080p 旁白版）、`music_only`（1080p 纯配乐）、`music_only_720p`（720p 纯配乐）。其他键是错误。站点地址为 `<slug>/films/<id>/<文件名>` · what the build makes, by file name: what is listed is built, hosted and linked, nothing else. Required: `narrated_720p` (the 720p narrated video the players play) and `cover` (1920×1080); optional, built only when listed: `narrated` (1080p), `music_only` (1080p), `music_only_720p`; any other key is an error. The site serves `<slug>/films/<id>/<file>` |
+| `outputs` | 构建产出的文件，键为输出、值为文件名；列出什么就构建、托管、链接什么。必需：`narrated_720p`（720p 旁白版，播放器播放它）与 `cover`（1920×1080 封面）；可选，列出才构建：`narrated`（1080p 旁白版）、`music_only`（1080p 纯配乐）、`music_only_720p`（720p 纯配乐）。其他键是错误。站点地址为 `<slug>/films/<name>/<文件名>` · what the build makes, by file name: what is listed is built, hosted and linked, nothing else. Required: `narrated_720p` (the 720p narrated video the players play) and `cover` (1920×1080); optional, built only when listed: `narrated` (1080p), `music_only` (1080p), `music_only_720p`; any other key is an error. The site serves `<slug>/films/<name>/<file>` |
 
 旧的 `release_tag`、`published_tag`（逐片 Release）不再使用，`./tbook check` 给出警告，删除即可。The former `release_tag` and `published_tag` (per-film releases) are no longer used: `./tbook check` warns; remove them.
 
@@ -122,7 +122,7 @@ SCENES.torus = S => {
 };
 ```
 
-**页面与视频共用一处造型**：把对象的造型（参数化、颜色分区、标记点，以及用 `surface`/`tube`/`bead` 画它的函数）写成书里的一个经典脚本，例如 `books/<slug>/viz/<id>/model.js`，定义一个全局对象；页面在 `main.js` 之前 `<script src="model.js">` 加载它，视频在 `film.json` 写 `"scripts": ["viz/<id>/model.js"]`（相对书目录），构建把它内联在 `scenes.js` 之前，并把它计入视频构建单元的键。画法函数只调用两边同名的图元、颜色由调用方传入（页面传 `TRV.palette`，视频传 `C.*`），于是改一处两边都变。示例：`books/example-monograph/viz/phase-torus/model.js`，页面 `phase-torus` 与视频 001 的结尾镜头都画它。
+**页面与视频共用一处造型**：把对象的造型（参数化、颜色分区、标记点，以及用 `surface`/`tube`/`bead` 画它的函数）写成书里的一个经典脚本，例如 `books/<slug>/viz/<id>/model.js`，定义一个全局对象；页面在 `main.js` 之前 `<script src="model.js">` 加载它，视频在 `film.json` 写 `"scripts": ["viz/<id>/model.js"]`（相对书目录），构建把它内联在 `scenes.js` 之前，并把它计入视频构建单元的键。画法函数只调用两边同名的图元、颜色由调用方传入（页面传 `TRV.palette`，视频传 `C.*`），于是改一处两边都变。示例：`books/example-monograph/viz/phase-torus/model.js`，页面 `phase-torus` 与示例视频 的结尾镜头都画它。
 
 **Share the model with the page**: put the object's model (parametrisation, coloured regions, marked points and a function that draws it with `surface`/`tube`/`bead`) in a classic script of the book such as `viz/<id>/model.js`; the page loads it before `main.js`, the film lists it in `film.json` `"scripts"`, which the build inlines before `scenes.js` and adds to the build key. The drawing function uses only the primitives both hosts share and takes its colours from the caller, so one edit changes both.
 
@@ -132,7 +132,7 @@ SCENES.torus = S => {
 
 ```bash
 theme/film/setup.sh                # 每台机器一次：视频 venv 与钉死的包（.cache/film/venv）、Kokoro 模型（.cache/film/models）、字体
-F=books/<slug>/films/<NNN>-<name>
+F=books/<slug>/films/<name>
 theme/film/film.sh $F timeline     # 无 TTS 的暂定时间轴（预览用）
 theme/film/film.sh $F shot 2 8 14 --poster   # 单帧截图 → out/shots/
 theme/film/film.sh $F serve        # 浏览器预览 index.html?play
@@ -149,16 +149,16 @@ Python 包钉在 `theme/film/requirements.txt`，`setup.sh` 装进独立的视�
 ## 构建与发布 · Build and publish
 
 1. `./tbook check` 无错误；提交 `film.json`、`script.json`、`scenes.js`、`poster.jpg`。
-2. `./tbook build films --book <slug>`（`build site`、`build all` 同样；`--film <NNN>-<name>` 可重复，只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染）：每部视频是一个构建单元。键覆盖视频依赖的全部输入——git 列出的视频目录文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本，`scripts` 所列的脚本，有实体镜头时还有 `theme/viz/solid-core.js` 与 `theme/viz/vendor/`；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python。键未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链的贡献者可用它取得视频）；都没有时以 `FILM_STRICT=1` 运行 `film.sh <dir> all <outputs 的键…>` 并把这些文件复制到 `build/films/<slug>/<id>/`。改动 `outputs` 会重新渲染（`film.json` 在键中）。
+2. `./tbook build films --book <slug>`（`build site`、`build all` 同样；`--film <name>` 可重复，只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染）：每部视频是一个构建单元。键覆盖视频依赖的全部输入——git 列出的视频目录文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本，`scripts` 所列的脚本，有实体镜头时还有 `theme/viz/solid-core.js` 与 `theme/viz/vendor/`；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python。键未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链的贡献者可用它取得视频）；都没有时以 `FILM_STRICT=1` 运行 `film.sh <dir> all <outputs 的键…>` 并把这些文件复制到 `build/films/<slug>/<name>/`。改动 `outputs` 会重新渲染（`film.json` 在键中）。
 3. `TBOOK_FILMS`：`auto`（默认）缓存未命中且工具链齐全时渲染，否则警告，站点只显示海报与“视频未构建”；`require` 缺工具链时失败；`skip` 从不渲染（命中缓存仍恢复）。
-4. 站点把视频放在 `<slug>/films/<id>/<文件名>`（同源，Content-Type 与按字节范围请求正确，iOS Safari 可以播放）；整站 Release 附带构建缓存，没有缓存的构建设置 `TBOOK_CACHE_REMOTE=1` 时可以从中恢复。
-5. 在章节中嵌入：`::: {.film src="<NNN>-<name>"}` 或 `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`，块内文字为图注。
+4. 站点把视频放在 `<slug>/films/<name>/<文件名>`（同源，Content-Type 与按字节范围请求正确，iOS Safari 可以播放）；整站 Release 附带构建缓存，没有缓存的构建设置 `TBOOK_CACHE_REMOTE=1` 时可以从中恢复。
+5. 在章节中嵌入：`::: {.film src="<name>"}` 或 `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`，块内文字为图注。
 
 1. `./tbook check` passes; commit `film.json`, `script.json`, `scenes.js`, `poster.jpg`.
-2. `./tbook build films --book <slug>` (or `build site`, `build all`; `--film <NNN>-<name>`, repeatable, renders or restores only those films and restores the others of the book from the cache without rendering): each film is a build unit. Its key covers everything the videos depend on: the film's files as git lists them (not `out/`, `poster.jpg` or `README.md`), `theme/film/` (not `site/`), `theme/generated/tokens.mjs`, `tools/tbook/film.py`, the data the engine draws (the book's code, version and titles, the pinned commit, the cited declarations and their statement digests, the in-frame strings), the `package-lock.json` versions of the @fontsource fonts and Playwright, the Kokoro model release and Node's major version, the scripts `scripts` lists and, for a film with solid shots, `theme/viz/solid-core.js` and `theme/viz/vendor/`; not the site's address, nor the probed ffmpeg, Chromium or film Python. An unchanged film is restored from the local cache, and with `TBOOK_CACHE_REMOTE=1` also from the published whole-site releases (the way for contributors without the film toolchain to get the videos); otherwise it is rendered with `film.sh <dir> all <the outputs keys…>` (`FILM_STRICT=1`) and those files are copied to `build/films/<slug>/<id>/`. Changing `outputs` renders again (`film.json` is in the key).
+2. `./tbook build films --book <slug>` (or `build site`, `build all`; `--film <name>`, repeatable, renders or restores only those films and restores the others of the book from the cache without rendering): each film is a build unit. Its key covers everything the videos depend on: the film's files as git lists them (not `out/`, `poster.jpg` or `README.md`), `theme/film/` (not `site/`), `theme/generated/tokens.mjs`, `tools/tbook/film.py`, the data the engine draws (the book's code, version and titles, the pinned commit, the cited declarations and their statement digests, the in-frame strings), the `package-lock.json` versions of the @fontsource fonts and Playwright, the Kokoro model release and Node's major version, the scripts `scripts` lists and, for a film with solid shots, `theme/viz/solid-core.js` and `theme/viz/vendor/`; not the site's address, nor the probed ffmpeg, Chromium or film Python. An unchanged film is restored from the local cache, and with `TBOOK_CACHE_REMOTE=1` also from the published whole-site releases (the way for contributors without the film toolchain to get the videos); otherwise it is rendered with `film.sh <dir> all <the outputs keys…>` (`FILM_STRICT=1`) and those files are copied to `build/films/<slug>/<name>/`. Changing `outputs` renders again (`film.json` is in the key).
 3. `TBOOK_FILMS`: `auto` (default) renders a film the cache does not hold when the toolchain is complete, and otherwise warns and the site shows only the poster and "Video not built"; `require` fails without the toolchain; `skip` never renders (a cached film is still restored).
-4. The site serves the videos at `<slug>/films/<id>/<file>`, same origin with the right Content-Type and byte-range responses, which iOS Safari needs; whole-site releases carry the build cache, from which a build without a cache can restore them with `TBOOK_CACHE_REMOTE=1`.
-5. Embed a film in a chapter with `::: {.film src="<NNN>-<name>"}` or `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`; the text inside the block is the caption.
+4. The site serves the videos at `<slug>/films/<name>/<file>`, same origin with the right Content-Type and byte-range responses, which iOS Safari needs; whole-site releases carry the build cache, from which a build without a cache can restore them with `TBOOK_CACHE_REMOTE=1`.
+5. Embed a film in a chapter with `::: {.film src="<name>"}` or `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`; the text inside the block is the caption.
 
 ## 边界 · Scope
 

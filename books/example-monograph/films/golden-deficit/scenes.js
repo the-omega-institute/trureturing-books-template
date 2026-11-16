@@ -1,4 +1,4 @@
-/* Film 001 · The Golden Deficit · 黄金亏量 (book example-monograph, chapter 1).
+/* Film · The Golden Deficit · 黄金亏量 (book example-monograph, chapter 1).
    Scenes for theme/film/engine.js. Everything on screen is computed here, exactly, from the definitions that
    trureturing formalizes (D5/S1/Digit/Normalize.lean, D5/S1/Deficit/DeficitInteger.lean):
      weights W_i = F_{i+2} (1, 2, 3, 5, 8, …), beta(n) = sum of phi^(i+2) over the Zeckendorf digits of n;
@@ -100,7 +100,7 @@ SCENES.zeck = S => {
   const ta = clamp(u / 0.5) * (1 - clamp((u - L0.s - 0.1) / 0.6));
   if (ta > 0) {
     const p = clamp(u / 1.3);
-    txt(`${DATA.book.code} · FILM ${DATA.film.number}`, W / 2, 360, { size: 26, fam: F.mono, w: 700, align: 'center', c: C.cyan, a: ta, ls: 10 });
+    txt(`${DATA.book.code} · FILM`, W / 2, 360, { size: 26, fam: F.mono, w: 700, align: 'center', c: C.cyan, a: ta, ls: 10 });
     txt(DATA.film.title_zh, W / 2, 500, { size: 120, fam: F.zh, w: 900, align: 'center', c: C.white, a: ta * clamp(p * 1.6), ab: 4 });
     txt(scramble(DATA.film.title.toUpperCase(), p, 3), W / 2, 600, { size: 56, fam: F.orb, w: 900, align: 'center', c: C.white, a: ta, ls: 10, ab: 2 });
   }
@@ -318,7 +318,7 @@ FILM.poster = () => {
   txt('c(v₁, v₂)  ∈  { −1, 0, 1 }', 1270, 600, { size: 64, fam: F.math, w: 700, align: 'center', c: C.cyan, ab: 2 });
   bloom(0.6);
   leanList(1270, 700, 1, { align: 'center', size: 24, gap: 48 });
-  txt(`${DATA.book.code} · FILM ${DATA.film.number}`, 1270, 860, { size: 24, fam: F.mono, w: 700, align: 'center', c: C.cyan, ls: 8 });
+  txt(`${DATA.book.code} · FILM`, 1270, 860, { size: 24, fam: F.mono, w: 700, align: 'center', c: C.cyan, ls: 8 });
   txt(`${DATA.book.title.zh} · ${DATA.book.title.en}`, 1270, 910, { size: 28, fam: F.zh, w: 700, align: 'center', c: C.white, a: 0.9 });
   hud(t, 930, 3, TL.scenes[3]);
   post(3);

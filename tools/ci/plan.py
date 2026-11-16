@@ -81,7 +81,7 @@ def inventory(tree):
             fm = re.fullmatch(re.escape(prefix) + r"films/([^/]+)/film.json", f)
             sm = re.fullmatch(re.escape(prefix) + r"slides/([^/]+)/.+", f)
             if fm:
-                if not re.fullmatch(r"[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*", fm[1]):
+                if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", fm[1]):
                     raise ValueError(f"invalid film directory: {fm[1]}")
                 meta = tree.json(f)
                 scripts = meta.get("scripts", [])
