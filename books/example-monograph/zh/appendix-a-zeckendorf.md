@@ -229,3 +229,16 @@ $$
 [@thm-charge-unique] 对任意数字串成立，但不限制电荷的大小。[@thm-deficit-three-valued] 保证总电荷落在 $\{-1, 0, 1\}$ 中，但只针对两个规范数字串之和。例如从 $5e_0$（位置 $0$ 上为 $5$，值为 $5$）出发，规范化过程走 $5$ 步到 $1000_W = z(5)$，总电荷为 $2$；直接计算也是 $5\varphi^2 - \varphi^5 = 2$。
 
 当前出版依据：[{commit}](trureturing:).
+
+## 编译时生成的统计 {#sec-generated-statistics-example}
+
+下面的简表来自本书的正式解析结果，书稿只保存视图选择，不维护总数。
+
+::: {.stats src="summary"}
+:::
+
+声明明细可以单独查看；每条声明的实际前提与结论仍见正文。
+
+::: {.stats src="declarations" display="link" format="html"}
+查看生成的声明索引
+:::

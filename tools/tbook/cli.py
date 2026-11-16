@@ -101,6 +101,19 @@ def cmd_stats(args) -> int:
     from . import stats
 
     rows = [stats.collect(book, exclude=tuple(args.exclude) if args.exclude else None) for book in _books(args)]
+    if (args.format or args.view or args.lang or args.group != "all") and not args.write:
+        raise config.ConfigError("stats: --format, --view, --lang and --group require --write")
+    if args.write:
+        selected = bool(args.format or args.view or args.lang or args.group != "all")
+        formats = args.format or (["markdown"] if selected else [])
+        views = args.view or (["declarations"] if args.group != "all" else ["summary"])
+        for data in rows:
+            exports = [(view, lang, fmt) for view in views for lang in args.lang or [data["lang"]] for fmt in formats]
+            for view, lang, fmt in exports:
+                stats.artifact_name(view, lang, fmt, args.group)
+            stats.write_artifact(data)
+            for view, lang, fmt in exports:
+                stats.export(data, view, lang, fmt, args.group)
     if args.json:
         print(json.dumps(rows, ensure_ascii=False, indent=2))
     else:
@@ -407,6 +420,12 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--book", action="append")
     c.add_argument("--exclude", action="append", default=[], help="generated index chapter to exclude")
     c.add_argument("--json", action="store_true", help="include declarations and citation locations")
+    c.add_argument("--write", action="store_true", help="export build/statistics/<book>.json without changing sources")
+    from . import stats
+    c.add_argument("--view", action="append", choices=stats.VIEWS, help="view to export; repeat to select several")
+    c.add_argument("--format", action="append", choices=stats.FORMATS, help="view format; repeat to select several")
+    c.add_argument("--lang", action="append", help="artifact label language (counts use the authoritative edition)")
+    c.add_argument("--group", choices=stats.GROUPS, default="all", help="declaration group for declarations/reuse")
     c.set_defaults(fn=cmd_stats)
 
     c = sub.add_parser("artifacts", help="list, untrack or reject generated publication files in Git")

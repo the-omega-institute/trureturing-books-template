@@ -508,6 +508,11 @@ def stage_edition(site: config.Site, book: config.Book, edition: config.Edition,
         rel = posixpath.join(ctx.book_prefix, p.resolve().relative_to(book_dir).as_posix())
         _copy(p, src / rel)
         stage.copied.append(rel)
+    for rel, text in sorted(ctx.book_texts.items()):
+        target = src / ctx.book_prefix / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        stage.copied.append(posixpath.join(ctx.book_prefix, rel))
     stage.warnings += ctx.issues
 
     # Theme.

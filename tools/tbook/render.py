@@ -90,6 +90,7 @@ class RenderContext:
     # files inside the edition directory that links point at (staged with the edition; ``check`` reads it)
     edition_files: set[Path] = field(default_factory=set)
     issues: list[str] = field(default_factory=list)
+    statistics_data: dict | None = None
 
     @property
     def lang(self) -> str:
