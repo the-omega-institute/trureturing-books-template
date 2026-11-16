@@ -9,6 +9,11 @@ network/filesystem reads performed by custom scripts.
 ENGINE_LANGUAGES = ("zh", "en")
 
 
+def chapter_sources(book, language):
+    """Additional reads of a film that opts into chapter numbering."""
+    return (f"books/{book}/{language}/SUMMARY.md", "tools/tbook/summary.py")
+
+
 def video_files(where, *, theme="theme/film", tokens="theme/generated/tokens.mjs", implementation="tools/tbook/film.py"):
     return (
         (where + "/", (f"/{where}/poster.jpg", f"/{where}/README.md", f"/{where}/out/")),

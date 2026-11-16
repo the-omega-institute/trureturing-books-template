@@ -1,4 +1,4 @@
-/* Film @@NUM@@ · @@TITLE_EN@@ · @@TITLE_ZH@@ (book @@SLUG@@).
+/* Film · @@TITLE_EN@@ · @@TITLE_ZH@@ (book @@SLUG@@).
    Scenes for the shared engine theme/film/engine.js: one SCENES.<id> per scene of script.json.
    S = { u: seconds into the scene, d: scene length, p: u / d, t: film time, f: frame, L: lines }.
    Timing helpers: at(S, k, dur, off) ramps 0→1 from line k's start; Q(S, k, 'phrase') from the moment the phrase

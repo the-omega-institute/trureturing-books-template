@@ -235,8 +235,8 @@ class ValidationTest(unittest.TestCase):
         self.assertEqual([f.listed(k) for k in film.VIDEO_OUTPUTS], [False, False, True, False, True])
         self.assertEqual(f.download(), "narrated_720p")
         # default_outputs still names every output
-        self.assertEqual(f.output("narrated"), "film-fixture_001_narrated_EN_subs_ZH-EN.mp4")
-        self.assertEqual(f.output("music_only_720p"), "film-fixture_001_720p_music_only.mp4")
+        self.assertEqual(f.output("narrated"), "film-fixture_001-golden-deficit_narrated_EN_subs_ZH-EN.mp4")
+        self.assertEqual(f.output("music_only_720p"), "film-fixture_001-golden-deficit_720p_music_only.mp4")
 
     @needs_example
     def test_optional_outputs_are_made_when_listed(self):
@@ -269,7 +269,7 @@ class ValidationTest(unittest.TestCase):
         self.assertEqual(problems(), [])
         self.assertEqual(problems(narrated_720p=...), [
             "film.json: outputs.narrated_720p is required (the file name of the 720p narrated video the players "
-            "play), e.g. 'film-fixture_001_720p_narrated.mp4'"])
+            "play), e.g. 'film-fixture_001-golden-deficit_720p_narrated.mp4'"])
         self.assertIn("outputs.cover is required", problems(cover=...)[0])
         self.assertEqual(problems(narrated_4k="x.mp4"), [
             "film.json: outputs.narrated_4k is not an output; outputs lists narrated_720p, cover and may add "
@@ -342,7 +342,7 @@ class ValidationTest(unittest.TestCase):
         self.assertIn("invalid JSON", msgs)
         self.assertIn("not a film source file", msgs)
         self.assertIn("films/ holds film directories", msgs)
-        self.assertIn("film number 001 is used twice", msgs)
+        self.assertNotIn("film number", msgs)
 
     @needs_example
     def test_missing_scene_definition_warns(self):
@@ -459,7 +459,7 @@ class EmbedTest(unittest.TestCase):
         d = "films/001-golden-deficit/"
         f = film.get(self.book, "001-golden-deficit")
         v720, v1080 = f.output("narrated_720p"), f.output("narrated")
-        head = f"视频 001 · 黄金亏量 · {f.meta['duration']}"
+        head = f"视频 · 黄金亏量 · {f.meta['duration']}"
         # the same markup whether or not the video is built: the site marks figures it does not host
         self.assertIn(f'<figure class="tr-media tr-film" data-film="001-golden-deficit" data-tr-video="{d}{v720}">', out)
         self.assertIn(f'<video class="tr-film-player" controls preload="metadata" playsinline poster="../{d}poster.jpg" '
@@ -483,7 +483,7 @@ class EmbedTest(unittest.TestCase):
         duration = film.get(self.book, "001-golden-deficit").meta["duration"]
         self.assertIn('poster="../../films/001-golden-deficit/poster.jpg"', out)
         self.assertIn('<source src="../../films/001-golden-deficit/example-monograph_001_720p_narrated.mp4"', out)
-        self.assertIn(f"Film 001 · The Golden Deficit · {duration}", out)
+        self.assertIn(f"Film · The Golden Deficit · {duration}", out)
         self.assertIn(">Film page</a>", out)
         self.assertIn(">⬇ 720p</a>", out)
         self.assertNotIn("Music only", out)
@@ -525,7 +525,7 @@ class EmbedTest(unittest.TestCase):
         self.assertEqual(lines[0], "::: {.tr-media .tr-film}")
         self.assertEqual(lines[-1], ":::")
         self.assertNotEqual(lines[-2], "")
-        self.assertIn(f"![视频 001 · 黄金亏量 · {duration}](_book/films/001-golden-deficit/poster.jpg){{width=100%}}", out)
+        self.assertIn(f"![视频 · 黄金亏量 · {duration}](_book/films/001-golden-deficit/poster.jpg){{width=100%}}", out)
         self.assertIn((EXAMPLE_FILM / "poster.jpg").resolve(), ctx.book_files)
         self.assertIn("图注。", out)
         self.assertNotIn(".mp4", out)
@@ -550,7 +550,7 @@ class EmbedTest(unittest.TestCase):
         out = film.render_embed(env_for("001-golden-deficit"), ctx, "", doc_for(self.book, "en", "part/ch.md"))
         duration = film.get(self.book, "001-golden-deficit").meta["duration"]
         self.assertIn("](../_book/films/001-golden-deficit/poster.jpg)", out)
-        self.assertIn(f"**Film 001 · The Golden Deficit · {duration}**", out)
+        self.assertIn(f"**Film · The Golden Deficit · {duration}**", out)
         if self.site.base_url:
             self.assertIn("Film:\\", out)
         ctx = ctx_for(self.book, "en", "pandoc")
@@ -598,6 +598,22 @@ class VideoUnitTest(unittest.TestCase):
 
     def setUp(self):
         self.sb = Sandbox(self)
+
+    def test_chapter_reordering_only_changes_numbered_video_keys(self):
+        sb = self.sb
+        toc = sb.book.editions[0].summary
+        toc.write_text('- [First](ch01.md)\n- [Second](ch02.md)\n')
+        plain = sb.key()
+        toc.write_text('- [Second](ch02.md)\n- [First](ch01.md)\n')
+        self.assertEqual(sb.key(), plain)
+        meta = json.loads((sb.dir / "film.json").read_text())
+        meta["chapter"] = "ch01.md"
+        (sb.dir / "film.json").write_text(json.dumps(meta))
+        numbered = sb.key()
+        output = sb.film().output("narrated_720p")
+        toc.write_text('- [First](ch01.md)\n- [Second](ch02.md)\n')
+        self.assertNotEqual(sb.key(), numbered)
+        self.assertEqual(sb.film().output("narrated_720p"), output)
 
     def test_unit(self):
         unit = film.video_unit(self.sb.site, self.sb.film())
@@ -1058,7 +1074,7 @@ class PublishTest(unittest.TestCase):
         items = film.items(example_book())
         self.assertEqual(len(items), 1)
         it = items[0]
-        self.assertEqual((it["kind"], it["id"], it["number"]), ("film", "001-golden-deficit", "001"))
+        self.assertEqual((it["kind"], it["id"], it["number"]), ("film", "001-golden-deficit", ""))
         self.assertEqual(it["title"]["zh"], "黄金亏量")
         self.assertEqual(it["title"]["en"], "The Golden Deficit")
         self.assertEqual(it["poster"], "films/001-golden-deficit/poster.jpg")
@@ -1102,6 +1118,67 @@ class ScaffoldTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
+    def test_ids_need_no_serial_and_shared_prefixes_have_distinct_outputs(self):
+        for name in ("carry-rules", "ch05-carry", "ch05-rotor", "002-other"):
+            film.scaffold(self.book, name, "进位", "Carry")
+        self.assertEqual(errors(film.check(self.book)), [])
+        entries = film.films(self.book)
+        self.assertEqual(len(entries), 4)
+        self.assertEqual(len({f.output("cover") for f in entries}), 4)
+        for f in entries:
+            self.assertEqual(f.number, "")
+            self.assertEqual(f.label("zh"), "视频")
+            self.assertEqual(film.engine_data(f)["film"]["number"], "")
+        for name in ("../escape", "a/b", "-carry", "carry-", "carry_rules", "Carry", "carry\n"):
+            with self.assertRaises(film.FilmError):
+                film.scaffold(self.book, name, "进位", "Carry")
+
+    def chapter_fixture(self):
+        toc = ('[Prelude](prelude.md)\n\n- [First](first.md)\n- [Second](second.md)\n'
+               '  - [Child](child.md)\n- [Coda](coda.md)\n\n[Appendix](appendix.md)\n')
+        self.book.unnumbered = {"coda.md": "Coda"}
+        for ed in self.book.editions:
+            ed.dir.mkdir(exist_ok=True)
+            ed.summary.write_text(toc)
+            for name in ("prelude", "first", "second", "child", "coda", "appendix"):
+                (ed.dir / f"{name}.md").write_text(f"# {name}\n")
+
+    def test_optional_numbers_follow_chapters_in_all_publication_data(self):
+        self.chapter_fixture()
+        film.scaffold(self.book, "explanation", "讲解", "Explanation")
+        f = film.get(self.book, "explanation")
+        for chapter, prefix in (("prelude.md", "0"), ("child.md", "2"),
+                                ("appendix.md", "A"), ("coda.md", "Coda")):
+            with self.subTest(chapter=chapter):
+                f.meta["chapter"] = chapter
+                (f.dir / "film.json").write_text(json.dumps(f.meta))
+                self.assertEqual(errors(film.check(self.book)), [])
+                self.assertEqual(f.number, prefix)
+                self.assertEqual(film.engine_data(f)["film"]["number"], prefix)
+                self.assertEqual(film.items(self.book)[0]["code"], f"FILM {prefix}")
+                self.assertIn(f"视频 {prefix} · 讲解", film._caption_title(f, "zh", f.id))
+                page = film.hub_html(config.load_site(), self.book)
+                self.assertIn(f">FILM {prefix}</span>", page)
+                self.assertEqual(film.published_registry(config.load_site(), self.book, None)["films"][0]["number"], prefix)
+        f.meta["chapter"] = "second.md"
+        toc = self.book.editions[0].summary
+        toc.write_text(toc.read_text().replace('- [First](first.md)\n', ''))
+        self.assertEqual(f.number, "1")
+
+    def test_invalid_chapter_and_missing_translations_are_errors(self):
+        self.chapter_fixture()
+        film.scaffold(self.book, "explanation", "讲解", "Explanation")
+        f = film.get(self.book, "explanation")
+        for chapter in ("", 3, [], "../first.md", "/first.md", "first.txt", "missing.md"):
+            with self.subTest(chapter=chapter):
+                f.meta["chapter"] = chapter
+                self.assertTrue(any(level == "error" and "chapter" in msg
+                                    for level, msg in film.validate_meta(f.meta, f.dir, self.book, None)))
+        f.meta["chapter"] = "child.md"
+        (self.book.edition("en").dir / "child.md").unlink()
+        self.assertTrue(any("en/SUMMARY.md" in msg for level, msg
+                            in film.validate_meta(f.meta, f.dir, self.book, None) if level == "error"))
+
     def test_default_release_date_uses_utc(self):
         with mock.patch.object(film, "datetime", wraps=datetime) as clock:
             clock.now.return_value = datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc)
@@ -1118,8 +1195,8 @@ class ScaffoldTest(unittest.TestCase):
         self.assertEqual(meta["publication_basis"], "pinned")
         self.assertNotIn("subject_commit", meta)
         # the default: the 720p narrated video and the cover
-        self.assertEqual(meta["outputs"], {"narrated_720p": "film-fixture_002_720p_narrated.mp4",
-                                           "cover": "film-fixture_002_cover.jpg"})
+        self.assertEqual(meta["outputs"], {"narrated_720p": "film-fixture_002-carry-rules_720p_narrated.mp4",
+                                           "cover": "film-fixture_002-carry-rules_cover.jpg"})
         self.assertEqual(meta["resolution"], "1280x720@30")
         issues = film.check(self.book)
         self.assertEqual(errors(issues), [], [i.format() for i in issues])
@@ -1127,7 +1204,7 @@ class ScaffoldTest(unittest.TestCase):
 
     def test_scaffold_rejects(self):
         film.scaffold(self.book, "002-carry-rules", "进位", "Carry")
-        for args in (("002-other", "甲", "A"), ("002-carry-rules", "甲", "A"), ("carry", "甲", "A"),
+        for args in (("../escape", "甲", "A"), ("002-carry-rules", "甲", "A"), ("Carry", "甲", "A"),
                      ("003-x", "", "A"), ("003-y", '引"号', "A")):
             with self.assertRaises(film.FilmError, msg=str(args)):
                 film.scaffold(self.book, *args)
@@ -1271,7 +1348,7 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("RENDITIONS=master,720p", r.stdout)
         self.assertIn("MUSIC_MIX=1", r.stdout)
-        self.assertIn("NARRATED=film-fixture_001_narrated_EN_subs_ZH-EN.mp4", r.stdout)
+        self.assertIn("NARRATED=film-fixture_001-golden-deficit_narrated_EN_subs_ZH-EN.mp4", r.stdout)
         self.assertIn("COVER=''", r.stdout)
         r = run("narrated_4k")
         self.assertEqual(r.returncode, 1)

@@ -11,7 +11,7 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 ./tbook film list
 ```
 
-`books/<slug>/films/<NNN>-<name>/` 只放这些源文件 · a film directory holds only:
+`books/<slug>/films/<id>/` 只放这些源文件 · a film directory holds only:
 
 | 文件 File | 作用 Purpose |
 | --- | --- |
@@ -51,7 +51,8 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 
 | 字段 Field | 规则 Rule |
 | --- | --- |
-| `id` | 等于目录名 `<NNN>-<name>` · equals the directory name |
+| `id` | 等于目录名 `<id>` · equals the directory name |
+| `chapter` | 可选，所属章节的相对 `.md` 路径（如 `ch05-topic.md`，各语言目录均须列出并存在）；填写时跟随权威版目录的主章编号，子页共享主章号，序曲/附录/未编号章沿用环境前缀；省略时不编号。旧 `001-…` id 只作稳定标识，不作显示编号 · optional chapter path; display its primary-edition chapter prefix, or omit for an unnumbered film |
 | `title`, `title_zh` | 英文、中文标题，各一行 · English and Chinese titles, one line each |
 | `summary`, `summary_zh` | 可选，一段简介（落地页与视频页） · optional one-paragraph blurbs |
 | `publication_basis` | 新视频填 `"pinned"`：当前出版依据、精确链接与构建数据由锁文件解析；钉版后仍须复核旁白 · current publication follows the lock; review narration after re-pinning |
@@ -122,7 +123,7 @@ SCENES.torus = S => {
 };
 ```
 
-**页面与视频共用一处造型**：把对象的造型（参数化、颜色分区、标记点，以及用 `surface`/`tube`/`bead` 画它的函数）写成书里的一个经典脚本，例如 `books/<slug>/viz/<id>/model.js`，定义一个全局对象；页面在 `main.js` 之前 `<script src="model.js">` 加载它，视频在 `film.json` 写 `"scripts": ["viz/<id>/model.js"]`（相对书目录），构建把它内联在 `scenes.js` 之前，并把它计入视频构建单元的键。画法函数只调用两边同名的图元、颜色由调用方传入（页面传 `TRV.palette`，视频传 `C.*`），于是改一处两边都变。示例：`books/example-monograph/viz/phase-torus/model.js`，页面 `phase-torus` 与视频 001 的结尾镜头都画它。
+**页面与视频共用一处造型**：把对象的造型（参数化、颜色分区、标记点，以及用 `surface`/`tube`/`bead` 画它的函数）写成书里的一个经典脚本，例如 `books/<slug>/viz/<id>/model.js`，定义一个全局对象；页面在 `main.js` 之前 `<script src="model.js">` 加载它，视频在 `film.json` 写 `"scripts": ["viz/<id>/model.js"]`（相对书目录），构建把它内联在 `scenes.js` 之前，并把它计入视频构建单元的键。画法函数只调用两边同名的图元、颜色由调用方传入（页面传 `TRV.palette`，视频传 `C.*`），于是改一处两边都变。示例：`books/example-monograph/viz/phase-torus/model.js`，页面 `phase-torus` 与示例视频 的结尾镜头都画它。
 
 **Share the model with the page**: put the object's model (parametrisation, coloured regions, marked points and a function that draws it with `surface`/`tube`/`bead`) in a classic script of the book such as `viz/<id>/model.js`; the page loads it before `main.js`, the film lists it in `film.json` `"scripts"`, which the build inlines before `scenes.js` and adds to the build key. The drawing function uses only the primitives both hosts share and takes its colours from the caller, so one edit changes both.
 
@@ -132,7 +133,7 @@ SCENES.torus = S => {
 
 ```bash
 theme/film/setup.sh                # 每台机器一次：视频 venv 与钉死的包（.cache/film/venv）、Kokoro 模型（.cache/film/models）、字体
-F=books/<slug>/films/<NNN>-<name>
+F=books/<slug>/films/<id>
 theme/film/film.sh $F timeline     # 无 TTS 的暂定时间轴（预览用）
 theme/film/film.sh $F shot 2 8 14 --poster   # 单帧截图 → out/shots/
 theme/film/film.sh $F serve        # 浏览器预览 index.html?play
@@ -149,16 +150,16 @@ Python 包钉在 `theme/film/requirements.txt`，`setup.sh` 装进独立的视�
 ## 构建与发布 · Build and publish
 
 1. `./tbook check` 无错误；提交 `film.json`、`script.json`、`scenes.js`、`poster.jpg`。
-2. `./tbook build films --book <slug>`（`build site`、`build all` 同样；`--film <NNN>-<name>` 可重复，只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染）：每部视频是一个构建单元。键覆盖视频依赖的全部输入——git 列出的视频目录文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本，`scripts` 所列的脚本，有实体镜头时还有 `theme/viz/solid-core.js` 与 `theme/viz/vendor/`；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python。键未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链的贡献者可用它取得视频）；都没有时以 `FILM_STRICT=1` 运行 `film.sh <dir> all <outputs 的键…>` 并把这些文件复制到 `build/films/<slug>/<id>/`。改动 `outputs` 会重新渲染（`film.json` 在键中）。
+2. `./tbook build films --book <slug>`（`build site`、`build all` 同样；`--film <id>` 可重复，只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染）：每部视频是一个构建单元。键覆盖视频依赖的全部输入——git 列出的视频目录文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本，`scripts` 所列的脚本，有实体镜头时还有 `theme/viz/solid-core.js` 与 `theme/viz/vendor/`；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python。键未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链的贡献者可用它取得视频）；都没有时以 `FILM_STRICT=1` 运行 `film.sh <dir> all <outputs 的键…>` 并把这些文件复制到 `build/films/<slug>/<id>/`。改动 `outputs` 会重新渲染（`film.json` 在键中）。
 3. `TBOOK_FILMS`：`auto`（默认）缓存未命中且工具链齐全时渲染，否则警告，站点只显示海报与“视频未构建”；`require` 缺工具链时失败；`skip` 从不渲染（命中缓存仍恢复）。
 4. 站点把视频放在 `<slug>/films/<id>/<文件名>`（同源，Content-Type 与按字节范围请求正确，iOS Safari 可以播放）；整站 Release 附带构建缓存，没有缓存的构建设置 `TBOOK_CACHE_REMOTE=1` 时可以从中恢复。
-5. 在章节中嵌入：`::: {.film src="<NNN>-<name>"}` 或 `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`，块内文字为图注。
+5. 在章节中嵌入：`::: {.film src="<id>"}` 或 `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`，块内文字为图注。
 
 1. `./tbook check` passes; commit `film.json`, `script.json`, `scenes.js`, `poster.jpg`.
-2. `./tbook build films --book <slug>` (or `build site`, `build all`; `--film <NNN>-<name>`, repeatable, renders or restores only those films and restores the others of the book from the cache without rendering): each film is a build unit. Its key covers everything the videos depend on: the film's files as git lists them (not `out/`, `poster.jpg` or `README.md`), `theme/film/` (not `site/`), `theme/generated/tokens.mjs`, `tools/tbook/film.py`, the data the engine draws (the book's code, version and titles, the pinned commit, the cited declarations and their statement digests, the in-frame strings), the `package-lock.json` versions of the @fontsource fonts and Playwright, the Kokoro model release and Node's major version, the scripts `scripts` lists and, for a film with solid shots, `theme/viz/solid-core.js` and `theme/viz/vendor/`; not the site's address, nor the probed ffmpeg, Chromium or film Python. An unchanged film is restored from the local cache, and with `TBOOK_CACHE_REMOTE=1` also from the published whole-site releases (the way for contributors without the film toolchain to get the videos); otherwise it is rendered with `film.sh <dir> all <the outputs keys…>` (`FILM_STRICT=1`) and those files are copied to `build/films/<slug>/<id>/`. Changing `outputs` renders again (`film.json` is in the key).
+2. `./tbook build films --book <slug>` (or `build site`, `build all`; `--film <id>`, repeatable, renders or restores only those films and restores the others of the book from the cache without rendering): each film is a build unit. Its key covers everything the videos depend on: the film's files as git lists them (not `out/`, `poster.jpg` or `README.md`), `theme/film/` (not `site/`), `theme/generated/tokens.mjs`, `tools/tbook/film.py`, the data the engine draws (the book's code, version and titles, the pinned commit, the cited declarations and their statement digests, the in-frame strings), the `package-lock.json` versions of the @fontsource fonts and Playwright, the Kokoro model release and Node's major version, the scripts `scripts` lists and, for a film with solid shots, `theme/viz/solid-core.js` and `theme/viz/vendor/`; not the site's address, nor the probed ffmpeg, Chromium or film Python. An unchanged film is restored from the local cache, and with `TBOOK_CACHE_REMOTE=1` also from the published whole-site releases (the way for contributors without the film toolchain to get the videos); otherwise it is rendered with `film.sh <dir> all <the outputs keys…>` (`FILM_STRICT=1`) and those files are copied to `build/films/<slug>/<id>/`. Changing `outputs` renders again (`film.json` is in the key).
 3. `TBOOK_FILMS`: `auto` (default) renders a film the cache does not hold when the toolchain is complete, and otherwise warns and the site shows only the poster and "Video not built"; `require` fails without the toolchain; `skip` never renders (a cached film is still restored).
 4. The site serves the videos at `<slug>/films/<id>/<file>`, same origin with the right Content-Type and byte-range responses, which iOS Safari needs; whole-site releases carry the build cache, from which a build without a cache can restore them with `TBOOK_CACHE_REMOTE=1`.
-5. Embed a film in a chapter with `::: {.film src="<NNN>-<name>"}` or `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`; the text inside the block is the caption.
+5. Embed a film in a chapter with `::: {.film src="<id>"}` or `::: {.film src="trureturing-film:film-<NNN>-v<k>"}`; the text inside the block is the caption.
 
 ## 边界 · Scope
 

@@ -22,11 +22,13 @@ description: 为书做讲解视频时使用：按 trureturing-film 方案新建�
 5. **实体镜头只给曲面与体。** 判据同 `book-viz` 的“具象”：正文点名的对象本身是曲面或体（环面、带、多面体、可行域、球里的东西）时，可以用实体镜头 `solid(…)` 把它画成受光的实体；它是多出来的一种能力，不是统一风格，曲线、格点、矩阵、记号串照旧二维。实体只是画法，依据标注不变：`LEAN ✓` 仍只给 `film.json` 的 `lean` 列出的定理。
 6. **仓库只存源码**：`film.json`、`script.json`、`scenes.js`、可选 `data/*.json`、`poster.jpg`（≤ 300 KB）。成片是构建产物，与 PDF 一样：构建写到 `build/films/<slug>/<id>/`，站点托管在 `_site/<slug>/films/<id>/`。没有单独的视频 Release，`film-*` tag 也不发布任何东西。
 
+7. **视频默认不编号**：目录用稳定的 kebab-case `<id>`，不要求独立序号。需要显示编号时，在 `film.json` 填 `"chapter": "ch05-topic.md"`；编号取权威版本 `SUMMARY.md` 中所属主章的编号（含序曲 `0`、附录字母及显式未编号章的前缀），章节改序后自动跟随。子页面共享主章号，各语言须有同名章节；省略 `chapter` 时各端只显示“视频／Film”。旧 `001-…` 目录与输出文件名可保留为稳定标识，不再作为显示编号。
+
 ## 流程
 
 ```bash
-./tbook film new <book> <NNN>-<name> "<中文标题>" "<English title>"
-F=books/<book>/films/<NNN>-<name>
+./tbook film new <book> <id> "<中文标题>" "<English title>"
+F=books/<book>/films/<id>
 theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache/film/venv）、Kokoro 模型（.cache/film/models）、字体
 ```
 
@@ -52,7 +54,7 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 5. 构建视频：
 
    ```bash
-   TBOOK_FILMS=require ./tbook build films --book <book> [--film <NNN>-<name> …]
+   TBOOK_FILMS=require ./tbook build films --book <book> [--film <id> …]
    ```
 
    `--film`（可重复）只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染；`build site`、`build all` 不接受它。
@@ -62,7 +64,7 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 6. 嵌入章节——**所有语言版本都要加**，`src` 相同，只翻译图注：
 
    ```markdown
-   ::: {.film src="<NNN>-<name>"}
+   ::: {.film src="<id>"}
    图注（可含数学与 [@thm-…] 引用）。
    :::
    ```

@@ -27,6 +27,14 @@ class PlanOutputBudgetTest(unittest.TestCase):
     commit = fixtures.AffectedPlanTest.commit
     make_plan = fixtures.AffectedPlanTest.make_plan
 
+    def test_chapter_summary_selects_only_numbered_films_and_accepts_plain_ids(self):
+        self.write("books/one/films/explanation/film.json", json.dumps({"chapter": "ch01.md"}))
+        tree = planner.Tree(self.root, self.commit())
+        selected = planner.impact(tree, tree, ["books/one/zh/SUMMARY.md"])
+        self.assertEqual(selected["films"], ["one/explanation"])
+        selected = planner.impact(tree, tree, ["tools/tbook/summary.py"])
+        self.assertIn("one/explanation", selected["films"])
+
     def outputs(self, plan):
         output, summary = self.root / "output.txt", self.root / "summary.md"
         for path in (output, summary):
