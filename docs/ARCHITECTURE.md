@@ -204,7 +204,7 @@ build/slides/<slug>/<deck>/<lang>/  Slidev 输出；PDF 在 build/slides/<slug>/
                                     与当前不符即为过期，slides.publish 先重新构建
 books/<slug>/films/<name>/out/  视频流水线的工作文件（git 忽略）；入口 theme/film/film.sh <film dir> <step>
 build/films/<slug>/<name>/            一部视频的成片：film.json outputs 所列的文件，必有 narrated_720p 与 cover，
-                                    列出时另有 narrated、music_only、music_only_720p（构建单元 films <slug>/<id>，
+                                    列出时另有 narrated、music_only、music_only_720p（构建单元 films <slug>/<name>，
                                     渲染或从缓存恢复）
 .cache/film/                        视频工具链：venv/（theme/film/requirements.txt）、models/（Kokoro）、fonts/
 build/lean-verify/                  ./tbook lean-project 生成的深度验证 Lake 工程

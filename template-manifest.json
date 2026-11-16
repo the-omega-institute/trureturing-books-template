@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -64,7 +64,7 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "90e59be93477be7a2f31cb1a4acbd4bd6f32a6c2c81b76d16ea75b66aea69c95",
+      "sha256": "fd662c86a05ceb5c607337e19f280b5a6a8309db5cc91441f1a976ba4f881c5a",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "16c39d2efaeda3afb31f186790521fb11254f0e1b39069d0c6ffd6d9658b0c81",
+      "sha256": "8c4aeb0e357919d04f099f7690ae6fcf7ea9314544e59325c7ff914e9bc35193",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
