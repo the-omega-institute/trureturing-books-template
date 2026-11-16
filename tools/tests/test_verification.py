@@ -996,7 +996,9 @@ class PullRequestCacheTests(unittest.TestCase):
                      dict(event="pull_request_target", ref="refs/heads/main"),
                      dict(event="push", ref="refs/heads/feature"),
                      dict(event="workflow_dispatch", ref="refs/heads/feature")]
-        runs = {"ci.yml": trusted[:4], "pages.yml": trusted[:2], "release.yml": trusted[2:4],
+        runs = {"ci.yml": trusted[:4],
+                "pages.yml": [trusted[1], dict(event="workflow_run", ref="refs/heads/main")],
+                "release.yml": trusted[2:4],
                 "trureturing-bump.yml": [trusted[1], trusted[4]]}
         for name, ok in runs.items():
             text = (self.WORKFLOWS / name).read_text(encoding="utf-8")
@@ -1118,6 +1120,7 @@ class PullRequestCacheTests(unittest.TestCase):
                     # a skipped restore step leaves its outputs empty
                     context = {k: "" for k in re.findall(r"steps\.[\w-]+\.outputs\.[\w-]+", cond)}
                     context["fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure"] = True
+                    context.update({"steps.verified.outcome": "success", "needs.plan.outputs.stills": "true"})
                     for event in pr_events:
                         self.assertFalse(gha_if(cond, event=event, ref="refs/pull/7/merge", context=context),
                                          f"{name}: {uses} on {event}")
@@ -1209,27 +1212,31 @@ fi
 
 
 class ExportRegressionWorkflowTests(unittest.TestCase):
-    def test_required_browser_export_runs_after_all_ordinary_unit_rounds(self):
+    def test_required_browser_exports_run_in_independent_selected_shards(self):
         workflow = GITHUB_DIR / "workflows" / "ci.yml"
-        steps = workflow_jobs(workflow)["validate"]
+        jobs = workflow_jobs(workflow)
+        steps = jobs["validate"]
         rounds = [i for i, step in enumerate(steps)
                   if 'python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"' in step.get("run", "")]
         self.assertEqual(len(rounds), 3)
         setups = [(i, step) for i, step in enumerate(steps) if step.get("uses") == "./.github/actions/setup"]
-        self.assertEqual(len(setups), 2)
-        (early, ordinary), (late, browser) = setups
+        self.assertEqual(len(setups), 1)
+        (early, ordinary), = setups
         self.assertLess(early, min(rounds))
         self.assertEqual(ordinary["with"]["browsers"], "false")
-        self.assertGreater(late, max(rounds))
-        self.assertEqual(browser["with"]["browsers"], "true")
-        required, = [(i, step) for i, step in enumerate(steps)
-                     if step.get("run") == 'python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json"']
-        self.assertGreater(required[0], late)
-        self.assertEqual(required[1]["if"], browser["if"])
-        self.assertEqual(browser["if"], "fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser")
-        self.assertNotIn("continue-on-error", required[1])
-        validate = workflow.read_text().split("\n  validate:\n", 1)[1].split("\n  build:\n", 1)[0]
-        self.assertIn("timeout-minutes: 30", validate)
+        browser_steps = jobs['browser']
+        browser, = [s for s in browser_steps if s.get('uses') == './.github/actions/setup']
+        self.assertEqual(browser['with']['browsers'], 'true')
+        self.assertEqual(browser['with']['mdbook'], 'true')
+        required, = [s for s in browser_steps if 'run.py browser ' in s.get('run', '')]
+        self.assertIn('--items-file "$RUNNER_TEMP/browser.json"', required['run'])
+        self.assertNotIn('continue-on-error', required)
+        text = workflow.read_text()
+        section = text.split('\n  browser:\n', 1)[1].split('\n  stills:\n', 1)[0]
+        self.assertIn("if: needs.plan.outputs.browser == 'true'", section)
+        self.assertIn('needs: plan', section)
+        self.assertIn('fromJSON(needs.plan.outputs.browser_matrix)', section)
+        self.assertIn('needs: [plan, validate, browser,', text)
 
 
 class BuildCacheWorkflowTests(unittest.TestCase):
@@ -1248,8 +1255,10 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         save, = [s for s in steps if s.get("uses", "").startswith("actions/cache/save@")]
         prune = next(s for s in steps if s.get("id") == "prune")
         self.assertFalse([s for s in steps if re.match(r"actions/cache@", s.get("uses", ""))])
-        self.assertEqual(restore["with"], {"path": ".cache/artifacts", "key": "build-cache-v1-${{ github.run_id }}",
-                                           "restore-keys": "build-cache-v1-"})
+        self.assertIn("inputs.scope == 'images'", restore["with"]["path"])
+        self.assertIn(".cache/artifacts/viz-stills", restore["with"]["path"])
+        self.assertIn("image-cache-v1-", restore["with"]["key"])
+        self.assertIn("build-cache-v1-", restore["with"]["key"])
         self.assertEqual(save["with"], {"path": ".cache/artifacts", "key": "${{ steps.prune.outputs.key }}"})
         self.assertLess(steps.index(prune), steps.index(save))
         default = [dict(event="push", ref="refs/heads/main"), dict(event="workflow_dispatch", ref="refs/heads/main"),

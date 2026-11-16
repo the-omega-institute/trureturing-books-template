@@ -27,6 +27,13 @@ class PlanOutputBudgetTest(unittest.TestCase):
     commit = fixtures.AffectedPlanTest.commit
     make_plan = fixtures.AffectedPlanTest.make_plan
 
+    def test_browser_shard_cannot_run_duplicate_empty_or_unplanned_classes(self):
+        selected = ['test_viz.KeysGate', 'test_viz.RailGate']
+        self.assertEqual(runner.browser_selection(selected, selected[:1]), selected[:1])
+        for items in ([], [selected[0], selected[0]], ['test_other.Unknown'], {}, [3]):
+            with self.subTest(items=items), self.assertRaises(ValueError):
+                runner.browser_selection(selected, items)
+
     def test_plain_film_name_is_selected_without_metadata_identifiers(self):
         self.write("books/one/films/explanation/film.json", json.dumps({"title": "Explanation"}))
         tree = planner.Tree(self.root, self.commit())
@@ -44,7 +51,7 @@ class PlanOutputBudgetTest(unittest.TestCase):
         fields = {k: json.loads(v) for k, v in (line.split("=", 1) for line in text.splitlines())}
         self.assertEqual(fields["plan"], original)
         self.assertEqual(plan, original)
-        for field, key in (("build", "exports"), ("viz", "viz"), ("slow", "slow"), ("film", "films")):
+        for field, key in (("build", "exports"), ("viz", "viz"), ("slow", "slow"), ("film", "films"), ('browser', 'browser')):
             self.assertEqual(fields[field + "_matrix"], {"include": plan[key]})
         for key in ("site", "publish"):
             self.assertEqual(fields[key], plan[key])
@@ -97,7 +104,7 @@ class PlanOutputBudgetTest(unittest.TestCase):
             self.assertEqual(sorted(plan["execution"][profile]), suites)
             self.assertEqual(sorted(plan["workloads"][profile]), suites)
             self.assertEqual(sorted(item for shard in matrix for item in shard["items"]), suites)
-        self.assertEqual(plan["tasks"], dict(validate=True, build=True, viz=True, **{"viz-slow": True}, media=True, films=False))
+        self.assertEqual(plan["tasks"], dict(validate=True, browser=False, stills=False, build=True, viz=True, **{"viz-slow": True}, media=True, films=False))
         output, summary = self.outputs(plan)
         self.assertIn(paths[0], output)
         self.assertNotIn("\\u7ae0", output)
@@ -166,7 +173,7 @@ class LargePlanTransportTest(unittest.TestCase):
         self.assertEqual(json.loads(outputs["plan"]), plan)
         for field, key in (("build", "exports"), ("viz", "viz"), ("slow", "slow"), ("film", "films")):
             self.assertEqual(json.loads(outputs[field + "_matrix"]), {"include": plan[key]})
-        selected = ({"probe": True, "build": plan["site"], "deploy": plan["site"] and enabled}
+        selected = ({"probe": True, "films": bool(plan.get('films')), "build": plan["site"], "deploy": plan["site"] and enabled}
                     if pages else plan["tasks"])
         return {"plan": {"result": "success", "outputs": outputs}, **{
             job: {"result": "success" if chosen else "skipped",
@@ -281,6 +288,8 @@ class LargePlanTransportTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         # Every selected job, including plan, must still succeed.
         for job in needs:
+            if job != 'plan' and not plan['tasks'][job]:
+                continue
             for status in ("failure", "cancelled", "skipped", None):
                 bad = copy.deepcopy(needs)
                 if status is None:

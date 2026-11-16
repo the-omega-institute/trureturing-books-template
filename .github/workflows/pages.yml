@@ -5,13 +5,15 @@
 # Until then the probe job warns and the site is built but not deployed.
 #
 # Build cache (docs/PUBLISHING.md §5): a unit whose inputs did not change is restored, from the Actions
-# cache that earlier runs of this workflow saved or else from the newest published releases, instead of
-# being built again. This is the only workflow that saves the Actions cache (on the default branch), and
-# the group "pages" runs it one at a time, so two runs never render the same film for the same entry.
+# cache that successful default-branch CI/Pages runs saved or from published releases. Automatic Pages
+# waits for CI's prepared exports; film shards prepare missing videos before site assembly. The group
+# "pages" runs one publication at a time.
 name: Pages
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -34,6 +36,12 @@ env:
 
 jobs:
   plan:
+    # Only the successful current default-branch push can start automatic publication.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_sha == github.sha)
     name: Plan affected work
     permissions:
       contents: read
@@ -45,6 +53,8 @@ jobs:
       plan: ${{ steps.plan.outputs.plan }}
       site: ${{ steps.plan.outputs.site }}
       publish: ${{ steps.plan.outputs.publish }}
+      films: ${{ steps.plan.outputs.films }}
+      film_matrix: ${{ steps.plan.outputs.film_matrix }}
     steps:
       - name: Check out the tested tree and complete history
         uses: actions/checkout@v5
@@ -59,6 +69,7 @@ jobs:
         run: python3 tools/ci/plan.py --workflow pages
 
   probe:
+    needs: plan
     name: Is GitHub Pages enabled?
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -93,10 +104,62 @@ jobs:
             echo "The site is still built (job **Build the site**) so that problems surface early."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  films:
+    name: Prepare publication films (${{ matrix.shard }})
+    needs: [plan, probe]
+    if: needs.plan.outputs.films == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.film_matrix) }}
+    permissions:
+      contents: read
+      actions: read
+      pages: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - name: Set up film tools
+        uses: ./.github/actions/setup
+        with:
+          browsers: 'true'
+          films: 'true'
+          fonts: 'false'
+          mdbook: 'false'
+      - name: Configure Pages
+        id: pages
+        if: needs.probe.outputs.enabled == 'true'
+        uses: actions/configure-pages@v6
+      - name: Restore completed CI inputs
+        uses: ./.github/actions/build-cache
+        with:
+          mode: restore
+          pages-url: ${{ steps.pages.outputs.base_url }}
+      - name: Snapshot prior entries
+        run: python3 tools/ci/cache_store.py snapshot "$RUNNER_TEMP/before.json"
+      - name: Build selected film shard
+        env:
+          TBOOK_CACHE_REMOTE: '1'
+          GITHUB_TOKEN: ${{ github.token }}
+          FILMS_JSON: ${{ toJSON(matrix.items) }}
+        run: python3 tools/ci/films.py --selection-env FILMS_JSON
+      - name: Export complete added film entries
+        run: python3 tools/ci/cache_store.py export --baseline "$RUNNER_TEMP/before.json" --out "$RUNNER_TEMP/film-entries"
+      - name: Share prepared films
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-pages-films-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/film-entries
+          include-hidden-files: true
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 1
+
   build:
     name: Build the site
-    needs: [plan, probe]
-    if: needs.plan.outputs.site == 'true'
+    needs: [plan, probe, films]
+    if: always() && !cancelled() && (needs.films.result == 'success' || needs.films.result == 'skipped') && needs.plan.outputs.site == 'true'
     runs-on: ubuntu-24.04
     # Rendering a film that no cache holds takes long (frames, narration, encoding). The build step has a
     # shorter limit of its own: a step that runs out of time fails, while a job that does is cancelled and
@@ -140,7 +203,19 @@ jobs:
           mode: restore
           pages-url: ${{ steps.pages.outputs.base_url }}
 
+      - name: Download prepared film entries
+        if: needs.plan.outputs.films == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: tbook-pages-films-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/prepared-film-shards
+      - name: Import verified film entries
+        if: needs.plan.outputs.films == 'true'
+        run: python3 tools/ci/cache_store.py merge "$RUNNER_TEMP"/prepared-film-shards/*
+
       - name: Check
+        if: github.event_name != 'workflow_run'
         env:
           # check asks GitHub's compare API whether the pinned trureturing commit is on the site.toml branch
           # (no trureturing checkout here); in GitHub Actions an unanswered question is an error.
@@ -214,8 +289,8 @@ jobs:
 
   coverage:
     name: Confirm deployment coverage
-    needs: [plan, probe, build, deploy]
-    if: always()
+    needs: [plan, probe, films, build, deploy]
+    if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

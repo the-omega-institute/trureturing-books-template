@@ -195,6 +195,7 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
       if (v.path !== `${v.id}/`) err(regFile, `${at}: path must be "${v.id}/"`);
       if (nonEmpty(v.thumbnail) && (!v.thumbnail.startsWith(`${v.id}/`) || !THUMB_EXT.test(v.thumbnail))) err(regFile, `${at}: thumbnail must be an image in ${v.id}/ (normally "${v.id}/thumb.jpg")`);
       if (!STATUSES.includes(v.status)) err(regFile, `${at}: status must be one of ${STATUSES.join(', ')}`);
+      if (v.capture_lock !== undefined && !['all', 'links'].includes(v.capture_lock)) err(regFile, `${at}: capture_lock must be all or links`);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v.added || '')) err(regFile, `${at}: added must be YYYY-MM-DD`);
       if (live) {
         for (const key of ['title_en', 'summary', 'summary_en']) if (!nonEmpty(v[key])) err(regFile, `${at}: a live entry needs "${key}"`);

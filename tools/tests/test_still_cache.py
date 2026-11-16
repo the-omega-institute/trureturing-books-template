@@ -15,6 +15,31 @@ SOURCE = paths.ROOT
 
 @unittest.skipUnless(shutil.which('node'), 'Node is required')
 class StillCacheTests(unittest.TestCase):
+    def test_link_only_capture_ignores_lock_but_ordinary_capture_keeps_full_dependency(self):
+        with Repo() as repo:
+            book = repo.book()
+            write(book.dir / 'viz/demo/index.html', '<a data-lean-gid="D5/S1/Example.result">Theorem</a>')
+            env = dict(os.environ, TBOOK_ROOT=str(repo.root))
+            js = '''
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const { inputKey } = await import(process.argv[1]);
+const book = {dir: path.join(process.env.TBOOK_ROOT, 'books/demo')};
+const all = {id:'demo'}, links = {id:'demo', capture_lock:'links'};
+const before = [inputKey(book, all), inputKey(book, links)];
+fs.writeFileSync(path.join(process.env.TBOOK_ROOT, 'trureturing.lock.json'), JSON.stringify({commit:'new',declarations:{added:{kind:'theorem'}}}));
+assert.notEqual(inputKey(book, all), before[0], 'undeclared lock reads remain conservative');
+assert.equal(inputKey(book, links), before[1], 'anchor destinations cannot invalidate captured pixels');
+fs.writeFileSync(path.join(book.dir, 'viz/demo/index.html'), '<a>Changed visible evidence</a>');
+assert.notEqual(inputKey(book, links), before[1], 'visible source changes still invalidate pixels');
+assert.throws(() => inputKey(book, {id:'demo',capture_lock:'invalid'}));
+'''
+            result = subprocess.run(['node', '--input-type=module', '-e', js,
+                                     (SOURCE / 'tools/node/viz-still-cache.mjs').as_uri()],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_large_plan_flushes_pipe_and_scans_book_once(self):
         with Repo() as repo:
             book = repo.book(langs=('en',))

@@ -34,8 +34,16 @@ def images(book: config.Book, ids: list[str] | None = None) -> None:
     if not (book.viz_dir / "visualizations.json").is_file():
         return
     from . import buildcache
-    for unit in buildcache.viz_units(book, ids):
-        vid = unit.name.split("/", 1)[1]
-        buildcache.run(unit, lambda v=vid: subprocess.run(
-            ["node", str(paths.TOOLS / "node/viz-thumbs.mjs"), book.slug, v], cwd=paths.ROOT,
-            env=dict(os.environ, TBOOK_ROOT=str(paths.ROOT)), check=True))
+    units = buildcache.viz_units(book, ids)
+    missing = [unit for unit in units if buildcache.run(unit, None) == "missing"]
+    if not missing:
+        return
+    if os.environ.get("TBOOK_STILLS_REQUIRE_CACHE") == "1":
+        raise config.ConfigError("missing prepared visualization images: " + ", ".join(u.name for u in missing))
+    # A single parser/server/browser per batch, rather than restarting all three for every page.
+    subprocess.run(["node", str(paths.TOOLS / "node/viz-thumbs.mjs"), book.slug,
+                    *(u.name.split("/", 1)[1] for u in missing)], cwd=paths.ROOT,
+                   env=dict(os.environ, TBOOK_ROOT=str(paths.ROOT)), check=True)
+    for unit in missing:
+        if buildcache.enabled():
+            buildcache.store(unit)
