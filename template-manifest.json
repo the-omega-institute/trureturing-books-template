@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -60,7 +60,7 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "c38bc9b5863fbb4db34e6ef93a7f013839d685686d5dd24a9a209f71bfe1436c",
+      "sha256": "38e7d4fcc0cc09fc73cc0fa18b1d1e66e3a603357ce772c3297462568f734475",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
@@ -72,7 +72,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "8c4aeb0e357919d04f099f7690ae6fcf7ea9314544e59325c7ff914e9bc35193",
+      "sha256": "68bf5512d5fa08d1ccf241e293901ec99235b08fc20ccd2a738497e67899ce5d",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -96,7 +96,7 @@
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
-      "sha256": "d194ac937ded4eeec07df1dce597e7996384af6532211f5f5f10c01ce3ae550d",
+      "sha256": "a10d0f6cd05ff2cb0a14441ba0662a549218ce327954de671af77c8d380216d5",
       "mode": "100644"
     },
     "docs/VERIFICATION.md": {
@@ -148,7 +148,7 @@
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
-      "sha256": "14788a92a2de16d13f41c2fd0225cfa8a6d16e7e62667f168567d502cde27d14",
+      "sha256": "8777714f4afed8a65a54c08ab6cbc2d1dcdc76489456cc57a1ac3b820f266e0e",
       "mode": "100644"
     },
     "skills/theorem-formalize/SKILL.md": {
