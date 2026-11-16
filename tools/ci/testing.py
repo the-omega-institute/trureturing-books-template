@@ -14,6 +14,7 @@ import sys
 EXTRA = {
     "test_ci*": ["tools/ci/**", ".github/**"],
     "test_ci_testing": ["tools/node/viz-test.mjs"],
+    "test_pr_conventions": [".github/workflows/pr-conventions.yml"],
     "test_template*": ["template.toml", "tools/migrations/**", "templates/**", "books/example-*/**"],
     "test_migration*": ["tools/migrations/**"],
     "test_container": ["tools/container/**", ".github/**"],

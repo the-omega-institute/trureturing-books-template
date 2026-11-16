@@ -7,9 +7,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
 
 from tbook import doctor, pandoc as tp, paths
 from tbook.model import load_edition
