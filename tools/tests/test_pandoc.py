@@ -262,7 +262,6 @@ class SourceCacheTest(unittest.TestCase):
                     patch.object(tp, "stage", wraps=tp.stage) as stage, \
                     patch.object(tp, "run_pandoc", side_effect=convert) as pandoc, \
                     patch.object(tp, "compile_typst", side_effect=compile) as typst, \
-                    patch.object(tp, "_compact_pdf", side_effect=lambda p: p), \
                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 for variant in config.PDF_VARIANTS:
                     directory = root / f"stage-{variant}"
@@ -1057,30 +1056,6 @@ class BuildTest(unittest.TestCase):
     def test_pdf_rejects_unknown_variant(self):
         with self.assertRaises(tp.PandocError):
             tp.build_pdf(self.site, self.book, self.ed, self.model, None, "glossy", self.tmp / "x.pdf")
-
-    def test_pdf_compaction_preserves_content_and_links(self):
-        import pikepdf
-
-        path = self.tmp / "compact.pdf"
-        with pikepdf.Pdf.new() as pdf:
-            pdf.docinfo["/Title"] = "Lossless academic PDF"
-            for i in range(100):
-                page = pdf.add_blank_page()
-                page.Contents = pdf.make_stream(f"q 1 0 0 1 {i} 0 cm Q".encode())
-                page.Annots = [pdf.make_indirect(pikepdf.Dictionary(
-                    Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Link,
-                    Rect=[0, 0, 10, 10],
-                    A=pikepdf.Dictionary(S=pikepdf.Name.URI, URI=f"https://example.org/{i}")))]
-            pdf.save(path, object_stream_mode=pikepdf.ObjectStreamMode.disable)
-        before = path.stat().st_size
-        self.assertEqual(tp._compact_pdf(path), path)
-        self.assertLess(path.stat().st_size, before)
-        with pikepdf.open(path) as pdf:
-            self.assertEqual(str(pdf.docinfo["/Title"]), "Lossless academic PDF")
-            self.assertEqual(len(pdf.pages), 100)
-            for i, page in enumerate(pdf.pages):
-                self.assertEqual(page.Contents.read_bytes(), f"q 1 0 0 1 {i} 0 cm Q".encode())
-                self.assertEqual(str(page.Annots[0].A.URI), f"https://example.org/{i}")
 
     def test_epub(self):
         old = os.environ.get("TBOOK_EPUBCHECK")

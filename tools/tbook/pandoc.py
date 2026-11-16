@@ -1739,44 +1739,6 @@ def compile_typst(main: Path, out_path: Path, *, root: Path, fmt: str = "pdf", p
     return out_path
 
 
-def _compact_pdf(path: Path) -> Path:
-    """Pack PDF objects and Flate streams without resampling or re-encoding images."""
-    import pikepdf
-    import zopfli.zlib
-
-    with tempfile.TemporaryDirectory(prefix=".tbook-pdf-", dir=path.parent) as tmp:
-        compact = Path(tmp) / path.name
-        with pikepdf.open(path) as pdf:
-            # Typst's numeric drawing/text operators compress better with FILTERED.
-            # Restrict this to plain page streams: image and font bytes stay untouched.
-            seen = set()
-            for page in pdf.pages:
-                contents = page.obj.get("/Contents")
-                if contents is None:
-                    continue
-                streams = contents if isinstance(contents, pikepdf.Array) else [contents]
-                for stream in streams:
-                    if (stream.objgen in seen or stream.get("/Filter") != pikepdf.Name.FlateDecode
-                            or stream.get("/DecodeParms") is not None):
-                        continue
-                    seen.add(stream.objgen)
-                    decoded = stream.read_bytes()
-                    encoder = zlib.compressobj(9, zlib.DEFLATED, 15, 9, zlib.Z_FILTERED)
-                    filtered = encoder.compress(decoded) + encoder.flush()
-                    # One Zopfli iteration, without block-split searches, bounds export
-                    # cost while improving Deflate's match selection. Keep FILTERED
-                    # when it wins; both encode exactly the same page commands.
-                    stronger = zopfli.zlib.compress(decoded, numiterations=1, blocksplitting=False)
-                    encoded = min((filtered, stronger), key=len)
-                    if len(encoded) < len(stream.read_raw_bytes()):
-                        stream.write(encoded, filter=pikepdf.Name.FlateDecode)
-            pdf.save(compact, object_stream_mode=pikepdf.ObjectStreamMode.generate,
-                     compress_streams=True, recompress_flate=False, deterministic_id=True)
-        if compact.stat().st_size < path.stat().st_size:
-            compact.replace(path)
-    return path
-
-
 def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
               stage_dir: Path | None = None) -> Path:
     """Build ``out_path`` (PDF: ``screen`` (dark), ``print`` (light), or ``academic`` (scholarly layout)).
@@ -1789,7 +1751,7 @@ def build_pdf(site, book, edition, model, lock, variant: str, out_path: Path, *,
     result = compile_typst(staged.dir / "main.typ", Path(out_path), root=staged.dir,
                          sys_inputs={"tr-variant": variant}, timestamp=source_date_epoch(book) or None,
                          pdf_tags=bool(book.pdf.get("academic_tags", False)) if variant == "academic" else True)
-    return _compact_pdf(result) if variant == "academic" else result
+    return result
 
 
 # --------------------------------------------------------------------------- EPUB
