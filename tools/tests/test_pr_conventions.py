@@ -16,7 +16,8 @@ class PullRequestConventionsTests(unittest.TestCase):
     def test_workflow_reads_current_target_even_when_the_pr_predates_adoption(self):
         path = Path(__file__).resolve().parents[2] / ".github/workflows/pr-conventions.yml"
         workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
-        self.assertIn("pull_request_target", workflow["on"])
+        self.assertIn("pull_request", workflow["on"])
+        self.assertNotIn("pull_request_target", workflow["on"])
         self.assertEqual(workflow["permissions"], {"contents": "read"})
         steps = workflow["jobs"]["conventions"]["steps"]
         checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
