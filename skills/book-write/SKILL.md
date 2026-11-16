@@ -116,7 +116,7 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 
 ### 手写的计数、清单与数值
 
-- 定理数量、声明分区、索引与统计图使用 `./tbook stats --book <slug>` 或 `stats.collect(book)` 的正式解析结果。已有 `[derived]` 生成器时，增删引用后运行 `./tbook sync --book <slug>`，修改生成器的论述模板，不手改生成结果；`./tbook check` 会只读检查新鲜度。方法见 `docs/AUTHORING.md` 的“统计与派生产物”。避免在散文中重复罗列会随正文变动的总数和排名；保留的人工计数仍须逐语核对。
+- 删除手工维护的全书计数、排名、声明表与统计地图；需要展示时用 `::: {.stats src="summary"}` 选择编译视图（另可选 `evidence`、`environments`、`kinds`、`chapters`、`pages`、`declarations`、`reuse`），默认嵌入表格，`display="link" format="html|markdown|csv|json"` 链接独立产物，索引与复用表可按 `group` 筛选。下游自行选择；命令行用 `./tbook stats --book <slug> --write` 按需导出，不把统计写回受版本管理的正文、图注、幻灯片或程序。旧统计的核对使用 `./tbook stats --book <slug>` 或 `stats.collect(book)` 的正式解析结果。已有 `[derived]` 生成器时，增删引用后运行 `./tbook sync --book <slug>`，修改生成器的论述模板，不手改生成结果；`./tbook check` 会只读检查新鲜度。方法见 `docs/AUTHORING.md` 的“统计与派生产物”。避免在散文中重复罗列会随正文变动的总数和排名；保留的人工计数仍须逐语核对。
 - “GID—源码行—摘要”这类对照行从 `trureturing.lock.json` 生成，不手抄。
 - 算例里的数值独立复算；写“四舍五入到所示位数”时确实是四舍五入而不是截断。各语言版本的数字应当逐个相同，而环境对齐检查不比较数字：把两版同一环境里的数字序列抽出来比对一次。
 

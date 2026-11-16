@@ -229,3 +229,16 @@ Combining [@thm-charge-unique] with the third part of [@thm-deficit-integer]: ev
 [@thm-charge-unique] holds for arbitrary digit strings, but it does not bound the charge. [@thm-deficit-three-valued] puts the total charge in $\{-1, 0, 1\}$, but only for sums of two canonical strings. For instance, from $5e_0$ (a $5$ at position $0$, value $5$) normalization takes $5$ steps to $1000_W = z(5)$ with total charge $2$; directly, $5\varphi^2 - \varphi^5 = 2$.
 
 Current publication basis: [{commit}](trureturing:).
+
+## Statistics Generated During Compilation {#sec-generated-statistics-example}
+
+The table below uses the book's publication parser. The manuscript selects a view without maintaining totals.
+
+::: {.stats src="summary"}
+:::
+
+Declaration details are available separately; their actual hypotheses and conclusions remain in the chapters.
+
+::: {.stats src="declarations" display="link" format="html"}
+Open the generated declaration index
+:::

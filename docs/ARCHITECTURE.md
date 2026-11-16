@@ -329,6 +329,7 @@ mdBook 的 `<lang>/print.html` 不改写 iframe 的 `src` 与 video 的 `poster`
 | `lean` | 名称键解码、GID、冻结状态来源、`resolve()`、`Lock` 与永久链接 |
 | `render` | `RenderContext`、`env_view()`、`chapter_markdown()`（mdbook / pandoc 两种 target）；环境标题中的 `[@id]`（`env_title()`）；`rewrite_links()`（图片与文件链接，`check` 也用它找缺失文件）；Lean 声明未被锁文件解析时显示 `UNVERIFIED`、不给链接；`verified_envs()` 是所有 `LEAN ✓ n` 计数的唯一口径 |
 | `ledger` | 生成“形式化验证账本”章节 |
+| `stats` | 从正式解析结果生成可选统计视图、数据产物与 `.stats` 嵌入／链接；不写回书稿 |
 | `figkit` | 静态图的画图库：`Figure`（`Canvas` 的方法：线、箭头、面、文字、标记，`axes()` 坐标系，`sphere()` 球面正交投影，`row()`/`panel()` 分栏），角色与语义名（`ROLES`、`ALIASES`），标准的下限（`MIN_FONT`、`MIN_STROKE`、`MAX_WIDTH`） |
 | `figure` | 静态图：`names()`、`render()`、`build(book, only, check=)`、`style_sheet()`、`materialize()`、`inline_html()`、`mdbook_css()`、`caption_problem()`、`shots()`，以及媒体接口 |
 | `check` / `pin` / `theme` / `newbook` / `build` / `cli` | 命令 |

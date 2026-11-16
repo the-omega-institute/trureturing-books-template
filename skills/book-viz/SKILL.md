@@ -228,7 +228,7 @@ node tools/node/viz-validate.mjs <book> && ./tbook check
 ./tbook build html site --book <book> && ./tbook serve
 ```
 
-完善 `books/<book>/viz/visualizations.json`（`title_en`、`summary`/`summary_en`、`tags`/`tags_en`、`theory`、`lean`），把 `status` 改为 `live`；新引用了 GID 时先 `./tbook pin --refresh`。改了卡片或引用之后运行 `viz-thumbs.mjs`；它核对输入和成品摘要，只补过期或缺失的图片，无变化时不启动浏览器。`.stills.json` 与图片均为本地构建输出，不提交，`--check` 只读检查，`--force` 用于有意重采样。首次建立清单必须实际出图。正文措辞变动不要求重画全部卡；数据驱动页面复用正式统计和本书生成器，不手填总数。`./tbook check` 会核对被引用的卡存在、各语言版本引用一致；导出构建负责生成所需静态图。只在相关输入和画面不变且原检查范围适用时复用看图证据；舞台、行为与标签变化仍按前文测试和看图。
+完善 `books/<book>/viz/visualizations.json`（`title_en`、`summary`/`summary_en`、`tags`/`tags_en`、`theory`、`lean`），把 `status` 改为 `live`；新引用了 GID 时先 `./tbook pin --refresh`。改了卡片或引用之后运行 `viz-thumbs.mjs`；它核对输入和成品摘要，只补过期或缺失的图片，无变化时不启动浏览器。`.stills.json` 与图片均为本地构建输出，不提交，`--check` 只读检查，`--force` 用于有意重采样。首次建立清单必须实际出图。正文措辞变动不要求重画全部卡；删除手工维护的全书统计地图数据；下游需要此类页面时读取编译产物，不把统计或声明表嵌入手工维护的程序，不手填总数。`./tbook check` 会核对被引用的卡存在、各语言版本引用一致；导出构建负责生成所需静态图。只在相关输入和画面不变且原检查范围适用时复用看图证据；舞台、行为与标签变化仍按前文测试和看图。
 
 ## kit 速查（`theme/viz/kit.js`，在 `<head>` 里排在 `shell.js` 之后）
 

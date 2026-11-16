@@ -104,6 +104,32 @@ Open.
             self.assertEqual(code, 0, err)
             self.assertEqual(json.loads(out)[0]['total'], 0)
 
+    def test_cli_artifacts_are_opt_in_scoped_and_refreshed_without_source_changes(self):
+        with Repo() as repo:
+            one = repo.book('one')
+            repo.book('two')
+            sources = snapshot(repo.root)
+            code, _, err = repo.run_cli('stats', '--book', 'one')
+            self.assertEqual(code, 0, err)
+            self.assertEqual(snapshot(repo.root), sources)
+            code, out, err = repo.run_cli('stats', '--book', 'one', '--write', '--json')
+            self.assertEqual(code, 0, err)
+            target = repo.root / 'build/statistics/one.json'
+            self.assertEqual(json.loads(target.read_text()), json.loads(out)[0])
+            self.assertFalse((repo.root / 'build/statistics/two.json').exists())
+            exported = target.read_bytes()
+            stamp = target.stat().st_mtime_ns
+            code, _, err = repo.run_cli('stats', '--book', 'one', '--write')
+            self.assertEqual(code, 0, err)
+            self.assertEqual(target.read_bytes(), exported)
+            self.assertEqual(target.stat().st_mtime_ns, stamp)
+            write(one.primary.dir / 'ch01.md', '# One\n\n::: {.problem #open}\nOpen.\n:::\n')
+            edited = snapshot(repo.root / 'books')
+            code, _, err = repo.run_cli('stats', '--book', 'one', '--write')
+            self.assertEqual(code, 0, err)
+            self.assertEqual(json.loads(target.read_text())['environments']['problem'], 1)
+            self.assertEqual(snapshot(repo.root / 'books'), edited)
+
     def test_invalid_hook_and_empty_books(self):
         with Repo() as repo:
             book = repo.book()
@@ -114,3 +140,128 @@ Open.
             book.raw.pop('derived')
             data = stats.collect(book, lock=lock())
             self.assertEqual(data['total'], 0)
+
+
+class StatisticsViewsTests(unittest.TestCase):
+    def populate(self, repo):
+        book = repo.book(summaries={lang: '# Summary\n\n- [One](ch01.md)\n  - [Child](ch01-child.md)\n'
+                                    for lang in ('zh', 'en')})
+        for edition in book.editions:
+            write(edition.dir / 'ch01.md', f'''# One
+
+::: {{.theorem #one lean="{A}"}}
+A.
+:::
+
+::: {{.lemma #reuse lean="{A}"}}
+A again.
+:::
+
+::: {{.stats src="summary"}}
+:::
+
+::: {{.stats src="declarations" display="link" format="csv" group="theorems"}}
+Declaration data
+:::
+
+[Carrier](lean:{D})
+''')
+            write(edition.dir / 'ch01-child.md', f'# Child\n\n[Reuse](lean:{A})\n')
+        return book
+
+    def test_views_distinguish_occurrences_unique_declarations_and_chapter_reuse(self):
+        with Repo() as repo:
+            book = self.populate(repo)
+            data = stats.collect(book, lock=lock())
+            _, summary = stats.table(data, 'summary', 'en')
+            self.assertEqual(summary[0][1], 2)
+            self.assertEqual(summary[1][1], 2)
+            _, chapters = stats.table(data, 'chapters', 'en')
+            self.assertEqual(chapters, [['ch01.md', 2, 2, 1, 2]])
+            _, pages = stats.table(data, 'pages', 'en')
+            self.assertEqual(len(pages), 2)
+            _, declarations = stats.table(data, 'declarations', 'en', 'theorems')
+            self.assertEqual(declarations, [[A, 'theorem', 3]])
+            _, reuse = stats.table(data, 'reuse', 'en')
+            self.assertEqual(reuse[0], [A, 2, 3])
+            for view in stats.VIEWS:
+                for fmt in stats.FORMATS:
+                    self.assertTrue(stats.artifact_content(data, view, 'zh', fmt))
+
+    def test_cli_selects_multiple_artifact_views_formats_and_languages_without_writing_sources(self):
+        from tbook import lean
+        with Repo() as repo:
+            book = self.populate(repo)
+            before = snapshot(book.dir)
+            with mock.patch.object(lean.Lock, 'load', return_value=lock()):
+                code, out, err = repo.run_cli('stats', '--write', '--view', 'summary', '--view', 'kinds',
+                                              '--format', 'markdown', '--format', 'csv', '--lang', 'zh', '--lang', 'en')
+            self.assertEqual(code, 0, err)
+            generated = sorted((repo.root / 'build/statistics/demo').glob('*'))
+            self.assertEqual(len(generated), 8)
+            self.assertTrue((repo.root / 'build/statistics/demo.json').is_file())
+            self.assertEqual(snapshot(book.dir), before)
+            times = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in generated}
+            with mock.patch.object(lean.Lock, 'load', return_value=lock()):
+                code, _, err = repo.run_cli('stats', '--write', '--view', 'summary', '--view', 'kinds',
+                                            '--format', 'markdown', '--format', 'csv', '--lang', 'zh', '--lang', 'en')
+            self.assertEqual(code, 0, err)
+            self.assertEqual(times, {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in generated})
+
+    def test_embeds_and_download_links_share_generated_data_for_both_targets(self):
+        from tbook import model, render
+        with Repo() as repo:
+            book = self.populate(repo)
+            site = config.load_site()
+            edition = book.editions[1]
+            parsed = model.load_edition(edition)
+            before = snapshot(book.dir)
+            for target in ('mdbook', 'pandoc'):
+                ctx = render.RenderContext(site, book, edition, parsed, lock(), target=target)
+                text = render.chapter_markdown(parsed.chapters[0], ctx)
+                self.assertIn('| Lean-verified formal environments | 2 |', text)
+                self.assertIn('[Declaration data](_book/statistics/declarations.theorems.en.csv)', text)
+                self.assertIn('summary.en.md', ' '.join(ctx.book_texts))
+                data = ctx.book_texts['statistics/declarations.theorems.en.csv']
+                self.assertIn(A, data)
+                self.assertNotIn(D, data)
+                self.assertEqual(ctx.statistics_data['environments']['lean_verified'], 2)
+            self.assertEqual(snapshot(book.dir), before)
+
+    def test_invalid_options_and_multilingual_selection_are_checked_before_building(self):
+        from tbook import check, model
+        from tbook.mdscan import Attrs
+        for values in ({'src': '../escape'}, {'src': 'summary', 'group': 'theorems'},
+                       {'src': 'summary', 'display': 'frame'}, {'src': 'summary', 'format': 'html'},
+                       {'src': 'summary', 'lean': A}, {'src': 'summary', 'limit': '5'}):
+            self.assertIsNotNone(stats.check_options(Attrs(kv=values)))
+        with self.assertRaises(config.ConfigError):
+            stats.artifact_name('summary', '../outside', 'html')
+        with Repo() as repo:
+            book = self.populate(repo)
+            models = model.load_book_models(book)
+            self.assertEqual(check._env_signature(models['zh']), check._env_signature(models['en']))
+            path = book.editions[1].dir / 'ch01.md'
+            path.write_text(path.read_text().replace('group="theorems"', 'group="inline"'))
+            models = model.load_book_models(book)
+            self.assertNotEqual(check._env_signature(models['zh']), check._env_signature(models['en']))
+            self.assertFalse((repo.root / 'build').exists())
+
+    def test_html_and_publication_stages_publish_the_requested_artifact_links(self):
+        from tbook import html, model, pandoc
+        with Repo() as repo:
+            book = self.populate(repo)
+            edition = book.editions[1]
+            path = edition.dir / 'ch01.md'
+            path.write_text(path.read_text() + '\n::: {.stats src="evidence" display="link" format="markdown"}\n::: \n')
+            parsed = model.load_edition(edition)
+            site = config.load_site()
+            before = snapshot(book.dir)
+            html_stage = html.stage_edition(site, book, edition, parsed, lock(), root=repo.root / 'html-stage')
+            csv = 'statistics/declarations.theorems.en.csv'
+            self.assertTrue((html_stage.src / '_book' / csv).is_file())
+            self.assertTrue((html_stage.src / '_book/statistics/evidence.en.md.txt').is_file())
+            publication = pandoc.stage(site, book, edition, parsed, lock(), out_dir=repo.root / 'publication')
+            self.assertTrue((publication.dir / '_book' / csv).is_file())
+            self.assertIn(site.book_url('demo', 'en') + '/_book/' + csv, publication.book_md.read_text())
+            self.assertEqual(snapshot(book.dir), before)

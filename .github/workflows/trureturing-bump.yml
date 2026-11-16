@@ -142,10 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           rc=0
-          ./tbook sync > build/check.txt 2>&1 || rc=$?
-          if [ "$rc" = "0" ]; then
-            ./tbook check >> build/check.txt 2>&1 || rc=$?
-          fi
+          ./tbook check > build/check.txt 2>&1 || rc=$?
           cat build/check.txt
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
 
@@ -257,7 +254,6 @@ jobs:
           git switch -C "$branch"
           if [ "$PIN_RC" = "0" ]; then
             git add trureturing.lock.json
-            git add --all -- books
             git commit -q -m "chore(trureturing): pin $short" -m "$(head -n 1 build/pin.md)"
           else
             # Nothing is staged: ./tbook pin writes the lock only when it succeeds, so this pull request

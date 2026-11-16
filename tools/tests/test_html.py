@@ -704,9 +704,35 @@ class BuildExampleTest(unittest.TestCase):
             others = [l["code"] for l in data["langs"] if l["code"] != lang]
             self.assertEqual(others, [o for o in ("zh", "en") if o != lang])
             for page in self.pages(lang):
+                # Standalone resources have language-specific names and no book language menu.
+                if not re.search(r'<script\b[^>]*src="[^"]*tr-editions[^"]*\.js"',
+                                 page.read_text(encoding="utf-8")):
+                    continue
                 rel = page.relative_to(self.out / lang)
                 for other in others:
                     self.assertTrue((self.out / other / rel).is_file(), f"{other}/{rel}")
+
+    def test_statistics_downloads_are_localized_standalone_resources(self):
+        from tbook import render, stats
+
+        for lang, title in (("zh", "声明索引"), ("en", "Declaration index")):
+            edition = next(ed for ed in self.book.editions if ed.lang == lang)
+            selected = [doc for doc in load_edition(edition).chapters
+                        if any(env.kind == "stats" and stats.options(env.attrs) ==
+                               ("declarations", "link", "all", "html") for env in doc.media)]
+            if not selected:
+                continue
+            rel = f"_book/statistics/declarations.{lang}.html"
+            artifact = self.out / lang / rel
+            text = artifact.read_text(encoding="utf-8")
+            self.assertIn(f'<html lang="{lang}">', text)
+            self.assertIn(f'<title>{title}</title>', text)
+            self.assertIn('<table>', text)
+            self.assertNotIn('tr-editions', text)
+            for doc in selected:
+                chapter = (self.out / lang / render.mdbook_chapter_path(doc.chapter.path)).with_suffix('.html')
+                href = os.path.relpath(artifact, chapter.parent)
+                self.assertIn(f'href="{href}"', chapter.read_text(encoding="utf-8"))
 
     def test_cjk_search_tokens(self):
         js = next((self.out / "zh").glob("searchindex*.js")).read_text(encoding="utf-8")
