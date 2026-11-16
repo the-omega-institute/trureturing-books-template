@@ -13,7 +13,7 @@ SCENES.open = S => {
   txt(DATA.film.title_zh, W / 2, 470, { size: 86, fam: F.zh, w: 900, align: 'center', c: C.white, a, ab: 3 });
   txt(DATA.film.title.toUpperCase(), W / 2, 560, { size: 46, fam: F.orb, w: 900, align: 'center', c: C.white, a, ls: 4 });
   panel(W / 2 - 520, 640, 1040, 120, at(S, 1, 0.6) * a, C.cyan, 'SCENES.JS');
-  txt('edit books/@@SLUG@@/films/@@ID@@/scenes.js', W / 2, 715, { size: 26, fam: F.mono, align: 'center', c: C.white, a: at(S, 1, 0.6) * a });
+  txt('edit books/@@SLUG@@/films/@@NAME@@/scenes.js', W / 2, 715, { size: 26, fam: F.mono, align: 'center', c: C.white, a: at(S, 1, 0.6) * a });
 };
 
 SCENES.close = S => {

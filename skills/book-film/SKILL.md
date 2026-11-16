@@ -11,7 +11,7 @@ description: 为书做讲解视频时使用：按 trureturing-film 方案新建�
 
 **不用**：可交互的探索（`book-viz`）；面向讲台的演示（`book-slides`）。
 
-**权威**：`templates/film/README.md`（`film.json`、`script.json`、`scenes.js` 规范与流水线）、`theme/film/`（共享引擎与步骤脚本）、`tools/tbook/film.py`（构建单元与站点发布）、示例 `books/example-monograph/films/001-golden-deficit/`。
+**权威**：`templates/film/README.md`（`film.json`、`script.json`、`scenes.js` 规范与流水线）、`theme/film/`（共享引擎与步骤脚本）、`tools/tbook/film.py`（构建单元与站点发布）、示例 `books/example-monograph/films/golden-deficit/`。
 
 ## 原则
 
@@ -20,15 +20,15 @@ description: 为书做讲解视频时使用：按 trureturing-film 方案新建�
 3. **旁白英文自然，字幕中文准确**，各一行，不逐字硬译。旁白与字幕写在 `script.json`，它是唯一的时间来源。
 4. **颜色只来自令牌**（`C.lean` 绿、`C.now` 琥珀、`C.open` 红、`C.argued` 紫，其余 `C.cyan`、`C.mag`、`C.white`、`C.dim`）。
 5. **实体镜头只给曲面与体。** 判据同 `book-viz` 的“具象”：正文点名的对象本身是曲面或体（环面、带、多面体、可行域、球里的东西）时，可以用实体镜头 `solid(…)` 把它画成受光的实体；它是多出来的一种能力，不是统一风格，曲线、格点、矩阵、记号串照旧二维。实体只是画法，依据标注不变：`LEAN ✓` 仍只给 `film.json` 的 `lean` 列出的定理。
-6. **仓库只存源码**：`film.json`、`script.json`、`scenes.js`、可选 `data/*.json`、`poster.jpg`（≤ 300 KB）。成片是构建产物，与 PDF 一样：构建写到 `build/films/<slug>/<id>/`，站点托管在 `_site/<slug>/films/<id>/`。没有单独的视频 Release，`film-*` tag 也不发布任何东西。
+6. **仓库只存源码**：`film.json`、`script.json`、`scenes.js`、可选 `data/*.json`、`poster.jpg`（≤ 300 KB）。成片是构建产物，与 PDF 一样：构建写到 `build/films/<slug>/<name>/`，站点托管在 `_site/<slug>/films/<name>/`。没有单独的视频 Release，`film-*` tag 也不发布任何东西。
 
-7. **视频默认不编号**：目录用稳定的 kebab-case `<id>`，不要求独立序号。需要显示编号时，在 `film.json` 填 `"chapter": "ch05-topic.md"`；编号取权威版本 `SUMMARY.md` 中所属主章的编号（含序曲 `0`、附录字母及显式未编号章的前缀），章节改序后自动跟随。子页面共享主章号，各语言须有同名章节；省略 `chapter` 时各端只显示“视频／Film”。旧 `001-…` 目录与输出文件名可保留为稳定标识，不再作为显示编号。
+7. **视频只用具体片名，不编号**：目录用片名的 kebab-case 写法（如 `golden-deficit`），`film.json` 只填双语标题等内容元数据，不另填视频 `id` 或所属章节。各端显示片名，不从目录提取序号。
 
 ## 流程
 
 ```bash
-./tbook film new <book> <id> "<中文标题>" "<English title>"
-F=books/<book>/films/<id>
+./tbook film new <book> <name> "<中文标题>" "<English title>"
+F=books/<book>/films/<name>
 theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache/film/venv）、Kokoro 模型（.cache/film/models）、字体
 ```
 
@@ -54,22 +54,22 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 5. 构建视频：
 
    ```bash
-   TBOOK_FILMS=require ./tbook build films --book <book> [--film <id> …]
+   TBOOK_FILMS=require ./tbook build films --book <book> [--film <name> …]
    ```
 
    `--film`（可重复）只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染；`build site`、`build all` 不接受它。
 
-   每部视频是一个构建单元（`./tbook cache status` 中目标为 `films`）：输入未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链时用它取得视频）；都没有时运行 `film.sh <dir> all`（`FILM_STRICT=1`：只用 TTS 实测的时间轴与自托管字体），只编码并复制 `outputs` 所列的文件到 `build/films/<slug>/<id>/`（默认不做 1080p 母版，720p 由帧直接缩放编码；50 秒的示例约 80 秒、成片约 6 MB）。构建不写任何入库文件；`poster.jpg` 只由第 4 步手工更新。渲染后若实际时长与 `film.json` 的 `duration` 不同，构建会警告，按提示更新。
+   每部视频是一个构建单元（`./tbook cache status` 中目标为 `films`）：输入未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链时用它取得视频）；都没有时运行 `film.sh <dir> all`（`FILM_STRICT=1`：只用 TTS 实测的时间轴与自托管字体），只编码并复制 `outputs` 所列的文件到 `build/films/<slug>/<name>/`（默认不做 1080p 母版，720p 由帧直接缩放编码；50 秒的示例约 80 秒、成片约 6 MB）。构建不写任何入库文件；`poster.jpg` 只由第 4 步手工更新。渲染后若实际时长与 `film.json` 的 `duration` 不同，构建会警告，按提示更新。
    `TBOOK_FILMS`：`auto`（默认）缓存未命中且工具链齐全时渲染，否则警告并在站点上只显示海报与“视频未构建”；`require` 缺工具链时失败；`skip` 从不渲染（命中缓存仍恢复）。`./tbook build site` 与 `./tbook build all` 同样会渲染或恢复视频。
 6. 嵌入章节——**所有语言版本都要加**，`src` 相同，只翻译图注：
 
    ```markdown
-   ::: {.film src="<id>"}
+   ::: {.film src="<name>"}
    图注（可含数学与 [@thm-…] 引用）。
    :::
    ```
 
-   本书的视频：HTML 中为 `<video>`，播放站内 `films/<id>/` 的 720p 旁白版，海报为提交的 `poster.jpg`，附 `outputs` 所列视频的下载（默认只有 720p）与视频页链接；站点没有该视频（未构建）时改为显示海报与“视频未构建”。PDF/EPUB 中为海报、图注与站点视频页地址（`site.toml` 没有 `base_url` 时只有海报与图注）。
+   本书的视频：HTML 中为 `<video>`，播放站内 `films/<name>/` 的 720p 旁白版，海报为提交的 `poster.jpg`，附 `outputs` 所列视频的下载（默认只有 720p）与视频页链接；站点没有该视频（未构建）时改为显示海报与“视频未构建”。PDF/EPUB 中为海报、图注与站点视频页地址（`site.toml` 没有 `base_url` 时只有海报与图注）。
 
    外部视频（trureturing-film 的 Release）：`::: {.film src="trureturing-film:film-<NNN>-v<k>"}`。HTML 中为 `<video>`，直接播放该 Release 的旁白版附件 `TRURETURING_<NNN>_narrated_EN_subs_ZH-EN.mp4`，海报为其 `TRURETURING_<NNN>_cover.jpg`，附“观看”（视频文件）与“下载”（Release 页）链接；不经站点托管，也不显示“视频未构建”。Release 附件的地址在 iOS Safari 中不能播放，需要所有读者都能看的视频请做成本书的视频。PDF/EPUB 中没有海报，为标题“trureturing-film 的视频 · film-<NNN>-v<k>”、图注与该 Release 页的地址（不依赖 `base_url`）。
 7. `./tbook build site --book <book> && ./tbook serve` 查看视频页 `<slug>/films/` 与章节中的播放器（手机宽度、深浅主题）。`./tbook serve` 支持按字节范围请求，Safari 也能在本地播放；用 iPhone 查看时设置 `TBOOK_SERVE_HOST=0.0.0.0`，从同一网络访问。

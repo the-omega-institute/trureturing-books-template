@@ -1,6 +1,6 @@
 """Shared helpers for the film pipeline scripts in theme/film/ (stdlib only).
 
-Every script takes the film directory (``books/<slug>/films/<id>``) as its first
+Every script takes the film directory (``books/<slug>/films/<name>``) as its first
 argument and writes into ``<film dir>/out/`` (git-ignored). Film metadata, validation and the
 provisional timeline come from ``tools/tbook/film.py`` so the pipeline and ``./tbook check``
 agree on one schema.

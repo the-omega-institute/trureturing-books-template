@@ -92,9 +92,6 @@ def inventory(tree):
                 if any(not x.endswith(".js") or x.startswith("/") or ".." in PurePosixPath(x).parts or "\\" in x for x in scripts):
                     raise ValueError(f"{f}: invalid script path")
                 films[f"{slug}/{fm[1]}"] = {"scripts": [prefix + x for x in scripts], "solid": meta.get("solid", False)}
-                if meta.get("chapter") is not None:
-                    editions = raw.get("book", {}).get("editions") or site.get("site", {}).get("languages") or ["zh", "en"]
-                    films[f"{slug}/{fm[1]}"]["chapter_lang"] = editions[0]
             if sm and not sm[1].startswith(("_", ".")):
                 if not SLUG.fullmatch(sm[1]):
                     raise ValueError(f"unsafe slide id: {sm[1]}")
@@ -246,8 +243,6 @@ def film_reads(tree, slug, film, meta):
     where = f"books/{slug}/films/{film.split('/')[1]}"
     scopes = (*film_inputs.video_files(where), *film_inputs.extra_files(meta["scripts"], meta["solid"]))
     sources = set(film_inputs.engine_sources(slug))
-    if meta.get("chapter_lang"):
-        sources.update(film_inputs.chapter_sources(slug, meta["chapter_lang"]))
     scripts = [*meta["scripts"], where + "/scenes.js"]
     closure = imports(tree, *scripts)
     uncertain = any(re.search(r"\bimport\s*(?:\(|['\"{*]|[\w$]+\s*(?:,|from\b))|\bexport\s+.*\bfrom\s*['\"]", tree.read(p))

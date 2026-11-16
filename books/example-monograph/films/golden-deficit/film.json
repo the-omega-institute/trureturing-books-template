@@ -1,5 +1,4 @@
 {
-  "id": "001-golden-deficit",
   "title": "The Golden Deficit",
   "title_zh": "黄金亏量",
   "summary": "Zeckendorf digits, golden carries and the deficit of β: the β of a sum differs from the sum of the βs by exactly −1, 0 or 1, as two Lean theorems of chapter 1 state.",
@@ -24,9 +23,11 @@
     "D5/S1/Deficit/DeficitInteger.deficit_integer"
   ],
   "solid": true,
-  "scripts": ["viz/phase-torus/model.js"],
+  "scripts": [
+    "viz/phase-torus/model.js"
+  ],
   "outputs": {
-    "narrated_720p": "example-monograph_001_720p_narrated.mp4",
-    "cover": "example-monograph_001_cover.jpg"
+    "narrated_720p": "example-monograph_golden-deficit_720p_narrated.mp4",
+    "cover": "example-monograph_golden-deficit_cover.jpg"
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The film pipeline, one entry point for every film directory (books/<slug>/films/<id>).
+# The film pipeline, one entry point for every film directory (books/<slug>/films/<name>).
 #
 #   theme/film/film.sh <film dir> <step> [args…]
 #   theme/film/film.sh setup                       (= theme/film/setup.sh, once per machine)

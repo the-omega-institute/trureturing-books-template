@@ -480,7 +480,7 @@ function hud(t, f, si, s) {
   ctx.moveTo(m + k, H - m); ctx.lineTo(m, H - m); ctx.lineTo(m, H - m - k);
   ctx.stroke(); ctx.globalAlpha = 1;
   const book = DATA.book || {}, film = DATA.film || {}, pin = DATA.pin || {};
-  txt(`${book.code || 'TRURETURING'} · ${(STR.en.film || 'FILM').toUpperCase()}${film.number ? ` ${film.number}` : ''}`, 60, 72, { size: 16, fam: F.mono, w: 700, c: C.cyan, a: 0.8, ls: 2 });
+  txt(`${book.code || 'TRURETURING'} · ${(STR.en.film || 'FILM').toUpperCase()}`, 60, 72, { size: 16, fam: F.mono, w: 700, c: C.cyan, a: 0.8, ls: 2 });
   txt(`SEQ ${String(si + 1).padStart(2, '0')}/${String(TL.scenes.length).padStart(2, '0')} · ${sceneName(s.id)}`, 60, 96, { size: 14, fam: F.mono, w: 700, c: C.mag, a: 0.9, ls: 2 });
   const tc = x => String(Math.floor(x)).padStart(2, '0');
   txt(`T+${tc(t / 60)}:${tc(t % 60)}:${tc((t * FPS) % FPS)}`, W - 60, 72, { size: 16, fam: F.mono, w: 700, c: C.cyan, a: 0.8, align: 'right', ls: 2 });
