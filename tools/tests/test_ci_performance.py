@@ -297,6 +297,26 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assertEqual(result["slides"], [])
                 self.assertEqual(result["books"], ["one", "two"])
 
+    def test_collaboration_ownership_additions_do_not_select_publication_outputs(self):
+        head, old = self.template_release()
+        metadata = head.read("template.toml").replace(
+            'paths=["tools/"]',
+            'paths=["tools/", "CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/", '
+            '".github/pull_request_template.md"]\nexclude=[".github/ISSUE_TEMPLATE/local-"]')
+        self.write("template.toml", metadata)
+        new = planner.Tree(self.root, self.commit())
+        for current, previous in ((new, old), (old, new), (new, head), (head, new)):
+            with self.subTest(current=current.sha, previous=previous.sha):
+                result = planner.impact(current, previous, ["template.toml"], template=True)
+                for key in ("suites", "films", "slides", "exports", "books", "browser_tests"):
+                    self.assertEqual(result[key], [], key)
+                self.assertTrue(result["checks"]["manifest"])
+
+        # Unknown metadata and ownership of publication resources still widen.
+        self.write("template.toml", metadata.replace('"CONTRIBUTING.md"', '"assets/"'))
+        other = planner.Tree(self.root, self.commit())
+        self.assertTrue(planner.impact(other, old, ["template.toml"])["exports"])
+
     def test_template_metadata_nonversion_invalid_and_absent_inputs_keep_full_fallback(self):
         head, old = self.template_release()
         valid = head.read("template.toml")

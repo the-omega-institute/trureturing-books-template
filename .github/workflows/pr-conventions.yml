@@ -1,0 +1,32 @@
+name: PR conventions
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-conventions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  conventions:
+    name: PR conventions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # 仅取目标分支上的检查程序；不检出或执行 PR 分支代码。
+      - name: 读取目标分支的规范
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: tools/ci/pr_conventions.py
+          sparse-checkout-cone-mode: false
+
+      - name: 检查 PR 标题与源分支
+        env:
+          PR_CONVENTIONS_SINCE: ${{ vars.PR_CONVENTIONS_SINCE }}
+        run: python3 tools/ci/pr_conventions.py

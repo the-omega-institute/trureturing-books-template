@@ -156,6 +156,25 @@ class SelectionTests(unittest.TestCase):
         selected = testing.select(head, old, ["tools/node/viz-test.mjs"])
         self.assertIn("test_ci_testing.LocalVizRunnerTests", selected["unit_tests"])
 
+    def test_collaboration_files_keep_declared_readers_without_unrelated_outputs(self):
+        metadata = [".github/ISSUE_TEMPLATE/bug.yml", ".github/pull_request_template.md",
+                    ".github/workflows/pr-conventions.yml", ".github/workflows/template-sync.yml",
+                    ".github/workflows/trureturing-bump.yml"]
+        for path in metadata:
+            self.write(path, "name: collaboration\n")
+        head, old = self.views()
+        for path in metadata:
+            with self.subTest(path=path):
+                selected = planner.impact(head, old, [path])
+                for key in ("browser_tests", "suites", "films", "slides", "exports", "books"):
+                    self.assertEqual(selected[key], [], key)
+        deps = json.loads(head.read("books/one/viz/tests/dependencies.json"))
+        deps["suites"]["a.test.mjs"].append(metadata[0])
+        self.write("books/one/viz/tests/dependencies.json", json.dumps(deps))
+        head, old = self.views()
+        self.assertEqual(planner.impact(head, old, [metadata[0]])["suites"],
+                         ["books/one/viz/tests/a.test.mjs"])
+
     def test_site_browser_regression_is_separate_from_unrelated_python_imports(self):
         self.write("tools/tests/test_site.py", "import unittest\nfrom tbook import cli\n"
                    "class BrowserLayoutTest(unittest.TestCase):\n def test_layout(self): pass\n")
