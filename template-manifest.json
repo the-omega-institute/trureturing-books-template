@@ -944,7 +944,7 @@
       "mode": "100644"
     },
     "tools/tests/test_export_layout.py": {
-      "sha256": "376c7f6223aa345cda8e103d0fc1d758c97060e19e64817b28934b851c54c41e",
+      "sha256": "18d0fc074be0c3a7b04a79d6e62b42ebf20cbca0108b1a67a187b3bc65db0da8",
       "mode": "100644"
     },
     "tools/tests/test_figkit_marks.py": {
