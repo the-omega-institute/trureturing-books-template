@@ -26,7 +26,6 @@ Interface shared with the other media modules (:mod:`tbook.viz`): ``check_ref``,
 
 from __future__ import annotations
 
-import ast
 import functools
 import html
 import importlib.util
@@ -227,165 +226,16 @@ def render(book, name: str, lang: str) -> str:
         raise FigureError(f"{where} ({lang}): {type(exc).__name__}: {exc}") from exc
 
 
-def _source_tree(source: Path) -> ast.Module:
-    try:
-        return ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
-    except (OSError, SyntaxError) as exc:
-        raise FigureError(f"{paths.rel(source)}: {exc}") from exc
-
-
-def _declared_inputs(tree: ast.Module, source: Path) -> list[str] | None:
-    """Read a literal INPUTS without importing (and running) the drawing script."""
-    for node in tree.body:
-        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
-        if not any(isinstance(t, ast.Name) and t.id == "INPUTS" for t in targets):
-            continue
-        try:
-            value = ast.literal_eval(node.value)
-        except (ValueError, TypeError):
-            value = None
-        if not isinstance(value, (list, tuple)) or not all(isinstance(p, str) and p for p in value):
-            raise FigureError(f"{paths.rel(source)}: INPUTS must be a literal list of nonempty paths relative to figures/")
-        return list(value)
-    return None
-
-
-def _script_sources(directory: Path, source: Path) -> list[Path]:
-    """The script and its statically imported local helpers, including transitive imports."""
-    found: set[Path] = set()
-
-    def visit(file: Path) -> None:
-        if file in found:
-            return
-        found.add(file)
-        for node in ast.walk(_source_tree(file)):
-            modules = [a.name for a in node.names] if isinstance(node, ast.Import) else (
-                [node.module or "", *((node.module + "." if node.module else "") + a.name
-                                       for a in node.names)] if isinstance(node, ast.ImportFrom) else [])
-            for module in modules:
-                if not module:
-                    continue
-                base = file.parent if isinstance(node, ast.ImportFrom) and node.level else directory
-                for _ in range(max(0, node.level - 1) if isinstance(node, ast.ImportFrom) else 0):
-                    base = base.parent
-                pieces = module.split(".")
-                local = base.joinpath(*pieces)
-                candidates = [base.joinpath(*pieces[:i]) / "__init__.py" for i in range(1, len(pieces))]
-                for candidate in (*candidates, local.with_suffix(".py"), local / "__init__.py"):
-                    if candidate.is_file():
-                        visit(candidate)
-    visit(source)
-    return sorted(found)
-
-
-def _generated_image(book, source: Path, copies: set[str]) -> bool:
-    if ((source.is_relative_to(book.slides_dir) and source.parent.name == "img" and source.name in copies)
-            or source.parent == figures_dir(book) and source.suffix == ".svg"):
-        return True
-    return source.is_relative_to(book.viz_dir) and (source.name in {"thumb.jpg", ".stills.json"}
-        or source.name.startswith("fig-") and source.suffix in {".jpg", ".png"})
-
-
-def _input_files(book, dependencies: list[Path], copies: set[str]):
-    from . import buildcache
-
-    inputs = buildcache.Inputs()
-    for dependency in dependencies:
-        files = [(f, label) for f, label in buildcache._files_under(dependency)
-                 if not _generated_image(book, f, copies)]
-        for file, label in files:
-            inputs.parts.append((label, buildcache.file_digest(file)))
-        if not files:
-            inputs.text(f"figure input {buildcache._item_label(dependency)}", "missing or no source files")
-    return inputs
-
-
-def _common_cache_inputs(book) -> tuple:
-    """Snapshot common dependencies once per build; no cross-build memo can hide an input mutation."""
-    from . import buildcache
-
-    buildcache._git_files.cache_clear()
-    buildcache._git_ignored.cache_clear()
-    core = (buildcache.Inputs().files(paths.TOOLS / "tbook", paths.TOKENS, paths.LOCK_FILE,
-                                    paths.ROOT / "requirements.txt")
-            .text("python", buildcache._python()))
-    copies = {f"{n}.{ed.lang}.svg" for n in names(book) for ed in book.editions}
-    snapshot = None
-
-    def conservative():
-        nonlocal snapshot
-        if snapshot is None:
-            dependencies = [book.dir, *(book.dir / p for p in book.raw.get("derived", {}).get("outputs", []))]
-            snapshot = _input_files(book, dependencies, copies)
-        return snapshot
-
-    return core, conservative, copies
-
-
-def cache_unit(book, name: str, lang: str, *, common: tuple | None = None):
-    """The expected SVG, separate from the source-tree output so a hit cannot hide a stale drawing.
-
-    INPUTS narrows the book dependencies to explicitly declared paths relative to figures/ (empty means
-    no book-data dependencies). The script, its local static imports, tool code, tokens and lock always
-    count. Without INPUTS every book source and declared derived output counts conservatively.
-    """
-    from . import buildcache
-
-    source = script_path(book, name)
-    declared = _declared_inputs(_source_tree(source), source)
-    core, conservative, copies = common if common is not None else _common_cache_inputs(book)
-    inputs = buildcache.Inputs(list(core.parts))
-    if declared is None:
-        inputs.add(conservative())  # includes every helper, even a dynamic import
-    else:
-        inputs.files(*_script_sources(figures_dir(book), source))
-        inputs.add(_input_files(book, [figures_dir(book) / p for p in declared], copies))
-    output = paths.CACHE / "figures" / book.slug / f"{name}.{lang}.svg"
-    return buildcache.Unit("figures", f"{book.slug}/{name}/{lang}", inputs, [output], required=False)
-
-
-def units(book) -> list:
-    common = _common_cache_inputs(book)
-    return [cache_unit(book, name, ed.lang, common=common) for name in names(book) for ed in book.editions]
-
-
-def cached_render(book, name: str, lang: str, *, common: tuple | None = None) -> str:
-    """Reuse verified expected bytes; ``build(check=True)`` still compares the local SVG separately."""
-    from . import buildcache
-
-    if not buildcache.enabled():
-        return render(book, name, lang)
-    try:
-        unit = cache_unit(book, name, lang, common=common)
-        output = unit.outputs[0]
-
-        def draw() -> None:
-            svg = render(book, name, lang)
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(svg, encoding="utf-8")
-
-        buildcache.run(unit, draw, announce=False)
-        return output.read_text(encoding="utf-8")
-    except OSError:
-        return render(book, name, lang)  # a read-only/full cache never prevents generation
-
-
 def build(book, only: list[str] | None = None, *, check: bool = False) -> tuple[list[Path], list[str]]:
     """Write (or with ``check`` only compare) the outputs of ``book``'s figures and the copies its
     slide decks show (:func:`slide_copies`). Returns the files that changed (would change) and the
     errors of scripts that could not be drawn."""
     changed: list[Path] = []
     errors: list[str] = []
-    from . import buildcache
-
-    try:
-        common = _common_cache_inputs(book) if buildcache.enabled() else None
-    except OSError:
-        common = None  # cached_render falls back to drawing if an optional cache input is unreadable
     for name in only if only is not None else names(book):
         for ed in book.editions:
             try:
-                svg = cached_render(book, name, ed.lang, common=common)
+                svg = render(book, name, ed.lang)
             except figkit.FigureError as exc:
                 errors.append(str(exc))
                 continue

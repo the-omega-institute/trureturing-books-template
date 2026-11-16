@@ -1124,7 +1124,6 @@ class BuildIntegrationTests(unittest.TestCase):
         self.assertEqual(len(final), units)
         self.assertEqual(sum(e["target"] == "pandoc" for e in entries), 2)
         self.assertEqual(sum(e["target"] == "typst" for e in entries), 2)
-        self.assertTrue(any(e["target"] == "figures" for e in entries))
 
         gh = FakeGitHub()
         self.addCleanup(gh.close)

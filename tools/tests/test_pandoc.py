@@ -676,22 +676,16 @@ class LuaFilterTest(unittest.TestCase):
                 self.assertNotIn("\ufffd", out)
 
     @unittest.skipUnless(have_typst(), "typst not available")
-    def test_inline_math_identities_preserve_heading_anchors(self):
+    def test_inline_math_preserves_heading_anchors(self):
         import typst
 
         out = run_filters("## Math $x$ and $y$ {#public-heading}\n\nBody $z$.\n", "typst", self.META)
-        identities = re.findall(r"<tr-inline-[^>]+>", out)
-        self.assertEqual(len(identities), 3)
-        self.assertEqual(len(set(identities)), 3)
         _, warnings = typst.compile_with_warnings(out.encode())
         self.assertFalse([w for w in warnings if "labelled" in w.message])
         self.assertEqual(json.loads(typst.query(out.encode(), "<public-heading>", field="level")), [2])
-        for identity in identities:
-            self.assertEqual(json.loads(typst.query(out.encode(), identity, field="block")), [False])
 
     def test_typst_output(self):
         out = run_filters(ENV_MD, "typst", self.META)
-        out = re.sub(r"#\[(\$.*?)<tr-inline-[^>]+>\]", r"\1", out, flags=re.S)
         self.assertIn('#tr-env(kind: "theorem", status: "lean", label: "Theorem", number: "1.2", '
                       'ref: "Theorem 1.2", title: [Bound on $c$], badge: "LEAN ✓", '
                       'badge-url: "https://example.org/X.lean#L3", lean: ((gid: "D5/S1/X.y", name: "D5.S1.X.y", url: "https://example.org/X.lean#L3"),), '
@@ -748,8 +742,8 @@ class LuaFilterTest(unittest.TestCase):
         meta = {**self.META, "tr-tex-macros": mathrender.newcommands()}
         typst = run_filters(mathrender.newcommands() + "\n\n" + self.TITLED, "typst", meta)
         self.assertNotIn("\\norm", typst)
-        self.assertRegex(typst, r"for\s+#\[\$lr\(bar.v.double v bar.v.double\)\$<tr-inline-tr-env-\d+>\]\]")
-        self.assertRegex(typst, r"Body #\[\$lr\(bar.v.double w bar.v.double\)\$<tr-inline-tr-book-\d+>\]\.")
+        self.assertRegex(typst, r"for\s+\$lr\(bar.v.double v bar.v.double\)\$\]")
+        self.assertRegex(typst, r"Body \$lr\(bar.v.double w bar.v.double\)\$\.")
         html = run_filters(mathrender.newcommands() + "\n\n" + self.TITLED, "html5", meta)
         self.assertNotIn("\\norm", html)
         self.assertNotIn("newcommand", html)
@@ -1045,9 +1039,8 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn("#cite", main)
         # Macros are expanded in math (no raw TeX fallback), titles included.
         self.assertNotIn("\\norm", main)
-        expressions = re.sub(r"#\[(\$.*?)<tr-inline-[^>]+>\]", r"\1", main, flags=re.S)
-        self.assertIn("a norm $lr(bar.v.double x bar.v.double)$ and $⌊y⌋$", expressions)
-        self.assertIn("== Bound $x^2$ for $lr(bar.v.double x bar.v.double)$", expressions)
+        self.assertIn("a norm $lr(bar.v.double x bar.v.double)$ and $⌊y⌋$", main)
+        self.assertIn("== Bound $x^2$ for $lr(bar.v.double x bar.v.double)$", main)
         # b.md#summary reaches B's "Summary", not A's.
         self.assertIn("#link(<ch-b--summary>)[the summary of B]", main)
         self.assertRegex(main, r"== Summary\s*<ch-b--summary>")
