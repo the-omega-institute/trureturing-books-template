@@ -61,6 +61,8 @@ jobs:
       site: ${{ steps.plan.outputs.site }}
       publish: ${{ steps.plan.outputs.publish }}
       validate: ${{ steps.plan.outputs.validate }}
+      browser: ${{ steps.plan.outputs.browser }}
+      browser_matrix: ${{ steps.plan.outputs.browser_matrix }}
       build: ${{ steps.plan.outputs.build }}
       viz: ${{ steps.plan.outputs.viz }}
       viz_slow: ${{ steps.plan.outputs.viz_slow }}
@@ -239,20 +241,36 @@ jobs:
           node tools/node/slides-check.mjs
           python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"
 
-      # Install a browser only when an affected browser regression is selected.
-      - name: Set up Chromium for selected browser regressions
-        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser
+  browser:
+    name: Tool browser regressions (${{ matrix.shard }})
+    needs: plan
+    if: needs.plan.outputs.browser == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.browser_matrix) }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - name: Materialize the selected plan and browser shard
+        run: |
+          cat <<'TBOOK_PLAN_JSON' > "$RUNNER_TEMP/ci-plan.json"
+          ${{ toJSON(fromJSON(needs.plan.outputs.plan)) }}
+          TBOOK_PLAN_JSON
+          cat <<'TBOOK_BROWSER_JSON' > "$RUNNER_TEMP/browser.json"
+          ${{ toJSON(matrix.items) }}
+          TBOOK_BROWSER_JSON
+      - name: Set up selected browser tools
         uses: ./.github/actions/setup
         with:
           browsers: 'true'
           fonts: 'false'
-          mdbook: 'false'
-
-      - name: Selected browser regressions
-        if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser
+          mdbook: 'true'
+      - name: Run the selected browser shard
         env:
           PYTHONPATH: tools
-        run: python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json"
+        run: python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json" --items-file "$RUNNER_TEMP/browser.json"
 
   stills:
     name: Prepare visualization images (${{ matrix.shard }})
@@ -641,7 +659,7 @@ jobs:
 
   check:
     name: Check
-    needs: [plan, validate, stills, build, viz, viz-slow, media, films]
+    needs: [plan, validate, browser, stills, build, viz, viz-slow, media, films]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 20

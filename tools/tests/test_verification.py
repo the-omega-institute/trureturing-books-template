@@ -1212,27 +1212,31 @@ fi
 
 
 class ExportRegressionWorkflowTests(unittest.TestCase):
-    def test_required_browser_export_runs_after_all_ordinary_unit_rounds(self):
+    def test_required_browser_exports_run_in_independent_selected_shards(self):
         workflow = GITHUB_DIR / "workflows" / "ci.yml"
-        steps = workflow_jobs(workflow)["validate"]
+        jobs = workflow_jobs(workflow)
+        steps = jobs["validate"]
         rounds = [i for i, step in enumerate(steps)
                   if 'python tools/ci/run.py unit --plan-file "$RUNNER_TEMP/ci-plan.json"' in step.get("run", "")]
         self.assertEqual(len(rounds), 3)
         setups = [(i, step) for i, step in enumerate(steps) if step.get("uses") == "./.github/actions/setup"]
-        self.assertEqual(len(setups), 2)
-        (early, ordinary), (late, browser) = setups
+        self.assertEqual(len(setups), 1)
+        (early, ordinary), = setups
         self.assertLess(early, min(rounds))
         self.assertEqual(ordinary["with"]["browsers"], "false")
-        self.assertGreater(late, max(rounds))
-        self.assertEqual(browser["with"]["browsers"], "true")
-        required, = [(i, step) for i, step in enumerate(steps)
-                     if step.get("run") == 'python tools/ci/run.py browser --plan-file "$RUNNER_TEMP/ci-plan.json"']
-        self.assertGreater(required[0], late)
-        self.assertEqual(required[1]["if"], browser["if"])
-        self.assertEqual(browser["if"], "fromJSON(needs.plan.outputs.plan).selections.normal.checks.browser")
-        self.assertNotIn("continue-on-error", required[1])
-        validate = workflow.read_text().split("\n  validate:\n", 1)[1].split("\n  build:\n", 1)[0]
-        self.assertIn("timeout-minutes: 30", validate)
+        browser_steps = jobs['browser']
+        browser, = [s for s in browser_steps if s.get('uses') == './.github/actions/setup']
+        self.assertEqual(browser['with']['browsers'], 'true')
+        self.assertEqual(browser['with']['mdbook'], 'true')
+        required, = [s for s in browser_steps if 'run.py browser ' in s.get('run', '')]
+        self.assertIn('--items-file "$RUNNER_TEMP/browser.json"', required['run'])
+        self.assertNotIn('continue-on-error', required)
+        text = workflow.read_text()
+        section = text.split('\n  browser:\n', 1)[1].split('\n  stills:\n', 1)[0]
+        self.assertIn("if: needs.plan.outputs.browser == 'true'", section)
+        self.assertIn('needs: plan', section)
+        self.assertIn('fromJSON(needs.plan.outputs.browser_matrix)', section)
+        self.assertIn('needs: [plan, validate, browser,', text)
 
 
 class BuildCacheWorkflowTests(unittest.TestCase):

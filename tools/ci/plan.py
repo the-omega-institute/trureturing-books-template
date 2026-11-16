@@ -28,7 +28,7 @@ VERSION = 6
 SCHEMA = "tbook-ci-coverage-v1"
 DEPENDENCIES = "tbook-ci-dependencies-v1"
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-JOBS = ("validate", "stills", "build", "viz", "viz-slow", "media", "films")
+JOBS = ("validate", "browser", "stills", "build", "viz", "viz-slow", "media", "films")
 
 
 def git(root, *args):
@@ -826,6 +826,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
     film_items = (selections['pages']['films'] if workflow == 'pages' and selections['pages']['site']
                   else [] if deferred_films else normal.get("films", []))
     tasks = dict(validate=bool(normal and any(normal["checks"].values())), build=bool(normal.get("exports")),
+                 browser=bool(normal.get('browser_tests')),
                  stills=bool(image_shards(current, normal.get('exports', []))),
                  viz=bool(normal.get("suites")), **{"viz-slow": bool(selections.get("slow", {}).get("suites"))},
                  media=bool(normal.get("slides")), films=bool(film_items))
@@ -833,7 +834,8 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                   profiles=profiles, coverage=coverage, selections=selections, tasks=tasks,
                   viz=matrices.get("normal", []), slow=matrices.get("slow", []), execution=execution, workloads=workloads,
                   browser_budget=dict(target=viz_budget.TARGET, ceiling=viz_budget.CEILING, reserve=viz_budget.RESERVE, margin=viz_budget.MARGIN),
-                  films=shards(film_items, 4), stills=image_shards(current, normal.get('exports', [])),
+                  films=shards(film_items, 4), browser=shards(normal.get('browser_tests', []), 8),
+                  stills=image_shards(current, normal.get('exports', [])),
                   exports=export_matrix(normal.get("exports", [])), slides=normal.get("slides", []),
                   site=selections.get("pages", {}).get("site", False), deferred_films=normal.get("films", []) if deferred_films else [],
                   publish=own and not event.startswith("pull_request") and (ref == f"refs/heads/{branch}" or
@@ -858,7 +860,7 @@ def write_outputs(result):
                       **{k.replace("-", "_"): v for k, v in result["tasks"].items()},
                       build_matrix={"include": result["exports"]}, viz_matrix={"include": result["viz"]},
                       slow_matrix={"include": result["slow"]}, film_matrix={"include": result["films"]},
-                      still_matrix={"include": result["stills"]})
+                      still_matrix={"include": result["stills"]}, browser_matrix={"include": result["browser"]})
         with open(output, "a", encoding="utf-8") as f:
             for key, value in fields.items():
                 f.write(f"{key}={json.dumps(value, ensure_ascii=False, separators=(',', ':'))}\n")

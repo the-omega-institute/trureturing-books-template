@@ -412,6 +412,27 @@ class AffectedPlanTest(unittest.TestCase):
         self.assertEqual(sorted(i for row in rows for i in row['items']), ['one/a', 'two/a'])
         self.assertEqual(planner.image_shards(tree, [dict(book='one', target='html')]), [])
 
+    def test_selected_tool_browser_classes_run_exactly_once_and_failure_blocks_coverage(self):
+        modules = {}
+        for name in planner.testing.BROWSER:
+            module, cls = name.split('.')
+            modules.setdefault(module, []).append(cls)
+        for module, classes in modules.items():
+            self.write(f'tools/tests/{module}.py', 'import unittest\n' + '\n'.join(
+                f'class {cls}(unittest.TestCase):\n    def test_ok(self): pass\n' for cls in classes))
+        self.commit()
+        result = self.make_plan(mode='full')
+        selected = result['selections']['normal']['browser_tests']
+        self.assertGreater(len(selected), 8)
+        self.assertEqual(len(result['browser']), 8)
+        self.assertEqual(sorted(x for row in result['browser'] for x in row['items']), selected)
+        self.assertTrue(result['tasks']['browser'])
+        needs = {'plan': {'result': 'success'}, **{job: {'result': 'success'} for job in result['tasks']}}
+        planner.verify_results(result, needs)
+        needs['browser']['result'] = 'failure'
+        with self.assertRaisesRegex(ValueError, 'browser: expected success'):
+            planner.verify_results(result, needs)
+
     def test_registry_entry_reader_skips_other_entries_but_whole_registry_reader_still_runs(self):
         import json
         registry = 'books/one/viz/visualizations.json'
