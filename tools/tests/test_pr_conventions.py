@@ -26,7 +26,23 @@ class PullRequestConventionsTests(unittest.TestCase):
         self.assertEqual(checkout["with"]["ref"], "${{ github.event.pull_request.base.ref }}")
         self.assertEqual(checkout["with"]["persist-credentials"], "false")
         self.assertEqual(checkout["with"]["sparse-checkout"], "tools/ci/pr_conventions.py")
-        self.assertEqual([step["run"] for step in steps if "run" in step], ["python3 tools/ci/pr_conventions.py"])
+        script = next(step["run"] for step in steps if "run" in step)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            event = root / "event.json"
+            checker = root / "tools/ci/pr_conventions.py"
+            env = {**os.environ, "GITHUB_EVENT_PATH": str(event), "PR_CONVENTIONS_SINCE": ""}
+            # A first adoption PR has no checker on its target branch yet. Later
+            # PRs must run the current target's checker and reject invalid metadata.
+            for installed, title, expected in ((False, "Historical title", 0),
+                                               (True, "fix(ci): Adopt policy", 0),
+                                               (True, "Invalid title", 1)):
+                if installed:
+                    checker.parent.mkdir(parents=True, exist_ok=True)
+                    checker.write_text(Path(policy.__file__).read_text())
+                event.write_text(json.dumps({"pull_request": self.pr(title=title)}))
+                run = subprocess.run(["bash", "-e", "-c", script], cwd=root, env=env, capture_output=True, text=True)
+                self.assertEqual(run.returncode, expected, run.stdout + run.stderr)
 
     def pr(self, title="fix(ch19): 修正证明范围", branch="fix/ch19-proof-scope", created="2026-11-17T00:00:00Z"):
         return {"title": title, "head": {"ref": branch}, "created_at": created}

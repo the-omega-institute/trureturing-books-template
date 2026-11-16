@@ -29,4 +29,9 @@ jobs:
       - name: 检查 PR 标题与源分支
         env:
           PR_CONVENTIONS_SINCE: ${{ vars.PR_CONVENTIONS_SINCE }}
-        run: python3 tools/ci/pr_conventions.py
+        run: |
+          if [ ! -f tools/ci/pr_conventions.py ]; then
+            echo '::notice::目标分支尚未接入命名规范；本 PR 由 CI 验证新增的检查程序。'
+            exit 0
+          fi
+          python3 tools/ci/pr_conventions.py
