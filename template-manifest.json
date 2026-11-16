@@ -980,7 +980,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "5a46e41969895d400543a4896b94e0ffe345b45f658fb1f68e7e3ba2371003f2",
+      "sha256": "ef03af15543ad2375a8920574dd828b36f72c1042599db099e1ed4642f90b32d",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {

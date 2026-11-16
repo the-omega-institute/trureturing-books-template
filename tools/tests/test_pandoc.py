@@ -789,7 +789,7 @@ class TypstSymbolTest(unittest.TestCase):
               'tr-number="1.1" tr-ref="Remark 1.1" tr-title="On $A \\\\cap B$"}\nBody.\n::::::\n')
         out = run_filters(md, "typst", self.META)
         for new in ("A inter B", "inter.big", "inter.double", "inter.sq", "dot.o", "dot.o.big", "times.o",
-                    "times.o.big", "minus.o", "dash.o", 'title: [On #[$A inter B$', 'upright("sect")/**/inter x'):
+                    "times.o.big", "minus.o", "dash.o", 'title: [On $A inter B$', 'upright("sect")/**/inter x'):
             self.assertIn(new, out)
         self.assertNotRegex(re.sub(r'"[^"]*"', "", out), r"\bsect\b|\.circle\b")
         self.assertIn("upright(i n t e r s e c t)", out)  # letters, not the name sect
