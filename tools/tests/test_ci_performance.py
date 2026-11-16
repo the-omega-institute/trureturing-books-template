@@ -1197,6 +1197,27 @@ class ExactRunnerTest(unittest.TestCase):
 
 
 class DeploymentCoverageTest(unittest.TestCase):
+    def test_deploy_after_optional_films_skip_requires_successful_assembly(self):
+        import re
+        from test_verification import gha_if
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/pages.yml"
+        block = workflow.read_text().split("\n  deploy:\n", 1)[1].split("\n  coverage:\n", 1)[0]
+        condition = re.search(r"^    if: (.+)$", block, re.M).group(1).strip('"')
+        for films in ("success", "skipped"):
+            for build in ("success", "failure", "cancelled", "skipped"):
+                for enabled, site, cancelled in (("true", "true", False), ("false", "true", False),
+                                                  ("true", "false", False), ("true", "true", True)):
+                    # GitHub implicitly requires successful ancestors unless the condition
+                    # contains a status function, even if the direct build need succeeded.
+                    implicit_success = (films == "success" and build == "success")
+                    explicit_status = bool(re.search(r"\b(?:always|success|failure|cancelled)\(", condition))
+                    allowed = (explicit_status or implicit_success) and gha_if(
+                        condition, event="workflow_run", ref="refs/heads/main", cancelled=cancelled,
+                        context={"needs.build.result": build, "needs.plan.outputs.site": site,
+                                 "needs.probe.outputs.enabled": enabled})
+                    with self.subTest(films=films, build=build, enabled=enabled, site=site, cancelled=cancelled):
+                        self.assertEqual(allowed, build == "success" and enabled == site == "true" and not cancelled)
+
     def test_only_active_success_is_valid_and_missing_deployment_forces_fallback(self):
         def get(endpoint):
             if "/statuses?" in endpoint:

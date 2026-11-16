@@ -273,7 +273,8 @@ jobs:
   deploy:
     name: Deploy
     needs: [plan, probe, build]
-    if: needs.plan.outputs.site == 'true' && needs.probe.outputs.enabled == 'true'
+    # A skipped optional film job must not propagate through the successful build.
+    if: "!cancelled() && needs.build.result == 'success' && needs.plan.outputs.site == 'true' && needs.probe.outputs.enabled == 'true'"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
