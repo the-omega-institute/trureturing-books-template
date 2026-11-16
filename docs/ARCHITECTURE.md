@@ -216,7 +216,7 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 
 环境变量：`MDBOOK`（mdBook 路径）、`PANDOC`、`PW_CHROMIUM_PATH`（已有的 Chromium）、`TBOOK_EPUBCHECK=1|warn|0`、`TBOOK_SLIDES_NO_PDF=1`（不导出、不发布幻灯片 PDF；`slides.publish` 会去掉章节卡片中指向未发布 PDF 的链接）、`TBOOK_SLIDES_NO_CHECK=1`、`SOURCE_DATE_EPOCH`（可复现的时间戳）、`TBOOK_REPO` / `TBOOK_BASE_URL`（覆盖仓库与站点地址）、`TRURETURING_DIR`（本地 trureturing 检出）、`TRURETURING_TOKEN`（读取私有 trureturing；GitHub API 也依次用 `GITHUB_TOKEN`、`GH_TOKEN`）、`TBOOK_LANG=zh|en`（模板升级摘要语言）。
 
-视频构建：每部视频是一个构建单元（目标 `films`，单元 `<slug>/<id>`，`tbook.film.units`），由 `./tbook build films|site|all` 经 `film.build_videos` 运行。键覆盖视频依赖的全部输入，而不含无关输入：视频目录中 git 会提交的文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含视频页资源 `site/`，含 `requirements.txt`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（`film.engine_data`：书的代号、版本与标题，所钉提交与引用声明的名称、陈述摘要，片内文字）、`package-lock.json` 中字体与 Playwright（它决定 Chromium）的版本、Kokoro 模型版本（`film.KOKORO_RELEASE`）与 Node 主版本，`film.json` 的 `scripts` 所列脚本，有实体镜头（`"solid": true`）时还有造型核心 `theme/viz/solid-core.js` 与 `theme/viz/vendor/` 的 three.js（没有实体镜头的视频不依赖它们）；不含站点地址，所以 CI、Pages 与 Release 的构建共用同一份视频。也不含探测到的 ffmpeg、Chromium 与视频 Python：没有视频工具链的构建（`TBOOK_FILMS=auto|skip`）须算出同一个键才能恢复视频，运行器上 ffmpeg 包的新修订也不改变视频的内容。缓存未命中时按 `TBOOK_FILMS` 处理：`auto`（默认）在工具链齐全（`film.toolchain_missing`：ffmpeg、Node 与 Playwright、Chromium、视频 Python 的包、Kokoro 模型、字体）时渲染，否则警告并删去该视频的旧构建目录；`require` 失败；`skip` 从不渲染。渲染即 `FILM_STRICT=1 theme/film/film.sh <dir> all <outputs 的键…>`（`film.render_videos` 明确传入 `film.json` 所列的输出），在 `out/` 中工作，只把这些文件复制到 `build/films/<slug>/<name>/`，缺少任何一个即失败（`buildcache.MissingOutput`，不存入缓存），不写入库文件（提交的 `poster.jpg` 只由手工的 `poster` 步骤生成）。`film.json` 在键中，改动 `outputs` 会重新渲染。流水线只编码所需（`film.render_plan`，`theme/film/plan.py` 给各步骤）：Chromium 按 1920×1080 截取每帧一次，各渲染进程在同一遍中编码——720p 视频（`narrated_720p`、`music_only_720p`）由帧直接缩放（hqdn3d、lanczos，x264 CRF 19、preset slow），只有列出 1080p 视频（`narrated`、`music_only`）时才另编码 1080p 母版（CRF 17）；`mux` 只做拼接与混入音频（AAC 48 kHz，`+faststart`），不再重新编码；纯配乐混音只在列出纯配乐视频时生成。同一台机器、同样的进程数，产物逐字节相同；720p 旁白版无论是否列出 1080p 都相同。默认（720p 旁白版与封面）渲染 50 秒的示例约 80 秒；另列出 1080p 视频时约 140 秒（帧截取不变，多编码 1080p 母版）。视频工具链由 `theme/film/setup.sh` 安装：钉死的包进 `$FILM_CACHE/venv`（默认 `.cache/film/venv`，`PYTHON` 可指定别的解释器），模型进 `$KOKORO_MODEL_DIR`（默认 `.cache/film/models`）；ffmpeg 来自系统（`FFMPEG` 可覆盖）。
+视频构建：每部视频是一个构建单元（目标 `films`，单元 `<slug>/<name>`，`tbook.film.units`），由 `./tbook build films|site|all` 经 `film.build_videos` 运行。键覆盖视频依赖的全部输入，而不含无关输入：视频目录中 git 会提交的文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含视频页资源 `site/`，含 `requirements.txt`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（`film.engine_data`：书的代号、版本与标题，所钉提交与引用声明的名称、陈述摘要，片内文字）、`package-lock.json` 中字体与 Playwright（它决定 Chromium）的版本、Kokoro 模型版本（`film.KOKORO_RELEASE`）与 Node 主版本，`film.json` 的 `scripts` 所列脚本，有实体镜头（`"solid": true`）时还有造型核心 `theme/viz/solid-core.js` 与 `theme/viz/vendor/` 的 three.js（没有实体镜头的视频不依赖它们）；不含站点地址，所以 CI、Pages 与 Release 的构建共用同一份视频。也不含探测到的 ffmpeg、Chromium 与视频 Python：没有视频工具链的构建（`TBOOK_FILMS=auto|skip`）须算出同一个键才能恢复视频，运行器上 ffmpeg 包的新修订也不改变视频的内容。缓存未命中时按 `TBOOK_FILMS` 处理：`auto`（默认）在工具链齐全（`film.toolchain_missing`：ffmpeg、Node 与 Playwright、Chromium、视频 Python 的包、Kokoro 模型、字体）时渲染，否则警告并删去该视频的旧构建目录；`require` 失败；`skip` 从不渲染。渲染即 `FILM_STRICT=1 theme/film/film.sh <dir> all <outputs 的键…>`（`film.render_videos` 明确传入 `film.json` 所列的输出），在 `out/` 中工作，只把这些文件复制到 `build/films/<slug>/<name>/`，缺少任何一个即失败（`buildcache.MissingOutput`，不存入缓存），不写入库文件（提交的 `poster.jpg` 只由手工的 `poster` 步骤生成）。`film.json` 在键中，改动 `outputs` 会重新渲染。流水线只编码所需（`film.render_plan`，`theme/film/plan.py` 给各步骤）：Chromium 按 1920×1080 截取每帧一次，各渲染进程在同一遍中编码——720p 视频（`narrated_720p`、`music_only_720p`）由帧直接缩放（hqdn3d、lanczos，x264 CRF 19、preset slow），只有列出 1080p 视频（`narrated`、`music_only`）时才另编码 1080p 母版（CRF 17）；`mux` 只做拼接与混入音频（AAC 48 kHz，`+faststart`），不再重新编码；纯配乐混音只在列出纯配乐视频时生成。同一台机器、同样的进程数，产物逐字节相同；720p 旁白版无论是否列出 1080p 都相同。默认（720p 旁白版与封面）渲染 50 秒的示例约 80 秒；另列出 1080p 视频时约 140 秒（帧截取不变，多编码 1080p 母版）。视频工具链由 `theme/film/setup.sh` 安装：钉死的包进 `$FILM_CACHE/venv`（默认 `.cache/film/venv`，`PYTHON` 可指定别的解释器），模型进 `$KOKORO_MODEL_DIR`（默认 `.cache/film/models`）；ffmpeg 来自系统（`FFMPEG` 可覆盖）。
 
 ### 5.1 构建缓存
 
@@ -232,7 +232,7 @@ HTML 专有选项：`book.toml` 的 `[html] section-labels = true` 恢复 mdBook
 | `covers` | `<slug>/<lang>/<variant>/<width>/<format>` | 站点与 EPUB 共用机制生成的书封 |
 | `viz-stills` | `<slug>/<viz id>` | 本地封面、引用卡静帧与清单 |
 | `slides` | `<slug>` | `build/slides/<slug>/`（全部 deck、语言与 PDF） |
-| `films` | `<slug>/<film id>` | `build/films/<slug>/<film id>/`（单元由 `film.units(site, book)` 给出） |
+| `films` | `<slug>/<name>` | `build/films/<slug>/<name>/`（单元由 `film.units(site, book)` 给出） |
 
 PDF 按完整文档编译，页码、目录、交叉引用和分页共同决定结果。三个变体共用 `pandoc` 暂存和 `typst` 转换缓存，再分别缓存最终 PDF；EPUB 只共用暂存，不需要 Typst 正文转换。暂存缓存保存相对链接和完整阶段元数据，恢复时绑定当前目录，不混入封面、最终 PDF 或 EPUB 工作文件。
 
@@ -301,8 +301,8 @@ manifest.json              机器可读清单（schema trureturing-books.site.v1
 <slug>/<lang>/             mdBook HTML
 <slug>/downloads/          PDF、EPUB
 <slug>/viz/                index.html（可视化索引）、visualizations.json、assets/（共享运行时）、<id>/
-<slug>/films/              index.html、films.json、assets/{tokens.css,films.css,films.js}、<id>/poster.jpg
-                           与 <id>/<outputs 所列的文件>（构建有该视频时；同源托管，iOS Safari 需要正确的
+<slug>/films/              index.html、films.json、assets/{tokens.css,films.css,films.js}、<name>/poster.jpg
+                           与 <name>/<outputs 所列的文件>（构建有该视频时；同源托管，iOS Safari 需要正确的
                            Content-Type 与按字节范围请求；没有时视频页、落地页与章节只显示海报与“视频未构建”）
 <slug>/slides/             index.html；<deck>/（第一语言）、<deck>/<lang>/（其他语言）、
                            <deck>/<slug>-<deck>-<lang>.pdf
