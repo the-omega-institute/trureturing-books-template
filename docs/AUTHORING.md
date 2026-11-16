@@ -55,7 +55,7 @@ books/<slug>/
 | `book.version` | 语义化版本，进入下载文件名与 Release |
 | `book.editions` | 语言版本，第一个为权威版本，默认 `["zh", "en"]` |
 | `book.title` / `subtitle` / `description` | 每种语言一行：`zh = "…"`、`en = "…"` |
-| `book.authors`、`license`、`isbn`（按语言）、`date` | 进入版权页与 EPUB 元数据 |
+| `book.authors`、`license`、`isbn`（按语言）、`doi`、`date` | 进入版权页与 EPUB 元数据；`doi` 是出版 DOI，通常填写 Zenodo 概念 DOI。省略时会从根目录 `.zenodo.json`、`CITATION.cff` 或 README 中明确的 Zenodo DOI 链接自动读取 |
 | `book.code` | 封面与站点卡片上的代号，形如 `GOLDEN//OBSERVE` |
 | `numbering.unnumbered` | 不参与章节计数的主章路径与独立定理前缀，适用于终章等整棵章节树，见下文 |
 | `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]`；可选加 `"academic"` 导出学术预印本版，省略配置或 `true` 仍只导出原两版 |

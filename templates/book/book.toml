@@ -8,6 +8,8 @@ editions = [{{EDITIONS}}]
 code = "{{CODE}}"
 # 出版日期（YYYY-MM-DD），进入 PDF/EPUB 元数据；留空则用构建当天（产物不能跨日复现）。
 date = "{{DATE}}"
+# Stable publication DOI (usually the Zenodo concept DOI); omit until one is assigned.
+doi = ""
 
 [book.title]
 {{TITLES}}

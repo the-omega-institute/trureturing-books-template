@@ -33,7 +33,7 @@ EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动�
 
 EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导航目录与 landmarks、`dc:language` 与 `ibooks:version` 元数据、`META-INF/com.apple.ibooks.display-options.xml`；样式不强制页面背景，在白/米/灰/夜间主题下都可读（夜间主题切换为霓虹强调色）。每次构建后由 epubcheck 校验。
 
-上架 Apple Books 需要通过 Apple Books for Authors / iTunes Producer 提交；若需要 ISBN，在 `book.toml` 的 `[book.isbn]` 中按语言填写，它会成为 EPUB 的标识符。
+上架 Apple Books 需要通过 Apple Books for Authors / iTunes Producer 提交；若需要 ISBN，在 `book.toml` 的 `[book.isbn]` 中按语言填写，它会成为 EPUB 的标识符。出版 DOI 写在 `book.toml` 的 `[book].doi`（推荐 Zenodo 概念 DOI）；若省略，构建会从根目录的 `.zenodo.json`、`CITATION.cff` 或 README 中明确的 Zenodo DOI 链接读取。模板不会联网猜测 DOI，也不会把版本 DOI 自动写回源码。
 
 ## 4. 持续集成与发布
 

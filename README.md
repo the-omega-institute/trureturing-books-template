@@ -19,6 +19,15 @@
 各端显示紫色“书面证明 / WRITTEN PROOF”，不带验证链接、不计入 Lean 数量，
 账本单列；真正开放才用 conjecture/problem。见 [写作手册](docs/AUTHORING.md) 与 [形式化请求规范](docs/FORMALIZATION-REQUESTS.md)。
 
+每本书的出版 DOI 写在 `books/<slug>/book.toml` 的 `[book]` 表中：
+
+```toml
+[book]
+doi = "10.5281/zenodo.12345678"
+```
+
+Zenodo 通常为书库提供一个跨版本的概念 DOI；优先填写这个 DOI，模板会把它带入站点书目、PDF/EPUB 版权页与 EPUB 标识符。没有 DOI 时省略或留空 `doi`；模板不会把版本号或仓库地址冒充 DOI。
+
 传统学术报告也可用 Beamer：`./tbook slides new <book> <deck> "<title>" --academic --editions en`。白底 4:3（可选 16:9）、定理与 Lean 链接由书和锁生成，输出听众 PDF 与演讲备注 PDF，可使用书库自有主题。见 [theme/beamer/README.md](theme/beamer/README.md)。Slidev 继续提供现有的在线演示。
 
 ## 承诺与检查

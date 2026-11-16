@@ -18,6 +18,7 @@ from . import paths
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 LANG_RE = re.compile(r"^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$")
+DOI_RE = re.compile(r"^10\.\d{4,9}/[-._;()/:A-Z0-9]+$", re.I)
 PDF_VARIANTS = ("screen", "print", "academic")
 DEFAULT_PDF_VARIANTS = ("screen", "print")
 
@@ -61,6 +62,81 @@ def duplicates(items: list[str]) -> list[str]:
             out.append(item)
         seen.add(item)
     return out
+
+
+def normalize_doi(value: Any, where: str = "book.doi") -> str:
+    """Return a bare DOI, accepting the common DOI and Zenodo URL forms."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ConfigError(f"{where}: expected a DOI string")
+    doi = value.strip().strip("<>")
+    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/",
+                   "https://zenodo.org/doi/", "http://zenodo.org/doi/"):
+        if doi.lower().startswith(prefix):
+            doi = doi[len(prefix):]
+            break
+    doi = doi.rstrip(".,;)")
+    if doi and not DOI_RE.fullmatch(doi):
+        raise ConfigError(f"{where}: invalid DOI {value!r}; use a bare DOI such as 10.5281/zenodo.12345678")
+    return doi
+
+
+def _metadata_doi(root: Path) -> str:
+    """Find a Zenodo DOI in repository metadata when ``book.doi`` is omitted.
+
+    This is deliberately local and deterministic: CI and offline builds never make a network request. A
+    book-level value always takes precedence; this fallback reads the standard Zenodo/Citation File formats
+    and an explicit Zenodo DOI link in the root README.
+    """
+    zenodo = root / ".zenodo.json"
+    if zenodo.is_file():
+        try:
+            data = json.loads(zenodo.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        if isinstance(data, dict):
+            for key in ("conceptdoi", "doi"):
+                try:
+                    found = normalize_doi(data.get(key), f"{zenodo.name}.{key}")
+                except ConfigError:
+                    found = ""
+                if found and "zenodo" in found.casefold():
+                    return found
+            related = data.get("related_identifiers", [])
+            for item in related if isinstance(related, list) else []:
+                if isinstance(item, dict):
+                    try:
+                        found = normalize_doi(item.get("identifier"), f"{zenodo.name}.related_identifiers")
+                    except ConfigError:
+                        found = ""
+                    if found and "zenodo" in found.casefold():
+                        return found
+    citation = root / "CITATION.cff"
+    if citation.is_file():
+        try:
+            text = citation.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        for match in re.finditer(r"(?im)^\s*doi\s*:\s*['\"]?([^\s'\"]+)", text):
+            try:
+                found = normalize_doi(match.group(1), f"{citation.name}.doi")
+            except ConfigError:
+                continue
+            if found and "zenodo" in found.casefold():
+                return found
+    readme = root / "README.md"
+    if readme.is_file():
+        try:
+            text = readme.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        for match in re.finditer(r"(?i)(?:https?://(?:doi\.org|zenodo\.org/doi)/)(10\.\d{4,9}/zenodo\.[^\s)<>\"']+)", text):
+            try:
+                return normalize_doi(match.group(1), f"{readme.name} Zenodo DOI")
+            except ConfigError:
+                continue
+    return ""
 
 
 # --------------------------------------------------------------------------- i18n
@@ -346,6 +422,7 @@ class Book:
     languages: list[str]
     code: str
     date: str
+    doi: str
     isbn: Localized
     outputs_html: bool
     outputs_pdf: list[str]
@@ -453,6 +530,7 @@ def load_book(slug_or_dir: str | Path) -> Book:
         languages=languages,
         code=str(meta.get("code", slug.upper().replace("-", "//", 1))),
         date=str(meta.get("date") or datetime.now(timezone.utc).date().isoformat()),
+        doi=normalize_doi(meta.get("doi"), f"{where} book.doi") or _metadata_doi(paths.ROOT),
         isbn=localized(meta.get("isbn"), f"{where} book.isbn"),
         outputs_html=bool(outputs.get("html", True)),
         outputs_pdf=list(pdf_variants),

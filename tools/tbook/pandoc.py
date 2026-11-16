@@ -1521,6 +1521,8 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
         "code": book.code,
         "version": book.version,
         "date": date,
+        "doi": book.doi,
+        "doi_url": f"https://doi.org/{book.doi}" if book.doi else "",
         "license": book.license,
         "isbn": edition_isbn(book, edition),
         "identifier": edition_identifier(book, edition),
@@ -1555,6 +1557,7 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
             "authors": t(lang, "pdf.authors"),
             "license": t(lang, "pdf.license"),
             "isbn": t(lang, "pdf.isbn"),
+            "doi": t(lang, "pdf.doi"),
             "publisher": t(lang, "pdf.publisher"),
             "edition": t(lang, "pdf.edition"),
             "variant_screen": t(lang, "pdf.variant_screen"),
@@ -1812,6 +1815,8 @@ def stage_epub(site, book, edition, model, lock, staged: Stage) -> dict:
 
     isbn = meta["isbn"]
     identifier = [{"scheme": "ISBN-13", "text": re.sub(r"[^0-9Xx]", "", isbn)}] if isbn else [{"text": meta["identifier"]}]
+    if meta["doi"]:
+        identifier.append({"scheme": "DOI", "text": meta["doi"]})
     title = [{"type": "main", "text": meta["title"]}]
     if meta["subtitle"]:
         title.append({"type": "subtitle", "text": meta["subtitle"]})
@@ -1849,6 +1854,8 @@ def epub_colophon(meta: dict) -> str:
         rows.append((s["license"], meta["license"]))
     if meta["isbn"]:
         rows.append((s["isbn"], meta["isbn"]))
+    if meta["doi"]:
+        rows.append((s["doi"], f"[{meta['doi']}]({meta['doi_url']})"))
     if meta["publisher"]:
         rows.append((s["publisher"], meta["publisher"]))
     tru = meta["trureturing"]

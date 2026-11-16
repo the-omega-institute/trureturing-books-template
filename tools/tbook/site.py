@@ -92,6 +92,7 @@ SITE_I18N: dict[str, dict[str, str]] = {
         "open_book": "进入本书",
         "authors": "作者",
         "license": "许可",
+        "doi": "DOI",
         "date": "日期",
         "verification": "形式化验证",
         "verification_intro": "以下定理都引用 trureturing 中已冻结的 Lean 声明；链接固定在所钉的提交上，不随上游漂移。",
@@ -129,6 +130,7 @@ SITE_I18N: dict[str, dict[str, str]] = {
         "open_book": "Open the book",
         "authors": "Authors",
         "license": "License",
+        "doi": "DOI",
         "date": "Date",
         "verification": "Formal verification",
         "verification_intro": "Each theorem below cites a frozen Lean declaration in trureturing; the links are fixed "
@@ -1294,6 +1296,8 @@ def landing_html(frame: Frame, view: BookView) -> str:
     facts.append((bi.s("ui.version"), f"<code>{esc(book.version)}</code>"))
     if book.license:
         facts.append((bi.t("license"), esc(book.license)))
+    if book.doi:
+        facts.append((bi.t("doi"), f'<a href="{esc("https://doi.org/" + book.doi)}" rel="noopener"><code>{esc(book.doi)}</code></a>'))
     if book.date:
         facts.append((bi.t("date"), f"<code>{esc(book.date)}</code>"))
     facts.append((bi.s("ui.language"), " · ".join(

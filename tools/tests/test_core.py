@@ -444,6 +444,7 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(book.edition("zh").key, "demo/zh")
             self.assertEqual(book.edition("zh").summary, repo.root / "books" / "demo" / "zh" / "SUMMARY.md")
             self.assertEqual(book.code, "DEMO")
+            self.assertEqual(book.doi, "")
             self.assertEqual(book.outputs_pdf, ["screen", "print"])
             self.assertTrue(book.outputs_epub and book.outputs_html)
             self.assertEqual(book.artifact("zh", "pdf", "print"), "demo-1.2.3-zh-print.pdf")
@@ -483,6 +484,16 @@ class ConfigTests(unittest.TestCase):
             write(repo.root / "books" / "Bad_Slug" / "book.toml", '[book]\ntitle="x"\n')
             with self.assertRaisesRegex(config.ConfigError, "kebab-case"):
                 config.load_book("Bad_Slug")
+
+    def test_doi_normalization_and_local_zenodo_discovery(self):
+        with CoreRepo() as repo:
+            write(repo.root / "README.md", "DOI: https://doi.org/10.5281/zenodo.12345678\n")
+            book = repo.book("from-readme")
+            self.assertEqual(book.doi, "10.5281/zenodo.12345678")
+            explicit = repo.book("explicit", toml='[book]\ntitle = "Explicit"\ndoi = "https://zenodo.org/doi/10.5281/zenodo.87654321"\n')
+            self.assertEqual(explicit.doi, "10.5281/zenodo.87654321")
+            with self.assertRaisesRegex(config.ConfigError, "invalid DOI"):
+                repo.book("invalid", toml='[book]\ntitle = "Invalid"\ndoi = "doi.invalid"\n')
             with self.assertRaisesRegex(config.ConfigError, "not found"):
                 config.load_book("missing")
 

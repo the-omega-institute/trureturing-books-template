@@ -63,6 +63,7 @@
   parbreak()
   [#S.version #meta.version]
   if meta.license != "" { [ · #meta.license] }
+  if meta.doi != "" { [ · #link(meta.doi_url, text(font: f-mono, size: 7.5pt, meta.doi))] }
   if meta.trureturing.commit != "" {
     [ · #S.pinned_at: #link(meta.trureturing.url, text(font: f-mono, size: 7.5pt, meta.trureturing.short))]
   }

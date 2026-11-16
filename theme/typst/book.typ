@@ -360,6 +360,7 @@
   if meta.authors.len() > 0 { rows.push(kv-row(S.authors, meta.authors.join(if cjk { "、" } else { ", " }))) }
   if meta.license != "" { rows.push(kv-row(S.license, meta.license)) }
   if meta.isbn != "" { rows.push(kv-row(S.isbn, meta.isbn)) }
+  if meta.doi != "" { rows.push(kv-row(S.doi, link(meta.doi_url, text(font: f-mono, size: 8pt, fill: link-colour, breakable-name(meta.doi))))) }
   if meta.publisher != "" { rows.push(kv-row(S.publisher, meta.publisher)) }
   if tru.commit != "" {
     rows.push(kv-row(S.pinned_at, [#link(tru.url, text(font: f-mono, size: 8.5pt, fill: link-colour, tru.short)) #h(4pt) #text(font: f-mono, size: 8pt, fill: pal.dim, tru.repo)]))

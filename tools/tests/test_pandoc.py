@@ -243,6 +243,7 @@ class StagingTest(unittest.TestCase):
         cls.tmp = Path(tempfile.mkdtemp(prefix="tbook-test-pandoc-"))
         cls.site = fixture_site()
         cls.book = make_book(cls.tmp)
+        cls.book.doi = "10.5281/zenodo.12345678"
         cls.ed = cls.book.edition("en")
         cls.model = load_edition(cls.ed)
         cls.stage = tp.stage(cls.site, cls.book, cls.ed, cls.model, None, out_dir=cls.tmp / "stage")
@@ -374,6 +375,8 @@ class StagingTest(unittest.TestCase):
         self.assertEqual(meta["authors"], ["A. Author", "B. Author"])
         self.assertEqual(meta["formal_count"], 0)
         self.assertEqual(meta["isbn"], "978-3-16-148410-0")
+        self.assertEqual(meta["doi"], "10.5281/zenodo.12345678")
+        self.assertEqual(meta["doi_url"], "https://doi.org/10.5281/zenodo.12345678")
         self.assertEqual(meta["date"], {"year": 2026, "month": 1, "day": 2, "iso": "2026-01-02"})
 
     def test_restage_is_clean_and_deterministic(self):

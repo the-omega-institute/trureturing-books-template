@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -68,11 +68,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "9c716d2c197a0b5e141cfdca4e5b2f06413ab8b3c0c296194f1f99d8d5218fdc",
+      "sha256": "37c85c876a2d2b05e8ec596ff2d3583213f4948a55ef75d08fe67b89a0f8acb6",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "61c95578269daaae64310e037eef60e3c1ce3f604e69a4b3046f9a8d156b4a33",
+      "sha256": "3380b5e0f62015323dadf485fc90f929ea2b2be7012765b0503bbe082ccc4623",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -88,7 +88,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "a679a13ca41e754d7394ed10f1d494c5d782291ab6f94af18fb5d10004dd2660",
+      "sha256": "b8ac33483babfef5003d0f170e08039ee581b2c41de72fa9954bd7946d44c152",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
@@ -172,7 +172,7 @@
       "mode": "100644"
     },
     "templates/book/book.toml": {
-      "sha256": "393697cb0c8abf14dff864f1503e1fd9a7582e577ba6bca8b01668db3890754f",
+      "sha256": "08116ea13382cc94d817de320b9b9c2965b41c3427b9b674a7d5d3f62e0c5d64",
       "mode": "100644"
     },
     "templates/book/en/README.md": {
@@ -336,11 +336,11 @@
       "mode": "100644"
     },
     "theme/i18n/en.toml": {
-      "sha256": "3fc68c561471dfa49a7ea9ff5fcc85b795cef4474125f861e913464233989243",
+      "sha256": "f0757e5e10667400b69346d8c28abcc2ce7c1e8d980a1fe797171325ebf06da5",
       "mode": "100644"
     },
     "theme/i18n/zh.toml": {
-      "sha256": "6592b6fd1c2e397a1e58c591f1310dc70b19f11c468e42c52328ddaa7b235f65",
+      "sha256": "0a42c42216a313daf1cfe1bb3668635d324848d812c8b657d5e5988108c7afb6",
       "mode": "100644"
     },
     "theme/mdbook/favicon.svg": {
@@ -464,11 +464,11 @@
       "mode": "100644"
     },
     "theme/typst/academic.typ": {
-      "sha256": "16757b49518d74983d98745d026eb9ae1721ba233fc6064020e146684a238162",
+      "sha256": "6722a31531d7e6476425a9160ff2d8b1b2755b9d7a2d17d89827b195021a2f78",
       "mode": "100644"
     },
     "theme/typst/book.typ": {
-      "sha256": "31f8c2003e38bfbf280112fa0d06c898773510016f72c385af8a4de991391166",
+      "sha256": "342c4dfdccaee001ea64dd6a2fab581ffb059e245bcad9f662eb0d690646ef30",
       "mode": "100644"
     },
     "theme/typst/cover.typ": {
@@ -704,7 +704,7 @@
       "mode": "100644"
     },
     "tools/tbook/config.py": {
-      "sha256": "fc7d369be0d3223607255f503c23b3d5fb18a393800b8a4f06e098fb63462487",
+      "sha256": "da974d1b451596d9af9da18b0291a0ef7efdc86533fee18edbbe6a4099ef3e20",
       "mode": "100644"
     },
     "tools/tbook/cover.py": {
@@ -776,7 +776,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "dddc1b95c268f6a2cb1b7146449a0874c9ec8e58ab0aa14909d3c55dfd36162d",
+      "sha256": "8e70b78a0c6f15115b09f67172135b256243dc4f8ca3b824ba177ec668735de1",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -800,7 +800,7 @@
       "mode": "100644"
     },
     "tools/tbook/site.py": {
-      "sha256": "6539b3208647e7cdcf877c08b13403f86aaf7fc8740a9c1502ba5065d284fa89",
+      "sha256": "9e4db57fda1af250fca0bd65a37047afc4b43b62440939ecfe25f577f116c4a1",
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
@@ -896,7 +896,7 @@
       "mode": "100644"
     },
     "tools/tests/test_core.py": {
-      "sha256": "93b8f91010607223309ed5cc6e6642ea27551183519de15be328b9fffe228f76",
+      "sha256": "e7e494e24d0137b886b51e052a42a8539786803ad307219e0bfe9e26c87a5607",
       "mode": "100644"
     },
     "tools/tests/test_export_layout.py": {
@@ -968,7 +968,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "f601fea45fee4ea10228c0288f9f46fa19bc267de65a4a505193a3c68ab3165a",
+      "sha256": "ad689985cd1208b4fc9a30f1f6be6cc259a12f09bc520f47ede9159500ca22d3",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {
