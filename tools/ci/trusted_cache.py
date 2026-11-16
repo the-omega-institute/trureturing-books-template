@@ -34,7 +34,9 @@ def find(repo: str, branch: str, get=api, *, artifact_name="tbook-build-store") 
             run.get("head_repository", {}).get("full_name") == repo and
             run.get("head_branch") == branch and run.get("event") in events and
             run.get("status") == "completed" and run.get("conclusion") == "success")]
-    for run in sorted(runs, key=lambda r: (r.get("created_at", ""), int(r["id"])), reverse=True):
+    # A long Pages build can upload fresh films after a later-started CI has
+    # finished. Prefer the most recently completed producer, including reruns.
+    for run in sorted(runs, key=lambda r: (r.get("updated_at") or r.get("created_at", ""), int(r["id"])), reverse=True):
         artifacts = get(f"repos/{repo}/actions/runs/{int(run['id'])}/artifacts?per_page=100")
         for artifact in artifacts.get("artifacts", []):
             if artifact.get("name") == artifact_name and not artifact.get("expired", True):

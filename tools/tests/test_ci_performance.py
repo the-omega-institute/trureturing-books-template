@@ -90,6 +90,18 @@ class TrustedCacheTest(unittest.TestCase):
         self.run["created_at"] = "2026-11-16T03:00:00Z"
         self.assertEqual(trusted_cache.find("owner/books", "main", api), (17, 42))
 
+    def test_late_finishing_pages_and_reruns_supply_the_freshest_store(self):
+        self.run.update(created_at='2026-11-16T01:00:00Z', updated_at='2026-11-16T03:00:00Z')
+        self.ci_runs = [dict(self.run, id=20, workflow_id=4,
+                             created_at='2026-11-16T02:00:00Z', updated_at='2026-11-16T02:30:00Z')]
+        def api(endpoint):
+            if '/runs/20/artifacts?' in endpoint:
+                return {'artifacts': [dict(self.artifact, id=43)]}
+            return self.api(endpoint)
+        self.assertEqual(trusted_cache.find('owner/books', 'main', api), (17, 42))
+        self.ci_runs[0].update(run_attempt=2, updated_at='2026-11-16T04:00:00Z')
+        self.assertEqual(trusted_cache.find('owner/books', 'main', api), (20, 43))
+
     def test_ci_store_has_the_same_source_and_success_requirements(self):
         original = dict(self.run, id=20, workflow_id=4)
         self.run["conclusion"] = "failure"
