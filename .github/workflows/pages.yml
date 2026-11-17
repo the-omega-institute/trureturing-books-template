@@ -135,6 +135,7 @@ jobs:
         uses: ./.github/actions/build-cache
         with:
           mode: restore
+          scope: films
           pages-url: ${{ steps.pages.outputs.base_url }}
       - name: Snapshot prior entries
         run: python3 tools/ci/cache_store.py snapshot "$RUNNER_TEMP/before.json"
@@ -144,8 +145,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           FILMS_JSON: ${{ toJSON(matrix.items) }}
         run: python3 tools/ci/films.py --selection-env FILMS_JSON
-      - name: Export complete added film entries
-        run: python3 tools/ci/cache_store.py export --baseline "$RUNNER_TEMP/before.json" --out "$RUNNER_TEMP/film-entries"
+      - name: Export selected complete film entries
+        env:
+          FILMS_JSON: ${{ toJSON(matrix.items) }}
+        run: python3 tools/ci/cache_store.py export --baseline "$RUNNER_TEMP/before.json" --out "$RUNNER_TEMP/film-entries" --include-films-env FILMS_JSON
       - name: Share prepared films
         uses: actions/upload-artifact@v6
         with:
@@ -212,7 +215,7 @@ jobs:
           path: ${{ runner.temp }}/prepared-film-shards
       - name: Import verified film entries
         if: needs.plan.outputs.films == 'true'
-        run: python3 tools/ci/cache_store.py merge "$RUNNER_TEMP"/prepared-film-shards/*
+        run: python3 tools/ci/cache_store.py merge --prefer-imported "$RUNNER_TEMP"/prepared-film-shards/*
 
       - name: Check
         if: github.event_name != 'workflow_run'
@@ -257,6 +260,24 @@ jobs:
         with:
           name: tbook-build-store
           path: .cache/artifacts
+          include-hidden-files: true
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Save reusable film entries
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/cache/save@v5
+        with:
+          path: .cache/artifacts/films
+          key: film-cache-v1-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Publish reusable films for pull requests
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-film-store
+          path: .cache/artifacts/films
           include-hidden-files: true
           compression-level: 0
           if-no-files-found: warn
