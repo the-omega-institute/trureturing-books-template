@@ -1361,6 +1361,38 @@ class ExactRunnerTest(unittest.TestCase):
 
 
 class DeploymentCoverageTest(unittest.TestCase):
+    def test_book_markdown_is_not_filtered_out_of_pr_or_main_push_events(self):
+        import re
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        events = re.search(r"^on:\n(.*?)^permissions:", workflow.read_text(), re.M | re.S).group(1)
+        for name in ("pull_request", "push"):
+            block = re.search(rf"^  {name}:\n(.*?)(?=^  \w|\Z)", events, re.M | re.S).group(1)
+            self.assertNotRegex(block, r"(?m)^    (?:paths|paths-ignore):")
+            if name == "push":
+                self.assertIn("branches: [main]", block)
+
+    def test_pages_requires_successful_current_main_push_and_ignores_pr_completion(self):
+        import re
+        from test_verification import gha_if
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/pages.yml"
+        condition = " ".join(re.search(r"^    if: >-\n(.*?)^    name:", workflow.read_text(), re.M | re.S).group(1).split())
+        context = {"github.event.workflow_run.conclusion": "success",
+                   "github.event.workflow_run.event": "push",
+                   "github.event.workflow_run.head_repository.full_name": "owner/books",
+                   "github.repository": "owner/books", "github.sha": "current-sha",
+                   "github.event.workflow_run.head_sha": "current-sha"}
+        self.assertTrue(gha_if(condition, event="workflow_run", ref="refs/heads/main", context=context))
+        for change in ({"github.event.workflow_run.conclusion": "cancelled"},
+                       {"github.event.workflow_run.conclusion": "failure"},
+                       {"github.event.workflow_run.event": "pull_request"},
+                       {"github.event.workflow_run.head_repository.full_name": "fork/books"},
+                       {"github.event.workflow_run.head_sha": "older-sha"}):
+            with self.subTest(change=change):
+                self.assertFalse(gha_if(condition, event="workflow_run", ref="refs/heads/main",
+                                        context={**context, **change}))
+        self.assertTrue(gha_if(condition, event="workflow_dispatch", ref="refs/heads/main",
+                               context={name: "" for name in context}))
+
     def test_only_superseded_pull_requests_cancel_running_ci(self):
         import re
         from test_verification import gha_if
