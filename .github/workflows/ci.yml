@@ -131,7 +131,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .cache/trureturing
-          key: trureturing-state-${{ hashFiles('trureturing.lock.json') }}
+          key: trureturing-state-${{ hashFiles('trureturing.lock.json', 'trureturing-lock/**') }}
           restore-keys: trureturing-state-
 
       - name: Books, bilingual parity and Lean citations
@@ -189,7 +189,7 @@ jobs:
           if [ -d .cache ]; then ln -s "$GITHUB_WORKSPACE/.cache" "$dir/.cache"; fi
           cd "$dir"
           git rm -r -q books/example-*
-          python3 - <<'PY'
+          PYTHONPATH="$GITHUB_WORKSPACE/tools" python3 - <<'PY'
           import re
           from pathlib import Path
 
@@ -220,7 +220,7 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/node_modules" "$dir/node_modules"
           if [ -d .cache ]; then ln -s "$GITHUB_WORKSPACE/.cache" "$dir/.cache"; fi
           cd "$dir"
-          python3 - <<'PY'
+          PYTHONPATH="$GITHUB_WORKSPACE/tools" python3 - <<'PY'
           import json
           import re
           from pathlib import Path
@@ -229,10 +229,12 @@ jobs:
           text, n = re.subn(r"(?m)^hide\s*=\s*\[\]", 'hide = ["example-*"]', site.read_text(encoding="utf-8"))
           assert n == 1, "site.toml: expected the line hide = [] under [books]"
           site.write_text(text, encoding="utf-8")
-          lock_path = Path("trureturing.lock.json")
-          lock = json.loads(lock_path.read_text(encoding="utf-8"))
-          lock.update(commit="4c76e4a56525afbb474bf04a03ee2ff4aec5da45", declarations={})
-          lock_path.write_text(json.dumps(lock, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          from tbook import lean
+          lock = lean.Lock.load()
+          assert lock is not None
+          lock.commit = "4c76e4a56525afbb474bf04a03ee2ff4aec5da45"
+          lock.declarations = {}
+          lock.save()
           PY
           ./tbook check | tee "$RUNNER_TEMP/hidden-check.txt"
           grep -q '^check: hidden by site.toml \[books\]\.hide, not checked: example-' "$RUNNER_TEMP/hidden-check.txt"

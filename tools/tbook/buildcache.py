@@ -305,7 +305,7 @@ def site_inputs(site: config.Site) -> Inputs:
     address (links and paths are built from it)."""
     return (Inputs()
             .files(paths.TOOLS / "tbook", paths.TOOLS / "filters", paths.TOOLS / "node", paths.TOOLS / "figkit", paths.THEME,
-                   paths.I18N_LOCAL, paths.SITE_TOML, paths.LOCK_FILE, paths.ROOT / "requirements.txt",
+                   paths.I18N_LOCAL, paths.SITE_TOML, paths.LOCK_FILE, paths.lock_dir(), paths.ROOT / "requirements.txt",
                    paths.ROOT / "package-lock.json", exclude=("/theme/film/",))
             .text("base_url", site.base_url or "")
             .text("repo", site.repo or "")
@@ -477,7 +477,7 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
     inputs = (Inputs()
               .files(book.dir, paths.THEME / "slides", paths.TOKENS, paths.TOOLS / "figkit",
                      paths.GENERATED, paths.I18N_THEME, paths.I18N_LOCAL, paths.TOOLS / "node",
-                     paths.TOOLS / "tbook" / "slides.py", paths.LOCK_FILE, paths.SITE_TOML,
+                     paths.TOOLS / "tbook" / "slides.py", paths.LOCK_FILE, paths.lock_dir(), paths.SITE_TOML,
                      paths.ROOT / "package-lock.json")
               .text("base", slides.base_path(site))
               .text("base_url", site.base_url or "")

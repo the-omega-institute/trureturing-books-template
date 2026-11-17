@@ -5,7 +5,7 @@ description: 升级或完善书库模板本身时使用：把下游书库更新�
 
 # 模板更新与 skills 完善
 
-一个书库由两部分组成：**模板托管的部分**（`template.toml` 的 `[managed].paths`：`tools/`、`theme/`、`templates/`、`skills/`、`docs/`、`.github/workflows/`、`CLAUDE.md`、`package.json` 等）和**书库自己的部分**（`books/`、`site.toml`、`trureturing.lock.json`、`i18n/`、`PROJECT.md`、`README.md`、`skills/local-*/`、`docs/project/`）。托管部分只在模板仓库修改，再同步到各书库；书库自己的部分永远不被模板覆盖。
+一个书库由两部分组成：**模板托管的部分**（`template.toml` 的 `[managed].paths`：`tools/`、`theme/`、`templates/`、`skills/`、`docs/`、`.github/workflows/`、`CLAUDE.md`、`package.json` 等）和**书库自己的部分**（`books/`、`site.toml`、`trureturing.lock.json`、`trureturing-lock/`、`i18n/`、`PROJECT.md`、`README.md`、`skills/local-*/`、`docs/project/`）。托管部分只在模板仓库修改，再同步到各书库；书库自己的部分永远不被模板覆盖。
 
 ## 适用范围
 

@@ -8,9 +8,9 @@
 | 可视化 HTML/CSS/JS、登记表、测试 | 常规 `thumb.jpg`、`fig-*.jpg`、`.stills.json` |
 | `theme/tokens.json`、`backdrop.css` | `theme/generated/tokens.*`、`backdrop.jpg/json` |
 | 必要的局部论述与源程序 | 全书统计视图、索引及数据按需生成，消费者引用编译产物 |
-| `trureturing.lock.json`、`template-manifest.json` | HTML、PDF、EPUB、视频与打包文件 |
+| `trureturing.lock.json`、`trureturing-lock/`、`template-manifest.json` | HTML、PDF、EPUB、视频与打包文件 |
 
-锁文件记录冻结证据，模板清单记录同步基线，两者不能当作可丢弃输出。旧书已发布且仍被引用的稳定编号也须保留；删除统计索引及其消费者后，不再维护其专用编号表。照片、扫描件、自定义封面等原始素材也保留。常规视频海报目前仍按视频流程维护。
+锁指针与 `trureturing-lock/` 下的模块分片共同记录冻结证据，模板清单记录同步基线，两者不能当作可丢弃输出。分片按模块保存，钉版只改动受影响的声明片；上游 `Golden/Frozen/state/` 也是同样的目录契约。旧书已发布且仍被引用的稳定编号也须保留；删除统计索引及其消费者后，不再维护其专用编号表。照片、扫描件、自定义封面等原始素材也保留。常规视频海报目前仍按视频流程维护。
 
 ## 日常操作
 

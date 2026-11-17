@@ -568,7 +568,7 @@ def impact(current, previous, paths, *, full=False, template=False):
             films.update(uncertain_films)
             reasons.update(f"unknown shared film reads -> {film}" for film in uncertain_films)
             continue
-        if p == "trureturing.lock.json":
+        if p == "trureturing.lock.json" or p == "trureturing-lock/index.json" or p.startswith("trureturing-lock/"):
             shared_outputs("evidence lock: ", p)
             # Ordinary declared lock readers above still run. Only explicit link-only
             # readers delegate the unchanged browser behavior to static evidence checks.
@@ -577,7 +577,7 @@ def impact(current, previous, paths, *, full=False, template=False):
             films.update(uncertain_films)
             continue
         if p.startswith(("tools/", "theme/", "templates/", ".github/", "i18n/")) or p in (
-                "site.toml", "trureturing.lock.json", "package.json", "package-lock.json", "requirements.txt", "template.toml", "tbook"):
+                "site.toml", "trureturing.lock.json", "trureturing-lock/index.json", "package.json", "package-lock.json", "requirements.txt", "template.toml", "tbook") or p.startswith("trureturing-lock/"):
             everything("shared input: ", p)
         else:
             everything("unknown impact: ", p)

@@ -1,7 +1,7 @@
 # Move the pinned trureturing commit forward (managed by the template).
 #
 # Weekly (or on demand, optionally with a commit, branch or tag) this resolves the target commit, runs
-# `./tbook pin <sha> --report build/pin.md`, and when trureturing.lock.json changes runs `./tbook check`
+# `./tbook pin <sha> --report build/pin.md`, and when the sharded trureturing lock changes runs `./tbook check`
 # and opens a pull request on branch trureturing-bump/<sha12> with the pin report and the check output.
 # Declarations whose module statement digest changed are highlighted: a person must re-read those
 # theorems at the new commit and adjust the book text (skills/trureturing-pin) before merging.
@@ -91,7 +91,7 @@ jobs:
           site = config.load_site()
           print(lean.ls_remote(site.trureturing_repo, os.environ.get("REF") or site.trureturing_branch))
           ')"
-          current="$(python3 -c 'import json; print(json.load(open("trureturing.lock.json"))["commit"])' 2>/dev/null || true)"
+          current="$(PYTHONPATH=tools python3 -c 'from tbook import lean; lock=lean.Lock.load(); print(lock.commit if lock else "")' 2>/dev/null || true)"
           echo "target=$target" >> "$GITHUB_OUTPUT"
           echo "current=$current" >> "$GITHUB_OUTPUT"
           if [ "$target" = "$current" ]; then
@@ -126,7 +126,7 @@ jobs:
           rc=0
           ./tbook pin "$TARGET" --report build/pin.md || rc=$?
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-          if git diff --quiet -- trureturing.lock.json; then
+          if git diff --quiet -- trureturing.lock.json trureturing-lock; then
             echo "lock_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "lock_changed=true" >> "$GITHUB_OUTPUT"
@@ -253,7 +253,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -C "$branch"
           if [ "$PIN_RC" = "0" ]; then
-            git add trureturing.lock.json
+            git add trureturing.lock.json trureturing-lock
             git commit -q -m "chore(trureturing): pin $short" -m "$(head -n 1 build/pin.md)"
           else
             # Nothing is staged: ./tbook pin writes the lock only when it succeeds, so this pull request

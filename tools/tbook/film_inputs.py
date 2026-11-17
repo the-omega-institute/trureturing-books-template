@@ -30,5 +30,5 @@ def engine_sources(book):
     Provenance is for change impact; video_unit continues hashing the generated
     values, so unrelated keys in these source files do not alter its output key.
     """
-    return (f"books/{book}/book.toml", "trureturing.lock.json", "package-lock.json",
+    return (f"books/{book}/book.toml", "trureturing.lock.json", "trureturing-lock/**", "package-lock.json",
             *(f"{base}/{lang}.toml" for base in ("theme/i18n", "i18n") for lang in ENGINE_LANGUAGES))

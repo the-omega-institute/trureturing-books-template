@@ -834,6 +834,42 @@ class LeanTests(unittest.TestCase):
         self.assertEqual(lean.ls_remote(TRU, COMMIT), COMMIT, "a full SHA needs no network")
         self.assertRegex(lean.now_utc(), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
 
+    def test_sharded_lock_keeps_module_files_independent(self):
+        with CoreRepo():
+            lock = make_lock()
+            lock.save()
+            first = paths.lock_dir() / f"{MOD_3V}.lean.json"
+            second = paths.lock_dir() / f"{MOD_INT}.lean.json"
+            self.assertTrue(paths.lock_index().is_file())
+            self.assertTrue(first.is_file())
+            self.assertTrue(second.is_file())
+            before = second.read_bytes()
+            lock.declarations.pop(GID_3V)
+            lock.save()
+            self.assertEqual(second.read_bytes(), before)
+            self.assertNotIn(GID_3V, lean.Lock.load().declarations)
+            self.assertIn(GID_INT, lean.Lock.load().declarations)
+
+    def test_concurrent_writers_merge_modules_without_rewriting_index(self):
+        with CoreRepo():
+            initial = make_lock()
+            initial.save()
+            index_before = paths.lock_index().read_bytes()
+            first = lean.Lock.load()
+            second = lean.Lock.load()
+            first.declarations[GID_3V]["statement_id"] = "sha256:first"
+            first.declarations[GID_3V]["commit"] = "b" * 40
+            first._base_declarations = dict(initial.declarations)
+            second.declarations[GID_INT]["statement_id"] = "sha256:second"
+            second.declarations[GID_INT]["commit"] = "c" * 40
+            second._base_declarations = dict(initial.declarations)
+            first.save()
+            second.save()
+            merged = lean.Lock.load()
+            self.assertEqual(merged.declarations[GID_3V]["statement_id"], "sha256:first")
+            self.assertEqual(merged.declarations[GID_INT]["statement_id"], "sha256:second")
+            self.assertEqual(paths.lock_index().read_bytes(), index_before)
+
     def test_ledger_sources(self):
         with CoreRepo() as repo, tempfile.TemporaryDirectory() as gtmp:
             g = Path(gtmp)
@@ -1289,11 +1325,15 @@ class PinTests(unittest.TestCase):
         self.assertEqual(report.removed, ["D5/S1/Old/Gone.x"])
         self.assertEqual(report.changed, [(GID_3V, "module statement digest changed")])
         lock = lean.Lock.load()
-        self.assertEqual(lock.commit, COMMIT)
+        # The index commit is a stable compatibility baseline; changed and new
+        # declarations carry the actual source commit in their module shards.
+        self.assertEqual(lock.commit, OLD_COMMIT)
+        self.assertEqual(lock.commit_for(GID_3V), COMMIT)
+        self.assertIn(f"/blob/{COMMIT}/{MOD_3V}.lean", lock.source_url(GID_3V))
         self.assertEqual(sorted(lock.declarations), sorted([GID_3V, GID_INT, GID_DEF]))
         res = lock.get(GID_3V)
         self.assertEqual((res.line, res.signature), (3, "theorem deficit_three_valued (v : Nat) : True"))
-        self.assertNotEqual(lock.pinned_at, "2025-01-01T00:00:00Z")
+        self.assertEqual(lock.pinned_at, "2025-01-01T00:00:00Z", "index metadata remains stable across shard pins")
         text = report.markdown()
         self.assertIn(f"trureturing pin: `{OLD_COMMIT[:12]}` → `{COMMIT[:12]}`", text)
         self.assertIn("**Changed — review the book text for these:**", text)

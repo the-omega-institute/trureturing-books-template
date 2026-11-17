@@ -11,7 +11,7 @@
 
 - **托管**（`[managed].paths`）：`tools/`、`theme/`、`templates/`、`skills/`、`docs/`、`.github/workflows/`、`.github/actions/`、`.claude/`、`CLAUDE.md`、`AGENTS.md`、`tbook`、`template.toml`、`template-manifest.json`、`requirements.txt`、`package.json`、`package-lock.json`、`.gitignore`、`.editorconfig`。升级时同步（新增、修改、删除）。
 - **例外**（`[managed].exclude`）：`skills/local-*`（书库自己的 skill）、`docs/project/`（书库自己的文档）。
-- **自有**：`books/`、`site.toml`、`trureturing.lock.json`、`i18n/`、`PROJECT.md`、`README.md`、`LICENSE`，以及任何不在托管路径下的文件。升级永不触碰。
+- **自有**：`books/`、`site.toml`、`trureturing.lock.json`、`trureturing-lock/`、`i18n/`、`PROJECT.md`、`README.md`、`LICENSE`，以及任何不在托管路径下的文件。升级永不触碰。
 
 `CONTRIBUTING.md`、`.github/ISSUE_TEMPLATE/` 与 `.github/pull_request_template.md` 同样由模板托管；下游额外的 Issue 表单使用 `.github/ISSUE_TEMPLATE/local-*`。升级会安装 PR 命名检查；分支保护与历史 PR 迁移变量需在各仓库分别设置，见 [贡献规范](../CONTRIBUTING.md)。
 
@@ -102,7 +102,7 @@ hide = ["example-*"]
 
 隐藏的书留在 `books/` 中，随合并照常更新，但检查、钉版、构建、站点与发版都当它不存在（`docs/ARCHITECTURE.md` §2.1）；模板以后新增的 `example-*` 示例书也自动隐藏。设好后运行 `./tbook check`（输出一行列出隐藏的书）与 `./tbook pin --refresh`（从锁文件中删去只被示例书引用的声明）。已经删掉示例书的书库，可以先 `git checkout template/main -- books/example-monograph`（或合并时按模板版本解决冲突）把它取回，再隐藏它。
 
-书库自有的文件（`site.toml`、`trureturing.lock.json`、`README.md` 等，§1）在模板里也有自己的版本，git 合并时可能冲突：保留书库的版本（必要时参考模板的改动，例如 `site.toml` 新增的配置项）。锁文件只由工具写：解决冲突后运行 `./tbook pin --refresh`。
+书库自有的文件（`site.toml`、`trureturing.lock.json`、`trureturing-lock/`、`README.md` 等，§1）在模板里也有自己的版本，git 合并时可能冲突：保留书库的版本（必要时参考模板的改动，例如 `site.toml` 新增的配置项）。锁指针和分片只由工具写：解决冲突后运行 `./tbook pin --refresh`；不同模块的分片可以直接合并。
 
 ## 当前 pin 的单一来源（0.5.0）
 

@@ -9,13 +9,14 @@
 3. **一次编写，多端导出。** 同一份 Markdown 生成 HTML（mdBook）、PDF（Typst，屏幕版与印刷版）、EPUB 3（Apple Books）。编号、标签、徽章与 Lean 链接由 `tools/tbook/render.py` 统一计算，各端一致。
 4. **多语言，默认中文与英文。** 每本书有若干语言版本（edition），第一个为权威版本；`./tbook check` 要求各版本的章节文件、环境序列（种类、id、Lean 引用、证据状态、证明关联与来源字段）逐条一致。
 5. **配色单一来源。** 赛博朋克配色只在 `theme/tokens.json` 定义，`./tbook theme` 派生出各端使用的 CSS / Typst / JS（幻灯片的打印背景图由 Chromium 按派生的 CSS 渲染，见 §2 的 `slides/`）。绿色只留给 Lean 已验证，琥珀色只留给“现在/当前选择”，红色标开放问题。
-6. **模板可升级。** `template.toml` 列出模板托管的路径；下游只改自己的路径（`books/`、`site.toml`、`trureturing.lock.json`、`i18n/`、`PROJECT.md`、`README.md`）。`./tbook template update` 把托管路径同步到模板的新版本。
+6. **模板可升级。** `template.toml` 列出模板托管的路径；下游只改自己的路径（`books/`、`site.toml`、`trureturing.lock.json`、`trureturing-lock/`、`i18n/`、`PROJECT.md`、`README.md`）。`./tbook template update` 把托管路径同步到模板的新版本。
 
 ## 2. 目录
 
 ```
 site.toml                 站点配置（下游所有）
-trureturing.lock.json     所钉的 trureturing 提交与已解析的声明（由 ./tbook pin 生成，本地使用、不提交）
+trureturing.lock.json     分片锁的稳定指针（由 ./tbook pin 生成）
+trureturing-lock/         按模块保存的声明解析结果与 index.json 元数据
 template.toml             模板版本与托管路径（模板所有）
 template-manifest.json    托管文件清单与 sha256（模板发布时生成，用于检测下游本地改动）
 tbook                     CLI 入口（bash → python3 -m tbook）

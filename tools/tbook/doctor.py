@@ -408,7 +408,7 @@ def check_lock(report: Report) -> str | None:
     except (lean.LeanError, ValueError, KeyError) as exc:
         report.add(Check("trureturing.lock.json", False, f"unreadable: {exc}", hint, targets=("check",)))
         return None
-    report.add(Check(f"trureturing.lock.json ({lock.commit[:12]}, {len(lock.declarations)} declarations)", True,
+    report.add(Check(f"trureturing lock ({lock.commit[:12]}, {len(lock.declarations)} declarations; sharded)", True,
                      lock.repo, hint, targets=("check",)))
     return f"{lock.repo}@{lock.commit}"
 

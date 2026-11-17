@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { bookDirs, hiddenBy, hiddenError, hidePatterns } from './slides-lib.mjs';
+import { bookDirs, hiddenBy, hiddenError, hidePatterns, loadLock } from './slides-lib.mjs';
 
 export const ROOT = path.resolve(process.env.TBOOK_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
 export const BOOKS = path.join(ROOT, 'books');
@@ -20,7 +20,6 @@ export const THEME_VIZ = path.join(ROOT, 'theme', 'viz');
 export const TOKENS_CSS = path.join(ROOT, 'theme', 'generated', 'tokens.css');
 export const TOKENS_JSON = path.join(ROOT, 'theme', 'tokens.json');
 export const TEMPLATES = path.join(ROOT, 'templates', 'viz');
-export const LOCK_FILE = path.join(ROOT, 'trureturing.lock.json');
 export const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const STATUSES = ['live', 'draft'];
 /** Lean kinds that may be cited as verified results (LEAN ✓); same as tbook.lean.FORMAL_KINDS. */
@@ -73,8 +72,7 @@ export function writeRegistry(book, reg) {
 
 /** trureturing.lock.json, or null when it does not exist. */
 export function readLock() {
-  if (!fs.existsSync(LOCK_FILE)) return null;
-  return JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8'));
+  return loadLock(ROOT);
 }
 
 export function parseGid(gid) {
@@ -88,7 +86,8 @@ export function leanUrl(lock, gid) {
   if (!lock || !g) return '';
   const d = (lock.declarations || {})[gid];
   const line = d && d.line ? `#L${d.line}` : '';
-  return `https://github.com/${lock.repo}/blob/${lock.commit}/${g.module}.lean${line}`;
+  const commit = lock.declarations?.[gid]?.commit || lock.commit;
+  return `https://github.com/${lock.repo}/blob/${commit}/${g.module}.lean${line}`;
 }
 /** Permalink of any path of the trureturing repository at the pinned commit. */
 export function trureturingUrl(lock, p) {

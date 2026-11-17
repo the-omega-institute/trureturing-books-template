@@ -61,7 +61,7 @@ jobs:
         id: project
         run: |
           ./tbook lean-project
-          commit="$(python -c 'import json; print(json.load(open("trureturing.lock.json"))["commit"])')"
+          commit="$(PYTHONPATH=tools python -c 'from tbook import lean; print(lean.Lock.load().commit)')"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "toolchain=$(cat build/lean-verify/lean-toolchain)" >> "$GITHUB_OUTPUT"
           cat build/lean-verify/lakefile.toml

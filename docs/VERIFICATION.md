@@ -8,7 +8,7 @@
 书中环境  ::: {.theorem #thm-x lean="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"}
    │  GID = <模块路径>.<声明名>
    ▼
-trureturing.lock.json   commit = 8a24ea4e…（40 位 SHA）
+trureturing-lock/index.json   commit = 8a24ea4e…（40 位 SHA）
    │  name = D5.S1.Deficit.deficit_three_valued, kind = theorem,
    │  statement_id = sha256:…（模块陈述摘要）, line = 264
    ▼
@@ -20,7 +20,7 @@ trureturing @ commit:  D5/S1/Deficit/DeficitThreeValued.lean   （Lean 源；由
 
 trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片 `Golden/Frozen/state/<module>.lean.json` 存在，当且仅当该模块已冻结**；状态片只在声明经内核验证（无 `sorry`、无私有公理）后由 trureturing 的流程写入。因此“在所钉提交上，状态片列有该声明且种类为 theorem”就是本书库对“已经 Lean 验证”的判据。
 
-这条判据只在 trureturing 的集成分支上成立：冻结律由 trureturing 的 CI 在 `site.toml` 的 `[trureturing].branch`（默认 `dev`）上执行。GitHub 也会按 SHA 提供从未合入的提交（任何人发起的 PR 的 head、其他分支），那些提交上的状态片可以是任意内容。所以**所钉提交必须能从该分支到达**：`./tbook pin` 拒绝不在分支上的提交，`./tbook check` 每次复核（§2）。锁文件的 `branch` 字段记录的就是被核对的分支，`./tbook check` 要求它与 `site.toml` 的分支相同（改了 `site.toml` 的分支就要重新 `./tbook pin`，或在提交也在新分支上时 `./tbook pin --refresh`），站点清单发布的分支因此就是被核对的分支。`[trureturing].branch` 必须是 trureturing 中一个**现有分支**的名字，因为 git 与 GitHub compare API 读的不只是分支名：`compare/<sha>...<sha>` 与 `compare/<sha>^0...<sha>` 的结果都是 `identical`；`dev-12-g7bbf30f` 这类形如 `git describe` 输出的名字，git 与 compare API 都读作 `-g` 后面那段缩写所指的提交；`owner:branch` 指向另一个仓库（例如 fork）的分支；`pull/123/head` 在 git 里是 `refs/pull/123/head`，即某个 PR 的 head。核对分两步。
+这条判据只在 trureturing 的集成分支上成立：冻结律由 trureturing 的 CI 在 `site.toml` 的 `[trureturing].branch`（默认 `dev`）上执行。GitHub 也会按 SHA 提供从未合入的提交（任何人发起的 PR 的 head、其他分支），那些提交上的状态片可以是任意内容。所以**所钉提交必须能从该分支到达**：`./tbook pin` 拒绝不在分支上的提交，`./tbook check` 每次复核（§2）。锁索引的 `branch` 字段记录的就是被核对的分支，声明解析结果按模块分片保存在 `trureturing-lock/`，根级 `trureturing.lock.json` 只保留稳定指针；`./tbook check` 要求索引分支与 `site.toml` 相同（改了 `site.toml` 的分支就要重新 `./tbook pin`，或在提交也在新分支上时 `./tbook pin --refresh`），站点清单发布的分支因此就是被核对的分支。`[trureturing].branch` 必须是 trureturing 中一个**现有分支**的名字，因为 git 与 GitHub compare API 读的不只是分支名：`compare/<sha>...<sha>` 与 `compare/<sha>^0...<sha>` 的结果都是 `identical`；`dev-12-g7bbf30f` 这类形如 `git describe` 输出的名字，git 与 compare API 都读作 `-g` 后面那段缩写所指的提交；`owner:branch` 指向另一个仓库（例如 fork）的分支；`pull/123/head` 在 git 里是 `refs/pull/123/head`，即某个 PR 的 head。核对分两步。
 
 第一步只看名字，不问任何人。下列写法都是错误：`git check-ref-format --branch` 不接受的名字（含 `^`、`~`、`:`、`?`、`*`、`[`、`\`、`..`、`@{`、空白或控制字符；以 `-` 开头或以 `.` 结尾；有空的分量，即以 `/` 开头或结尾或含 `//`；有以 `.` 开头或以 `.lock` 结尾的分量；`HEAD`）；单独的 `@`（在修订表达式里 git 把它当作 `HEAD`）与含 Unicode 空白或不可见字符的名字（git 接受，但不同的名字会显示得一模一样）；完整 SHA、所钉提交的缩写 SHA 与 `refs/…`。
 

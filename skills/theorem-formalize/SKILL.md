@@ -15,7 +15,7 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 
 ## 先读
 
-- 本仓库：`docs/VERIFICATION.md`、`trureturing.lock.json`、`site.toml` 的 `[trureturing]`。
+- 本仓库：`docs/VERIFICATION.md`、`trureturing.lock.json`、`trureturing-lock/`、`site.toml` 的 `[trureturing]`。
 - trureturing：`CLAUDE.md`（尤其冻结律、检索顺序、文档是投影）、`skills/codex-formalize/SKILL.md`、`agents/CONTEXT.md`。
 
 ## 步骤

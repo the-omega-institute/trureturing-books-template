@@ -39,7 +39,10 @@ export function inputKey(book, v) {
   // Opt-in constructor contract: the lock is used only to pin anchor hrefs,
   // never fetched or displayed. Evidence is validated separately before publication.
   if (v.capture_lock !== undefined && !['all', 'links'].includes(v.capture_lock)) throw new Error(`invalid capture_lock for ${v.id}`);
-  if (v.capture_lock !== 'links') add(path.join(ROOT, 'trureturing.lock.json'), 'lock');
+  if (v.capture_lock !== 'links') {
+    add(path.join(ROOT, 'trureturing.lock.json'), 'lock-pointer');
+    add(path.join(ROOT, 'trureturing-lock'), 'lock-shards');
+  }
   add(path.join(ROOT, 'package-lock.json'), 'packages');
   // Common book assets may be referenced from page CSS, SVG or JavaScript.
   add(path.join(book.dir, 'assets'), 'book-assets');

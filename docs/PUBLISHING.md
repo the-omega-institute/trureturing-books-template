@@ -85,6 +85,7 @@ CI 中没有 trureturing 的 checkout，`./tbook check` 通过 GitHub compare AP
   "suites": {
     "declaration-map.test.mjs": [
       "trureturing.lock.json",
+      "trureturing-lock/",
       "books/my-book/zh/SUMMARY.md",
       "books/my-book/zh/*.md"
     ],

@@ -9,7 +9,7 @@
 ## 结构
 
 - `books/<slug>/`：一本书。`book.toml` 元数据；`<lang>/` 每个语言版本一个目录（默认 `zh`、`en`，第一个为权威版本）；`figures/` 静态图（脚本与生成的 SVG）；`assets/` 共享图片；`viz/` 可视化；`films/` 视频；`slides/` 演示文稿。
-- `site.toml`：站点配置。`trureturing.lock.json`：所钉的 trureturing 提交与已解析的声明（只由 `./tbook pin` 写）。
+- `site.toml`：站点配置。`trureturing.lock.json` 是稳定指针，`trureturing-lock/` 按模块保存所钉的 trureturing 冻结声明（只由 `./tbook pin` 写）。
 - `tools/tbook/`：构建与校验（`./tbook <命令>`）。`theme/`：赛博朋克主题，配色唯一来源 `theme/tokens.json`。`skills/`：内置 skills。
 - 架构与契约：`docs/ARCHITECTURE.md`；写作手册：`docs/AUTHORING.md`；验证模型：`docs/VERIFICATION.md`；发布：`docs/PUBLISHING.md`；升级：`docs/UPGRADING.md`。
 

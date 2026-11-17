@@ -7,7 +7,9 @@ where a name key encodes a Lean ``Name`` with length-prefixed components::
 
     ns(ns(ns(ns(n0,2:D5),2:S1),7:Deficit),20:deficit_three_valued)  ==  D5.S1.Deficit.deficit_three_valued
 
-Books cite declarations by GID, the same address trureturing's Blueprint uses:
+Books cite declarations by GID, the same address trureturing's Blueprint uses.  The
+downstream evidence lock is sharded by module under ``trureturing-lock/``; its
+historical root JSON is only a pointer:
 ``<module path>.<name>``, e.g. ``D5/S1/Deficit/DeficitThreeValued.deficit_three_valued``.
 The name part is a Lean name (identifier components such as ``of_ρ_eq_self`` or ``mk₂?``,
 or ``«…»``-escaped ones); its components are matched against the module's frozen
@@ -33,6 +35,8 @@ describe output such as ``dev-12-g<sha>`` for the commit it abbreviates (``_bran
 from __future__ import annotations
 
 import json
+import contextlib
+import fcntl
 import os
 import re
 import subprocess
@@ -54,6 +58,10 @@ ABBREV_SHA_RE = re.compile(r"^[0-9a-f]{4,39}$")
 HEXISH_RE = re.compile(r"^[0-9a-fA-F]{4,40}$")  # a name that git and GitHub can also read as a commit SHA
 STATE_DIR = "Golden/Frozen/state"
 LOCK_SCHEMA = "trureturing-books.lock.v1"
+SHARDED_LOCK_SCHEMA = "trureturing-books.lock.v3"
+SHARDED_LOCK_SCHEMA_V2 = "trureturing-books.lock.v2"
+LOCK_POINTER_SCHEMA = "trureturing-books.lock-pointer.v2"
+MODULE_LOCK_SCHEMA = "trureturing-books.lock-module.v1"
 FORMAL_KINDS = {"theorem"}
 STD_AXIOMS = ("propext", "Classical.choice", "Quot.sound")
 
@@ -676,6 +684,9 @@ class Resolution:
     statement_id: str  # module statement digest from the state file
     line: int = 0  # line of the declaration in the .lean source (0 = unknown)
     signature: str = ""  # declaration header up to ':=' (best effort, informational)
+    # The commit that supplied this module's frozen state.  Sharded locks may
+    # intentionally contain several commits while dev advances.
+    commit: str = ""
 
     def to_lock(self) -> dict:
         d = asdict(self)
@@ -706,7 +717,7 @@ def resolve(ledger: Ledger, commit: str, gid_text: str) -> Resolution:
         raise LeanError(f"{gid.text}: ambiguous, matches {names}; write a longer name suffix")
     full, kind = matches[0]
     return Resolution(gid=gid.text, module=gid.module, name=full, kind=kind,
-                      statement_id=str(state.get("statement_id", "")))
+                      statement_id=str(state.get("statement_id", "")), commit=commit)
 
 
 DECL_KEYWORDS = r"(?:theorem|lemma|def|abbrev|instance|structure|inductive|class|opaque|axiom)"
@@ -861,6 +872,31 @@ def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
 # --------------------------------------------------------------------------- lock file
 
 
+def _atomic_write(path: Path, text: str) -> None:
+    """Write a small evidence file without exposing a partial JSON document."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            tmp.unlink()
+
+
+@contextlib.contextmanager
+def _lock_writer():
+    """Serialize local pin writers while preserving independent module shards."""
+    lock_path = paths.CACHE / "trureturing-lock-write.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 @dataclass
 class Lock:
     repo: str
@@ -872,7 +908,32 @@ class Lock:
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Lock | None":
-        path = path or paths.LOCK_FILE
+        # An explicit path is the v1 compatibility API used by migrations and
+        # callers that need to inspect an historical lock.  The default loader
+        # prefers the sharded lock and falls back to the old aggregate file.
+        if path is not None:
+            return cls._load_legacy(path)
+        # The pointer is part of the canonical lock contract.  Requiring it
+        # makes deleting the pointer an unambiguous "no lock" operation while
+        # still keeping all declaration evidence in the directory.
+        if paths.LOCK_FILE.exists():
+            try:
+                pointer = json.loads(paths.LOCK_FILE.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise LeanError(f"{paths.rel(paths.LOCK_FILE)}: unreadable lock pointer: {exc}") from exc
+            if pointer.get("schema") == LOCK_POINTER_SCHEMA:
+                if pointer.get("path") != paths.lock_dir().name:
+                    raise LeanError(f"{paths.rel(paths.LOCK_FILE)}: unsupported lock pointer schema")
+                # A pointer without its directory is an absent lock.  This is
+                # useful for template/no-book fixtures and produces the normal
+                # missing-lock diagnostic only when a citation needs one.
+                return cls._load_sharded(paths.lock_index()) if paths.lock_index().exists() else None
+            if paths.lock_index().exists():
+                raise LeanError(f"{paths.rel(paths.LOCK_FILE)}: unsupported lock pointer schema")
+        return cls._load_legacy(paths.LOCK_FILE)
+
+    @classmethod
+    def _load_legacy(cls, path: Path) -> "Lock | None":
         if not path.exists():
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -880,13 +941,66 @@ class Lock:
             raise LeanError(f"{paths.rel(path)}: unsupported schema {data.get('schema')!r}")
         if not SHA_RE.match(data.get("commit", "")):
             raise LeanError(f"{paths.rel(path)}: commit must be a full 40-hex SHA")
-        return cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
-                   pinned_at=data.get("pinned_at", ""), declarations=data.get("declarations", {}))
+        obj = cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
+                  pinned_at=data.get("pinned_at", ""), declarations=data.get("declarations", {}))
+        obj._base_declarations = dict(obj.declarations)
+        return obj
+
+    @classmethod
+    def _load_sharded(cls, index: Path) -> "Lock | None":
+        try:
+            data = json.loads(index.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise LeanError(f"{paths.rel(index)}: unreadable sharded lock: {exc}") from exc
+        if data.get("schema") not in (SHARDED_LOCK_SCHEMA, SHARDED_LOCK_SCHEMA_V2):
+            raise LeanError(f"{paths.rel(index)}: unsupported schema {data.get('schema')!r}")
+        if not SHA_RE.match(data.get("commit", "")):
+            raise LeanError(f"{paths.rel(index)}: commit must be a full 40-hex SHA")
+        root = index.parent
+        declarations: dict[str, dict] = {}
+        for module_file in sorted(root.rglob("*.lean.json")):
+            try:
+                fragment = json.loads(module_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise LeanError(f"{paths.rel(module_file)}: unreadable lock shard: {exc}") from exc
+            if fragment.get("schema") != MODULE_LOCK_SCHEMA:
+                raise LeanError(f"{paths.rel(module_file)}: unsupported schema {fragment.get('schema')!r}")
+            module = str(fragment.get("module", ""))
+            if not module or module_file.is_symlink() or module_file.relative_to(root).as_posix() != f"{module}.lean.json":
+                raise LeanError(f"{paths.rel(module_file)}: module path does not match its shard filename")
+            shard_commit = fragment.get("commit", data["commit"])
+            if not SHA_RE.match(str(shard_commit)):
+                raise LeanError(f"{paths.rel(module_file)}: commit must be a full 40-hex SHA")
+            entries = fragment.get("declarations", {})
+            if not isinstance(entries, dict):
+                raise LeanError(f"{paths.rel(module_file)}: declarations must be an object")
+            for gid, resolution in entries.items():
+                if not isinstance(resolution, dict) or resolution.get("module") != module:
+                    raise LeanError(f"{paths.rel(module_file)}: invalid declaration {gid!r}")
+                if gid in declarations:
+                    raise LeanError(f"{paths.rel(module_file)}: duplicate declaration {gid!r}")
+                item = dict(resolution)
+                item.setdefault("commit", shard_commit)
+                if not SHA_RE.match(str(item["commit"])):
+                    raise LeanError(f"{paths.rel(module_file)}: declaration {gid!r} has invalid commit")
+                declarations[gid] = item
+        obj = cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
+                  pinned_at=data.get("pinned_at", ""), declarations=declarations,
+                  schema=SHARDED_LOCK_SCHEMA)
+        obj._base_declarations = dict(declarations)
+        return obj
 
     def save(self, path: Path | None = None) -> None:
-        path = path or paths.LOCK_FILE
+        # Explicit paths retain the old single-file writer for compatibility with
+        # importers and old lock snapshots.  The normal writer is sharded by module.
+        if path is not None:
+            self._save_legacy(path)
+            return
+        self._save_sharded()
+
+    def _save_legacy(self, path: Path) -> None:
         data = {
-            "schema": self.schema,
+            "schema": LOCK_SCHEMA,
             "repo": self.repo,
             "branch": self.branch,
             "commit": self.commit,
@@ -895,13 +1009,105 @@ class Lock:
         }
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    def _save_sharded(self) -> None:
+        root = paths.lock_dir()
+        root.mkdir(parents=True, exist_ok=True)
+        by_module: dict[str, dict[str, dict]] = {}
+        for gid, resolution in self.declarations.items():
+            module = str(resolution.get("module", ""))
+            if not module:
+                raise LeanError(f"{gid}: lock declaration has no module")
+            by_module.setdefault(module, {})[gid] = resolution
+
+        # A short local lock makes the read/merge/write sequence safe when two
+        # pin jobs update different modules in the same checkout.  The lock is
+        # ignored and lives outside the tracked evidence directory.
+        with _lock_writer():
+            existing = Lock._load_sharded(paths.lock_index()) if paths.lock_index().exists() else None
+            existing_by_module: dict[str, dict[str, dict]] = {}
+            if existing:
+                for gid, resolution in existing.declarations.items():
+                    existing_by_module.setdefault(str(resolution.get("module", "")), {})[gid] = resolution
+
+            # If the lock changed since this writer read it, merge instead of
+            # pruning. Otherwise the caller's cited set is authoritative and
+            # stale modules can be removed as before. This optimistic check is
+            # what lets concurrent pins update different modules safely.
+            base = getattr(self, "_base_declarations", None)
+            concurrent_change = existing is not None and base is not None and existing.declarations != base
+            for module, entries in sorted(by_module.items()):
+                if concurrent_change:
+                    merged = dict(existing_by_module.get(module, {}))
+                    for gid, entry in entries.items():
+                        old_entry = (base or {}).get(gid)
+                        # A loader adds the shard commit as a compatibility
+                        # field; that alone does not mean this stale writer
+                        # changed the declaration.
+                        comparable = lambda value: {k: v for k, v in value.items() if k != "commit"}
+                        if old_entry is None or comparable(entry) != comparable(old_entry):
+                            merged[gid] = entry
+                else:
+                    merged = dict(entries)
+                target = root / f"{module}.lean.json"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                payload = {
+                    "schema": MODULE_LOCK_SCHEMA,
+                    "module": module,
+                    "declarations": {k: merged[k] for k in sorted(merged)},
+                }
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+                _atomic_write(target, encoded)
+
+            if not concurrent_change:
+                expected = {f"{module}.lean.json" for module in by_module}
+                for target in sorted(root.rglob("*.lean.json")):
+                    if target.relative_to(root).as_posix() not in expected:
+                        target.unlink()
+                for directory in sorted((p for p in root.rglob("*") if p.is_dir()), reverse=True):
+                    if directory != root and not any(directory.iterdir()):
+                        directory.rmdir()
+
+            # The index is intentionally stable.  Its commit is a baseline for
+            # old consumers and is written only when the index is first created
+            # (or when repo/branch changes); declaration source commits live in
+            # their module entries and therefore do not contend on this file.
+            index_path = paths.lock_index()
+            current_index = None
+            if index_path.exists():
+                try:
+                    current_index = json.loads(index_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    current_index = None
+            index = {
+                "schema": SHARDED_LOCK_SCHEMA,
+                "repo": self.repo,
+                "branch": self.branch,
+                "commit": (current_index or {}).get("commit") if current_index else self.commit,
+                "pinned_at": (current_index or {}).get("pinned_at") if current_index else self.pinned_at,
+            }
+            if not SHA_RE.match(str(index["commit"])):
+                index["commit"] = self.commit
+            if not index.get("pinned_at"):
+                index["pinned_at"] = self.pinned_at
+            _atomic_write(index_path, json.dumps(index, ensure_ascii=False, indent=2) + "\n")
+
+        # Keep a stable, tiny compatibility pointer at the historical path.  It
+        # is deliberately independent of declaration content, so it never causes
+        # the old large-file merge conflict.
+        pointer = {"schema": LOCK_POINTER_SCHEMA, "path": paths.lock_dir().name}
+        _atomic_write(paths.LOCK_FILE, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
+
     def get(self, gid: str) -> Resolution | None:
         d = self.declarations.get(gid)
         if not d:
             return None
         return Resolution(gid=gid, module=d["module"], name=d["name"], kind=d["kind"],
                           statement_id=d.get("statement_id", ""), line=int(d.get("line", 0) or 0),
-                          signature=d.get("signature", ""))
+                          signature=d.get("signature", ""), commit=d.get("commit", self.commit))
+
+    def commit_for(self, gid: str) -> str:
+        """Commit whose frozen state supplied ``gid`` (with v1 fallback)."""
+        return str((self.declarations.get(gid) or {}).get("commit") or self.commit)
 
     # Links ------------------------------------------------------------------
     def blob(self, path: str, line: int = 0) -> str:
@@ -911,13 +1117,17 @@ class Lock:
     def source_url(self, gid: str) -> str:
         res = self.get(gid)
         g = parse_gid(gid)
-        return self.blob(g.source_path, res.line if res else 0)
+        return self._blob_at(self.commit_for(gid), g.source_path, res.line if res else 0)
 
     def state_url(self, gid: str) -> str:
-        return self.blob(parse_gid(gid).state_path)
+        return self._blob_at(self.commit_for(gid), parse_gid(gid).state_path)
 
     def blueprint_url(self, gid: str) -> str:
-        return self.blob(parse_gid(gid).blueprint_path)
+        return self._blob_at(self.commit_for(gid), parse_gid(gid).blueprint_path)
+
+    def _blob_at(self, commit: str, path: str, line: int = 0) -> str:
+        url = f"https://github.com/{self.repo}/blob/{commit}/{path}"
+        return url + (f"#L{line}" if line else "")
 
     @property
     def tree_url(self) -> str:

@@ -3,7 +3,7 @@
 The rule this enforces: every theorem / lemma / proposition / corollary cites at least
 one Lean declaration (``lean="<GID>"``), unless explicitly marked status="written-proof"
 with a proof block in every edition and no lean attribute. A Lean citation must be recorded
-in ``trureturing.lock.json`` and, at the pinned commit, listed in trureturing's ``Golden/Frozen/state`` with kind
+in the sharded ``trureturing-lock/`` evidence ledger and, at the pinned commit, listed in trureturing's ``Golden/Frozen/state`` with kind
 ``theorem`` — i.e. kernel-verified and frozen. The pinned commit must be on the site.toml
 branch, where trureturing's CI enforces the freeze rule. Conjectures and open problems must
 not cite Lean. Editions of a book (zh, en, …) must agree item by item, and their SUMMARY.md
@@ -546,27 +546,30 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
              f"lock was pinned against branch {lock.branch!r} but site.toml uses {branch!r}; run ./tbook pin "
              f"(or ./tbook pin --refresh to keep commit {lock.commit[:12]} if it is on {branch!r})")
     ledger = lean.Ledger(lock.repo, offline=offline)
-    problem = lean.branch_problem(branch, lock.commit)
-    anc = lean.Ancestry(None, "") if problem else ledger.branch_contains(lock.commit, branch)
-    where = f"branch {branch!r} of {lock.repo}"
-    if problem:
-        _err(issues, paths.SITE_TOML, 0,
-             f"[trureturing] branch {branch!r} {problem}: trureturing enforces its freeze rule on a branch "
-             "(default 'dev'), and only a branch can show that the pinned commit was merged")
-    elif anc.no_branch:
-        _err(issues, paths.SITE_TOML, 0,
-             f"[trureturing] branch {branch!r} does not exist in {lock.repo} ({anc.detail}); set it to an existing "
-             f"branch (default 'dev'), then run ./tbook pin --refresh to keep commit {lock.commit[:12]} if it is on "
-             "that branch, or ./tbook pin")
-    elif anc.on_branch is False:
-        _err(issues, paths.LOCK_FILE, 0,
-             f"pinned commit {lock.commit[:12]} is not on {where} ({anc.detail}); trureturing enforces the freeze "
-             f"rule only on {branch}, so its frozen state at other commits proves nothing. Pin a commit on "
-             f"{branch}: ./tbook pin")
-    elif anc.on_branch is None:
-        (_err if lean.ancestry_required(offline) else _warn)(
-            issues, paths.LOCK_FILE, 0,
-            f"could not verify that pinned commit {lock.commit[:12]} is on {where}: {anc.detail}")
+    # Shards can intentionally retain evidence from several dev commits. Check
+    # each source commit once; the index commit is only a compatibility baseline.
+    for source_commit in sorted({lock.commit_for(gid) for gid in cited if lock.get(gid)}):
+        problem = lean.branch_problem(branch, source_commit)
+        anc = lean.Ancestry(None, "") if problem else ledger.branch_contains(source_commit, branch)
+        where = f"branch {branch!r} of {lock.repo}"
+        if problem:
+            _err(issues, paths.SITE_TOML, 0,
+                 f"[trureturing] branch {branch!r} {problem}: trureturing enforces its freeze rule on a branch "
+                 "(default 'dev'), and only a branch can show that the commit was merged")
+        elif anc.no_branch:
+            _err(issues, paths.SITE_TOML, 0,
+                 f"[trureturing] branch {branch!r} does not exist in {lock.repo} ({anc.detail}); set it to an existing "
+                 f"branch (default 'dev'), then run ./tbook pin --refresh to keep commit {source_commit[:12]} if it is on "
+                 "that branch, or ./tbook pin")
+        elif anc.on_branch is False:
+            _err(issues, paths.LOCK_FILE, 0,
+                 f"pinned commit {source_commit[:12]} is not on {where} ({anc.detail}); trureturing enforces the freeze "
+                 f"rule only on {branch}, so its frozen state at other commits proves nothing. Pin a commit on "
+                 f"{branch}: ./tbook pin")
+        elif anc.on_branch is None:
+            (_err if lean.ancestry_required(offline) else _warn)(
+                issues, paths.LOCK_FILE, 0,
+                f"could not verify that pinned commit {source_commit[:12]} is on {where}: {anc.detail}")
     for gid, uses in sorted(cited.items()):
         path, line, _ = uses[0]
         res = lock.get(gid)
@@ -578,8 +581,9 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
                 if formal:
                     _err(issues, fpath, fline,
                          f"{gid} is a Lean {res.kind}, but theorem-like environments must cite theorems")
+        source_commit = lock.commit_for(gid)
         try:
-            live = lean.resolve(ledger, lock.commit, gid)
+            live = lean.resolve(ledger, source_commit, gid)
         except lean.LeanError as exc:
             if offline and "network disabled" in str(exc):
                 _warn(issues, path, line, f"{gid}: not re-verified offline ({exc})")
@@ -589,7 +593,7 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
         for fld in ("name", "kind", "module", "statement_id"):
             if getattr(live, fld) != getattr(res, fld):
                 _err(issues, paths.LOCK_FILE, 0,
-                     f"{gid}: lock says {fld}={getattr(res, fld)!r} but trureturing@{lock.commit[:12]} says "
+                     f"{gid}: lock says {fld}={getattr(res, fld)!r} but trureturing@{source_commit[:12]} says "
                      f"{getattr(live, fld)!r}; run ./tbook pin --refresh")
                 break
     if cited_elsewhere is None:

@@ -97,13 +97,13 @@ PDF 一端由 `tools/filters/typst-compat.lua` 负责与 KaTeX 保持一致：�
 ```bash
 export TRURETURING_DIR="${TRURETURING_DIR:-$HOME/trureturing}"
 T="$TRURETURING_DIR"
-C=$(python3 -c "import json; print(json.load(open('trureturing.lock.json'))['commit'])")
+C=$(PYTHONPATH=tools python3 -c "from tbook import lean; print(lean.Lock.load().commit)")
 git -C "$T" grep -n -i -E 'digest: .*(stinespring|trace distance)' "$C" -- D5
 git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && echo frozen
 ```
 
 - 关键词用英文术语及其变体：人名、对象名、结论的形状（`contract`、`no continuous section`、`iff critical line`）都试。
-- 也搜本书自己：`grep -rn '<声明名或关键词>' books/<slug>/ trureturing.lock.json`。别的章节可能已经引用了同一结论的更一般形式，这时注记里不能再把它列为未形式化，应改为交叉引用。
+- 也搜本书自己：`grep -rn '<声明名或关键词>' books/<slug>/ trureturing-lock/`。别的章节可能已经引用了同一结论的更一般形式，这时注记里不能再把它列为未形式化，应改为交叉引用。
 - 找到的若是特例或等价改写，就照它的原样引用，并在正文写明它与经典表述之间还差哪一步、那一步仍是文献结果。
 - “猜想 ⟺ X”这类冻结定理是等价改写，不是证明：定理框里写等价，`conjecture` 环境照旧保留，正文明说猜想仍然开放。
 
@@ -117,7 +117,7 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 ### 手写的计数、清单与数值
 
 - 删除手工维护的全书计数、排名、声明表与统计地图；需要展示时用 `::: {.stats src="summary"}` 选择编译视图（另可选 `evidence`、`environments`、`kinds`、`chapters`、`pages`、`declarations`、`reuse`），默认嵌入表格，`display="link" format="html|markdown|csv|json"` 链接独立产物，索引与复用表可按 `group` 筛选。下游自行选择；命令行用 `./tbook stats --book <slug> --write` 按需导出，不把统计写回受版本管理的正文、图注、幻灯片或程序。旧统计的核对使用 `./tbook stats --book <slug>` 或 `stats.collect(book)` 的正式解析结果。已有 `[derived]` 生成器时，增删引用后运行 `./tbook sync --book <slug>`，修改生成器的论述模板，不手改生成结果；`./tbook check` 会只读检查新鲜度。方法见 `docs/AUTHORING.md` 的“统计与派生产物”。避免在散文中重复罗列会随正文变动的总数和排名；保留的人工计数仍须逐语核对。
-- “GID—源码行—摘要”这类对照行从 `trureturing.lock.json` 生成，不手抄。
+- “GID—源码行—摘要”这类对照行从 `trureturing-lock/` 生成，不手抄。
 - 算例里的数值独立复算；写“四舍五入到所示位数”时确实是四舍五入而不是截断。各语言版本的数字应当逐个相同，而环境对齐检查不比较数字：把两版同一环境里的数字序列抽出来比对一次。
 
 ## 步骤
@@ -133,8 +133,8 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 
 - 把未冻结结果当作 Lean 已验证；删掉 `lean` 而不声明 written-proof 与关联书面证明；编造 GID、改变数学来匹配声明，或把变体当作同一结果。
 - 用绿色或手写 LEAN ✓ 标记书面证明；其紫色“书面证明 / WRITTEN PROOF”徽章由构建生成、不带链接、不计入 Lean 数量。
-- 手改 `trureturing.lock.json`（只能由 `./tbook pin` 写）。
+- 手改 `trureturing.lock.json` 或 `trureturing-lock/`（只能由 `./tbook pin` 写）。
 - 在本仓库写 `.lean` 文件或 Lean 证明。
 - 让各语言版本的环境序列不一致，或只改一种语言。
 
-当前版本来自 `trureturing.lock.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。
+当前版本来自 `trureturing-lock/index.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从分片锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。
