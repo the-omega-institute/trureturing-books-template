@@ -1224,6 +1224,20 @@ class ExactRunnerTest(unittest.TestCase):
 
 
 class DeploymentCoverageTest(unittest.TestCase):
+    def test_only_superseded_pull_requests_cancel_running_ci(self):
+        import re
+        from test_verification import gha_if
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        condition = re.search(r"^  cancel-in-progress: (.+)$", workflow.read_text(), re.M).group(1)
+        for event, ref, ref_type in (("pull_request", "refs/pull/1/merge", "branch"),
+                                     ("push", "refs/heads/main", "branch"),
+                                     ("push", "refs/tags/v1.5.3", "tag"),
+                                     ("workflow_dispatch", "refs/heads/main", "branch"),
+                                     ("schedule", "refs/heads/main", "branch")):
+            with self.subTest(event=event, ref=ref):
+                self.assertEqual(gha_if(condition, event=event, ref=ref,
+                                        context={"github.ref_type": ref_type}), event == "pull_request")
+
     def test_deploy_after_optional_films_skip_requires_successful_assembly(self):
         import re
         from test_verification import gha_if
