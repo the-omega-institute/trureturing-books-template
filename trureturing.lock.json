@@ -2,8 +2,8 @@
   "schema": "trureturing-books.lock.v1",
   "repo": "the-omega-institute/trureturing",
   "branch": "dev",
-  "commit": "8a24ea4e79de962725aab9d9b49cc605fcc211d8",
-  "pinned_at": "2026-11-08T12:32:04Z",
+  "commit": "b948587fa6b17151a4097a12834a8b608a26234d",
+  "pinned_at": "2026-11-17T06:47:43Z",
   "declarations": {
     "D5/S0/Carrier/Conj.trace": {
       "module": "D5/S0/Carrier/Conj",
