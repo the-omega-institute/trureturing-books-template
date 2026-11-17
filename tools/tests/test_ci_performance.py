@@ -499,6 +499,70 @@ class AffectedPlanTest(unittest.TestCase):
                     self.assertEqual(len(result["suites"]), 2)
                     self.assertEqual(result["films"], ["one/001-film", "two/001-film"])
 
+    def plain_markdown_change(self):
+        import json
+        # Complete nonreader summaries distinguish book text from engineering docs.
+        # Neither browser suite reads this chapter, so publication must stand alone.
+        for slug in ("one", "two"):
+            self.write(f"books/{slug}/viz/tests/dependencies.json", json.dumps({
+                "schema": planner.DEPENDENCIES, "suites": {"a.test.mjs": [], "b.test.mjs": []}}))
+        path = "books/one/zh/prose.md"
+        self.write(path, "# Chapter\n\nOriginal text.\n")
+        self.base = self.commit()
+        self.write(path, "# Chapter\n\nRevised text.\n")
+        return path, self.commit()
+
+    def assert_markdown_publication(self, result, path):
+        selected = result["selections"]["normal"]
+        self.assertEqual(result["coverage"]["normal"]["paths"], [path])
+        self.assertTrue(result["tasks"]["validate"])
+        self.assertTrue(selected["checks"]["structure"])
+        self.assertEqual(selected["books"], ["one"])
+        self.assertEqual({(x["target"], x["variant"]) for x in selected["exports"]},
+                         {("html", ""), ("pdf", "screen"), ("epub", "")})
+        self.assertTrue(result["tasks"]["build"])
+        self.assertEqual(selected["suites"], [])
+        self.assertFalse(result["tasks"]["viz"])
+        # The stable Check cannot pass after validation/exports unexpectedly skip.
+        needs = {job: {"result": "success"} for job in ("plan", *result["tasks"])}
+        planner.verify_results(result, needs)
+        for job in ("validate", "build"):
+            with self.subTest(job=job), self.assertRaisesRegex(ValueError, job + ": expected success"):
+                planner.verify_results(result, {**needs, job: {"result": "skipped"}})
+
+    def test_only_book_markdown_push_validates_exports_and_selects_pages_without_a_browser_reader(self):
+        import json
+        path, head = self.plain_markdown_change()
+        for baseline in (True, False):
+            with self.subTest(baseline=baseline):
+                result = self.make_plan(baseline=baseline)
+                self.assert_markdown_publication(result, path)
+                output = self.root / "github-output"
+                output.write_text("")
+                with mock.patch.dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=""):
+                    planner.write_outputs(result)
+                fields = dict(line.split("=", 1) for line in output.read_text().splitlines())
+                self.assertTrue(json.loads(fields["validate"]))
+                self.assertTrue(json.loads(fields["build"]))
+                pages = self.make_plan(event="workflow_run", workflow="pages", baseline=baseline)
+                self.assertTrue(pages["site"])
+                self.assertEqual(pages["sha"], head)
+                self.assertEqual(pages["coverage"]["pages"]["paths"], [path])
+
+    def test_only_book_markdown_pr_validates_the_tested_merge(self):
+        path, head = self.plain_markdown_change()
+        self.git("branch", "markdown-head", head)
+        self.git("checkout", "-qb", "tested-merge", self.base)
+        self.git("merge", "--no-ff", "-qm", "merge fixture", "markdown-head")
+        payload = {"pull_request": {"base": {"sha": self.base}, "head": {"sha": head}}}
+        for baseline in (True, False):
+            with self.subTest(baseline=baseline):
+                result = planner.plan(self.root, event="pull_request", payload=payload, repo="owner/books",
+                                      branch="main", ref="refs/pull/1/merge",
+                                      get_baseline=lambda *args: {"sha": self.base} if baseline else None)
+                self.assert_markdown_publication(result, path)
+                self.assertFalse(result["publish"])
+
     def test_link_only_reader_keeps_static_evidence_check_without_unrelated_browser_work(self):
         import json
         name = 'books/one/viz/tests/dependencies.json'

@@ -40,7 +40,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 | 工作流 | 触发 | 作用 |
 | --- | --- | --- |
 | `ci.yml` | PR、推送到 main、手动、被调用、每周 | 先由仅需标准库的 `tools/ci/plan.py` 生成计划，再启动选中的结构／Lean、theme、unit、manifest、静态媒体、模板兼容检查族，以及按书籍启用格式展开的导出、精确 suite、film 和 slide 集合；空集合不开 runner；同一导出格式合并所选书籍，复用一次安装。viz 最多 8 片、film 最多 4 片，先选择再分片，每项恰一次。稳定必需检查名仍为 **Check**，移到末尾用 `always()` 核对全部计划任务，失败、取消和意外跳过均不通过。调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
-| `pages.yml` | 推送到 `main`、手动 | 共用影响规则，以独立的成功部署覆盖为基准；无站点影响且已有有效部署时跳过安装和构建。需要输出时仍 `./tbook check`、`./tbook build all`，恢复未变单元、补建缺失单元、清理删除内容后完整部署；Pages 未启用时只构建并提示，不记录部署覆盖。与可信 CI 汇总共同保存构建缓存（§5），同一时间只运行一个 |
+| `pages.yml` | `main` 推送的 CI 成功后、手动 | 自动发布要求成功 CI 的 SHA 仍为当前主干提交；旧提交的运行跳过，等待新提交的 CI。共用影响规则，以独立的成功部署覆盖为基准；无站点影响且已有有效部署时跳过安装和构建。自动运行复用 CI 的检查与产物，手动运行另做 `./tbook check`；需要输出时 `./tbook build all`，恢复未变单元、补建缺失单元、清理删除内容后完整部署；Pages 未启用时只构建并提示，不记录部署覆盖。与可信 CI 汇总共同保存构建缓存（§5），同一时间只运行一个 |
 | `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
 | `trureturing-bump.yml` | 每周、手动 | 把所钉的 trureturing 提交升级到最新并开 PR；标题前缀 `[refused]`（目标提交不在 `site.toml` 的分支上或无法核实）、`[unresolved]`（有引用无法解析）、`[pin failed]`、`[check fails]`、`[review statements]` 提示需要处理的情况；前三种 PR 不改锁文件，与 `[check fails]` 一样以草稿开出 |
@@ -48,6 +48,8 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 | `template-release.yml` | tag `v*`（仅模板仓库） | 核对版本与清单、跑 CI 后发布模板版本，附示例站点的构建缓存（同样先建草稿、上传后发布） |
 
 `ci.yml` 的选择检查从 JSON 文件读取完整计划；CI 与 Pages 的汇总从另一份 JSON 文件读取完整 `needs`，并直接使用其中的 `plan.outputs.plan`，没有第二份计划副本。工作流用带引号的 here-document 接收 `toJSON` 编码的数据，由运行器先写脚本再落盘；计划和汇总载荷不进入进程参数或环境变量，字符串中的换行与 shell 语法不会被执行。矩阵、检查条件、精确浏览器报告核对与覆盖来源保持原有契约；缺少计划、作业结果或执行报告仍使汇总失败。
+
+**仅修改书稿也运行 CI。** `books/<slug>/<lang>/*.md`（含子目录与 `SUMMARY.md`）属于出版输入，选择所属书的结构／多语言检查与启用的导出格式；没有浏览器套件读取该章，也不能省略这些工作。工程文档 `docs/` 与根目录说明的轻量规则不适用于书稿。推送普通工作分支尚未开 PR 时不会自动运行 CI；创建 PR、更新 PR 提交或合入 `main` 才会触发，编辑 PR 标题／正文只重跑命名检查。排查时先在 Actions 中按工作流和提交 SHA 找运行，再看 **Plan affected work** 的 `coverage.normal.paths` 与 `tasks`：没有运行、任务按计划跳过、排队和旧提交的 Pages 被跳过是不同情况；稳定的 **Check** 必须等所有已选任务成功。
 
 检查与构建作业（`ci.yml`、`pages.yml`、`release.yml` 的构建、`trureturing-bump.yml`）通过组合动作 `.github/actions/setup` 安装工具链（Python 3.12 + requirements、Node 22 + `npm ci`、按需安装 Chromium、mdBook 0.5.4、CJK 字体；`films: 'true'` 且有（未隐藏的）书带视频时另装 ffmpeg 与备用字体，运行 `theme/film/setup.sh` 安装 `theme/film/requirements.txt` 并下载 Kokoro 模型到 `.cache/film/models`）。
 
