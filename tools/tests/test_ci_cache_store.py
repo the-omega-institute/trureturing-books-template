@@ -119,6 +119,33 @@ class CacheStoreTest(unittest.TestCase):
             self.assertEqual(external.read_bytes(), original)
             self.assertFalse(buildcache.restore_local(unit))
 
+    def test_independent_inventory_preserves_unselected_films_before_partial_shards(self):
+        with Scratch() as s:
+            def unit(name, version):
+                return buildcache.Unit("films", "demo/" + name, buildcache.Inputs().text("film", version),
+                                       [s.root / "build" / f"{name}.mp4"])
+            def store(item, content):
+                write(item.outputs[0], content)
+                buildcache.store(item)
+            store(unit("b", "old"), "old b")
+            aggregate = s.root / "aggregate"
+            shutil.copytree(buildcache.store_root(), aggregate)
+            shutil.rmtree(buildcache.store_root())
+            a, b = unit("a", "current"), unit("b", "current")
+            store(a, "current a")
+            store(b, "current b")
+            baseline = s.root / "film-baseline"
+            shutil.copytree(buildcache.store_root(), baseline)
+            snapshot, shard = s.root / "before.json", s.root / "partial-shard"
+            cache_store.snapshot(buildcache.store_root(), snapshot)
+            cache_store.export(buildcache.store_root(), snapshot, shard, include_units={("films", a.name)})
+            cache_store.merge(aggregate, [baseline], prefer_imported=True)
+            cache_store.merge(aggregate, [shard], prefer_imported=True)
+            for item in (a, b):
+                entry = aggregate / item.entry_dir().relative_to(buildcache.store_root())
+                self.assertEqual(buildcache.verify(entry), "")
+                self.assertEqual((entry / "files/0").read_text(), f"current {item.name.rsplit('/', 1)[1]}")
+
     def test_merge_preserves_only_recent_valid_keys_without_tools_or_fonts(self):
         with Scratch() as s:
             units = []
@@ -164,6 +191,20 @@ class CacheStoreTest(unittest.TestCase):
 
 
 class CacheTransferWorkflowTest(unittest.TestCase):
+    def test_complete_publishers_merge_the_independent_inventory(self):
+        for workflow, job in (("ci.yml", "check"), ("pages.yml", "build"),
+                              ("release.yml", "build"), ("template-release.yml", "site")):
+            steps = workflow_jobs(GITHUB_DIR / "workflows" / workflow)[job]
+            restore = next(s for s in steps if s.get("uses") == "./.github/actions/build-cache" and
+                           s.get("with", {}).get("mode") == "restore")
+            self.assertEqual(restore["with"].get("film-baseline"), "true", workflow)
+        steps = action_steps("build-cache")
+        download = next(s for s in steps if s.get("id") == "film-baseline")
+        merge = next(s for s in steps if "cache_store.py merge" in s.get("run", ""))
+        self.assertLess(steps.index(download), steps.index(merge))
+        self.assertIn("--prefer-imported", merge["run"])
+        self.assertIn("steps.film-baseline.outputs.artifact-scope == 'films'", merge["if"])
+
     def test_film_actions_cache_hit_skips_the_complete_store_but_miss_can_migrate(self):
         steps = action_steps("build-cache")
         films = next(s for s in steps if s.get("id") == "film-restore")

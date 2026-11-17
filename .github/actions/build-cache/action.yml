@@ -47,6 +47,10 @@ inputs:
     description: Restore the complete store (all), visualization images (images), or videos (films).
     required: false
     default: all
+  film-baseline:
+    description: Restore only. Merge the latest trusted film inventory into a complete publication store.
+    required: false
+    default: 'false'
   pages-url:
     description: restore only. The Pages URL (actions/configure-pages base_url), or empty when Pages is not set up.
     required: false
@@ -135,6 +139,34 @@ runs:
         repository: ${{ github.repository }}
         path: ${{ inputs.scope == 'images' && '.cache/artifacts/viz-stills' || steps.trusted.outputs.artifact-scope == 'films' && '.cache/artifacts/films' || '.cache/artifacts' }}
         merge-multiple: true
+
+    - name: Find the independent film baseline for publication
+      id: film-baseline
+      if: inputs.mode == 'restore' && inputs.scope == 'all' && inputs.film-baseline == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        CACHE_ARTIFACT: tbook-film-store
+      run: python3 tools/ci/trusted_cache.py
+
+    - name: Download the independent film baseline separately
+      if: inputs.mode == 'restore' && steps.film-baseline.outputs.artifact-scope == 'films'
+      continue-on-error: true
+      uses: actions/download-artifact@v7
+      with:
+        artifact-ids: ${{ steps.film-baseline.outputs.artifact-id }}
+        run-id: ${{ steps.film-baseline.outputs.run-id }}
+        github-token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        path: ${{ runner.temp }}/tbook-film-baseline/films
+        merge-multiple: true
+
+    - name: Merge the verified film baseline before current shards
+      if: inputs.mode == 'restore' && steps.film-baseline.outputs.artifact-scope == 'films'
+      continue-on-error: true
+      shell: bash
+      run: python3 tools/ci/cache_store.py merge --prefer-imported "$RUNNER_TEMP/tbook-film-baseline"
 
     - name: Prune the build cache
       id: prune

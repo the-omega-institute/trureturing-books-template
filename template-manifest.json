@@ -28,7 +28,7 @@
       "mode": "100644"
     },
     ".github/actions/build-cache/action.yml": {
-      "sha256": "77a4d856808a6ed7a48d2a7ee529498e82cddc20b7e1d0b48c14816399ab6015",
+      "sha256": "c4240d425320c2249fa15bd6f3489c5c69f4acf505c5d937d73d90c805dcac3f",
       "mode": "100644"
     },
     ".github/actions/setup/action.yml": {
@@ -40,7 +40,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "8e612d50066eae50662e87b8de04d51d3b9fb836e6615d4527684d2d6e1bb106",
+      "sha256": "8da17301d65944723f9a0ea672f003d51a3c91bb151b5b04844366da4cba7747",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "fba1081b8505d6d8c18b169cbfab62fa603aa558a8e0b54ca6bfb45a0830b014",
+      "sha256": "1fb926955dc8f9da21016d342de414169f7b078805dbfb82f0a3947291319e9e",
       "mode": "100644"
     },
     ".github/workflows/pr-conventions.yml": {
@@ -56,11 +56,11 @@
       "mode": "100644"
     },
     ".github/workflows/release.yml": {
-      "sha256": "2ec9339a6e418428fd037fc23158af970d2e88b5ab258200df473f723c7b1471",
+      "sha256": "bf663820642a5d8193204b6ba508bc12ad261cdc824bb21c7a5558e61b7d8ff0",
       "mode": "100644"
     },
     ".github/workflows/template-release.yml": {
-      "sha256": "eab039101179faac8c911fc897eabf52f4b0c20117d92940978442f3c1267cea",
+      "sha256": "ffb5af411cc8a393785687e00deb42bee8b986dc2bc63fbad627bb541fe4f75a",
       "mode": "100644"
     },
     ".github/workflows/template-sync.yml": {
@@ -100,7 +100,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "ba61e22025a9fc5165043d4c33df1860ede052fabcb7e5dd219480b3456e9924",
+      "sha256": "93baa88373258fc62ffe4a75412debc8ac969e5003d9729170d8db3ac25b2ba3",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "dd20344649e9e97a5b577d0ef1e4f835b97a8039954b5ba931d0968d91104381",
+      "sha256": "565990fb435a10d1e65fbfd70e9cfb92e9e0444011e223c1b0aaa112635b1d9e",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
@@ -912,7 +912,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_cache_store.py": {
-      "sha256": "79f2b361046ae09ecabae665145aa0ea5b3a3ca1acb837128d28c5cb10fed309",
+      "sha256": "1b829ee41c0d91ab06450981db5afc2e766e57e7b47b77dbc325cfcdbeed9e33",
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {

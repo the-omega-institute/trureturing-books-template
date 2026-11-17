@@ -114,6 +114,7 @@ jobs:
         uses: ./.github/actions/build-cache
         with:
           mode: restore
+          film-baseline: 'true'
           pages-url: ${{ steps.pages.outputs.base_url }}
 
       - name: Build everything
