@@ -222,7 +222,7 @@ jobs:
       - name: Check
         if: github.event_name != 'workflow_run'
         env:
-          # check asks GitHub's compare API whether the pinned trureturing commit is on the site.toml branch
+          # check asks GitHub's compare API whether each declaration's evidence commit is on the site.toml branch
           # (no trureturing checkout here); in GitHub Actions an unanswered question is an error.
           GITHUB_TOKEN: ${{ github.token }}
           # Optional repository secret for a private trureturing (raw files and the compare API).

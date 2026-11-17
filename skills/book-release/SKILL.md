@@ -32,7 +32,7 @@ tag 是什么、哪种 tag 触发发版、推送后发生什么、与“从 Rele
    ```
    发布全部书时用 `v<日期或版本>`，例如 `v2026.11.08`、`v2026-11-08` 或 `v3.0.0`（模板仓库自身除外——那里的 `v*` 是模板版本）。
    只有语义化版本的预发布才标为 GitHub pre-release：单本书看 `book.toml` 的 `version`（如 `1.0.0-rc.1`），全部书看 tag 中 `v` 之后的部分（如 `v3.0.0-rc.1`）；其他形式都是正式发布。日期写成 `YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零：以这样的日期开头的版本无论后面跟什么都是正式发布，同一天再发一次可用 `v2026.11.08-2`。不补零的 `v2026.1.5-2` 恰好是语义化版本的预发布，会标为 pre-release。
-5. `release.yml` 校验 tag 与 `book.toml` 版本一致，构建整个站点（未变的单元从缓存恢复，视频也在其中），先建草稿 Release，上传所选书的 PDF（屏幕版、印刷版）、EPUB、幻灯片 PDF 与全站的构建缓存（`cache-*.tar`、`build-cache.json`），全部上传后才发布；说明中列出所钉的 trureturing 提交与定理数。
+5. `release.yml` 校验 tag 与 `book.toml` 版本一致，构建整个站点（未变的单元从缓存恢复，视频也在其中），先建草稿 Release，上传所选书的 PDF（屏幕版、印刷版）、EPUB、幻灯片 PDF 与全站的构建缓存（`cache-*.tar`、`build-cache.json`），全部上传后才发布；说明中列出跟随的 trureturing 分支与定理数。
 6. 检查 Release 附件（读者下载与 `build-cache.json` 都在）与 Pages 上的下载链接和视频。
 7. （建议，只需一次）在 Settings → General → Releases 启用不可变 Release，发布后的附件与 tag 不能再改（`docs/VERIFICATION.md` §2）。
 
@@ -41,7 +41,7 @@ tag 是什么、哪种 tag 触发发版、推送后发生什么、与“从 Rele
 - **Release 停在草稿**：发布作业在上传途中失败。重跑失败的作业即可：它替换草稿的附件后再发布。已发布的 Release 重跑时只更新标题与说明，附件不变。
 - **`./tbook cache export` 失败**：有单元不在存储中（通常是构建失败，或视频无法渲染）。看构建步骤的日志，修好后重新打 tag（新版本）或重跑。
 - **单元每次都重新构建**（HTML、PDF、EPUB、幻灯片）：`./tbook cache status` 看键是否稳定，用条目的 `entry.json` 比对输入。这些单元的键含站点地址，地址不同就是不同的键：CI、Pages 与 Release 都用 `configure-pages` 的地址，`site.toml` 设了 `base_url` 时都用它；`site.toml` 没有 `base_url` 时，本地构建的地址与 CI 不同，命中不了 CI 或 Release 的这些条目。
-- **视频每次都重新渲染**：`./tbook cache status` 看键是否稳定。视频的键覆盖 git 列出的视频文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python。只有 `main` 上的 `pages.yml` 保存 Actions 缓存，分支与 tag 上的构建从中恢复；PR 运行只读已发布的 Release，所以改动了的视频在 PR 每次推送时都重新渲染，直到某个 Release 附上它的键。本机没有视频工具链时设置 `TBOOK_CACHE_REMOTE=1`，从已发布的 Release 恢复。
+- **视频每次都重新渲染**：`./tbook cache status` 看键是否稳定。视频的键覆盖 git 列出的视频文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎数据（书的代号、版本与标题，跟随分支，引用的声明及其证据提交、陈述摘要，片内文字）、`package-lock.json` 中 @fontsource 字体与 Playwright 的版本、Kokoro 模型版本与 Node 主版本；不含站点地址，也不含探测到的 ffmpeg、Chromium 与视频 Python。只有 `main` 上的 `pages.yml` 保存 Actions 缓存，分支与 tag 上的构建从中恢复；PR 运行只读已发布的 Release，所以改动了的视频在 PR 每次推送时都重新渲染，直到某个 Release 附上它的键。本机没有视频工具链时设置 `TBOOK_CACHE_REMOTE=1`，从已发布的 Release 恢复。
 - **`main` 上每次都恢复不到上次的结果**：看 `pages.yml` 保存步骤的日志。存储内容与恢复到的相同时不保存；不同时以带运行号的新键保存，下一次运行恢复的就是它，存储回到早先的内容（例如回滚）时也一样。保存了仍然重建，就是键不稳定，按上两条排查。
 - **从 Release 恢复失败**：日志中 `cache:` 开头的行说明原因（列不出 Release、摘要不符、条目不匹配）；工具随即改为构建，不会用不完整的条目。
 

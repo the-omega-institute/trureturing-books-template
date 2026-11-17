@@ -95,7 +95,7 @@ SITE_I18N: dict[str, dict[str, str]] = {
         "doi": "DOI",
         "date": "日期",
         "verification": "形式化验证",
-        "verification_intro": "以下定理都引用 trureturing 中已冻结的 Lean 声明；链接固定在所钉的提交上，不随上游漂移。",
+        "verification_intro": "以下定理都引用 trureturing 中已冻结的 Lean 声明；链接固定在各声明的证据提交上，不随上游漂移。",
         "ledger_link": "完整的形式化验证账本",
         "all_theorems": "全部 {n} 条定理",
         "open_none": "本书没有标为开放的条目。",
@@ -134,7 +134,7 @@ SITE_I18N: dict[str, dict[str, str]] = {
         "date": "Date",
         "verification": "Formal verification",
         "verification_intro": "Each theorem below cites a frozen Lean declaration in trureturing; the links are fixed "
-                              "to the pinned commit and do not drift with upstream changes.",
+                              "to each declaration's evidence commit and do not drift with upstream changes.",
         "ledger_link": "Full verification ledger",
         "all_theorems": "All {n} theorems",
         "open_none": "This book marks no item as open.",
@@ -1497,7 +1497,7 @@ def _load_lock() -> lean.Lock | None:
     try:
         return lean.Lock.load()
     except lean.LeanError as exc:
-        _warn(f"trureturing.lock.json unreadable ({exc}); pages omit the pinned commit")
+        _warn(f"trureturing.lock.json unreadable ({exc}); pages omit the trureturing revision")
         return None
 
 

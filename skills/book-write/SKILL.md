@@ -90,7 +90,7 @@ PDF 一端由 `tools/filters/typst-compat.lua` 负责与 KaTeX 保持一致：�
 
 ### 写“文献结果”之前先搜冻结库
 
-把源文已证结果写成显式 written-proof 之前，先在所钉提交上搜索匹配的冻结声明；真正未证才用 conjecture。经典结论常常已经冻结，只是换了名字，或以有限维、固定参数、等价改写的形式出现。trureturing 每个 `D5/**/*.lean` 文件头有一行英文 `digest:` 摘要：
+把源文已证结果写成显式 written-proof 之前，先在所跟随分支上搜索匹配的冻结声明；真正未证才用 conjecture。经典结论常常已经冻结，只是换了名字，或以有限维、固定参数、等价改写的形式出现。trureturing 每个 `D5/**/*.lean` 文件头有一行英文 `digest:` 摘要：
 
 本地上游默认使用 `~/trureturing`；用户显式指定时先将该路径设为 `TRURETURING_DIR`，否则沿用已有值。后续形式化与钉版继续使用这个目录。
 
@@ -123,7 +123,7 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 ## 步骤
 
 1. 确认要写的每条形式结论在 trureturing 中已有冻结声明：在 trureturing checkout 中搜索 `D5/`，或读 `Golden/Frozen/state/<module>.lean.json`。没有 → 若源文有证明，按 DOI 或源论文仓库地址、原文定位和对应 issue 登记显式书面证明，并关联每版证明；若确实开放，用 conjecture/problem。需要内核验证且已获授权时再走 `skills/theorem-formalize`。
-2. 在权威版本中写作；新增 GID 后运行 `./tbook pin --refresh`（不移动提交，只解析新引用）。
+2. 在权威版本中写作；新增 GID 后运行 `./tbook pin --refresh`（跟随配置分支头解析引用；未变化声明保留原证据提交）。
 3. 同步其他语言版本（同样的 id、lean、顺序）。
 4. `./tbook check` 必须 0 错误；处理警告（未列入 SUMMARY 的文件、未使用的锁条目）。
 5. `./tbook build html --book <slug>`，检查构建日志与适用的自动检查结果。改动了公式或表格时，`./tbook build pdf epub --book <slug>` 也要跑：epubcheck 的错误与 PDF 的转换问题只在各自的构建里暴露（见“容易踩的坑”）。普通正文修改不默认截图或打开页面逐一查看；仅在出现相关错误或警告，或任务明确要求视觉／版式检查与修复时，按 [book-export](../book-export/SKILL.md) 排查受影响页面。
@@ -137,4 +137,4 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 - 在本仓库写 `.lean` 文件或 Lean 证明。
 - 让各语言版本的环境序列不一致，或只改一种语言。
 
-当前版本来自 `trureturing-lock/index.json`，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从分片锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。
+当前跟随分支来自 `trureturing-lock/index.json`；每条声明的证据 SHA 在所属模块分片中保存，不复制 SHA 到源码。正文与审计表用 `docs/AUTHORING.md` 的保留链接标签；幻灯片用 `<PinnedCommit />`（复用主题的 `pinned`）；可视化锚点用 `data-lean-gid` / `data-trureturing-path` 和 `href="#"`，由构建与本地预览解析。动态声明数据可从 `../assets/trureturing.json` 取得（构建生成、本地预览从分片锁读取；不提交该文件）。真实历史版本仍按历史事实保留。钉版后复核摘要变化与媒体陈述，再重建；纯提交或行号变化不要求改正文或媒体源码。

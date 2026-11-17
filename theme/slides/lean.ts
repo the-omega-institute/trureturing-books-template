@@ -43,7 +43,7 @@ export function leanState(info: LeanInfo, status?: string, kind?: string): LeanS
   return info.theorem && kind !== 'definition' ? 'lean' : 'defined'
 }
 
-/** The pinned trureturing commit (short) and its tree URL, or empty strings without a lock. */
+/** The followed trureturing branch (legacy: short pinned commit) and its tree URL, or empty strings without a lock. */
 export const pinned = tr.lock
   ? { short: tr.lock.commit.slice(0, 8), url: `https://github.com/${tr.lock.repo}/tree/${tr.lock.commit}`, repo: tr.lock.repo }
   : { short: '', url: '', repo: '' }

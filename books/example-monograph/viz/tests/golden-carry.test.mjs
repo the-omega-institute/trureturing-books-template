@@ -10,11 +10,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { loadLock } from '../../../../tools/node/slides-lib.mjs';
 import { session, stageFirstChecks, settle, until, cjkLeftovers, playsAfter, openStill } from '../../../../tools/node/viz-testkit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const BOOK = 'example-monograph', ID = 'golden-carry';
-const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'trureturing.lock.json'), 'utf8'));
+const lock = loadLock(ROOT);
 // This suite visits the hub, so materialize the two covers it displays on a clean checkout.
 for (const id of ['golden-carry', 'phase-torus']) {
   execFileSync(process.execPath, [path.join(ROOT, 'tools/node/viz-thumbs.mjs'), BOOK, id], { cwd: ROOT, stdio: 'inherit' });
@@ -257,11 +258,11 @@ await D(() => window.GC_DEBUG.set(20, 35)); await page.keyboard.press('s'); st =
 check('S swaps the pair from the keyboard', st.v1 === 35 && st.v2 === 20);
 await scene('map'); check('the scene chips switch scenes and show the evidence of that scene', (await state()).scene === 'map' && (await D(() => !document.querySelector('.lean[data-scenes="map"]').hidden && document.querySelector('.lean[data-scenes="carry"]').hidden)));
 
-/* ---------- evidence: Lean links at the pinned commit; honest labels ---------- */
+/* ---------- evidence: Lean links at each declaration's evidence commit; honest labels ---------- */
 const links = await D(() => [...document.querySelectorAll('a[data-lean-gid]')].map((a) => [a.dataset.leanGid, a.href]));
-check('every Lean link points at the pinned commit, file and line of trureturing.lock.json', links.length >= 7 && links.every(([gid, href]) => {
-  const d = lock.declarations[gid]; return d && d.kind === 'theorem' && href === `https://github.com/${lock.repo}/blob/${lock.commit}/${gid.slice(0, gid.lastIndexOf('.'))}.lean#L${d.line}`;
-}), JSON.stringify(links.find(([gid, href]) => { const d = lock.declarations[gid]; return !d || href !== `https://github.com/${lock.repo}/blob/${lock.commit}/${gid.slice(0, gid.lastIndexOf('.'))}.lean#L${d.line}`; }) || ''));
+check('every Lean link points at the declaration evidence commit, file and line in the lock', links.length >= 7 && links.every(([gid, href]) => {
+  const d = lock.declarations[gid]; return d && d.kind === 'theorem' && href === `https://github.com/${lock.repo}/blob/${d.commit || lock.commit}/${gid.slice(0, gid.lastIndexOf('.'))}.lean#L${d.line}`;
+}), JSON.stringify(links.find(([gid, href]) => { const d = lock.declarations[gid]; return !d || href !== `https://github.com/${lock.repo}/blob/${d.commit || lock.commit}/${gid.slice(0, gid.lastIndexOf('.'))}.lean#L${d.line}`; }) || ''));
 const cites = new Set(links.map(([g]) => g));
 check('the page cites the theorems of its four scenes', ['D5/S1/Deficit/DeficitInteger.deficit_integer', 'D5/S1/Deficit/DeficitThreeValued.deficit_three_valued', 'D5/S1/Deficit/GoldenPhaseDeficit.golden_phase_deficit', 'D5/S1/Words/Expansions/BasePhiNegativeBridge.betaContraction_mem_window'].every((g) => cites.has(g)));
 const registry = JSON.parse(fs.readFileSync(path.join(ROOT, 'books', BOOK, 'viz', 'visualizations.json'), 'utf8')).visualizations.find((v) => v.id === ID);

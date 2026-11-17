@@ -1,7 +1,7 @@
 <!--
   The frame shared by every slide: void background with aurora, scanlines and corner brackets,
-  a header (book code // deck title, section on the right) and a footer (book · version, the pinned
-  trureturing commit, page number). Frontmatter:
+  a header (book code // deck title, section on the right) and a footer (book · version, the followed
+  trureturing branch (legacy: pinned commit), page number). Frontmatter:
     section: "…"   right side of the header
     bare: true     no header and footer (slides that draw their own frame, such as a cover)
   Header and footer read the deck headmatter: deck.code, deck.title, deck.book, deck.version.

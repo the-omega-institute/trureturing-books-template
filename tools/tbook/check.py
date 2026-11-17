@@ -3,8 +3,9 @@
 The rule this enforces: every theorem / lemma / proposition / corollary cites at least
 one Lean declaration (``lean="<GID>"``), unless explicitly marked status="written-proof"
 with a proof block in every edition and no lean attribute. A Lean citation must be recorded
-in the sharded ``trureturing-lock/`` evidence ledger and, at the pinned commit, listed in trureturing's ``Golden/Frozen/state`` with kind
-``theorem`` — i.e. kernel-verified and frozen. The pinned commit must be on the site.toml
+in the sharded ``trureturing-lock/`` evidence ledger and, at its evidence commit, listed in
+trureturing's ``Golden/Frozen/state`` with kind ``theorem`` — i.e. kernel-verified and frozen.
+Each declaration's evidence commit must be on the site.toml
 branch, where trureturing's CI enforces the freeze rule. Conjectures and open problems must
 not cite Lean. Editions of a book (zh, en, …) must agree item by item, and their SUMMARY.md
 must give every chapter the same number.
@@ -505,8 +506,8 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
                site: config.Site, issues: list[Issue], *, offline: bool,
                extra_cited: list[tuple[Path, int, str]] | None = None,
                cited_elsewhere: set[str] | None = frozenset()) -> None:
-    """Re-verify every cited GID against the lock and the frozen state at the pinned commit, and
-    the pinned commit against the site.toml branch, which must be a branch name and the lock's branch.
+    """Re-verify each cited GID at its evidence commit, including that commit's ancestry on the
+    site.toml branch, which must be a branch name and the lock's branch.
     (In a pull request's GitHub Actions run the Ledger reads nothing from ``.cache/trureturing``.)
 
     ``extra_cited`` holds citations outside the chapters (visualizations, films, slides); they are
@@ -544,10 +545,11 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
     if lock.branch and lock.branch != branch:  # the lock (and the site manifest) would name an unchecked branch
         _err(issues, paths.LOCK_FILE, 0,
              f"lock was pinned against branch {lock.branch!r} but site.toml uses {branch!r}; run ./tbook pin "
-             f"(or ./tbook pin --refresh to keep commit {lock.commit[:12]} if it is on {branch!r})")
+             f"(or ./tbook pin --refresh to follow {branch!r} and refresh the declaration shards)")
     ledger = lean.Ledger(lock.repo, offline=offline)
     # Shards can intentionally retain evidence from several dev commits. Check
-    # each source commit once; the index commit is only a compatibility baseline.
+    # each source commit once. The v3 index follows a branch; only legacy locks
+    # use one global commit as the fallback for declaration evidence.
     for source_commit in sorted({lock.commit_for(gid) for gid in cited if lock.get(gid)}):
         problem = lean.branch_problem(branch, source_commit)
         anc = lean.Ancestry(None, "") if problem else ledger.branch_contains(source_commit, branch)
@@ -559,8 +561,7 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
         elif anc.no_branch:
             _err(issues, paths.SITE_TOML, 0,
                  f"[trureturing] branch {branch!r} does not exist in {lock.repo} ({anc.detail}); set it to an existing "
-                 f"branch (default 'dev'), then run ./tbook pin --refresh to keep commit {source_commit[:12]} if it is on "
-                 "that branch, or ./tbook pin")
+                 "branch (default 'dev'), then run ./tbook pin --refresh to refresh the declaration shards, or ./tbook pin")
         elif anc.on_branch is False:
             _err(issues, paths.LOCK_FILE, 0,
                  f"pinned commit {source_commit[:12]} is not on {where} ({anc.detail}); trureturing enforces the freeze "

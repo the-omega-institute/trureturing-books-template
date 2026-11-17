@@ -336,7 +336,7 @@ class RegistryChecks(unittest.TestCase):
         page.write_text(page.read_text(encoding="utf-8").replace('data-trureturing-path="D5/S1/Digit/Normalize.lean"',
                                                                  'data-trureturing-path="D5/S1/Digit/Nope.lean"'), encoding="utf-8")
         msgs = messages(viz.check(book))
-        self.assertTrue(any("Blueprint/D5/Nope.md does not exist in trureturing at the pinned commit" in m for m in msgs), msgs)
+        self.assertTrue(any("Blueprint/D5/Nope.md does not exist in trureturing at revision" in m for m in msgs), msgs)
         self.assertTrue(any('data-trureturing-path="D5/S1/Digit/Nope.lean" does not exist' in m for m in msgs), msgs)
 
     @needs_example

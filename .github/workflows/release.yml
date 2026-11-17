@@ -17,8 +17,8 @@
 # and v2026.11.10-2 (a second release that day) are ordinary releases.
 #
 # The release carries, per book, the PDFs (screen + print), the EPUB of every edition and the slide PDFs
-# (<slug>-<deck>-<lang>.pdf); its notes list each book's version, editions, theorem count and the pinned
-# trureturing commit.
+# (<slug>-<deck>-<lang>.pdf); its notes list each book's version, editions, theorem count and the followed
+# trureturing branch (legacy locks show their pinned commit).
 #
 # Every release is also a restore point of the build cache (docs/PUBLISHING.md §5): whatever the tag, the
 # build job builds the whole site (./tbook build all, films included), restoring unchanged units from the
@@ -211,7 +211,7 @@ jobs:
 
       - name: Check
         env:
-          # check asks GitHub's compare API whether the pinned trureturing commit is on the site.toml branch
+          # check asks GitHub's compare API whether each declaration's evidence commit is on the site.toml branch
           # (no trureturing checkout here); in GitHub Actions an unanswered question is an error.
           GITHUB_TOKEN: ${{ github.token }}
           # Optional repository secret for a private trureturing (raw files and the compare API).

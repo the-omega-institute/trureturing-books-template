@@ -7,7 +7,7 @@ chapter's Markdown for one target:
   environment title → ``定理2.1`` (a ``[定理2.1](#id)`` link for Pandoc, :func:`env_title`);
 * ``[text](lean:GID)`` (also ``(<lean:GID>)``, any title, a reference definition ``[x]: lean:GID``
   in or out of a block quote or list item, and the autolink ``<lean:GID>``, whose text is the GID)
-  → a permalink to the declaration's Lean source at the pinned commit (just the text when the lock
+  → a permalink to the declaration's Lean source at its evidence commit (just the text when the lock
   does not resolve the GID; a reference definition gets ``#``). A ``lean:`` link the line scanner
   cannot read (written across lines, also with a ``<lean:GID>`` destination, raw HTML) loses its
   destination the same way (:func:`without_stray_lean`): no target ever writes a ``lean:`` URL;

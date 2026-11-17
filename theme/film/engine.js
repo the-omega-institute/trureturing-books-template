@@ -417,7 +417,7 @@ function badgeQ(S, seq) {
   seq.forEach(e => { const s0 = e[0] === 0 && !e[1] ? 0 : phraseAt(S, e[0], e[1]); if (S.u >= s0) { cur = e; st = s0; } });
   badge(clamp((S.u - st) / 0.5) * clamp(S.u / 0.8) * clamp((S.d - S.u) / 0.5), cur[2]);
 }
-/* LEAN ✓ declaration chips: the film's citations (DATA.lean) at the pinned commit. Only theorems get the green
+/* LEAN ✓ declaration chips: the film's citations (DATA.lean) at their evidence commits. Only theorems get the green
    chip (./tbook check refuses any other kind in film.json "lean"). Each shows r.label: the full Lean name, or the GID
    when the declaration's namespace would name another module (tbook.film.cited_label). */
 /* the citation of one GID (film.json "lean"), or null: look citations up by the whole GID, not by the short name */
@@ -436,7 +436,7 @@ function leanList(x, y, a, o = {}) {
   }
   return y;
 }
-/* end card: book code and titles, film title, Lean citations and the pinned commit; o: from (seconds into the scene),
+/* end card: book code and titles, film title, Lean citations and the followed branch (legacy: pinned commit); o: from (seconds into the scene),
    y (top line), x (centre, default the frame's), hyper (false: no hypercube behind it) */
 function closingCard(S, o = {}) {
   const from = o.from || 0, a = clamp((S.u - from) / 1.0) * clamp((S.d - S.u) / 1.2);

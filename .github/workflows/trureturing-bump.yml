@@ -1,4 +1,4 @@
-# Move the pinned trureturing commit forward (managed by the template).
+# Refresh declaration evidence from the followed trureturing branch (managed by the template).
 #
 # Weekly (or on demand, optionally with a commit, branch or tag) this resolves the target commit, runs
 # `./tbook pin <sha> --report build/pin.md`, and when the sharded trureturing lock changes runs `./tbook check`
@@ -43,8 +43,8 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      # Used by gh and by tbook: pin and check ask GitHub's compare API whether the commit is on the
-      # site.toml branch (tbook reads $TRURETURING_TOKEN, $GITHUB_TOKEN, then $GH_TOKEN), and in GitHub
+      # Used by gh and by tbook: pin checks its target and check checks each evidence commit against the
+      # site.toml branch via GitHub's compare API (tbook reads $TRURETURING_TOKEN, $GITHUB_TOKEN, then $GH_TOKEN), and in GitHub
       # Actions an unanswered question is an error.
       GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
       HAS_BOT_TOKEN: ${{ secrets.BOT_TOKEN != '' }}

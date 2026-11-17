@@ -1,4 +1,4 @@
-"""Resolve Lean declarations against trureturing's frozen ledger at a pinned commit.
+"""Resolve Lean declarations against trureturing's frozen ledger at their evidence commits.
 
 In trureturing, a module's declarations are kernel-verified and frozen exactly when
 ``Golden/Frozen/state/<module>.lean.json`` exists (CLAUDE.md §1.3, the freeze rule).
@@ -23,7 +23,7 @@ request's GitHub Actions run never reads the cache (``cache_trusted``): the cach
 restores may have been saved by an earlier run of the same pull request, i.e. by its code.
 
 The freeze rule is enforced by trureturing's CI on its integration branch (``dev``), so a
-pinned commit must be reachable from that branch (``Ledger.branch_contains``): raw URLs
+declaration's evidence commit must be reachable from that branch (``Ledger.branch_contains``): raw URLs
 also serve commits that were never merged (pull-request heads, other branches). The
 branch must be a valid branch name, not a commit SHA, a full ref or a revision expression
 such as ``<sha>^0`` (``branch_problem``), and an existing branch of the repository: the
@@ -274,7 +274,9 @@ class CacheSource(Source):
         return self.dir / commit / path
 
     def read(self, commit: str, path: str) -> bytes | None:
-        if not self.readable:
+        # Only full evidence SHAs are immutable. Never reuse old branch/tag
+        # content (including .missing markers), even if a previous version cached it.
+        if not self.readable or not SHA_RE.fullmatch(commit):
             return None
         f = self._file(commit, path)
         if f.exists():
@@ -283,6 +285,8 @@ class CacheSource(Source):
         return b"" if missing.exists() else None
 
     def store(self, commit: str, path: str, data: bytes) -> None:
+        if not SHA_RE.fullmatch(commit):
+            return
         f = self._file(commit, path if data else path + ".missing")
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(data)
@@ -525,7 +529,7 @@ def branch_problem(branch: str, commit: str = "") -> str:
     """Why ``branch`` (site.toml ``[trureturing].branch``) cannot stand for trureturing's integration
     branch, as a phrase that follows the name ('' if it can).
 
-    Git and GitHub's compare API read more than branch names: with the pinned commit, an abbreviation
+    Git and GitHub's compare API read more than branch names: with an evidence commit, an abbreviation
     of it, or ``<sha>^0`` in place of the branch, compare answers ``identical``; ``owner:branch`` names
     another repository's branch. Refused here, before anybody is asked: every name
     ``git check-ref-format --branch`` refuses, and a few more (``branch_name_problem``); a full ref

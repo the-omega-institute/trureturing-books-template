@@ -177,7 +177,7 @@ $$
 | 写法 | 结果 |
 | --- | --- |
 | `[@thm-deficit-three-valued]` | “定理1.3”，链接到该定理（跨章节可用） |
-| ``[`deficit_three_valued`](lean:D5/S1/Deficit/DeficitThreeValued.deficit_three_valued)`` | 指向所钉提交上 Lean 源文件对应行的永久链接 |
+| ``[`deficit_three_valued`](lean:D5/S1/Deficit/DeficitThreeValued.deficit_three_valued)`` | 指向该声明证据提交上 Lean 源文件对应行的永久链接 |
 | `[该定理][lt]` + `[lt]: lean:D5/…/Module.name` | 引用式写法，同上；尖括号 `(<lean:…>)` 与自动链接 `<lean:…>`（显示为 GID）也可以。各种写法见表下说明 |
 | `[第二章](ch02-refutation-observation.md)` | 章节链接（HTML 为页面链接，PDF/EPUB 为内部跳转） |
 | `[观测能恢复什么](ch02-refutation-observation.md#观测能恢复什么)` | 章节内标题：片段按目标章节内的标题解析（与 HTML 相同），各章都有的同名标题（如“小结”）不会串章；片段照抄 HTML 页面上的锚点即可，标题含公式或脚注时也一样（`## 关于 $\beta$ 的估计` 的片段是 `#关于-β-的估计`；`## 注释[^a]` 的片段是 `#注释1`，数字是该脚注在本章的编号；标题里的 HTML 注释不进锚点）。片段也可以是目标章节里的显式 id（`{#id}`）或任一环境 id。目标章节没有的片段，HTML 中只打开该页，PDF/EPUB 中只显示链接文字并警告，不会落到别章的同名锚点上 |
@@ -271,7 +271,7 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 | --- | --- |
 | `theorem #… cites no Lean declaration` | 加 `lean="…"`；若未证明，改为 `conjecture` |
 | `… is not in trureturing.lock.json` | `./tbook pin --refresh` |
-| `module … is not frozen at …` | 该模块在所钉提交上没有状态片：换一个已冻结的声明，或先在 trureturing 中完成冻结，再 `./tbook pin` |
+| `module … is not frozen at …` | 该模块在声明的证据提交上没有状态片：换一个已冻结的声明，或先在 trureturing 中完成冻结，再 `./tbook pin` |
 | `no frozen declaration named …` / `ambiguous` | 检查名字；歧义时写更长的后缀 |
 | `is a Lean def, but theorem-like environments must cite theorems` | 定义请用 `definition` 环境 |
 | `item N differs between editions` | 对齐各语言版本的环境序列 |
@@ -286,7 +286,7 @@ HTML 注释 `<!-- … -->` 不出现在任何输出中：其中的图片、链�
 | `this definition's ':' line holds nothing and a blank line follows it …`（警告） | 去掉冒号行后的空行，或把定义的第一行写在冒号后（见 §4） |
 | `the '$' at column … is not closed before the fenced code block on line …`（警告） | 字面美元号写 `\$`（见 §3） |
 | `'…' is the destination of the reference definition whose label ends the line before …`（警告） | 把地址写在 `[x]:` 那一行；两行本是正文时写 `\[x]:`（见 §4） |
-| `pinned commit … is not on branch 'dev'` | 所钉提交未合入 `site.toml` 的 trureturing 分支（默认 `dev`）：改钉该分支上的提交（`./tbook pin`） |
+| `pinned commit … is not on branch 'dev'` | 该声明的证据提交未合入 `site.toml` 的 trureturing 分支（默认 `dev`）：改钉该分支上的提交（`./tbook pin`） |
 | `could not verify that pinned commit …` | 设置 `TRURETURING_DIR` 指向含该提交的 checkout（必要时先 `git fetch`），或联网让 GitHub API 回答（设置 `GITHUB_TOKEN` 可免匿名限额）；GitHub Actions 中这是错误 |
 | `not listed in SUMMARY.md` | 加入 SUMMARY 或删除文件 |
 | `figure … has no caption` / `has a placeholder caption` | 给 `.figure` 块或图片写一句说明这张图的图注；“图 13”这样的编号不算图注 |

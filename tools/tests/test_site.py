@@ -11,6 +11,7 @@ ledger is skipped without a trureturing checkout ($TRURETURING_DIR or ../truretu
 
 from __future__ import annotations
 
+import copy
 import html.parser
 import json
 import os
@@ -39,7 +40,7 @@ HAVE_KATEX = bool(NODE) and (paths.ROOT / "node_modules" / "katex" / "package.js
 
 
 def site_lock(*drop: str) -> lean.Lock:
-    """The lock the site tests build with (not the repository's: the LEAN ✓ counts follow the lock,
+    """A legacy lock for the site tests (not the repository's: the LEAN ✓ counts follow the lock,
     so a re-pinned downstream lock must not change them); ``drop`` leaves GIDs out."""
     decls = {
         GID_3V: {"module": "D5/S1/Deficit/DeficitThreeValued", "name": "D5.S1.Deficit.deficit_three_valued",
@@ -48,7 +49,8 @@ def site_lock(*drop: str) -> lean.Lock:
                   "kind": "theorem", "statement_id": "sha256:int", "line": 5},
     }
     return lean.Lock(repo="the-omega-institute/trureturing", branch="dev", commit=SITE_COMMIT,
-                     pinned_at="2026-01-01T00:00:00Z", declarations={g: d for g, d in decls.items() if g not in drop})
+                     pinned_at="2026-01-01T00:00:00Z", schema=lean.LOCK_SCHEMA,
+                     declarations={g: d for g, d in decls.items() if g not in drop})
 
 
 # --------------------------------------------------------------------------- fixtures
@@ -1007,7 +1009,9 @@ class DoctorTest(unittest.TestCase):
 
 
 def sample_lock() -> lean.Lock:
+    """A legacy aggregate lock: one immutable revision supplies the verification environment."""
     return lean.Lock(repo="the-omega-institute/trureturing", branch="dev", commit="a" * 40, pinned_at="2026-01-01T00:00:00Z",
+                     schema=lean.LOCK_SCHEMA,
                      declarations={
                          GID_3V: {"module": "D5/S1/Deficit/DeficitThreeValued", "name": "D5.S1.Deficit.deficit_three_valued",
                                   "kind": "theorem", "statement_id": "sha256:x"},
@@ -1032,7 +1036,7 @@ class LeanVerifyTest(unittest.TestCase):
                          'Lean.Name.mkStr (Lean.Name.mkNum (Lean.Name.mkStr (Lean.Name.anonymous) "A") 2) "b"')
 
     def test_generate(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(lean, "ls_remote") as resolve:
             out = leanverify.generate(Path(tmp) / "lv", lock=sample_lock(), toolchain="leanprover/lean4:v4.35.0")
             self.assertEqual((out / "lean-toolchain").read_text(), "leanprover/lean4:v4.35.0\n")
             lake = (out / "lakefile.toml").read_text()
@@ -1068,6 +1072,37 @@ class LeanVerifyTest(unittest.TestCase):
             # deterministic
             again = leanverify.generate(Path(tmp) / "lv2", lock=sample_lock(), toolchain="leanprover/lean4:v4.35.0")
             self.assertEqual(src, (again / "BookVerify.lean").read_text())
+            resolve.assert_not_called()
+
+    def test_v3_resolves_branch_once_without_rewriting_evidence(self):
+        lock = sample_lock()
+        lock.schema = lean.SHARDED_LOCK_SCHEMA
+        lock.branch = lock.commit = "integration"
+        for i, declaration in enumerate(lock.declarations.values(), 1):
+            declaration["commit"] = str(i) * 40
+        evidence = copy.deepcopy(lock.declarations)
+        snapshot = "f" * 40
+        ledger = mock.Mock()
+        ledger.read.return_value = b"leanprover/lean4:v4.35.0\n"
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(lean, "ls_remote", return_value=snapshot) as resolve, \
+                mock.patch.object(leanverify, "_citing_books", return_value={}):
+            out = leanverify.generate(Path(tmp) / "first", lock=lock, ledger=ledger)
+            resolve.assert_called_once_with(lock.repo, "refs/heads/integration")
+            ledger.read.assert_called_once_with(snapshot, "lean-toolchain")
+            self.assertEqual((out / "lean-toolchain").read_text(), "leanprover/lean4:v4.35.0\n")
+            self.assertIn(f'rev = "{snapshot}"', (out / "lakefile.toml").read_text())
+            self.assertIn(f"{lock.repo}@{snapshot}", (out / "BookVerify.lean").read_text())
+            self.assertIn(snapshot, (out / "README.md").read_text())
+            resolve.reset_mock()
+            ledger.read.reset_mock()
+            again = leanverify.generate(Path(tmp) / "second", lock=lock, ledger=ledger)
+            resolve.assert_called_once_with(lock.repo, "refs/heads/integration")
+            ledger.read.assert_called_once_with(snapshot, "lean-toolchain")
+            for path in out.iterdir():
+                self.assertEqual(path.read_bytes(), (again / path.name).read_bytes(), path.name)
+        self.assertEqual(lock.commit, "integration")
+        self.assertEqual(lock.declarations, evidence)
 
     def test_errors(self):
         lock = sample_lock()
@@ -1094,15 +1129,25 @@ class LeanVerifyTest(unittest.TestCase):
         "needs trureturing.lock.json and a trureturing checkout")
     def test_real_lock(self):
         lock = lean.Lock.load()
-        with tempfile.TemporaryDirectory() as tmp:
-            out = leanverify.generate(tmp)
+        ledger = lean.Ledger(lock.repo, offline=True)
+        if ledger.checkout is None:
+            self.skipTest("needs a usable trureturing checkout")
+        snapshot = lock.commit
+        if lock.schema == lean.SHARDED_LOCK_SCHEMA:
+            ref = lean._branch_ref(ledger.checkout, lock.repo, lock.branch)
+            if not ref:
+                self.skipTest(f"checkout lacks branch {lock.branch}")
+            snapshot = lean._git(ledger.checkout, "rev-parse", ref).stdout.strip()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(lean, "ls_remote", return_value=snapshot):
+            out = leanverify.generate(tmp, lock=lock, ledger=ledger)
             toolchain = (out / "lean-toolchain").read_text().strip()
             self.assertRegex(toolchain, r"^leanprover/lean4:v\d+\.\d+")
             src = (out / "BookVerify.lean").read_text()
             for gid, d in lock.declarations.items():
                 self.assertIn(f"import {d['module'].replace('/', '.')}", src)
                 self.assertIn(f'gid := "{gid}"', src)
-            self.assertIn(lock.commit, (out / "lakefile.toml").read_text())
+            lakefile = (out / "lakefile.toml").read_text()
+            self.assertIn(f'rev = "{snapshot}"', lakefile)
 
 
 if __name__ == "__main__":

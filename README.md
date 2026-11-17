@@ -8,7 +8,7 @@
 
 | 组成 | 方案 |
 | --- | --- |
-| 形式化验证 | [trureturing](https://github.com/the-omega-institute/trureturing)：Lean 代码写在那里；书按 GID 引用其已冻结的声明，提交钉在 `trureturing.lock.json` |
+| 形式化验证 | [trureturing](https://github.com/the-omega-institute/trureturing)：Lean 代码写在那里；书按 GID 引用其已冻结的声明，跟随配置分支，各声明的证据提交保存在 `trureturing-lock/`；`trureturing.lock.json` 是稳定指针 |
 | 在线阅读 | [trureturing-mdbook](https://github.com/the-omega-institute/trureturing-mdbook) 的 mdBook 方案（KaTeX 构建期渲染、永久链接） |
 | 交互可视化 | [trureturing-visualize](https://github.com/the-omega-institute/trureturing-visualize) 方案（纯 HTML/CSS/JS、双语、理论接口抽屉） |
 | 视频 | [trureturing-film](https://github.com/the-omega-institute/trureturing-film) 方案（确定性 Canvas、TTS 旁白、双语字幕） |
@@ -42,9 +42,9 @@ Zenodo 通常为书库提供一个跨版本的概念 DOI；优先填写这个 DO
 :::
 ```
 
-`./tbook check` 在所钉的 trureturing 提交上读取 `Golden/Frozen/state/<module>.lean.json`——trureturing 冻结律下“已被内核验证并冻结”的唯一判据——确认该声明存在且是 `theorem`；既无 Lean 引用又不满足书面证明要求的定理、引用了 Lean 的开放问题、过期或被手改的锁文件、中英版本不一致，都会让 CI 失败。`lean-verify` 工作流再生成一个依赖所钉 trureturing 的 Lake 工程，逐条检查公理闭包。详见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
+`./tbook check` 在各声明的证据提交上读取 `Golden/Frozen/state/<module>.lean.json`——trureturing 冻结律下“已被内核验证并冻结”的唯一判据——确认该声明存在且是 `theorem`；既无 Lean 引用又不满足书面证明要求的定理、引用了 Lean 的开放问题、过期或被手改的锁文件、中英版本不一致，都会让 CI 失败。`lean-verify` 工作流再将配置分支头解析为一个完整 SHA，生成工具链与依赖使用同一快照的 Lake 工程（旧聚合锁仍使用全局所钉 SHA），逐条检查公理闭包。详见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
 
-渲染后，Lean 验证定理框带绿色 `LEAN ✓` 徽章与指向所钉提交上 Lean 源（含行号）的链接，书末自动生成“形式化验证账本”；未按规定声明书面证明、锁文件也不能确认的形式结论显示红色 `UNVERIFIED`，徽章不是链接，锁文件没有的声明也不给链接（`./tbook check` 会报错，不能发布）。
+渲染后，Lean 验证定理框带绿色 `LEAN ✓` 徽章与指向各声明证据提交上 Lean 源（含行号）的链接，书末自动生成“形式化验证账本”；未按规定声明书面证明、锁文件也不能确认的形式结论显示红色 `UNVERIFIED`，徽章不是链接，锁文件没有的声明也不给链接（`./tbook check` 会报错，不能发布）。
 
 ## 快速开始
 
@@ -115,7 +115,7 @@ theme/   tools/   templates/   skills/   docs/   .github/workflows/
 | --- | --- |
 | `./tbook doctor` | 工具链体检 |
 | `./tbook check` | 结构、多语言对齐、Lean 引用 |
-| `./tbook pin [<sha>\|<branch>\|<tag>\|--refresh]` | 钉 trureturing 提交（须在 `site.toml` 的分支上），解析引用 |
+| `./tbook pin [<sha>\|<branch>\|<tag>\|--refresh]` | 跟随 `site.toml` 的 trureturing 分支，刷新引用的声明证据 |
 | `./tbook new-book` / `new-chapter` | 新书、新章节 |
 | `./tbook books [--hidden]` | 列出书库中的书（`site.toml` 的 `[books] hide` 隐藏的书不算；`--hidden` 列出它们） |
 | `./tbook build [html\|pdf\|epub\|slides\|viz\|films\|site\|all]` | 构建（输入未变的单元从缓存恢复） |

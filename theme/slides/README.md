@@ -28,16 +28,16 @@ node tools/node/slides-check.mjs                                 # 同上（Node
 
 ## 版式与每页 frontmatter
 
-- `layout: cover`：封面与结尾。无页眉页脚；自带书代号、所钉 trureturing 提交、HUD 表盘与页码。正文放 `p.kicker`、`h1.display`、`p.lead`。
+- `layout: cover`：封面与结尾。无页眉页脚；自带书代号、跟随的 trureturing 分支（旧锁显示所钉提交）、HUD 表盘与页码。正文放 `p.kicker`、`h1.display`、`p.lead`。
 - `layout: section`：章节页。`chapter: "01"` 为大号描边编号；正文放 `p.kicker`、`h2.t`、`p.lead`，可再放一张卡片。
-- 默认版式：页眉（书代号 // 标题，右侧 `section`）与页脚（书名 · 版本、所钉提交、页码）。`bare: true` 去掉页眉页脚。
+- 默认版式：页眉（书代号 // 标题，右侧 `section`）与页脚（书名 · 版本、跟随分支、页码）。`bare: true` 去掉页眉页脚。
 - 各语言版本逐页的 `layout`、`bare`、`chapter`、`class` 与 `section` 是否存在必须一致。
 
 ## 组件
 
 | 组件 | 用法 |
 | --- | --- |
-| `<LeanBadge gid="<GID>" />` | 绿色 `LEAN ✓`（链接到所钉提交上的 Lean 源码），仅当 `trureturing.lock.json` 把该 GID 解析为 Lean `theorem`；锁文件中没有的 GID 显示红色 `UNVERIFIED`。`kind="definition"` → 青色 `LEAN DEF`（Lean 定义，中性样式，不是“已验证”）。`status="open"` → 红色 `OPEN`；`status="argued"` → 紫色 `ARGUED`。 |
+| `<LeanBadge gid="<GID>" />` | 绿色 `LEAN ✓`（链接到各声明证据提交上的 Lean 源码），仅当 `trureturing.lock.json` 把该 GID 解析为 Lean `theorem`；锁文件中没有的 GID 显示红色 `UNVERIFIED`。`kind="definition"` → 青色 `LEAN DEF`（Lean 定义，中性样式，不是“已验证”）。`status="open"` → 红色 `OPEN`；`status="argued"` → 紫色 `ARGUED`。 |
 | `<TheoremCard label="定理1.3" title="…" gid="<GID>" cite="thm-…">` | 定理卡：编号、标题、徽章、陈述（默认插槽，前后空一行，可写 Markdown 与 `$…$`）、Lean 名。`cite` 指向书中的环境 id，`./tbook check` 据此核对编号与 GID。`kind="definition"` 用于定义：`gid` 可以是 Lean 定义，卡片为青色中性样式与 `LEAN DEF`，从不显示绿色 `LEAN ✓`；`status="open"` 用于开放问题（不得带 `gid`）。 |
 | `<Stat value="4" label="…" tone="ok" />` | 大号数字。`tone`：`cyan`（默认）、`magenta`、`ok`、`warn`、`violet`、`amber`。 |
 | `<Source>…</Source>` | 页面底部的出处行。 |

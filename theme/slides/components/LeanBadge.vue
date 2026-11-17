@@ -1,6 +1,6 @@
 <!--
   Verification badge. Colour carries meaning (theme/tokens.json semantics):
-    gid="<GID>"        green LEAN ✓ (links to the Lean source at the pinned commit) only when
+    gid="<GID>"        green LEAN ✓ (links to the Lean source at the declaration's evidence commit) only when
                        trureturing.lock.json resolves the GID to a Lean theorem; a locked definition (or
                        other non-theorem) gets the neutral cyan LEAN DEF, an unlocked GID a red UNVERIFIED
     kind="definition"  always the neutral LEAN DEF (a definition is not a claim to verify)

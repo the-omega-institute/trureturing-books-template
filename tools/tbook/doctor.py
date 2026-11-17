@@ -6,7 +6,7 @@ when one of the core targets needs it:
 
 =============  ===========================================================================
 check          Python ≥ 3.11, trureturing.lock.json, trureturing access (checkout or network),
-               the pinned commit on the site.toml trureturing branch
+               the recorded revision on the site.toml trureturing branch
 html           mdBook 0.5.x, Node ≥ 22.12, KaTeX in node_modules
 pdf            pypandoc (Pandoc 3.9), typst; fonts are optional (Typst falls back)
 epub           pypandoc; epubcheck + Java are optional (validation is skipped without them)
@@ -19,7 +19,7 @@ command. Exit status: 1 if a required check fails, else 0.
 
 Nothing here installs anything. Network access is one HEAD request with a short timeout, made
 only when no local trureturing checkout is available, and, when neither the cache nor a checkout
-can tell, two GitHub API requests asking whether the pinned commit is on the site.toml branch: the
+can tell, two GitHub API requests asking whether the recorded revision is on the site.toml branch: the
 branch's head, then a comparison with it (when the branch is not found, one asking whether the
 repository is readable instead). The only file written is the one ``./tbook check`` writes for that
 question: a positive answer cached under ``.cache/trureturing/<commit>/``.
@@ -396,10 +396,10 @@ def check_fonts(report: Report) -> None:
 
 
 def check_lock(report: Report) -> str | None:
-    """Returns the pinned (repo, commit) as 'repo@commit' when the lock is readable."""
+    """Return 'repo@revision': the followed branch for v3, or the pinned commit for a legacy lock."""
     from . import lean
 
-    hint = "./tbook pin  (pins the trureturing commit and resolves cited declarations)"
+    hint = "./tbook pin  (follows the configured trureturing branch and resolves cited declarations)"
     if not paths.LOCK_FILE.exists():
         report.add(Check("trureturing.lock.json", False, "missing", hint, targets=("check",)))
         return None
@@ -426,15 +426,16 @@ def _checkouts() -> list[Path]:
 
 
 def check_trureturing(report: Report, pinned: str | None) -> None:
-    """Access to trureturing at the pinned commit, and whether that commit is on the configured branch."""
+    """Access to the lock's revision (v3 branch or legacy commit) and the configured branch."""
     _check_access(report, pinned)
     check_branch(report, pinned)
 
 
 def check_branch(report: Report, pinned: str | None) -> None:
-    """``./tbook check`` requires the pinned commit on site.toml's trureturing branch (default ``dev``).
+    """Probe the recorded revision against site.toml's trureturing branch (default ``dev``).
 
-    Asked as check asks it (cache, local checkout, GitHub's branches and compare API), so a stale
+    Full per-declaration evidence verification belongs to ``./tbook check``. This probe uses the
+    same sources (cache, local checkout, GitHub's branches and compare API), so a stale
     checkout or a missing API token shows up here first. "Cannot tell" is only a warning: check makes
     it an error in GitHub Actions alone. A branch that GitHub says does not exist is an error.
     """
@@ -448,10 +449,10 @@ def check_branch(report: Report, pinned: str | None) -> None:
         repo, branch = site.trureturing_repo, site.trureturing_branch
         anc = lean.Ledger(repo).branch_contains(commit, branch)
     except Exception as exc:  # noqa: BLE001 - doctor reports, it never crashes
-        report.add(Check("pinned commit on the trureturing branch", False, f"cannot tell: {exc}",
+        report.add(Check("lock revision on the trureturing branch", False, f"cannot tell: {exc}",
                          "fix site.toml, then ./tbook check", targets=("check",), required=False))
         return
-    label = f"pinned commit {commit[:12]} on {repo}@{branch}"
+    label = f"lock revision {commit[:12]} on {repo}@{branch}"
     if anc.on_branch:
         report.add(Check(label, True, anc.detail, targets=("check",)))
     elif anc.no_branch:
@@ -476,7 +477,7 @@ def _check_access(report: Report, pinned: str | None) -> None:
         if commit:
             code, _ = _run(["git", "-C", str(cand), "cat-file", "-e", f"{commit}^{{commit}}"])
             if code != 0:
-                report.add(Check(f"trureturing checkout {cand}", False, f"lacks the pinned commit {commit[:12]}",
+                report.add(Check(f"trureturing checkout {cand}", False, f"lacks lock revision {commit[:12]}",
                                  f"git -C {cand} fetch origin", targets=("check",), required=False))
                 continue
         report.add(Check("trureturing access", True, f"git checkout {cand}", "", targets=("check",)))

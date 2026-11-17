@@ -463,7 +463,7 @@ export function loadLock(root = ROOT) {
   return { ...index, commit: index.branch || 'dev', pinned_at: '', declarations };
 }
 
-// Source permalink of a locked declaration at the pinned commit (same as tbook.lean.Lock.source_url).
+// Source permalink of a locked declaration at its evidence commit (same as tbook.lean.Lock.source_url).
 export function leanSourceUrl(lock, gid) {
   if (!lock) return '';
   const module = gid.slice(0, gid.indexOf('.')) || gid;

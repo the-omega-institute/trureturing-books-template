@@ -80,7 +80,7 @@ export function parseGid(gid) {
   return m ? { module: m[1], name: m[2] } : null;
 }
 
-/** Permalink of a declaration's Lean source at the pinned commit (same as tbook.lean.Lock.source_url). */
+/** Permalink of a declaration's Lean source at its evidence commit (same as tbook.lean.Lock.source_url). */
 export function leanUrl(lock, gid) {
   const g = parseGid(gid);
   if (!lock || !g) return '';
@@ -89,7 +89,7 @@ export function leanUrl(lock, gid) {
   const commit = lock.declarations?.[gid]?.commit || lock.commit;
   return `https://github.com/${lock.repo}/blob/${commit}/${g.module}.lean${line}`;
 }
-/** Permalink of any path of the trureturing repository at the pinned commit. */
+/** URL of any path of trureturing on the followed branch (legacy: pinned commit). */
 export function trureturingUrl(lock, p) {
   return lock ? `https://github.com/${lock.repo}/blob/${lock.commit}/${String(p).replace(/^\/+/, '')}` : '';
 }
@@ -113,7 +113,7 @@ export function pinnedRefs(html) {
   }
   return out;
 }
-/** Point `<a data-lean-gid>` / `<a data-trureturing-path>` links at the pinned commit (mirrors tbook.viz.pin_links). */
+/** Point `<a data-lean-gid>` / `<a data-trureturing-path>` links at declaration evidence commits or the followed branch (mirrors tbook.viz.pin_links). */
 export function pinLinks(html, lock) {
   if (!lock) return html;
   return html.replace(TAG_RE, (tag) => {
@@ -125,7 +125,7 @@ export function pinLinks(html, lock) {
   });
 }
 
-/** `{trureturing}/path` in registry theory links → the path at the pinned commit. */
+/** `{trureturing}/path` in registry theory links → the path on the followed branch (legacy: pinned commit). */
 export function resolveHref(href, lock) {
   if (typeof href === 'string' && href.startsWith('{trureturing}/')) return trureturingUrl(lock, href.slice('{trureturing}/'.length));
   return href;

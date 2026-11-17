@@ -167,6 +167,75 @@ class CheckRefTest(unittest.TestCase):
             self.assertIn("trureturing-film:film-<NNN>-v<k>", film.check_ref(self.book, src), src)
 
 
+class SubjectCommitTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        book = temp_book(Path(tmp.name))
+        self.film = film.Film(book, book.films_dir / "history", {
+            "title": "History", "title_zh": "历史", "released": "2026-01-01", "duration": "0:52",
+            "narration": {"language": "en", "engine": "kokoro", "voice": "af_heart"},
+            "subtitles": ["zh", "en"], "lean": [GID3, GIDI],
+            "outputs": {k: v for k, v in film.default_outputs(book.slug, "history").items()
+                        if k in film.REQUIRED_OUTPUTS},
+            "publication_basis": "pinned",
+        }, None)
+        self.film.dir.mkdir()
+        (self.film.dir / "scenes.js").write_text("const SCENES = {};\n", encoding="utf-8")
+        self.lock = fake_lock()
+        self.lock.schema = lean.SHARDED_LOCK_SCHEMA
+        self.lock.commit = "dev"
+        self.lock.declarations[GID3]["commit"] = "a" * 40
+        self.lock.declarations[GIDI]["commit"] = "b" * 40
+        self.lock.declarations[GIDDEF]["commit"] = "c" * 40  # not cited by the film
+
+    def assert_subject(self, commit, *, stale, lock=None):
+        lock = self.lock if lock is None else lock
+        if commit is None:
+            self.film.meta.pop("subject_commit", None)
+        else:
+            self.film.meta["subject_commit"] = commit
+        before = dict(self.film.meta)
+        # Check the caller path and the standalone metadata API against the same card behavior.
+        issues = film.check_film(self.film, lock)
+        self.assertEqual(errors(issues), [])
+        warnings = [i.message for i in issues if i.severity == "warning" and "subject_commit" in i.message]
+        direct = [m for severity, m in film.validate_meta(self.film.meta, self.film.dir, self.film.book, lock)
+                  if severity == "warning" and "subject_commit" in m]
+        self.assertEqual(warnings, direct)
+        self.assertEqual(bool(warnings), stale)
+        card = film._film_card(config.load_site(), self.film, lock)
+        self.assertEqual('class="subject stale"' in card, stale)
+        if commit:
+            self.assertIn(f"https://github.com/{lock.repo}/tree/{commit}", card)
+        else:
+            self.assertNotIn('class="subject', card)
+        self.assertEqual(self.film.meta, before)  # subject_commit is historical provenance
+        return warnings
+
+    def test_v3_matches_any_cited_evidence_commit_or_prefix(self):
+        for commit in ("a" * 40, "a" * 7, "b" * 40, "b" * 12):
+            with self.subTest(commit=commit):
+                self.assert_subject(commit, stale=False)
+        for commit in ("c" * 7, "d" * 40):
+            with self.subTest(commit=commit):
+                warnings = self.assert_subject(commit, stale=True)
+                self.assertIn("does not match any cited declaration evidence commit", warnings[0])
+                self.assertIn("preserve subject_commit", warnings[0])
+
+    def test_v3_without_cited_evidence_or_historical_commit(self):
+        self.assert_subject(None, stale=False)
+        self.film.meta["lean"] = []
+        self.assert_subject("d" * 40, stale=False)
+
+    def test_legacy_keeps_the_global_commit_comparison(self):
+        lock = fake_lock()
+        for commit in ("a" * 40, "a" * 7):
+            self.assert_subject(commit, stale=False, lock=lock)
+        warnings = self.assert_subject("b" * 12, stale=True, lock=lock)
+        self.assertIn("not the pinned commit", warnings[0])
+
+
 class ValidationTest(unittest.TestCase):
     def setUp(self):
         patch = mock.patch.object(film, "_lock", return_value=fake_lock())
@@ -644,7 +713,7 @@ class VideoUnitTest(unittest.TestCase):
         (self.sb.dir / "data" / "extra.json").write_text("[1]", encoding="utf-8")
         key3 = self.sb.key()
         self.assertNotEqual(key3, key2)
-        # the lock: the HUD draws the pinned commit and the cited declarations' statement digests
+        # the lock: the HUD draws the lock revision and the cited declarations' statement digests
         moved = fake_lock()
         moved.commit = "c" * 40
         with mock.patch.object(film, "_lock", return_value=moved):

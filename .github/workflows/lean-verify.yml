@@ -1,8 +1,8 @@
 # Deep verification: re-check, with Lean itself, every declaration the books cite.
 #
 # `./tbook check` (every PR) trusts trureturing's frozen ledger. This workflow builds a Lake project
-# (`./tbook lean-project` → build/lean-verify/) that depends on trureturing at the commit pinned in
-# trureturing.lock.json, imports every cited module and checks for each cited declaration that it
+# (`./tbook lean-project` → build/lean-verify/) that resolves the followed branch once for its toolchain and dependency revision
+# (legacy locks use their pinned commit), imports every cited module and checks for each declaration that it
 # exists, lives in the expected module, has the expected kind, and that its axioms are only
 # propext, Classical.choice and Quot.sound (no sorryAx). It needs a full Lean build of the cited
 # modules, so it runs weekly, on demand, and from the release workflow (workflow_call) — not per PR.

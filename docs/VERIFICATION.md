@@ -1,6 +1,6 @@
 # 验证模型 · Verification model
 
-本书库区分三种状态：**Lean 内核验证、源文书面证明、开放问题。** 只有 `LEAN ✓` 结果承诺对应 trureturing 中已被 Lean 内核验证并冻结的声明，且固定在一个确切的提交上。`status="written-proof"` 表示有书面证明但没有陈述同一结果的冻结声明，不声称内核验证。 本文说明这条承诺如何被检查、检查到什么程度，以及什么仍需人工负责。
+本书库区分三种状态：**Lean 内核验证、源文书面证明、开放问题。** 只有 `LEAN ✓` 结果承诺对应 trureturing 中已被 Lean 内核验证并冻结的声明，且每条声明的证据固定在一个确切的提交上。`status="written-proof"` 表示有书面证明但没有陈述同一结果的冻结声明，不声称内核验证。 本文说明这条承诺如何被检查、检查到什么程度，以及什么仍需人工负责。
 
 ## 1. 一条定理的身份链
 
@@ -8,9 +8,12 @@
 书中环境  ::: {.theorem #thm-x lean="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"}
    │  GID = <模块路径>.<声明名>
    ▼
-trureturing-lock/index.json   commit = 8a24ea4e…（40 位 SHA）
-   │  name = D5.S1.Deficit.deficit_three_valued, kind = theorem,
-   │  statement_id = sha256:…（模块陈述摘要）, line = 264
+trureturing.lock.json         {schema: trureturing-books.lock-pointer.v2, path: trureturing-lock}
+   │
+trureturing-lock/index.json   {repo, branch: dev}
+   │
+trureturing-lock/D5/S1/Deficit/DeficitThreeValued.lean.json
+   │  D5/...deficit_three_valued → {name, kind, statement_id, line, commit: 8a24ea4e…}
    ▼
 trureturing @ commit:  Golden/Frozen/state/D5/S1/Deficit/DeficitThreeValued.lean.json
    │  {statement_id, declarations: [{declaration_name_key: "ns(…,20:deficit_three_valued)", kind: "theorem"}]}
@@ -18,25 +21,25 @@ trureturing @ commit:  Golden/Frozen/state/D5/S1/Deficit/DeficitThreeValued.lean
 trureturing @ commit:  D5/S1/Deficit/DeficitThreeValued.lean   （Lean 源；由 trureturing 的 CI 以 lake build 与公理检查保证）
 ```
 
-trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片 `Golden/Frozen/state/<module>.lean.json` 存在，当且仅当该模块已冻结**；状态片只在声明经内核验证（无 `sorry`、无私有公理）后由 trureturing 的流程写入。因此“在所钉提交上，状态片列有该声明且种类为 theorem”就是本书库对“已经 Lean 验证”的判据。
+trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片 `Golden/Frozen/state/<module>.lean.json` 存在，当且仅当该模块已冻结**；状态片只在声明经内核验证（无 `sorry`、无私有公理）后由 trureturing 的流程写入。因此“在该声明的证据提交上，状态片列有该声明且种类为 theorem”就是本书库对“已经 Lean 验证”的判据。
 
-这条判据只在 trureturing 的集成分支上成立：冻结律由 trureturing 的 CI 在 `site.toml` 的 `[trureturing].branch`（默认 `dev`）上执行。GitHub 也会按 SHA 提供从未合入的提交（任何人发起的 PR 的 head、其他分支），那些提交上的状态片可以是任意内容。所以**所钉提交必须能从该分支到达**：`./tbook pin` 拒绝不在分支上的提交，`./tbook check` 每次复核（§2）。锁索引的 `branch` 字段记录的就是被核对的分支，声明解析结果按模块分片保存在 `trureturing-lock/`，根级 `trureturing.lock.json` 只保留稳定指针；`./tbook check` 要求索引分支与 `site.toml` 相同（改了 `site.toml` 的分支就要重新 `./tbook pin`，或在提交也在新分支上时 `./tbook pin --refresh`），站点清单发布的分支因此就是被核对的分支。`[trureturing].branch` 必须是 trureturing 中一个**现有分支**的名字，因为 git 与 GitHub compare API 读的不只是分支名：`compare/<sha>...<sha>` 与 `compare/<sha>^0...<sha>` 的结果都是 `identical`；`dev-12-g7bbf30f` 这类形如 `git describe` 输出的名字，git 与 compare API 都读作 `-g` 后面那段缩写所指的提交；`owner:branch` 指向另一个仓库（例如 fork）的分支；`pull/123/head` 在 git 里是 `refs/pull/123/head`，即某个 PR 的 head。核对分两步。
+这条判据只在 trureturing 的集成分支上成立：冻结律由 trureturing 的 CI 在 `site.toml` 的 `[trureturing].branch`（默认 `dev`）上执行。GitHub 也会按 SHA 提供从未合入的提交（任何人发起的 PR 的 head、其他分支），那些提交上的状态片可以是任意内容。所以**每条声明的证据提交必须能从该分支到达**：`./tbook pin` 拒绝不在分支上的提交，`./tbook check` 每次复核（§2）。v3 锁索引只记录仓库与跟随的 `branch`，不保存全局 SHA 或时间戳；每条声明的证据 SHA 与解析结果按模块分片保存在 `trureturing-lock/`，根级 `trureturing.lock.json` 只保留稳定指针；`./tbook check` 要求索引分支与 `site.toml` 相同（改了 `site.toml` 的分支就要重新 `./tbook pin`，或 `./tbook pin --refresh` 跟随新分支头刷新声明证据），站点清单发布的分支因此就是被核对的分支。`[trureturing].branch` 必须是 trureturing 中一个**现有分支**的名字，因为 git 与 GitHub compare API 读的不只是分支名：`compare/<sha>...<sha>` 与 `compare/<sha>^0...<sha>` 的结果都是 `identical`；`dev-12-g7bbf30f` 这类形如 `git describe` 输出的名字，git 与 compare API 都读作 `-g` 后面那段缩写所指的提交；`owner:branch` 指向另一个仓库（例如 fork）的分支；`pull/123/head` 在 git 里是 `refs/pull/123/head`，即某个 PR 的 head。核对分两步。
 
-第一步只看名字，不问任何人。下列写法都是错误：`git check-ref-format --branch` 不接受的名字（含 `^`、`~`、`:`、`?`、`*`、`[`、`\`、`..`、`@{`、空白或控制字符；以 `-` 开头或以 `.` 结尾；有空的分量，即以 `/` 开头或结尾或含 `//`；有以 `.` 开头或以 `.lock` 结尾的分量；`HEAD`）；单独的 `@`（在修订表达式里 git 把它当作 `HEAD`）与含 Unicode 空白或不可见字符的名字（git 接受，但不同的名字会显示得一模一样）；完整 SHA、所钉提交的缩写 SHA 与 `refs/…`。
+第一步只看名字，不问任何人。下列写法都是错误：`git check-ref-format --branch` 不接受的名字（含 `^`、`~`、`:`、`?`、`*`、`[`、`\`、`..`、`@{`、空白或控制字符；以 `-` 开头或以 `.` 结尾；有空的分量，即以 `/` 开头或结尾或含 `//`；有以 `.` 开头或以 `.lock` 结尾的分量；`HEAD`）；单独的 `@`（在修订表达式里 git 把它当作 `HEAD`）与含 Unicode 空白或不可见字符的名字（git 接受，但不同的名字会显示得一模一样）；完整 SHA、证据提交的缩写 SHA 与 `refs/…`。
 
-第二步核对这个分支确实存在，并且只把它当分支查，不当修订表达式解析（§2）：本地 checkout 只认恰好同名的 ref（`git show-ref --verify` 核对 `refs/remotes/<远程>/<分支>` 或 `refs/heads/<分支>`）；GitHub 上先问 `repos/<repo>/branches/<分支>`，再用它回答的分支头提交的完整 SHA（而不是名字）去比较。GitHub 回答仓库里没有这个分支，或回答的是另一个分支（改过名的分支会被重定向到新名字），`./tbook check` 把错误报在 `site.toml` 上：说明该分支不存在，提示把它改成现有分支（默认 `dev`），再运行 `./tbook pin --refresh`（所钉提交也在那个分支上时保留它）或 `./tbook pin`；`./tbook pin` 拒绝（**Refused**）。形如 describe 输出的名字、`pull/123/head` 与拼错的名字在语法上都是合法的分支名，就在这一步被拒绝；真有一个这样命名的分支时，按那个分支本身核对。本地 checkout 里没有同名 ref 时，它说不清 GitHub 上有没有这个分支，只能算“无法判定”（规则见 §2 的表）。
+第二步核对这个分支确实存在，并且只把它当分支查，不当修订表达式解析（§2）：本地 checkout 只认恰好同名的 ref（`git show-ref --verify` 核对 `refs/remotes/<远程>/<分支>` 或 `refs/heads/<分支>`）；GitHub 上先问 `repos/<repo>/branches/<分支>`，再用它回答的分支头提交的完整 SHA（而不是名字）去比较。GitHub 回答仓库里没有这个分支，或回答的是另一个分支（改过名的分支会被重定向到新名字），`./tbook check` 把错误报在 `site.toml` 上：说明该分支不存在，提示把它改成现有分支（默认 `dev`），再运行 `./tbook pin --refresh`（跟随该分支头刷新声明证据）或 `./tbook pin`；`./tbook pin` 拒绝（**Refused**）。形如 describe 输出的名字、`pull/123/head` 与拼错的名字在语法上都是合法的分支名，就在这一步被拒绝；真有一个这样命名的分支时，按那个分支本身核对。本地 checkout 里没有同名 ref 时，它说不清 GitHub 上有没有这个分支，只能算“无法判定”（规则见 §2 的表）。
 
 ## 2. 每个 PR 都运行的检查（`./tbook check`）
 
 | 检查 | 失败时 |
 | --- | --- |
 | 形式结论默认必须有 `lean`；显式 `status="written-proof"` 必须无 `lean`，并用 `proof="id"` 指向每版非空证明，填写 DOI 或源论文仓库、原文定位与已登记的形式化请求；开放条目不能用该状态或 `lean` | 错误 |
-| 所钉提交可从 `site.toml` 的 trureturing 分支到达，且该分支存在（§1） | 错误，报在锁文件上，提示 `./tbook pin`；GitHub 回答没有这个分支时报在 `site.toml` 上，提示改成现有分支（§1）；无法判定时：GitHub Actions 中为错误，本地或 `--offline` 下为警告 |
+| 每个被引用声明的证据提交可从 `site.toml` 的 trureturing 分支到达，且该分支存在（§1） | 错误，报在锁文件上，提示 `./tbook pin`；GitHub 回答没有这个分支时报在 `site.toml` 上，提示改成现有分支（§1）；无法判定时：GitHub Actions 中为错误，本地或 `--offline` 下为警告 |
 | 锁文件的 `branch` 与 `site.toml` 的 trureturing 分支相同；该分支是合法的分支名（`git check-ref-format --branch` 接受，且不是 `@`、SHA、`refs/…`，见 §1） | 错误，提示 `./tbook pin`；分支名不合法时指出原因 |
 | GID 语法（与 trureturing Blueprint 相同的地址格式；声明名是 Lean 名，分量可含希腊字母等类字母符号、下标与 `'` `!` `?`，其他分量写成 `«…»`；不得含空白或逗号） | 错误 |
 | 每个被引用的 GID 都在锁文件中 | 错误，提示 `./tbook pin --refresh` |
 | 形式结论引用的声明种类为 `theorem` | 错误 |
-| 在锁定提交上重新读取状态片：名称、种类、模块、`statement_id` 与锁文件一致 | 错误（锁文件过期或被手改） |
+| 在各声明的证据提交上重新读取状态片：名称、种类、模块、`statement_id` 与锁文件一致 | 错误（锁文件过期或被手改） |
 | 声明解析：在模块状态片中按完整名或名称分量后缀恰好匹配一个非私有声明 | 错误（不存在 / 有歧义 / 模块未冻结） |
 | 多语言版本的环境序列（种类、id、Lean 引用）逐条一致；SUMMARY 结构（前言/编号/附录章节、嵌套、草稿条目）一致，使同一定理在各语言中编号相同 | 错误 |
 | 锁文件中有未被任何书引用的条目（`--book` 时也计入其他书的引用） | 警告 |
@@ -69,14 +72,14 @@ trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片
 
 状态片是 trureturing 自己的账本。为了不只依赖账本，`./tbook lean-project` 生成一个 Lake 工程：
 
-- `lean-toolchain` 取自所钉提交；`lakefile.toml` 以 `rev = <commit>` 依赖 trureturing；
+- v3 锁在生成时只解析一次所跟随分支（默认 `dev`）的当前头，`lean-toolchain` 与 `lakefile.toml` 的依赖 `rev` 共用这个完整 SHA；旧聚合锁仍使用其全局所钉 SHA。生成过程不改写分片中的历史证据 SHA，后者仍由 `./tbook check` 逐条复核；
 - 导入每个被引用的模块，对每条声明检查：存在；位于预期模块；种类与锁文件一致；`collectAxioms` 的结果只含 `propext`、`Classical.choice`、`Quot.sound`（因而没有 `sorryAx`）。
 
 它需要构建被引用模块及其依赖（Mathlib 用 `lake exe cache get`），耗时较长，所以每周和发版前运行（`.github/workflows/lean-verify.yml`；设置仓库变量 `REQUIRE_LEAN_VERIFY=true` 可让 Release 依赖它）。
 
-## 4. 升级所钉提交时
+## 4. 跟随分支刷新声明证据时
 
-`./tbook pin` 先核对目标提交在 `site.toml` 的分支上（不在，或 GitHub 回答没有这个分支，则 **Refused**，锁文件不写；无法判定时 GitHub Actions 中拒绝、其他情况列为 **Warnings**；不带参数时用 `git ls-remote` 取 `refs/heads/<分支>` 的头，分支不存在则直接报错退出），再列出：新增与删除的 GID（仍被引用但无法解析的只列在 Unresolved）、名称或种类变化、**模块陈述摘要变化**、源码行号变化。`statement_id` 是模块级摘要：它变了，说明该模块中至少一条声明的陈述变了，不一定是你引用的那条。合并前必须对照新旧提交的 Lean 源复核被引用定理的陈述，并同步书中文字（`skills/trureturing-pin`）。
+`./tbook pin` 先核对目标提交在 `site.toml` 的分支上（不在，或 GitHub 回答没有这个分支，则 **Refused**，锁文件不写；无法判定时 GitHub Actions 中拒绝、其他情况列为 **Warnings**；不带参数时用 `git ls-remote` 取 `refs/heads/<分支>` 的头，分支不存在则直接报错退出），再解析所有被引用声明；`--refresh` 同样跟随配置分支头，离线时优先用本地该分支。名称、种类、模块与陈述摘要均未变化的声明保留原证据提交和源码定位，不因分支头移动而改写；只有新增或解析结果变化的声明记录目标提交。报告列出：新增与删除的 GID（仍被引用但无法解析的只列在 Unresolved）、名称或种类变化、**模块陈述摘要变化**、源码行号变化。`statement_id` 是模块级摘要：它变了，说明该模块中至少一条声明的陈述变了，不一定是你引用的那条。合并前必须对照新旧提交的 Lean 源复核被引用定理的陈述，并同步书中文字（`skills/trureturing-pin`）。
 
 ## 5. 不由机器保证、需要人工负责的部分
 
@@ -87,4 +90,4 @@ trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片
 
 ## 6. 读者如何自行核对
 
-Lean 验证定理框的 `LEAN ✓` 徽章与页脚链接指向所钉提交上的 Lean 源文件（含行号；行号按 `namespace`/`section` 解析出的完整名定位，无法唯一确定时不带行号，而不是猜一个）；书末“形式化验证账本”列出全部对应关系与状态片链接。构建只在锁文件把一条形式结论所引的每个 GID 都解析为 Lean `theorem` 时才显示 `LEAN ✓`；否则显示红色 `UNVERIFIED`（徽章在各端都不是链接），也不计入“LEAN ✓ n”等统计（这样的书通不过 `./tbook check`，不会发布）；页脚与账本只给锁文件解析了的声明链接，锁文件没有的 GID 显示为不带链接的文字。读者可以克隆 trureturing，检出该提交，运行 `lake build` 并对声明执行 `#print axioms`。
+Lean 验证定理框的 `LEAN ✓` 徽章与页脚链接指向各声明证据提交上的 Lean 源文件（含行号；行号按 `namespace`/`section` 解析出的完整名定位，无法唯一确定时不带行号，而不是猜一个）；书末“形式化验证账本”列出全部对应关系与状态片链接。构建只在锁文件把一条形式结论所引的每个 GID 都解析为 Lean `theorem` 时才显示 `LEAN ✓`；否则显示红色 `UNVERIFIED`（徽章在各端都不是链接），也不计入“LEAN ✓ n”等统计（这样的书通不过 `./tbook check`，不会发布）；页脚与账本只给锁文件解析了的声明链接，锁文件没有的 GID 显示为不带链接的文字。读者可以克隆 trureturing，检出对应声明的证据提交，运行 `lake build` 并对声明执行 `#print axioms`。

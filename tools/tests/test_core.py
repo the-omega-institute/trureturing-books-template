@@ -28,7 +28,6 @@ from unittest import mock
 from tbook import check, config, lean, ledger, mdscan, model, paths, pin, render, summary, theme
 
 REAL_I18N = paths.THEME / "i18n"
-REAL_LOCK = paths.LOCK_FILE
 REAL_TOKENS = paths.TOKENS
 REAL_GENERATED = paths.GENERATED
 
@@ -45,18 +44,20 @@ TRU = "the-omega-institute/trureturing"
 # --------------------------------------------------------------------------- helpers
 
 
-def trureturing_checkout() -> tuple[Path, str] | None:
-    """(checkout, pinned commit) when a local trureturing checkout has this repository's pinned commit."""
+def trureturing_checkout() -> tuple[Path, lean.Lock] | None:
+    """(checkout, canonical lock) when every required evidence commit is locally available."""
     try:
         lock = lean.Lock.load()
-        commit = next(iter(lock.declarations.values())).get("commit", lock.commit) if lock.declarations else lock.commit
-    except (OSError, ValueError, KeyError):
+        if lock is None or not lock.declarations:
+            return None
+        commits = {lock.commit_for(gid) for gid in lock.declarations}
+    except (OSError, ValueError, KeyError, lean.LeanError):
         return None
     for cand in (os.environ.get("TRURETURING_DIR"), paths.ROOT.parent / "trureturing"):
         if cand and (Path(cand) / ".git").exists():
-            r = subprocess.run(["git", "-C", str(cand), "cat-file", "-e", f"{commit}^{{commit}}"], capture_output=True)
-            if r.returncode == 0:
-                return Path(cand), commit
+            if all(subprocess.run(["git", "-C", str(cand), "cat-file", "-e", f"{commit}^{{commit}}"],
+                                  capture_output=True).returncode == 0 for commit in sorted(commits)):
+                return Path(cand), lock
     return None
 
 
@@ -723,20 +724,23 @@ class LeanTests(unittest.TestCase):
     # The same bug against trureturing itself (skipped without a local checkout of the pinned commit):
     # this frozen module lists GRType.n₁ … so citing its theorem `result` crashes ./tbook check / pin
     # with an uncaught IndexError.
-    @unittest.skipUnless(TRURETURING, "needs a trureturing checkout ($TRURETURING_DIR) with the pinned commit")
+    @unittest.skipUnless(TRURETURING, "needs a trureturing checkout ($TRURETURING_DIR) with all evidence commits")
     def test_resolve_real_module_with_multibyte_names(self):
-        checkout, commit = TRURETURING
+        checkout, lock = TRURETURING
+        gid = "D5/S0/Certificates/Combinatorics/GaleRobinsonKernelDimensionRefutation.result"
+        commit = lock.commit_for(gid) if lock.get(gid) else lock.commit_for(next(iter(lock.declarations)))
         led = lean.Ledger(TRU, offline=True, checkout=checkout)
-        res = lean.resolve(led, commit, "D5/S0/Certificates/Combinatorics/GaleRobinsonKernelDimensionRefutation.result")
+        if not led.read(commit, lean.parse_gid(gid).state_path):
+            self.skipTest("multibyte-name fixture is not frozen at the available evidence commit")
+        res = lean.resolve(led, commit, gid)
         self.assertEqual(res.kind, "theorem")
 
-    @unittest.skipUnless(TRURETURING, "needs a trureturing checkout ($TRURETURING_DIR) with the pinned commit")
+    @unittest.skipUnless(TRURETURING, "needs a trureturing checkout ($TRURETURING_DIR) with all evidence commits")
     def test_resolve_real_pinned_declarations(self):
-        checkout, commit = TRURETURING
+        checkout, lock = TRURETURING
         led = lean.Ledger(TRU, offline=True, checkout=checkout)
-        lock = lean.Lock.load(REAL_LOCK)
         for gid, decl in lock.declarations.items():
-            res = lean.resolve(led, commit, gid)
+            res = lean.resolve(led, lock.commit_for(gid), gid)
             self.assertEqual((res.name, res.kind, res.statement_id), (decl["name"], decl["kind"], decl["statement_id"]))
 
     def test_name_to_str(self):
@@ -896,6 +900,50 @@ class LeanTests(unittest.TestCase):
             os.environ["TRURETURING_DIR"] = str(g)
             self.assertEqual(type(lean.Ledger(TRU, offline=True).sources[0]).__name__, "GitSource")
             self.assertIn("HttpSource", [type(s).__name__ for s in lean.Ledger(TRU).sources])
+
+    def test_branch_reads_ignore_persistent_content_and_missing_cache(self):
+        from tbook import viz
+
+        with CoreRepo() as repo:
+            lock = make_lock()
+            lock.commit = "dev"
+            source_path = f"{MOD_3V}.lean"
+            for earlier, current in ((b"old source", b""), (b"", b"new source")):
+                with self.subTest(earlier=earlier, current=current):
+                    # Simulate cache entries left by an older version as well
+                    # as two invocations on either side of ordinary dev advancement.
+                    cached = paths.CACHE / "trureturing/dev" / (source_path if earlier else source_path + ".missing")
+                    write(cached, earlier.decode())
+                    with mock.patch.object(lean.HttpSource, "read", side_effect=[earlier, current]) as http:
+                        self.assertEqual(viz._ledger_has(lean.Ledger(TRU), lock, source_path), bool(earlier))
+                        self.assertEqual(viz._ledger_has(lean.Ledger(TRU), lock, source_path), bool(current))
+                        self.assertEqual(http.call_count, 2)
+                    self.assertIsNone(lean.Ledger(TRU, offline=True).read("dev", source_path))
+            immutable = paths.CACHE / "trureturing" / COMMIT / source_path
+            with mock.patch.object(lean.HttpSource, "read", return_value=b"evidence") as http:
+                self.assertEqual(lean.Ledger(TRU).read(COMMIT, source_path), b"evidence")
+                self.assertEqual(lean.Ledger(TRU).read(COMMIT, source_path), b"evidence")
+                self.assertEqual(http.call_count, 1)
+            self.assertEqual(immutable.read_bytes(), b"evidence")
+            self.assertEqual(lean.Ledger(TRU, offline=True).read(COMMIT, source_path), b"evidence")
+
+    def test_real_checkout_requires_every_declaration_evidence(self):
+        with CoreRepo() as repo:
+            lock = make_lock()
+            lock.declarations[GID_3V]["commit"] = OLD_COMMIT
+            lock.save()
+            checkout = repo.root / "trureturing"
+            (checkout / ".git").mkdir(parents=True)
+            with mock.patch.dict(os.environ, TRURETURING_DIR=str(checkout)):
+                with mock.patch.object(subprocess, "run", side_effect=lambda args, **kw:
+                                       types.SimpleNamespace(returncode=int(args[-1] == f"{OLD_COMMIT}^{{commit}}"))):
+                    self.assertIsNone(trureturing_checkout())
+                with mock.patch.object(subprocess, "run", return_value=types.SimpleNamespace(returncode=0)) as git:
+                    found, loaded = trureturing_checkout()
+                    self.assertEqual(found, checkout)
+                    self.assertEqual(loaded.commit_for(GID_3V), OLD_COMMIT)
+                    self.assertEqual({call.args[0][-1] for call in git.call_args_list},
+                                     {f"{COMMIT}^{{commit}}", f"{OLD_COMMIT}^{{commit}}"})
 
 
 # --------------------------------------------------------------------------- model
@@ -1256,6 +1304,43 @@ class CheckTests(unittest.TestCase):
             self.assertEqual([(i.severity, i.message) for i in issues],
                              [("warning", "D5/S1/Old/Gone.x is locked but no longer cited; ./tbook pin --refresh prunes it")])
 
+    def test_mixed_evidence_reads_and_ancestry(self):
+        class EvidenceLedger(FakeLedger):
+            def __init__(self, off_branch=""):
+                super().__init__()
+                self.off_branch = off_branch
+
+            def state(self, commit, module):
+                self.calls.append((commit, module))
+                # State exists only at the declaration's own SHA. Reading all
+                # modules at dev or at either single evidence SHA must fail.
+                return {(OLD_COMMIT, MOD_3V): states()[MOD_3V],
+                        (COMMIT, MOD_INT): states()[MOD_INT]}.get((commit, module))
+
+            def branch_contains(self, commit, branch):
+                super().branch_contains(commit, branch)
+                return lean.Ancestry(commit != self.off_branch, "mixed-evidence fixture")
+
+        with CoreRepo() as repo:
+            repo.book()
+            lock = make_lock()
+            lock.declarations[GID_3V]["commit"] = OLD_COMMIT
+            lock.save()
+            lock = lean.Lock.load()
+            self.assertEqual(lock.commit, "dev")
+            for off_branch in ("", OLD_COMMIT, COMMIT):
+                with self.subTest(off_branch=off_branch):
+                    led = EvidenceLedger(off_branch)
+                    issues = self.run_lean(lock, led)
+                    self.assertEqual(led.ancestry_calls, [(COMMIT, "dev"), (OLD_COMMIT, "dev")])
+                    self.assertCountEqual(led.calls, [(OLD_COMMIT, MOD_3V), (COMMIT, MOD_INT), (COMMIT, MOD_INT)])
+                    if off_branch:
+                        self.assertEqual(len(issues), 1)
+                        self.assertEqual(issues[0].severity, "error")
+                        self.assertIn(f"pinned commit {off_branch[:12]} is not on branch 'dev'", issues[0].message)
+                    else:
+                        self.assertEqual(issues, [])
+
     def test_run_end_to_end(self):
         with CoreRepo() as repo:
             book = repo.book()
@@ -1324,8 +1409,8 @@ class PinTests(unittest.TestCase):
         self.assertEqual(report.removed, ["D5/S1/Old/Gone.x"])
         self.assertEqual(report.changed, [(GID_3V, "module statement digest changed")])
         lock = lean.Lock.load()
-        # The index commit is a stable compatibility baseline; changed and new
-        # declarations carry the actual source commit in their module shards.
+        # The v3 index follows a branch; changed and new declarations carry
+        # their evidence commits in module shards, with no global SHA.
         self.assertEqual(lock.commit, "dev")
         self.assertEqual(lock.commit_for(GID_3V), COMMIT)
         self.assertIn(f"/blob/{COMMIT}/{MOD_3V}.lean", lock.source_url(GID_3V))
@@ -1340,17 +1425,28 @@ class PinTests(unittest.TestCase):
         self.assertIn("**Removed:**", text)
 
     def test_dry_run_and_errors_do_not_write(self):
-        before = paths.LOCK_FILE.read_text(encoding="utf-8")
+        def snapshot():
+            return {str(p.relative_to(paths.ROOT)): p.read_bytes()
+                    for p in [paths.LOCK_FILE, *paths.lock_dir().rglob("*")] if p.is_file()}
+
+        before = snapshot()
+        self.assertIn("trureturing-lock/index.json", before)
+        self.assertIn(f"trureturing-lock/{MOD_3V}.lean.json", before)
         report = pin.pin(COMMIT, offline=True, dry_run=True)
         self.assertFalse(report.written)
         self.assertEqual(report.added, [GID_DEF, GID_INT])
-        self.assertEqual(paths.LOCK_FILE.read_text(encoding="utf-8"), before)
+        self.assertEqual(snapshot(), before)
         self.ledger.states = {MOD_3V: states()[MOD_3V], MOD_INT: None}
         report = pin.pin(COMMIT, offline=True)
         self.assertFalse(report.written)
         self.assertEqual(len(report.errors), 2)
         self.assertIn("**Unresolved (lock not written):**", report.markdown())
-        self.assertEqual(paths.LOCK_FILE.read_text(encoding="utf-8"), before)
+        self.assertEqual(snapshot(), before)
+        self.ledger.ancestry = lean.Ancestry(False, "not on dev")
+        report = pin.pin(COMMIT, offline=True)
+        self.assertTrue(report.refused)
+        self.assertFalse(report.written)
+        self.assertEqual(snapshot(), before)
 
     def test_refresh_and_offline_rules(self):
         report = pin.pin(refresh=True, offline=True)

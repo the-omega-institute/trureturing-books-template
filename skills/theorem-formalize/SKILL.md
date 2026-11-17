@@ -9,7 +9,7 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 
 **用**：某条定理、引理、命题或推论在 trureturing 中找不到已冻结的 Lean 声明；或者已有声明的陈述与书中想写的不一致。
 
-**不用**：声明已冻结、只是书中还没引用（直接写，见 `skills/book-write`）；升级所钉的提交（`skills/trureturing-pin`）。
+**不用**：声明已冻结、只是书中还没引用（直接写，见 `skills/book-write`）；刷新声明证据（`skills/trureturing-pin`）。
 
 **权威**：Lean 形式化的全部规则在 trureturing 仓库：它的 `CLAUDE.md`、`docs/develop/spec/golden-ledger-repo-spec.md` 与 `skills/codex-formalize/SKILL.md`。本文件只描述书仓库与 trureturing 之间的往返。冻结成员身份的唯一判据是 `Golden/Frozen/state/<module>.lean.json` 存在且列有该声明。
 

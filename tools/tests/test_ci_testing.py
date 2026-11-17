@@ -140,6 +140,15 @@ class SelectionTests(unittest.TestCase):
         selected = testing.select(head, old, ["theme/epub/style.css"])
         self.assertEqual(selected["browser_tests"], ["test_export_layout.EpubLayoutTest"])
 
+    def test_migration_edit_selects_dynamically_loaded_lock_migration(self):
+        self.write("tools/tests/test_lock_migration.py", "import unittest\n"
+                   "class LockMigrationTests(unittest.TestCase):\n def test_migrate(self): pass\n")
+        self.write("tools/migrations/v1.6.0.py", "def migrate(root): return []\n")
+        head, old = self.views()
+        selected = testing.select(head, old, ["tools/migrations/v1.6.0.py"])
+        self.assertIn("test_lock_migration.LockMigrationTests", selected["unit_tests"])
+        self.assertEqual(selected["browser_tests"], [])
+
     def test_toolchain_image_workflow_edit_has_no_unrelated_browser_consumers(self):
         self.write(".github/workflows/toolchain-image.yml", "name: Toolchain image\n")
         head, old = self.views()

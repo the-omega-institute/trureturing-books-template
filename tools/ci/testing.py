@@ -17,6 +17,7 @@ EXTRA = {
     "test_pr_conventions": [".github/workflows/pr-conventions.yml"],
     "test_template*": ["template.toml", "tools/migrations/**", "templates/**", "books/example-*/**"],
     "test_migration*": ["tools/migrations/**"],
+    "test_lock_migration": ["tools/migrations/**"],
     "test_container": ["tools/container/**", ".github/**"],
     "test_verification": [".github/**"],
     "test_*pandoc": ["tools/filters/**", "theme/typst/**", "theme/epub/**"],

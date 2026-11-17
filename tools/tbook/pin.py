@@ -1,4 +1,4 @@
-"""``./tbook pin``: pin a trureturing commit and resolve every cited declaration.
+"""``./tbook pin``: follow trureturing's configured branch and refresh declaration evidence.
 
 ``./tbook pin``            follow the branch in site.toml (default ``dev``) to its head
 ``./tbook pin <sha|ref>``  pin an explicit commit (full or abbreviated SHA), branch or tag
@@ -14,9 +14,10 @@ branch name, not a commit SHA, a full ref or a revision expression such as ``<sh
 branch of that name (``dev-12-g<sha>``, ``pull/<n>/head``…), the commit is refused; the lock
 records the branch, and ``./tbook check`` requires the lock's branch to be site.toml's.
 
-The lock records, per GID, the fully qualified Lean name, its kind, its module's frozen
-``statement_id`` and (best effort) the source line and header. When the commit moves,
-the report lists modules whose statement digest changed: re-read those theorems'
+The v3 index records the repository and followed branch, with no global commit or timestamp.
+The shards record, per GID, its evidence commit, fully qualified Lean name, kind, module's frozen
+``statement_id`` and (best effort) source line and header. Unchanged declarations retain their
+evidence commits when the branch moves. The report lists modules whose statement digest changed: re-read those theorems'
 statements in trureturing and adjust the book text before merging.
 """
 

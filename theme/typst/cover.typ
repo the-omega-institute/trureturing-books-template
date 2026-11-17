@@ -4,7 +4,7 @@
 // with zero margins). Everything is drawn in Typst: void background, aurora glows, a neon
 // perspective grid under a striped horizon sun, scanlines, a cut-corner frame, the book
 // code CODE//NAME with a chromatic glitch, title, subtitle, authors, the edition language
-// tag, a LEAN ✓ <N> stamp (N = formal environments) and the pinned trureturing commit.
+// tag, a LEAN ✓ <N> stamp (N = formal environments) and the followed trureturing branch (legacy: pinned commit).
 // "print" keeps the same composition on white paper with the darkened paper accents.
 //
 // `meta` is the JSON written by tools/tbook/pandoc.py (book_meta); tools/tbook/cover.py

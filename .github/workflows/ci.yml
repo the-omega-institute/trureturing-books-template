@@ -137,7 +137,7 @@ jobs:
       - name: Books, bilingual parity and Lean citations
         if: fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure
         env:
-          # Without a trureturing checkout, check asks GitHub's compare API whether the pinned commit is on
+          # Without a trureturing checkout, check asks GitHub's compare API whether each evidence commit is on
           # the site.toml branch (in pull requests always: no cache is read there); in GitHub Actions an
           # unanswered question is an error, and anonymous calls are limited to 60 per hour per runner address.
           GITHUB_TOKEN: ${{ github.token }}

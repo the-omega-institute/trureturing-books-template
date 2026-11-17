@@ -1865,8 +1865,8 @@ class NoSuchBranchTests(unittest.TestCase):
             message = issues[0].message
             self.assertIn(f"[trureturing] branch {branch!r} does not exist in {TRU} "
                           f"(GitHub: {TRU} has no branch {branch!r}", message)
-            self.assertIn(f"set it to an existing branch (default 'dev'), then run ./tbook pin --refresh to keep "
-                          f"commit {COMMIT[:12]} if it is on that branch, or ./tbook pin", message)
+            self.assertIn("set it to an existing branch (default 'dev'), then run ./tbook pin --refresh to refresh "
+                          "the declaration shards, or ./tbook pin", message)
             self.assertNotIn("Pin a commit on", message)
             # a branch that exists but does not contain the commit: unchanged, under the lock file
             with mock.patch.object(lean, "Ledger", lambda r, **kw: FakeLedger(on_branch=False)):

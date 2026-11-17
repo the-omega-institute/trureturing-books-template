@@ -1,6 +1,6 @@
 <!--
   Cover and closing slides: the default frame without header and footer, plus the cover furniture —
-  the book code, the pinned trureturing commit, a horizon grid, a HUD dial with a golden spiral and
+  the book code, the followed trureturing branch (legacy: pinned commit), a horizon grid, a HUD dial with a golden spiral and
   a meta strip from the headmatter. Put a kicker, an h1.display and a lead paragraph in the body.
 -->
 <script setup lang="ts">

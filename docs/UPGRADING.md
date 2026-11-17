@@ -108,7 +108,7 @@ hide = ["example-*"]
 
 0.5.0 向后兼容旧链接和视频清单。迁移仅把可视化里已带 `data-lean-gid` / `data-trureturing-path` 的 trureturing `href` 换成 `#`；构建和 `tools/node/viz-server.mjs` 仍给出精确永久链接。迁移幂等，不改无标记链接或历史档案。
 
-可选的内容迁移：按 `docs/AUTHORING.md` 把当前版本与审计表的行号、摘要改为保留链接标签；幻灯片用 `<PinnedCommit />`。视频若此前每次 pin 都复制 `subject_commit`，核对历史后改用 `publication_basis: "pinned"`；真正记录制作历史的 `subject_commit` 保留。可视化生成器只提交书的拓扑与引用关系，当前 repo/commit/line/kind 由生成的 `assets/trureturing.json` 解析。所有格式的精确提交仍进入构建输出，历史比较不迁移。
+可选的内容迁移：按 `docs/AUTHORING.md` 把当前版本与审计表的行号、摘要改为保留链接标签；幻灯片用 `<PinnedCommit />`。视频若此前每次 pin 都复制 `subject_commit`，核对历史后改用 `publication_basis: "pinned"`；真正记录制作历史的 `subject_commit` 保留。可视化生成器只提交书的拓扑与引用关系，当前 repo/commit/line/kind 由生成的 `assets/trureturing.json` 解析。v3 锁的当前版本字段显示跟随分支，各声明的精确证据提交仍进入构建输出与永久链接，历史比较不迁移。
 
 
 ## 模板层

@@ -1,7 +1,7 @@
 """The generated "verification ledger" chapter appended to every edition.
 
-It lists Lean-backed formal environments with their declaration(s), linked at the
-pinned commit, then written proofs with book proof links and explicitly open items. The output is plain Markdown
+It lists Lean-backed formal environments with their declaration(s), each linked at its
+evidence commit, then written proofs with book proof links and explicitly open items. The output is plain Markdown
 (pipe tables), rendered by every target.
 
 The ledger never claims more than the lock backs: a declaration the lock does not resolve

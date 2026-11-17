@@ -16,7 +16,7 @@ description: 为书做讲解视频时使用：按 trureturing-film 方案新建�
 ## 原则
 
 1. **视频是讲解，不是证明。** 片中只有 `film.json` 的 `lean` 列出、且在锁文件中种类为 `theorem` 的声明可以标 `LEAN ✓`（`lean` 列出定义会被 `./tbook check` 报错）；屏幕上的计算用 `badge(a, 'computed')`，论证用 `argued`，开放问题用 `open`。
-2. **片中的数字必须精确算出或取自所钉提交。**
+2. **片中的数字必须精确算出或取自所引声明的证据提交。**
 3. **旁白英文自然，字幕中文准确**，各一行，不逐字硬译。旁白与字幕写在 `script.json`，它是唯一的时间来源。
 4. **颜色只来自令牌**（`C.lean` 绿、`C.now` 琥珀、`C.open` 红、`C.argued` 紫，其余 `C.cyan`、`C.mag`、`C.white`、`C.dim`）。
 5. **实体镜头只给曲面与体。** 判据同 `book-viz` 的“具象”：正文点名的对象本身是曲面或体（环面、带、多面体、可行域、球里的东西）时，可以用实体镜头 `solid(…)` 把它画成受光的实体；它是多出来的一种能力，不是统一风格，曲线、格点、矩阵、记号串照旧二维。实体只是画法，依据标注不变：`LEAN ✓` 仍只给 `film.json` 的 `lean` 列出的定理。
@@ -78,12 +78,12 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 
 | 现象 | 处理 |
 | --- | --- |
-| `check` 警告 `subject_commit` 与所钉提交不同 | 复核片中陈述；若它记录真实制作历史则保留原值。当前出版用 `publication_basis: "pinned"`，构建自动随锁文件重新渲染 |
+| `check` 警告 `subject_commit` 未匹配任一所引声明的证据提交 | 复核片中陈述；若它记录真实制作历史则保留原值。v3 按所引声明的证据 SHA 比较，接受 7–40 位前缀；旧聚合锁仍比较全局所钉 SHA。当前出版用 `publication_basis: "pinned"`，构建自动随锁文件重新渲染 |
 | `check` 警告 `release_tag` / `published_tag` 不再使用 | 旧的逐片 Release 字段；删除即可，视频随站点构建 |
 | `check` 报 `outputs.narrated_720p is required` 或 `outputs.<键> is not an output` | `outputs` 必须列出 `narrated_720p` 与 `cover`，可选键只有 `narrated`、`music_only`、`music_only_720p`；文件名可取 `./tbook film new` 生成的默认名 |
 | 需要 1080p 或纯配乐版本 | 在 `outputs` 中列出 `narrated`、`music_only` 或 `music_only_720p`（1080p 时 `resolution` 改为 `1920x1080@30`）；视频重新渲染，站点只托管、链接所列文件。每分钟视频默认约 7 MB，列出全部输出时约 84 MB，注意 Pages 站点 1 GB 的上限 |
 | 站点显示“视频未构建” | 缓存未命中且没有渲染：工具链不全（构建日志列出缺项，运行 `theme/film/setup.sh`）或 `TBOOK_FILMS=skip` |
-| 改了章节，视频却重新渲染 | 不应发生：键只含 git 列出的视频文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，所钉提交，引用的声明及其陈述摘要，片内文字）、字体与 Playwright 的 npm 版本、Kokoro 模型版本与 Node 主版本，不含站点地址。改 `book.toml` 的版本或标题、钉新的 trureturing 提交也会让视频重新渲染（它们属于引擎数据）；用 `./tbook cache status` 与条目的 `entry.json` 比对输入 |
+| 改了章节，视频却重新渲染 | 不应发生：键只含 git 列出的视频文件（不含 `out/`、`poster.jpg`、`README.md`）、`theme/film/`（不含 `site/`）、`theme/generated/tokens.mjs`、`tools/tbook/film.py`、引擎绘制的数据（书的代号、版本与标题，跟随分支，引用的声明及其证据提交、陈述摘要，片内文字）、字体与 Playwright 的 npm 版本、Kokoro 模型版本与 Node 主版本，不含站点地址。改 `book.toml` 的版本或标题、更新所引声明的证据也会让视频重新渲染（它们属于引擎数据）；用 `./tbook cache status` 与条目的 `entry.json` 比对输入 |
 | PR 中视频每次推送都重新渲染 | 预期如此：PR 运行不读也不存 Actions 缓存（防投毒），只从已发布的 Release 恢复；合入后 `pages.yml` 渲染并保存，之后分支与 `main` 上的构建都从缓存恢复，PR 要等某个 Release 附上该键 |
 | 本机没有视频工具链 | 设置 `TBOOK_CACHE_REMOTE=1` 构建，从已发布的整站 Release 恢复键未变的视频；改动过的视频仍需工具链渲染（或交给 CI） |
 | 页面报 “cannot create a WebGL context” | 这部视频有实体镜头而 Chromium 没有 WebGL；`./tbook doctor` 的 “WebGL for solid shots” 一行给出原因。`theme/film/lib.js` 以 `--enable-unsafe-swiftshader` 启动（SwiftShader，不需要 GPU），不要加 `--use-angle=swiftshader`（它把二维画布也换到 ANGLE，所有帧都会变，且帧与之前画过的帧有关）。不做回退 |

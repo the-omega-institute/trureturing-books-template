@@ -335,10 +335,11 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--json", action="store_true", help="emit DOI/repository, source, issue and book/result usage counts as JSON")
     c.set_defaults(fn=cmd_requests)
 
-    c = sub.add_parser("pin", help="pin a trureturing commit and resolve cited declarations")
+    c = sub.add_parser("pin", help="follow a trureturing branch and refresh declaration evidence")
     c.add_argument("ref", nargs="?", help="commit SHA (full or abbreviated), branch or tag; it must be on the "
-                                          "site.toml branch (default: that branch's head)")
-    c.add_argument("--refresh", action="store_true", help="keep the pinned commit; re-resolve cited GIDs")
+                                          "site.toml branch (default: that branch's head); unchanged declarations "
+                                          "keep their evidence commits")
+    c.add_argument("--refresh", action="store_true", help="follow the configured branch; re-resolve cited GIDs")
     c.add_argument("--offline", action="store_true")
     c.add_argument("--dry-run", action="store_true", help="report changes without writing the lock")
     c.add_argument("--report", help="also write the Markdown report to this file")

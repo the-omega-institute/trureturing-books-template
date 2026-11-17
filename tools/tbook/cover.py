@@ -2,8 +2,8 @@
 
 :func:`render_cover` draws the cyberpunk cover of one edition — book code with a glitch
 treatment, title, subtitle, authors, language tag, neon perspective grid and scanlines, a
-``LEAN ✓ <N>`` stamp (N = formal environments of the edition) and the short pinned
-trureturing commit — in one of three formats:
+``LEAN ✓ <N>`` stamp (N = formal environments of the edition) and the followed
+trureturing branch (legacy locks show their short pinned commit) — in one of three formats:
 
 * ``png`` — 1600×2560 px (5×8 in at 320 ppi): the EPUB cover image and the site's book cards;
 * ``pdf`` — one page at the book's paper size (``[pdf] paper``), the same page the PDF opens with;

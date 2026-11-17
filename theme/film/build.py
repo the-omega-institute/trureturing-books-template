@@ -4,7 +4,7 @@ Usage: python3 theme/film/build.py <film dir> [--strict | --timeline-only]
 
 The page inlines, in order: the palette and font stacks (theme/generated/tokens.mjs, sections
 "film", "font", "semantic"), window.DATA (timeline, film and book metadata, Lean citations at
-the pinned commit, in-frame strings, data/*.json), theme/film/engine.js, the film's scenes.js,
+the followed branch and declaration evidence commits, in-frame strings, data/*.json), theme/film/engine.js, the film's scenes.js,
 and the boot call. Fonts are @fontsource WOFF2 subsets copied to out/fonts/ (only the
 unicode-range subsets the film's text needs) and referenced by relative URL, so the page is
 served over local http (render.js, poster.js and shot.js start their own server).

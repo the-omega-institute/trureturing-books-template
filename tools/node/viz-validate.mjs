@@ -12,9 +12,9 @@
 //   { "version": 1, "visualizations": [ { id, code, title, title_en, summary, summary_en, path: "<id>/",
 //     thumbnail: "<id>/thumb.jpg", status: "live"|"draft", added: "YYYY-MM-DD", tags, tags_en,
 //     theory: [{ label, label_en, href, href_en? }], lean: [{ gid, label? }] } ] }
-//   theory hrefs: https://…, {trureturing}/<path> (pinned commit), or ../<lang>/<chapter>.html (this book).
+//   theory hrefs: https://…, {trureturing}/<path> (followed branch; legacy: pinned commit), or ../<lang>/<chapter>.html (this book).
 //   lean gids (and page data-lean-gid links) must be theorems of trureturing.lock.json; pages and the hub link them
-//   at the pinned commit and mark them LEAN ✓.
+//   at their evidence commits and mark them LEAN ✓.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';

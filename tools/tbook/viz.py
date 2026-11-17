@@ -29,17 +29,17 @@ relative to ``viz/`` and Lean references cite GIDs)::
         "added": "YYYY-MM-DD",
         "tags": […], "tags_en": […],              tags_en translates every tag
         "theory": [{"label", "label_en", "href", "href_en"?}],
-                     href: https://…, {trureturing}/<path> (that path at the pinned commit), or a chapter of
+                     href: https://…, {trureturing}/<path> (that path on the followed branch (legacy: pinned commit)), or a chapter of
                      this book relative to viz/, e.g. ../zh/ch01-golden-deficit.html (href_en for English)
         "lean": [{"gid": "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued", "label"?: "…"}]
                      the theorems the visualization cites (shown as LEAN ✓): every GID must be in
-                     trureturing.lock.json with kind "theorem"; links point at the pinned commit
+                     trureturing.lock.json with kind "theorem"; links point at each declaration's evidence commit
     }]}
 
 Pages cite Lean theorems with ``<a data-lean-gid="GID" href="…">`` (a theorem of the lock: pages mark these
 LEAN ✓) and other trureturing files, definitions included, with
 ``<a data-trureturing-path="Blueprint/…" href="…">``; :func:`pin_links` (and tools/node/viz-server.mjs for local
-preview) rewrite those hrefs to the pinned commit, so a re-pin never leaves a page pointing at an old commit.
+preview) rewrite declaration hrefs to their evidence commits and repository paths to the followed branch.
 
 Embedding in a chapter: ``::: {.viz src="golden-carry" height="560"}`` (a local id) or
 ``src="trureturing-visualize:<id>"`` (a page of https://the-omega-institute.github.io/trureturing-visualize/).
@@ -107,7 +107,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "tagline_em": "动画只改变看法，真值以 Lean 内核验证为准",
         "hero_title": "把书中的关系结构，做成可以操作的对象",
         "hero_lede": "每个可视化对应书中的一节或一组定理。页面写明依据的章节，哪些结论已由 Lean 内核验证并冻结"
-                     "（链接固定到所钉的 trureturing 提交），哪些只是页面上的数值计算或示意模型。",
+                     "（链接固定到各声明的证据提交），哪些只是页面上的数值计算或示意模型。",
         "legend_lean": "trureturing 中已冻结的定理",
         "legend_theory": "书中章节与理论条目",
         "legend_num": "页面上的数值计算，不是证明",
@@ -127,8 +127,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "tagline_em": "animation changes the view; truth rests on the Lean kernel",
         "hero_title": "The relations in the book, as objects you can operate",
         "hero_lede": "Each visualization follows a section of the book or a group of its theorems. Every page names the "
-                     "sections it draws on, which results are kernel-verified and frozen in Lean (linked at the pinned "
-                     "trureturing commit), and which parts are computations on the page or a schematic model.",
+                     "sections it draws on, which results are kernel-verified and frozen in Lean (linked at each declaration's "
+                     "evidence commit), and which parts are computations on the page or a schematic model.",
         "legend_lean": "frozen theorem in trureturing",
         "legend_theory": "book section or theory entry",
         "legend_num": "computed on the page, not a proof",
@@ -264,7 +264,7 @@ def lean_url(lock: lean.Lock | None, gid: str) -> str:
 
 
 def pin_links(page_html: str, lock: lean.Lock | None) -> str:
-    """Point ``<a data-lean-gid>`` / ``<a data-trureturing-path>`` hrefs at the pinned commit.
+    """Point ``<a data-lean-gid>`` / ``<a data-trureturing-path>`` hrefs at declaration evidence commits or the followed branch.
 
     Mirrors ``pinLinks`` in tools/node/viz-common.mjs (the local preview server applies the same rewrite).
     """
@@ -286,7 +286,7 @@ def pin_links(page_html: str, lock: lean.Lock | None) -> str:
 
 
 def resolve_href(href: str, lock: lean.Lock | None) -> str:
-    """Registry theory href → URL (``{trureturing}/<path>`` becomes that path at the pinned commit)."""
+    """Registry theory href → URL (``{trureturing}/<path>`` becomes that path on the followed branch (legacy: pinned commit))."""
     if isinstance(href, str) and href.startswith(TRURETURING_HREF):
         return trureturing_url(lock, href[len(TRURETURING_HREF):]) or href
     return href
@@ -452,7 +452,7 @@ def _line_of(text: str, viz_id: str) -> int:
 
 
 def _ledger_has(ledger: lean.Ledger | None, lock: lean.Lock | None, path: str) -> bool | None:
-    """Whether ``path`` exists in trureturing at the pinned commit (None when no offline source can tell)."""
+    """Whether ``path`` exists in trureturing on the followed branch (legacy: pinned commit; None when no offline source can tell)."""
     if ledger is None or lock is None:
         return None
     try:
@@ -549,7 +549,7 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
                     err(reg_file, line, f"{at}: theory[{k}].{key}: {problem}")
                 if href.startswith(TRURETURING_HREF) and _ledger_has(ledger, lock, href[len(TRURETURING_HREF):]) is False:
                     err(reg_file, line, f"{at}: theory[{k}].{key}: {href[len(TRURETURING_HREF):]} does not exist in "
-                                        f"trureturing at the pinned commit {lock.commit[:12]}")
+                                        f"trureturing at revision {lock.commit[:12]}")
         refs = v.get("lean", [])
         if not isinstance(refs, list):
             err(reg_file, line, f"{at}: lean must be a list of {{gid, label?}}")
@@ -814,7 +814,7 @@ def check_page(book, vid: str, page: Path, ids: set[str], *, lock=None, ledger=N
             if not value or ".." in value or value.startswith("/"):
                 err(line, f'data-trureturing-path="{value}" must be a repository-relative path')
             elif _ledger_has(ledger, lock, value) is False:
-                err(line, f'data-trureturing-path="{value}" does not exist in trureturing at the pinned commit {lock.commit[:12]}')
+                err(line, f'data-trureturing-path="{value}" does not exist in trureturing at revision {lock.commit[:12]}')
     for m in re.finditer(r'\s(?:src|href)="([^"]+)"', text):
         problem = link_problem(book, f"viz/{vid}/", m.group(1), ids)
         if problem:
