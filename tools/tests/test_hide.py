@@ -282,7 +282,11 @@ class PinTests(unittest.TestCase):
             self.assertEqual((report.errors, report.refused), ([], ""), report.markdown())
             self.assertEqual(report.removed, [HIDDEN_GID], "only the hidden book cited it")
             self.assertEqual(sorted(lean.Lock.load().declarations), sorted([GID_3V, GID_DEF, GID_INT]))
-            self.assertEqual(lean.Lock.load().commit, COMMIT)
+            # The sharded lock's compatibility commit is the followed branch;
+            # each declaration keeps the immutable evidence commit separately.
+            lock = lean.Lock.load()
+            self.assertEqual(lock.commit, "dev")
+            self.assertEqual(lock.commit_for(GID_3V), COMMIT)
 
 
 # --------------------------------------------------------------------------- release plan
