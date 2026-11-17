@@ -1,6 +1,6 @@
 // Types of the build-time module provided by setup/vite-plugins.ts.
 declare module 'virtual:trureturing' {
-  interface LockedDecl { name: string, kind: string, line: number }
+  interface LockedDecl { name: string, kind: string, line: number, commit: string }
   const data: {
     lang: string
     book: string

@@ -48,7 +48,8 @@ TRU = "the-omega-institute/trureturing"
 def trureturing_checkout() -> tuple[Path, str] | None:
     """(checkout, pinned commit) when a local trureturing checkout has this repository's pinned commit."""
     try:
-        commit = json.loads(REAL_LOCK.read_text(encoding="utf-8"))["commit"]
+        lock = lean.Lock.load()
+        commit = next(iter(lock.declarations.values())).get("commit", lock.commit) if lock.declarations else lock.commit
     except (OSError, ValueError, KeyError):
         return None
     for cand in (os.environ.get("TRURETURING_DIR"), paths.ROOT.parent / "trureturing"):
@@ -859,10 +860,8 @@ class LeanTests(unittest.TestCase):
             second = lean.Lock.load()
             first.declarations[GID_3V]["statement_id"] = "sha256:first"
             first.declarations[GID_3V]["commit"] = "b" * 40
-            first._base_declarations = dict(initial.declarations)
             second.declarations[GID_INT]["statement_id"] = "sha256:second"
             second.declarations[GID_INT]["commit"] = "c" * 40
-            second._base_declarations = dict(initial.declarations)
             first.save()
             second.save()
             merged = lean.Lock.load()
@@ -1327,13 +1326,13 @@ class PinTests(unittest.TestCase):
         lock = lean.Lock.load()
         # The index commit is a stable compatibility baseline; changed and new
         # declarations carry the actual source commit in their module shards.
-        self.assertEqual(lock.commit, OLD_COMMIT)
+        self.assertEqual(lock.commit, "dev")
         self.assertEqual(lock.commit_for(GID_3V), COMMIT)
         self.assertIn(f"/blob/{COMMIT}/{MOD_3V}.lean", lock.source_url(GID_3V))
         self.assertEqual(sorted(lock.declarations), sorted([GID_3V, GID_INT, GID_DEF]))
         res = lock.get(GID_3V)
         self.assertEqual((res.line, res.signature), (3, "theorem deficit_three_valued (v : Nat) : True"))
-        self.assertEqual(lock.pinned_at, "2025-01-01T00:00:00Z", "index metadata remains stable across shard pins")
+        self.assertEqual(lock.pinned_at, "", "shared index has no timestamp")
         text = report.markdown()
         self.assertIn(f"trureturing pin: `{OLD_COMMIT[:12]}` → `{COMMIT[:12]}`", text)
         self.assertIn("**Changed — review the book text for these:**", text)
@@ -1356,8 +1355,8 @@ class PinTests(unittest.TestCase):
     def test_refresh_and_offline_rules(self):
         report = pin.pin(refresh=True, offline=True)
         lock = lean.Lock.load()
-        self.assertEqual((report.commit, lock.commit), (OLD_COMMIT, OLD_COMMIT))
-        self.assertEqual(lock.pinned_at, "2025-01-01T00:00:00Z", "refresh keeps the pin time")
+        self.assertEqual((report.commit, lock.commit), (OLD_COMMIT, "dev"))
+        self.assertEqual(lock.pinned_at, "", "shared index has no timestamp")
         report = pin.pin(refresh=True, offline=True)
         self.assertIn("No declaration changes.", report.markdown())
         with self.assertRaisesRegex(lean.LeanError, "--offline needs a full 40-hex commit"):

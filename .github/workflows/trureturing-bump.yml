@@ -91,7 +91,7 @@ jobs:
           site = config.load_site()
           print(lean.ls_remote(site.trureturing_repo, os.environ.get("REF") or site.trureturing_branch))
           ')"
-          current="$(PYTHONPATH=tools python3 -c 'from tbook import lean; lock=lean.Lock.load(); print(lock.commit if lock else "")' 2>/dev/null || true)"
+          current="$(PYTHONPATH=tools python3 -c 'from tbook import lean; lock=lean.Lock.load(); cs={lock.commit_for(g) for g in lock.declarations} if lock else set(); print(next(iter(cs)) if len(cs)==1 else ("mixed" if cs else ""))' 2>/dev/null || true)"
           echo "target=$target" >> "$GITHUB_OUTPUT"
           echo "current=$current" >> "$GITHUB_OUTPUT"
           if [ "$target" = "$current" ]; then
@@ -126,7 +126,7 @@ jobs:
           rc=0
           ./tbook pin "$TARGET" --report build/pin.md || rc=$?
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
-          if git diff --quiet -- trureturing.lock.json trureturing-lock; then
+          if [ -z "$(git status --porcelain --untracked-files=all -- trureturing.lock.json trureturing-lock)" ]; then
             echo "lock_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "lock_changed=true" >> "$GITHUB_OUTPUT"

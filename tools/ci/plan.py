@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import film_inputs, template as template_metadata
 from ci import viz_budget, testing
 
-VERSION = 6
+VERSION = 7
 SCHEMA = "tbook-ci-coverage-v1"
 DEPENDENCIES = "tbook-ci-dependencies-v1"
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -209,6 +209,8 @@ def suite_inputs(tree, slug, book, suite):
     if "@citations" in patterns:
         patterns.remove("@citations")
         patterns.extend(citation_inputs(tree, slug, ident))
+    if "trureturing.lock.json" in patterns:
+        patterns.append("trureturing-lock/**")
     roots = [suite, *(p for p in tree.files if p.endswith((".js", ".mjs")) and
                       any(fnmatch.fnmatchcase(p, pat) for pat in patterns))]
     return patterns, imports(tree, *roots)

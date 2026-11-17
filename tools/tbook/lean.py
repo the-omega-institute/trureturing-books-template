@@ -36,6 +36,8 @@ from __future__ import annotations
 
 import json
 import contextlib
+import copy
+import tempfile
 import fcntl
 import os
 import re
@@ -875,7 +877,11 @@ def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
 def _atomic_write(path: Path, text: str) -> None:
     """Write a small evidence file without exposing a partial JSON document."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    if path.is_file() and path.read_text(encoding="utf-8") == text:
+        return
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(fd)
+    tmp = Path(name)
     try:
         tmp.write_text(text, encoding="utf-8")
         os.replace(tmp, path)
@@ -887,7 +893,7 @@ def _atomic_write(path: Path, text: str) -> None:
 @contextlib.contextmanager
 def _lock_writer():
     """Serialize local pin writers while preserving independent module shards."""
-    lock_path = paths.CACHE / "trureturing-lock-write.lock"
+    lock_path = paths.LOCK_FILE.parent / ".cache" / "trureturing-lock-write.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -928,8 +934,6 @@ class Lock:
                 # useful for template/no-book fixtures and produces the normal
                 # missing-lock diagnostic only when a citation needs one.
                 return cls._load_sharded(paths.lock_index()) if paths.lock_index().exists() else None
-            if paths.lock_index().exists():
-                raise LeanError(f"{paths.rel(paths.LOCK_FILE)}: unsupported lock pointer schema")
         return cls._load_legacy(paths.LOCK_FILE)
 
     @classmethod
@@ -943,7 +947,7 @@ class Lock:
             raise LeanError(f"{paths.rel(path)}: commit must be a full 40-hex SHA")
         obj = cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
                   pinned_at=data.get("pinned_at", ""), declarations=data.get("declarations", {}))
-        obj._base_declarations = dict(obj.declarations)
+        obj._base_declarations = copy.deepcopy(obj.declarations)
         return obj
 
     @classmethod
@@ -954,8 +958,6 @@ class Lock:
             raise LeanError(f"{paths.rel(index)}: unreadable sharded lock: {exc}") from exc
         if data.get("schema") not in (SHARDED_LOCK_SCHEMA, SHARDED_LOCK_SCHEMA_V2):
             raise LeanError(f"{paths.rel(index)}: unsupported schema {data.get('schema')!r}")
-        if not SHA_RE.match(data.get("commit", "")):
-            raise LeanError(f"{paths.rel(index)}: commit must be a full 40-hex SHA")
         root = index.parent
         declarations: dict[str, dict] = {}
         for module_file in sorted(root.rglob("*.lean.json")):
@@ -968,14 +970,12 @@ class Lock:
             module = str(fragment.get("module", ""))
             if not module or module_file.is_symlink() or module_file.relative_to(root).as_posix() != f"{module}.lean.json":
                 raise LeanError(f"{paths.rel(module_file)}: module path does not match its shard filename")
-            shard_commit = fragment.get("commit", data["commit"])
-            if not SHA_RE.match(str(shard_commit)):
-                raise LeanError(f"{paths.rel(module_file)}: commit must be a full 40-hex SHA")
+            shard_commit = fragment.get("commit", data.get("commit", ""))
             entries = fragment.get("declarations", {})
             if not isinstance(entries, dict):
                 raise LeanError(f"{paths.rel(module_file)}: declarations must be an object")
             for gid, resolution in entries.items():
-                if not isinstance(resolution, dict) or resolution.get("module") != module:
+                if parse_gid(gid).module != module or not isinstance(resolution, dict) or resolution.get("module") != module:
                     raise LeanError(f"{paths.rel(module_file)}: invalid declaration {gid!r}")
                 if gid in declarations:
                     raise LeanError(f"{paths.rel(module_file)}: duplicate declaration {gid!r}")
@@ -984,10 +984,10 @@ class Lock:
                 if not SHA_RE.match(str(item["commit"])):
                     raise LeanError(f"{paths.rel(module_file)}: declaration {gid!r} has invalid commit")
                 declarations[gid] = item
-        obj = cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
-                  pinned_at=data.get("pinned_at", ""), declarations=declarations,
+        obj = cls(repo=data["repo"], branch=data.get("branch", ""), commit=data.get("branch") or "dev",
+                  pinned_at="", declarations=declarations,
                   schema=SHARDED_LOCK_SCHEMA)
-        obj._base_declarations = dict(declarations)
+        obj._base_declarations = copy.deepcopy(declarations)
         return obj
 
     def save(self, path: Path | None = None) -> None:
@@ -1011,91 +1011,58 @@ class Lock:
 
     def _save_sharded(self) -> None:
         root = paths.lock_dir()
-        root.mkdir(parents=True, exist_ok=True)
-        by_module: dict[str, dict[str, dict]] = {}
-        for gid, resolution in self.declarations.items():
-            module = str(resolution.get("module", ""))
-            if not module:
-                raise LeanError(f"{gid}: lock declaration has no module")
-            by_module.setdefault(module, {})[gid] = resolution
-
-        # A short local lock makes the read/merge/write sequence safe when two
-        # pin jobs update different modules in the same checkout.  The lock is
-        # ignored and lives outside the tracked evidence directory.
         with _lock_writer():
             existing = Lock._load_sharded(paths.lock_index()) if paths.lock_index().exists() else None
-            existing_by_module: dict[str, dict[str, dict]] = {}
-            if existing:
-                for gid, resolution in existing.declarations.items():
-                    existing_by_module.setdefault(str(resolution.get("module", "")), {})[gid] = resolution
-
-            # If the lock changed since this writer read it, merge instead of
-            # pruning. Otherwise the caller's cited set is authoritative and
-            # stale modules can be removed as before. This optimistic check is
-            # what lets concurrent pins update different modules safely.
+            desired = copy.deepcopy(self.declarations)
+            for gid, entry in desired.items():
+                module = parse_gid(gid).module
+                if entry.get("module") != module:
+                    raise LeanError(f"{gid}: lock module does not match GID")
+                entry.setdefault("commit", self.commit)
+                if not SHA_RE.fullmatch(str(entry["commit"])):
+                    raise LeanError(f"{gid}: evidence commit must be a full 40-hex SHA")
             base = getattr(self, "_base_declarations", None)
-            concurrent_change = existing is not None and base is not None and existing.declarations != base
+            current = copy.deepcopy(existing.declarations) if existing else {}
+            # A newly constructed lock is a replacement. A loaded lock (or pin)
+            # applies only its own delta, preserving concurrent additions and
+            # changes in every other module, including the same module file.
+            if base is None or existing is None:
+                merged = desired
+            else:
+                merged = copy.deepcopy(current)
+                for gid in set(base) | set(desired):
+                    before, after = base.get(gid), desired.get(gid)
+                    if before == after:
+                        continue
+                    latest = current.get(gid)
+                    if latest != before and latest != after:
+                        raise LeanError(f"{gid}: evidence changed during pin; run ./tbook pin --refresh again")
+                    if after is None:
+                        merged.pop(gid, None)
+                    else:
+                        merged[gid] = after
+            by_module: dict[str, dict[str, dict]] = {}
+            for gid, entry in merged.items():
+                by_module.setdefault(parse_gid(gid).module, {})[gid] = entry
+            root.mkdir(parents=True, exist_ok=True)
             for module, entries in sorted(by_module.items()):
-                if concurrent_change:
-                    merged = dict(existing_by_module.get(module, {}))
-                    for gid, entry in entries.items():
-                        old_entry = (base or {}).get(gid)
-                        # A loader adds the shard commit as a compatibility
-                        # field; that alone does not mean this stale writer
-                        # changed the declaration.
-                        comparable = lambda value: {k: v for k, v in value.items() if k != "commit"}
-                        if old_entry is None or comparable(entry) != comparable(old_entry):
-                            merged[gid] = entry
-                else:
-                    merged = dict(entries)
                 target = root / f"{module}.lean.json"
-                target.parent.mkdir(parents=True, exist_ok=True)
-                payload = {
-                    "schema": MODULE_LOCK_SCHEMA,
-                    "module": module,
-                    "declarations": {k: merged[k] for k in sorted(merged)},
-                }
-                encoded = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-                _atomic_write(target, encoded)
-
-            if not concurrent_change:
-                expected = {f"{module}.lean.json" for module in by_module}
-                for target in sorted(root.rglob("*.lean.json")):
-                    if target.relative_to(root).as_posix() not in expected:
-                        target.unlink()
-                for directory in sorted((p for p in root.rglob("*") if p.is_dir()), reverse=True):
-                    if directory != root and not any(directory.iterdir()):
-                        directory.rmdir()
-
-            # The index is intentionally stable.  Its commit is a baseline for
-            # old consumers and is written only when the index is first created
-            # (or when repo/branch changes); declaration source commits live in
-            # their module entries and therefore do not contend on this file.
-            index_path = paths.lock_index()
-            current_index = None
-            if index_path.exists():
-                try:
-                    current_index = json.loads(index_path.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    current_index = None
-            index = {
-                "schema": SHARDED_LOCK_SCHEMA,
-                "repo": self.repo,
-                "branch": self.branch,
-                "commit": (current_index or {}).get("commit") if current_index else self.commit,
-                "pinned_at": (current_index or {}).get("pinned_at") if current_index else self.pinned_at,
-            }
-            if not SHA_RE.match(str(index["commit"])):
-                index["commit"] = self.commit
-            if not index.get("pinned_at"):
-                index["pinned_at"] = self.pinned_at
-            _atomic_write(index_path, json.dumps(index, ensure_ascii=False, indent=2) + "\n")
-
-        # Keep a stable, tiny compatibility pointer at the historical path.  It
-        # is deliberately independent of declaration content, so it never causes
-        # the old large-file merge conflict.
-        pointer = {"schema": LOCK_POINTER_SCHEMA, "path": paths.lock_dir().name}
-        _atomic_write(paths.LOCK_FILE, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
+                if target.resolve().is_relative_to(root.resolve()) is False or target.is_symlink():
+                    raise LeanError(f"{target}: evidence shard resolves outside the lock directory")
+                payload = {"schema": MODULE_LOCK_SCHEMA, "module": module,
+                           "declarations": {k: entries[k] for k in sorted(entries)}}
+                _atomic_write(target, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+            expected = {f"{module}.lean.json" for module in by_module}
+            for target in sorted(root.rglob("*.lean.json")):
+                if target.relative_to(root).as_posix() not in expected:
+                    target.unlink()
+            # No moving SHA or timestamp belongs in this shared index.
+            index = {"schema": SHARDED_LOCK_SCHEMA, "repo": self.repo, "branch": self.branch}
+            _atomic_write(paths.lock_index(), json.dumps(index, ensure_ascii=False, indent=2) + "\n")
+            pointer = {"schema": LOCK_POINTER_SCHEMA, "path": paths.lock_dir().name}
+            _atomic_write(paths.LOCK_FILE, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
+            self.declarations = merged
+            self._base_declarations = copy.deepcopy(merged)
 
     def get(self, gid: str) -> Resolution | None:
         d = self.declarations.get(gid)

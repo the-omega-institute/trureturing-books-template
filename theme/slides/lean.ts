@@ -30,7 +30,7 @@ export function leanInfo(gid: string | undefined): LeanInfo {
   const module = m?.[1] ?? ''
   const fallback = m ? `${module.replaceAll('/', '.')}.${m[2]}` : id
   const url = decl && tr.lock
-    ? `https://github.com/${tr.lock.repo}/blob/${tr.lock.commit}/${module}.lean${decl.line ? `#L${decl.line}` : ''}`
+    ? `https://github.com/${tr.lock.repo}/blob/${decl.commit || tr.lock.commit}/${module}.lean${decl.line ? `#L${decl.line}` : ''}`
     : ''
   return { gid: id, locked: !!decl, theorem: decl?.kind === 'theorem', name: decl?.name || fallback, kind: decl?.kind ?? '', url }
 }

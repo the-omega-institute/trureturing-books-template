@@ -41,9 +41,9 @@ function data(entry: string) {
   // slides.<lang>.md names its language even outside a book (templates/slides/slides.zh.md)
   const lang = langOfFile({ languages }, name) ?? /^slides\.([a-z]{2,3}(?:-[A-Za-z0-9]+)*)\.md$/.exec(name)?.[1] ?? languages[0] ?? 'zh'
   const lock = loadLock()
-  const decls: Record<string, { name: string, kind: string, line: number }> = {}
+  const decls: Record<string, { name: string, kind: string, line: number, commit: string }> = {}
   for (const [gid, d] of Object.entries<any>(lock?.declarations ?? {}))
-    decls[gid] = { name: String(d.name ?? ''), kind: String(d.kind ?? ''), line: Number(d.line ?? 0) }
+    decls[gid] = { name: String(d.name ?? ''), kind: String(d.kind ?? ''), line: Number(d.line ?? 0), commit: String(d.commit ?? lock?.commit ?? '') }
   return {
     lang,
     book,
@@ -54,7 +54,7 @@ function data(entry: string) {
 }
 
 export default function setupVitePlugins(options: Options) {
-  const watched = [join(ROOT, 'trureturing.lock.json'), join(ROOT, 'theme', 'i18n'), join(ROOT, 'i18n')]
+  const watched = [join(ROOT, 'trureturing.lock.json'), join(ROOT, 'trureturing-lock'), join(ROOT, 'theme', 'i18n'), join(ROOT, 'i18n')]
   return [
     {
       name: 'trureturing:data',

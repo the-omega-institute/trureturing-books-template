@@ -440,7 +440,8 @@ export function loadLock(root = ROOT) {
   if (!existsSync(file)) return null;
   const pointer = JSON.parse(readFileSync(file, 'utf8'));
   if (pointer.schema !== 'trureturing-books.lock-pointer.v2') return pointer;
-  const dir = join(root, pointer.path || 'trureturing-lock');
+  if (pointer.path !== 'trureturing-lock') throw new Error('unsupported lock pointer path');
+  const dir = join(root, pointer.path);
   const indexFile = join(dir, 'index.json');
   if (!existsSync(indexFile)) return null;
   const index = JSON.parse(readFileSync(indexFile, 'utf8'));
@@ -451,12 +452,15 @@ export function loadLock(root = ROOT) {
       if (entry.isDirectory()) visit(full);
       else if (entry.isFile() && entry.name.endsWith('.lean.json')) {
         const shard = JSON.parse(readFileSync(full, 'utf8'));
-        Object.assign(declarations, shard.declarations || {});
+        for (const [gid, item] of Object.entries(shard.declarations || {})) {
+          if (gid.split('.')[0] !== shard.module || item.module !== shard.module) throw new Error(`invalid lock declaration ${gid}`);
+          declarations[gid] = { ...item, commit: item.commit || shard.commit || index.commit };
+        }
       }
     }
   }
   visit(dir);
-  return { ...index, declarations };
+  return { ...index, commit: index.branch || 'dev', pinned_at: '', declarations };
 }
 
 // Source permalink of a locked declaration at the pinned commit (same as tbook.lean.Lock.source_url).

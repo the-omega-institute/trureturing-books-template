@@ -2,7 +2,7 @@
 
 ``./tbook pin``            follow the branch in site.toml (default ``dev``) to its head
 ``./tbook pin <sha|ref>``  pin an explicit commit (full or abbreviated SHA), branch or tag
-``./tbook pin --refresh``  keep the current commit; add newly cited and prune unused GIDs
+``./tbook pin --refresh``  follow the configured branch; add newly cited and prune unused GIDs
 
 Whatever the ref, the commit must be on the site.toml branch: trureturing's CI enforces the
 freeze rule (frozen ⇒ kernel-verified, no ``sorry``) only there, while GitHub also serves
@@ -21,6 +21,8 @@ statements in trureturing and adjust the book text before merging.
 """
 
 from __future__ import annotations
+
+import copy
 
 from dataclasses import dataclass, field
 
@@ -99,7 +101,17 @@ def _target(ref: str | None, old: lean.Lock | None, *, refresh: bool, offline: b
         # shard records the commit that actually supplied its evidence, so a
         # moving dev head does not require rewriting unrelated shards.
         if offline:
-            return old.commit, False
+            checkout = getattr(ledger, "checkout", None)
+            if checkout:
+                ref = lean._branch_ref(checkout, repo, branch)
+                if ref:
+                    return lean._git(checkout, "rev-parse", ref).stdout.strip(), False
+            commits = {old.commit_for(gid) for gid in old.declarations}
+            if lean.SHA_RE.fullmatch(old.commit):
+                return old.commit, False
+            if len(commits) == 1:
+                return next(iter(commits)), False
+            raise lean.LeanError("--refresh --offline needs a local trureturing checkout with the configured branch")
         return lean.ls_remote(repo, f"refs/heads/{branch}"), True
     if ref and lean.SHA_RE.match(ref):
         return ref, False
@@ -125,7 +137,9 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
     commit, head = _target(ref, old, refresh=refresh, offline=offline, branch=branch,
                            repo=site.trureturing_repo, ledger=ledger)
     _check_branch(branch, commit)
-    report = PinReport(commit=commit, previous=old.commit if old else "", branch=branch,
+    previous_commits = {old.commit_for(gid) for gid in old.declarations} if old else set()
+    previous = (next(iter(previous_commits)) if len(previous_commits) == 1 else ("mixed" if previous_commits else ""))
+    report = PinReport(commit=commit, previous=previous, branch=branch,
                        previous_branch=old.branch if old else "")
     if head:
         ledger.record_on_branch(commit, branch, f"head of {branch}")
@@ -168,7 +182,7 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
         previous = before.get(gid)
         if previous and all(previous.get(field) == current.get(field)
                             for field in ("module", "name", "kind", "statement_id")):
-            resolved[gid] = dict(previous)
+            resolved[gid] = dict(previous, commit=old.commit_for(gid))
     report.added = sorted(set(resolved) - set(before))
     report.removed = sorted(set(before) - set(cited))  # a cited GID that fails to resolve is Unresolved only
     for gid in sorted(set(fresh_resolved) & set(before)):
@@ -189,7 +203,7 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
     lock = lean.Lock(repo=site.trureturing_repo, branch=branch, commit=commit,
                      pinned_at=(old.pinned_at if old and refresh and old.commit == commit else lean.now_utc()),
                      declarations=resolved)
-    lock._base_declarations = dict(before)
+    lock._base_declarations = copy.deepcopy(before)
     lock.save()
     report.written = True
     return report

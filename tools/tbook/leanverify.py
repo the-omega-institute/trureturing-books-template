@@ -32,6 +32,7 @@ CI: ``.github/workflows/lean-verify.yml`` (weekly, manual, and callable before a
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 import stat
 from pathlib import Path
 
@@ -384,6 +385,11 @@ def generate(out_dir: str | Path, *, lock: lean.Lock | None = None, ledger: lean
             raise LeanVerifyError(str(exc)) from exc
         if lock is None:
             raise LeanVerifyError(f"{paths.rel(paths.LOCK_FILE)} not found; run ./tbook pin first")
+    if lock.schema == lean.SHARDED_LOCK_SCHEMA:
+        # One fresh dev snapshot supplies the deep-check environment. The
+        # evidence shards retain their own immutable source commits.
+        commit = lean.ls_remote(lock.repo, f"refs/heads/{lock.branch}")
+        lock = replace(lock, commit=commit)
     entries = _entries(lock)
     toolchain = toolchain or read_toolchain(lock, ledger)
     if not TOOLCHAIN_RE.match(toolchain):
