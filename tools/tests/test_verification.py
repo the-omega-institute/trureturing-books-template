@@ -1120,7 +1120,8 @@ class PullRequestCacheTests(unittest.TestCase):
                     # a skipped restore step leaves its outputs empty
                     context = {k: "" for k in re.findall(r"steps\.[\w-]+\.outputs\.[\w-]+", cond)}
                     context["fromJSON(needs.plan.outputs.plan).selections.normal.checks.structure"] = True
-                    context.update({"steps.verified.outcome": "success", "needs.plan.outputs.stills": "true"})
+                    context.update({"steps.verified.outcome": "success", "needs.plan.outputs.stills": "true",
+                                    "needs.plan.outputs.films": "true"})
                     for event in pr_events:
                         self.assertFalse(gha_if(cond, event=event, ref="refs/pull/7/merge", context=context),
                                          f"{name}: {uses} on {event}")
@@ -1146,7 +1147,7 @@ class PullRequestCacheTests(unittest.TestCase):
                 elif re.match(r"actions/setup-\w+@", uses) and "cache" in step["with"]:
                     self.assertTrue(uses.startswith("actions/setup-node@"), f"{action}: {uses} caches")
                     self.assertEqual(step["with"]["cache"], "npm", action)
-        self.assertEqual(action_caches, 2 * 4 + 2, "pip, Chromium, fonts, film models; the build cache")
+        self.assertEqual(action_caches, 2 * 4 + 3, "pip, Chromium, fonts, film models; build and film caches")
 
     def test_lean_verify_caches_outside_pull_requests(self):
         """lean-verify.yml restores and saves its pip and Lake caches (built .olean files, which the axiom check
@@ -1251,7 +1252,7 @@ class BuildCacheWorkflowTests(unittest.TestCase):
 
     def test_store_is_restored_outside_pull_requests_and_saved_by_the_default_branch(self):
         steps = action_steps("build-cache")
-        restore, = [s for s in steps if s.get("uses", "").startswith("actions/cache/restore@")]
+        restore = next(s for s in steps if s.get("id") == "restore")
         save, = [s for s in steps if s.get("uses", "").startswith("actions/cache/save@")]
         prune = next(s for s in steps if s.get("id") == "prune")
         self.assertFalse([s for s in steps if re.match(r"actions/cache@", s.get("uses", ""))])
@@ -1269,7 +1270,8 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         pull_requests = [dict(event=e, ref="refs/pull/7/merge") for e in PR_EVENTS] + [
             dict(event="pull_request_target", ref="refs/heads/main")]
         for mode in ("restore", "save"):
-            ctx = {"inputs.mode": mode, "steps.prune.outputs.changed": "true"}
+            ctx = {"inputs.mode": mode, "inputs.scope": "all", "steps.prune.outputs.changed": "true",
+                   "steps.film-restore.outputs.cache-matched-key": ""}
             for run in default + other:
                 self.assertEqual(gha_if(restore["if"], **run, context=ctx), mode == "restore", (mode, run))
             for run in default:
@@ -1294,7 +1296,7 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         returns to an earlier content (a revert) must still become the newest entry."""
         steps = action_steps("build-cache")
         remember = next(s for s in steps if "TBOOK_BUILD_CACHE_RESTORED" in s.get("run", "") and s.get("id") != "prune")
-        self.assertEqual(remember["env"], {"MATCHED": "${{ steps.restore.outputs.cache-matched-key }}"})
+        self.assertEqual(remember["env"], {"MATCHED": "${{ steps.film-restore.outputs.cache-matched-key || steps.restore.outputs.cache-matched-key }}"})
         prune = next(s for s in steps if s.get("id") == "prune")
         (self.tmp / "tbook").write_text("#!/usr/bin/env bash\n"
                                         "printf '%s\\n' \"$*\" >> calls.txt\n"

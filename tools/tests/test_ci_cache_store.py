@@ -10,7 +10,7 @@ from unittest import mock
 from tbook import buildcache
 from test_buildcache import Scratch, tree, write
 from test_ci_performance import ci_module
-from test_verification import GITHUB_DIR, gha_if, workflow_jobs
+from test_verification import GITHUB_DIR, action_steps, gha_if, workflow_jobs
 
 cache_store = ci_module("cache_store")
 
@@ -64,6 +64,38 @@ class CacheStoreTest(unittest.TestCase):
             self.assertTrue(buildcache.restore_local(unit))
             self.assertEqual(unit.outputs[0].read_text(), "first")
 
+    def test_selected_film_cache_hits_survive_an_older_complete_aggregate_baseline(self):
+        with Scratch() as s:
+            def film_unit(value):
+                return buildcache.Unit("films", "demo/explanation", buildcache.Inputs().text("film", value),
+                                       [s.root / "build/film.mp4"])
+            current = film_unit("current")
+            for index in range(buildcache.KEEP):
+                old = film_unit(f"old-{index}")
+                write(old.outputs[0], "old video")
+                buildcache.store(old)
+                meta = json.loads((old.entry_dir() / "entry.json").read_text())
+                (old.entry_dir() / "entry.json").write_text(json.dumps(dict(meta, created=100 + index)))
+            stale = s.root / "complete-store"
+            shutil.copytree(buildcache.store_root(), stale)
+            shutil.rmtree(buildcache.store_root())
+            write(current.outputs[0], "current video")
+            buildcache.store(current)
+            meta = json.loads((current.entry_dir() / "entry.json").read_text())
+            (current.entry_dir() / "entry.json").write_text(json.dumps(dict(meta, created=1)))
+            self.store(s.root)  # unrelated unchanged PDF must remain out of the shard
+            baseline, shard = s.root / "before.json", s.root / "film-shard"
+            cache_store.snapshot(buildcache.store_root(), baseline)
+            self.assertTrue(buildcache.restore_local(current))
+            self.assertEqual(cache_store.export(buildcache.store_root(), baseline, shard), 0)
+            self.assertEqual(cache_store.export(buildcache.store_root(), baseline, shard,
+                                               include_units={("films", current.name)}), 1)
+            self.assertFalse((shard / "pdf").exists())
+            cache_store.merge(stale, [shard], prefer_imported=True)
+            entry = stale / current.entry_dir().relative_to(buildcache.store_root())
+            self.assertEqual(buildcache.verify(entry), "")
+            self.assertEqual((entry / "files/0").read_text(), "current video")
+
     def test_corruption_wrong_identity_and_links_are_not_imported(self):
         with Scratch() as s:
             unit = self.store(s.root)
@@ -86,6 +118,33 @@ class CacheStoreTest(unittest.TestCase):
             self.assertEqual(cache_store.merge(buildcache.store_root(), [shard]), 0)
             self.assertEqual(external.read_bytes(), original)
             self.assertFalse(buildcache.restore_local(unit))
+
+    def test_independent_inventory_preserves_unselected_films_before_partial_shards(self):
+        with Scratch() as s:
+            def unit(name, version):
+                return buildcache.Unit("films", "demo/" + name, buildcache.Inputs().text("film", version),
+                                       [s.root / "build" / f"{name}.mp4"])
+            def store(item, content):
+                write(item.outputs[0], content)
+                buildcache.store(item)
+            store(unit("b", "old"), "old b")
+            aggregate = s.root / "aggregate"
+            shutil.copytree(buildcache.store_root(), aggregate)
+            shutil.rmtree(buildcache.store_root())
+            a, b = unit("a", "current"), unit("b", "current")
+            store(a, "current a")
+            store(b, "current b")
+            baseline = s.root / "film-baseline"
+            shutil.copytree(buildcache.store_root(), baseline)
+            snapshot, shard = s.root / "before.json", s.root / "partial-shard"
+            cache_store.snapshot(buildcache.store_root(), snapshot)
+            cache_store.export(buildcache.store_root(), snapshot, shard, include_units={("films", a.name)})
+            cache_store.merge(aggregate, [baseline], prefer_imported=True)
+            cache_store.merge(aggregate, [shard], prefer_imported=True)
+            for item in (a, b):
+                entry = aggregate / item.entry_dir().relative_to(buildcache.store_root())
+                self.assertEqual(buildcache.verify(entry), "")
+                self.assertEqual((entry / "files/0").read_text(), f"current {item.name.rsplit('/', 1)[1]}")
 
     def test_merge_preserves_only_recent_valid_keys_without_tools_or_fonts(self):
         with Scratch() as s:
@@ -132,6 +191,63 @@ class CacheStoreTest(unittest.TestCase):
 
 
 class CacheTransferWorkflowTest(unittest.TestCase):
+    def test_complete_publishers_merge_the_independent_inventory(self):
+        for workflow, job in (("ci.yml", "check"), ("pages.yml", "build"),
+                              ("release.yml", "build"), ("template-release.yml", "site")):
+            steps = workflow_jobs(GITHUB_DIR / "workflows" / workflow)[job]
+            restore = next(s for s in steps if s.get("uses") == "./.github/actions/build-cache" and
+                           s.get("with", {}).get("mode") == "restore")
+            self.assertEqual(restore["with"].get("film-baseline"), "true", workflow)
+        steps = action_steps("build-cache")
+        download = next(s for s in steps if s.get("id") == "film-baseline")
+        merge = next(s for s in steps if "cache_store.py merge" in s.get("run", ""))
+        self.assertLess(steps.index(download), steps.index(merge))
+        self.assertIn("--prefer-imported", merge["run"])
+        self.assertIn("steps.film-baseline.outputs.artifact-scope == 'films'", merge["if"])
+
+    def test_film_actions_cache_hit_skips_the_complete_store_but_miss_can_migrate(self):
+        steps = action_steps("build-cache")
+        films = next(s for s in steps if s.get("id") == "film-restore")
+        legacy = next(s for s in steps if s.get("id") == "restore")
+        for scope in ("all", "images", "films"):
+            for matched in ("", "film-cache-v1-123"):
+                context = {"inputs.mode": "restore", "inputs.scope": scope,
+                           "steps.film-restore.outputs.cache-matched-key": matched}
+                self.assertEqual(gha_if(films["if"], event="push", ref="refs/heads/main", context=context),
+                                 scope == "films")
+                self.assertEqual(gha_if(legacy["if"], event="push", ref="refs/heads/main", context=context),
+                                 scope != "films" or not matched)
+                for step in (films, legacy):
+                    self.assertFalse(gha_if(step["if"], event="pull_request", ref="refs/pull/1/merge", context=context))
+
+    def test_film_shards_restore_only_videos_and_publish_after_trusted_success(self):
+        for workflow in ("ci.yml", "pages.yml"):
+            jobs = workflow_jobs(GITHUB_DIR / "workflows" / workflow)
+            restore = next(s for s in jobs["films"] if s.get("uses") == "./.github/actions/build-cache")
+            self.assertEqual(restore["with"]["scope"], "films")
+            export = next(s for s in jobs["films"] if "cache_store.py export" in s.get("run", ""))
+            env_name = "CI_ITEMS" if workflow == "ci.yml" else "FILMS_JSON"
+            self.assertIn(f"--include-films-env {env_name}", export["run"])
+            self.assertEqual(export["env"][env_name], "${{ toJSON(matrix.items) }}")
+            producer = jobs["check" if workflow == "ci.yml" else "build"]
+            merge = next(s for s in producer if "cache_store.py merge" in s.get("run", ""))
+            self.assertIn("--prefer-imported", merge["run"])
+            publish = next(s for s in producer if s.get("with", {}).get("name") == "tbook-film-store")
+            save = next(s for s in producer if s.get("with", {}).get("key", "").startswith("film-cache-v1-"))
+            self.assertEqual(save["with"]["path"], ".cache/artifacts/films")
+            self.assertEqual(publish["with"]["path"], ".cache/artifacts/films")
+            context = {"steps.verified.outcome": "success", "needs.plan.outputs.films": "true",
+                       "steps.cache-merge.outputs.entries": "1"}
+            for step in (save, publish):
+                self.assertTrue(gha_if(step["if"], event="push", ref="refs/heads/main", context=context))
+                self.assertFalse(gha_if(step["if"], event="pull_request", ref="refs/pull/1/merge", context=context))
+                self.assertNotIn("always()", step["if"])
+                if workflow == "ci.yml":
+                    self.assertFalse(gha_if(step["if"], event="push", ref="refs/heads/main",
+                                            context={**context, "needs.plan.outputs.films": "false"}))
+                    self.assertFalse(gha_if(step["if"], event="push", ref="refs/heads/main",
+                                            context={**context, "steps.verified.outcome": "failure"}))
+
     def test_only_default_branch_jobs_upload_shards_and_the_aggregate_publishes_after_verification(self):
         jobs = workflow_jobs(GITHUB_DIR / "workflows/ci.yml")
         for job in ("build", "media", "films"):

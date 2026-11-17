@@ -1,6 +1,8 @@
 """Transfer complete, verified build-cache entries between CI jobs.
 
-Build jobs snapshot the restored store and upload only added entries. The successful
+Build jobs snapshot the restored store and upload added entries; selected film cache
+hits travel too because their dedicated baseline may be newer than the aggregate's.
+The successful
 aggregate merges each shard separately: copying files from two encodings of the same
 input-addressed key would corrupt both entries. No command calculates current build
 keys or needs the publishing toolchain (in particular, the runner's font families).
@@ -102,8 +104,12 @@ def _copy(entry: Path, final: Path) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def export(root: Path, baseline: Path, dest: Path) -> int:
-    """Write added entries only, preserving each complete entry's relative path."""
+def export(root: Path, baseline: Path, dest: Path, *, include_units=()) -> int:
+    """Write additions and explicitly selected units, preserving complete entries.
+
+    Film shards can restore a newer dedicated baseline than the aggregate's full
+    store. Their selected cache hits must travel too, even when the delta is empty.
+    """
     _separate(root, dest)
     data = json.loads(baseline.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or data.get("schema") != SNAPSHOT or not isinstance(data.get("entries"), list):
@@ -114,7 +120,8 @@ def export(root: Path, baseline: Path, dest: Path) -> int:
     dest.mkdir(parents=True)
     count = 0
     for entry, meta in verified(root):
-        if (meta["target"], meta["unit"], meta["key"]) not in before:
+        if ((meta["target"], meta["unit"], meta["key"]) not in before or
+                (meta["target"], meta["unit"]) in include_units):
             _copy(entry, dest / entry.relative_to(root))
             count += 1
     return count
@@ -127,8 +134,8 @@ def _remove(path: Path) -> None:
         path.unlink(missing_ok=True)
 
 
-def maintain(root: Path) -> int:
-    """Keep only verified entries and the newest KEEP keys of each unit, without rebuilding keys."""
+def maintain(root: Path, *, preferred=()) -> int:
+    """Keep verified KEEP keys per unit: preferred entries first, then the newest."""
     groups = {}
     for entry, data in verified(root):
         groups.setdefault((data["target"], data["unit"]), []).append((entry, data))
@@ -136,7 +143,7 @@ def maintain(root: Path) -> int:
     for entries in groups.values():
         def order(item):
             created = item[1].get("created", 0)
-            return (created if isinstance(created, int) else 0, item[1]["key"])
+            return (item[0] in preferred, created if isinstance(created, int) else 0, item[1]["key"])
         keep.update(entry for entry, _ in sorted(entries, key=order, reverse=True)[:buildcache.KEEP])
     parents = {p for entry in keep for p in entry.parents if p != root and root in p.parents}
 
@@ -153,18 +160,21 @@ def maintain(root: Path) -> int:
     return len(keep)
 
 
-def merge(root: Path, sources: list[Path]) -> int:
+def merge(root: Path, sources: list[Path], *, prefer_imported=False) -> int:
     """Validate and import shards separately; never overlay the files of the same key."""
     maintain(root)
+    preferred = set()
     for source in sources:
         _separate(source, root)
         for entry, _ in verified(source):
             final = root / entry.relative_to(source)
+            if prefer_imported:
+                preferred.add(final)
             if valid(final, root) is None:
                 if final.exists() or final.is_symlink():
                     _remove(final)
                 _copy(entry, final)
-    return maintain(root)
+    return maintain(root, preferred=preferred)
 
 
 def main(argv=None) -> None:
@@ -176,17 +186,25 @@ def main(argv=None) -> None:
     p = sub.add_parser("export")
     p.add_argument("--baseline", required=True, type=Path)
     p.add_argument("--out", required=True, type=Path)
+    p.add_argument("--include-films-env", help="JSON environment variable naming selected film units, including cache hits")
     p = sub.add_parser("merge")
     p.add_argument("sources", nargs="*", type=Path)
+    p.add_argument("--prefer-imported", action="store_true", help="retain current shard keys before older baseline keys")
     sub.add_parser("maintain")
     args = parser.parse_args(argv)
     try:
         if args.command == "snapshot":
             count = snapshot(args.store, args.file)
         elif args.command == "export":
-            count = export(args.store, args.baseline, args.out)
+            include = set()
+            if args.include_films_env:
+                names = json.loads(os.environ[args.include_films_env])
+                if not isinstance(names, list) or not all(isinstance(n, str) and n for n in names):
+                    raise ValueError("selected film units must be a JSON array of nonempty strings")
+                include = {("films", name) for name in names}
+            count = export(args.store, args.baseline, args.out, include_units=include)
         elif args.command == "merge":
-            count = merge(args.store, args.sources)
+            count = merge(args.store, args.sources, prefer_imported=args.prefer_imported)
         else:
             count = maintain(args.store)
     except (OSError, ValueError, TypeError) as exc:

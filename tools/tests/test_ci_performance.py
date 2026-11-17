@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import copy
 import importlib.util
+import os
 from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -36,6 +38,10 @@ class TrustedCacheTest(unittest.TestCase):
             return dict(id=3, path=".github/workflows/pages.yml")
         if endpoint.endswith("/ci.yml"):
             return dict(id=4, path=".github/workflows/ci.yml")
+        if "/actions/artifacts?" in endpoint:
+            return {"total_count": 1, "artifacts": [dict(self.artifact, workflow_run={"id": 17})]}
+        if endpoint.endswith("/runs/17"):
+            return self.run
         if "/ci.yml/runs?" in endpoint:
             return {"workflow_runs": self.ci_runs}
         if "/runs?" in endpoint:
@@ -120,6 +126,73 @@ class TrustedCacheTest(unittest.TestCase):
                 raise OSError("not present")
             return self.api(endpoint)
         self.assertEqual(trusted_cache.find("owner/books", "main", api), (17, 42))
+
+    def test_film_store_is_not_shadowed_by_a_newer_export_only_ci(self):
+        self.artifact["name"] = "tbook-film-store"
+        self.run["updated_at"] = "2026-11-17T01:00:00Z"
+        self.ci_runs = [dict(self.run, id=20, workflow_id=4, updated_at="2026-11-17T02:00:00Z")]
+        def api(endpoint):
+            if "/runs/20/artifacts?" in endpoint:
+                return {"artifacts": [dict(self.artifact, id=43, name="tbook-build-store")]}
+            return self.api(endpoint)
+        self.assertEqual(trusted_cache.find("owner/books", "main", api,
+                                          artifact_name="tbook-film-store"), (17, 42))
+        self.run["event"] = "pull_request"
+        self.assertIsNone(trusted_cache.find("owner/books", "main", api,
+                                            artifact_name="tbook-film-store"))
+
+    def test_film_discovery_survives_twenty_newer_export_runs_and_paginates_artifacts(self):
+        self.artifact["name"] = "tbook-film-store"
+        self.ci_runs = [dict(self.run, id=i, workflow_id=4) for i in range(18, 39)]
+        calls = []
+        def api(endpoint):
+            calls.append(endpoint)
+            if "/actions/artifacts?" in endpoint:
+                if endpoint.endswith("page=1"):
+                    return {"total_count": 101, "artifacts": [dict(self.artifact, id=i,
+                            workflow_run={"id": 20}) for i in range(100, 200)]}
+                self.assertTrue(endpoint.endswith("page=2"))
+                return {"total_count": 101, "artifacts": [dict(self.artifact, workflow_run={"id": 17})]}
+            if endpoint.endswith("/runs/20"):
+                return dict(self.run, id=20, event="pull_request")
+            return self.api(endpoint)
+        self.assertEqual(trusted_cache.find("owner/books", "main", api,
+                                          artifact_name="tbook-film-store"), (17, 42))
+        self.assertEqual(calls.count("repos/owner/books/actions/runs/20"), 1)
+        self.assertFalse(any("/runs?" in call for call in calls), "unrelated run volume cannot hide films")
+
+    def test_named_film_artifacts_keep_all_producer_and_expiry_checks(self):
+        self.artifact["name"] = "tbook-film-store"
+        for changes in ({"event": "pull_request"}, {"head_branch": "feature"},
+                        {"head_repository": {"full_name": "fork/books"}}, {"workflow_id": 99},
+                        {"status": "in_progress"}, {"conclusion": "failure"}):
+            original = dict(self.run)
+            self.run.update(changes)
+            with self.subTest(changes=changes):
+                self.assertIsNone(trusted_cache.find("owner/books", "main", self.api,
+                                                    artifact_name="tbook-film-store"))
+            self.run = original
+        self.artifact["expired"] = True
+        self.calls.clear()
+        self.assertIsNone(trusted_cache.find("owner/books", "main", self.api,
+                                            artifact_name="tbook-film-store"))
+        self.assertNotIn("repos/owner/books/actions/runs/17", self.calls)
+
+    def test_film_restore_falls_back_to_legacy_store_at_the_correct_root(self):
+        find = trusted_cache.find
+        for dedicated in (True, False):
+            with self.subTest(dedicated=dedicated), tempfile.TemporaryDirectory() as tmp:
+                self.artifact["name"] = "tbook-film-store" if dedicated else "tbook-build-store"
+                output = Path(tmp) / "output"
+                with mock.patch.dict(os.environ, GITHUB_REPOSITORY="owner/books", DEFAULT_BRANCH="main",
+                                     CACHE_ARTIFACT="tbook-film-store", GITHUB_OUTPUT=str(output)), \
+                     mock.patch.object(trusted_cache, "find", side_effect=lambda *a, **kw:
+                                       find(*a, get=self.api, **kw)), \
+                     mock.patch("builtins.print"):
+                    trusted_cache.main()
+                self.assertEqual(dict(line.split("=", 1) for line in output.read_text().splitlines()),
+                                 {"run-id": "17", "artifact-id": "42",
+                                  "artifact-scope": "films" if dedicated else "all"})
 
 
 class FilmShardsTest(unittest.TestCase):

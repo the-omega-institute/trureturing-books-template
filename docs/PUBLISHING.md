@@ -40,7 +40,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 | 工作流 | 触发 | 作用 |
 | --- | --- | --- |
 | `ci.yml` | PR、推送到 main、手动、被调用、每周 | 先由仅需标准库的 `tools/ci/plan.py` 生成计划，再启动选中的结构／Lean、theme、unit、manifest、静态媒体、模板兼容检查族，以及按书籍启用格式展开的导出、精确 suite、film 和 slide 集合；空集合不开 runner；同一导出格式合并所选书籍，复用一次安装。viz 最多 8 片、film 最多 4 片，先选择再分片，每项恰一次。稳定必需检查名仍为 **Check**，移到末尾用 `always()` 核对全部计划任务，失败、取消和意外跳过均不通过。调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
-| `pages.yml` | 推送到 `main`、手动 | 共用影响规则，以独立的成功部署覆盖为基准；无站点影响且已有有效部署时跳过安装和构建。需要输出时仍 `./tbook check`、`./tbook build all`，恢复未变单元、补建缺失单元、清理删除内容后完整部署；Pages 未启用时只构建并提示，不记录部署覆盖。唯一保存构建缓存的工作流（§5），同一时间只运行一个 |
+| `pages.yml` | 推送到 `main`、手动 | 共用影响规则，以独立的成功部署覆盖为基准；无站点影响且已有有效部署时跳过安装和构建。需要输出时仍 `./tbook check`、`./tbook build all`，恢复未变单元、补建缺失单元、清理删除内容后完整部署；Pages 未启用时只构建并提示，不记录部署覆盖。与可信 CI 汇总共同保存构建缓存（§5），同一时间只运行一个 |
 | `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
 | `trureturing-bump.yml` | 每周、手动 | 把所钉的 trureturing 提交升级到最新并开 PR；标题前缀 `[refused]`（目标提交不在 `site.toml` 的分支上或无法核实）、`[unresolved]`（有引用无法解析）、`[pin failed]`、`[check fails]`、`[review statements]` 提示需要处理的情况；前三种 PR 不改锁文件，与 `[check fails]` 一样以草稿开出 |
@@ -130,6 +130,8 @@ CI 精确项为 `books/<slug>/viz/tests/<id>.test.mjs#<part>`，未分部仍为�
 
 ## 5. 构建缓存
 
+视频分片使用 `scope: films`：默认分支优先恢复 `film-cache-v1-`，PR 只读取可信成功 CI／Pages 发布的 `tbook-film-store`，恢复到 `.cache/artifacts/films/`。独立缓存不包含 PDF、EPUB 和静帧；视频工件按名称分页检索，分页范围由首次返回的工件总数限定，再校验其所属运行，不受最近 20 次无关成功运行的窗口限制；只有实际完成视频任务的 CI 汇总或成功完整构建的 Pages 发布它，纯导出 CI 不覆盖它。完整站点／Release 构建与 CI 汇总用 `film-baseline: true` 将最新可信视频库存先独立下载、逐条原子合并，再导入本次分片，保留未选影片的较新缓存；普通导出作业不额外下载这份库存。升级初期没有独立缓存时仍恢复旧完整缓存，并按旧归档的根目录解包。视频单元的输入键、完整性校验与 PR 信任边界沿用原契约；输入变化仍须重建。
+
 构建单元（每个语言版本的 HTML、每种 PDF、EPUB、每本书的幻灯片、每个视频）的输入没有变化时不再构建，而是恢复存下的产物（`tools/tbook/buildcache.py`；键与本地存储见 `docs/ARCHITECTURE.md`）。视频不是特例，与 PDF、幻灯片走同一条路。查找顺序：
 
 1. 本地存储 `.cache/artifacts/`。在 GitHub Actions 中，组合动作 `.github/actions/build-cache` 在构建前恢复它（Actions 缓存，按前缀 `build-cache-v1-` 先找本次运行所在 ref 的最新一份，再找默认分支的），PR 事件不读 Actions 缓存，改读成功的默认分支 CI 或 Pages 运行的 `tbook-build-store` 工件；
@@ -138,7 +140,7 @@ CI 精确项为 `books/<slug>/viz/tests/<id>.test.mjs#<part>`，未分部仍为�
 
 `pages.yml` 与默认分支成功的 CI 聚合都保存 Actions 缓存。Pages 构建后执行 `./tbook cache prune`（只留当前输入的条目），再由 `./tbook cache key` 算出存储内容的摘要 `build-cache-v1-<sha256>`。它与恢复到的键去掉运行后缀 `-r…` 后的部分相同时不再上传；不同时以 `build-cache-v1-<sha256>-r<run id>-<run attempt>` 保存。运行后缀使每次保存都得到一个新键，成为最新的一份：缓存键不能覆盖，存储回到早先的内容（例如回滚）时，若沿用早先的键，保存会因键已存在而落空，恢复就仍取那份更新却已过时的存储。每次保存的是整个存储，仓库的 Actions 缓存超过上限（默认 10 GB）时，GitHub 先淘汰最久未用的条目，恢复总是取最新的一份。Pages 在构建失败时也保存，已完成的单元（例如先渲染好的视频）不必重做；构建步骤自己的时限（210 分钟）短于作业的时限，超时只让这一步失败，保存照常进行，重新运行或下一次推送从已完成处继续（作业超时会被取消，保存也随之跳过）。`pages` 并发组使它同一时间只运行一个，后一次运行恢复前一次保存的结果。`films` 作业在默认分支与 tag 的推送上不构建视频（`pages.yml` 与发版工作流会构建）；`release.yml` 不保存 Actions 缓存，而是把缓存附在 Release 上。
 
-CI 的构建、幻灯片与影片作业在恢复后记录已验证条目的键，只上传构建中新增的完整条目（`tools/ci/cache_store.py snapshot|export`；临时分片保留 1 天）。稳定 Check 先确认全部计划作业成功，再恢复已有存储，按本次运行尝试分别下载分片并逐条校验、原子合并，最后保存 Actions 缓存与 `tbook-build-store`。相同输入键可能因编码器而有不同字节，合并保留一份完整有效条目，绝不逐文件覆盖混合两种编码。Check 没有出版字体或工具，不重新计算 PDF 等当前键；它只保留每个单元最新的两个已验证键，删除损坏条目、链接与其他未验证文件（动作 `prune: 'false'` 仅供 `check` 聚合使用）。这条写入链只在默认分支的 push、workflow_dispatch、schedule 中运行；PR、其他分支、失败或取消的计划均不发布聚合存储。新增条目才跨作业上传，完整存储仍需在聚合时下载和发布；这部分传输成本不会消失。缓存传输失败只导致后续缓存未命中，不改变检查结果。
+CI 的构建、幻灯片与影片作业在恢复后记录已验证条目的键，上传构建中新增的完整条目；CI 与 Pages 的影片分片同时交付所选影片的已验证命中条目，避免独立视频基准中的命中项在差量传输时丢失（`tools/ci/cache_store.py snapshot|export`；临时分片保留 1 天）。稳定 Check 先确认全部计划作业成功，再恢复已有存储，按本次运行尝试分别下载分片并逐条校验、原子合并，最后保存 Actions 缓存与 `tbook-build-store`。相同输入键可能因编码器而有不同字节，合并保留一份完整有效条目，绝不逐文件覆盖混合两种编码。Check 没有出版字体或工具，不重新计算 PDF 等当前键；它只保留每个单元两个已验证键，优先保留本次已选分片交付的键，再按创建时间取舍；这也保留回滚后命中的较早视频键；同时清理损坏条目、链接与其他未验证文件（动作 `prune: 'false'` 仅供 `check` 聚合使用）。这条写入链只在默认分支的 push、workflow_dispatch、schedule 中运行；PR、其他分支、失败或取消的计划均不发布聚合存储。除所选影片的命中条目外，仅新增条目跨作业上传；完整存储仍需在聚合时下载和发布；这部分传输成本不会消失。缓存传输失败只导致后续缓存未命中，不改变检查结果。
 
 PR 复用默认分支构建：成功的 `ci.yml` 聚合与 `pages.yml` 构建上传 `tbook-build-store`（保留 7 天，含隐藏文件，不压缩已压缩的视频）。PR 用 GitHub API 分别检查默认分支最近 20 次成功 CI 与 Pages 运行，从新到旧选择仍有工件的一次，核对 workflow ID、源仓库、分支、事件（push / workflow_dispatch，CI 另允许 schedule）、完成状态与结果，再按不可混淆的 run ID / artifact ID 下载。需要 `actions: read`；被调用的 CI 的调用者也须授予它。权限不足、工件过期或下载失败时照常构建，仍可从 Release 恢复。PR 自己的 Actions 缓存与工件始终不读；每个构建单元仍按当前输入键与逐文件摘要验证。信任边界见 `docs/VERIFICATION.md` §2。
 
