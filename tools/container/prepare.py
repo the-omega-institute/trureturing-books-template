@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 INPUTS = (
@@ -13,6 +14,21 @@ INPUTS = (
     "tools/fetch-fonts.sh", "theme/typst/fonts.sha256",
     "tools/install-tectonic.sh",
 )
+
+
+# Both the image contents and the workflow that certified its digest identify a release input set.
+IMAGE_INPUTS = (*INPUTS, "tools/container", ".dockerignore", ".github/workflows/toolchain-image.yml")
+
+
+def image_key(root: Path) -> str:
+    entries = subprocess.check_output(["git", "ls-tree", "-rz", "HEAD", "--", *IMAGE_INPUTS], cwd=root)
+    return hashlib.sha256(entries).hexdigest()
+
+
+def image_source(root: Path) -> str:
+    return subprocess.check_output(
+        ["git", "log", "--first-parent", "-1", "--format=%H", "HEAD", "--", *IMAGE_INPUTS],
+        cwd=root, text=True).strip()
 
 
 def fingerprints(root: Path) -> dict[str, str]:
@@ -46,10 +62,14 @@ def prepare(root: Path, toolchain: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--image-key", action="store_true", help="identify the tracked image and validation inputs")
     parser.add_argument("--record", action="store_true", help="record image inputs at build time")
     parser.add_argument("--toolchain", type=Path, default=Path("/opt/tbook"))
     parser.add_argument("--root", type=Path, default=Path.cwd())
     args = parser.parse_args()
+    if args.image_key:
+        print(image_key(args.root))
+        return
     if args.record:
         (args.toolchain / "inputs.json").write_text(
             json.dumps(fingerprints(args.toolchain), indent=2) + "\n", encoding="utf-8")

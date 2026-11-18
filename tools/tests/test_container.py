@@ -6,6 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import unittest
 
@@ -31,6 +32,31 @@ class ContainerTests(unittest.TestCase):
         for name in ("node_modules", ".cache/fonts"):
             (self.image / name).mkdir(parents=True)
         (self.image / "inputs.json").write_text(json.dumps(prepare.fingerprints(self.image)))
+
+    def test_input_key_and_producer_follow_changed_files(self):
+        def git(*args):
+            return subprocess.check_output(["git", *args], cwd=self.root).decode().strip()
+
+        def commit():
+            git("add", ".")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture")
+            return git("rev-parse", "HEAD")
+
+        git("init", "-q")
+        source = commit()
+        key = prepare.image_key(self.root)
+        (self.root / "README.md").write_text("updated")
+        commit()
+        self.assertEqual(prepare.image_key(self.root), key)
+        self.assertEqual(prepare.image_source(self.root), source)
+        (self.root / "tools/install-tectonic.sh").write_text("new engine")
+        new_source = commit()
+        self.assertNotEqual(prepare.image_key(self.root), key)
+        self.assertEqual(prepare.image_source(self.root), new_source)
+        workflow = (SCRIPT.parents[2] / ".github/workflows/toolchain-image.yml").read_text()
+        for path in prepare.IMAGE_INPUTS:
+            pattern = path + "/**" if path == "tools/container" else path
+            self.assertEqual(workflow.count("      - " + pattern + "\n"), 2, pattern)
 
     def test_matching_checkout_uses_image_dependencies_idempotently(self):
         prepare.prepare(self.root, self.image)

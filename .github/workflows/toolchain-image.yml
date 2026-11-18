@@ -2,7 +2,7 @@ name: Toolchain image
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
     tags: ['v*']
     paths:
       - tools/container/**
@@ -14,6 +14,8 @@ on:
       - theme/film/setup.sh
       - tools/fetch-fonts.sh
       - theme/typst/fonts.sha256
+      - tools/install-tectonic.sh
+      - .dockerignore
   pull_request:
     paths:
       - tools/container/**
@@ -25,6 +27,8 @@ on:
       - theme/film/setup.sh
       - tools/fetch-fonts.sh
       - theme/typst/fonts.sha256
+      - tools/install-tectonic.sh
+      - .dockerignore
   workflow_dispatch:
   schedule:
     - cron: '17 3 * * 2'
@@ -38,7 +42,7 @@ concurrency:
 
 jobs:
   image:
-    if: github.repository == 'the-omega-institute/trureturing-books-template'
+    if: github.repository == 'the-omega-institute/trureturing-books-template' && github.ref_type != 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -107,9 +111,6 @@ jobs:
           if [ "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" ]; then
             docker tag tbook-toolchain:test "$IMAGE:latest"
             docker push "$IMAGE:latest"
-          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            docker tag tbook-toolchain:test "$IMAGE:$GITHUB_REF_NAME"
-            docker push "$IMAGE:$GITHUB_REF_NAME"
           fi
           digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$image")"
           echo "image=$digest" >> "$GITHUB_OUTPUT"
@@ -156,3 +157,55 @@ jobs:
         run: |
           ./tbook doctor
           ./tbook check
+
+  publish-alias:
+    name: Publish the verified toolchain digest
+    needs: [image, use-image]
+    if: >-
+      !cancelled() && github.repository == 'the-omega-institute/trureturing-books-template' &&
+      ((github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
+       (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs.use-image.result == 'success'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/the-omega-institute/trureturing-books-toolchain
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply the input or release tag to the same manifest
+        env:
+          TESTED: ${{ needs.image.outputs.image }}
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          key="$(python3 tools/container/prepare.py --image-key)"
+          verified="$IMAGE:inputs-$key"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            if ! docker buildx imagetools inspect "$verified" > /dev/null; then
+              # A release can race the default-branch producer of these inputs.
+              PYTHONPATH=tools/ci:tools/container python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from pages import wait_for_push
+          from prepare import image_source
+          sha = image_source(Path.cwd())
+          run = wait_for_push(os.environ["GITHUB_REPOSITORY"], "toolchain-image", os.environ["DEFAULT_BRANCH"], sha, minutes=95)
+          if run["conclusion"] != "success":
+              raise SystemExit(f"Toolchain producer {sha} did not pass: {run['html_url']}")
+          PY
+            fi
+            docker buildx imagetools create --prefer-index=false --tag "$IMAGE:$GITHUB_REF_NAME" --tag "$IMAGE:sha-$GITHUB_SHA" "$verified"
+          else
+            docker buildx imagetools create --prefer-index=false --tag "$verified" "$TESTED"
+          fi

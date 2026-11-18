@@ -1,6 +1,8 @@
 """Cover compilation is shared across output directories and checks its real inputs."""
 
+import json
 import os
+import subprocess
 import shutil
 from types import SimpleNamespace
 from unittest import TestCase, mock, skipUnless
@@ -192,7 +194,15 @@ class CoverCacheTests(TestCase):
         tokens = (paths.GENERATED / "tokens.typ").read_bytes()
         site = fixture_site()
 
+        def compile_with_fixture_fonts(args, *, input, **kwargs):
+            # The image installs the same family system-wide. Use the fixture's actual
+            # font files in the real compiler worker so their replacement is observable.
+            request = json.loads(input)
+            request["kwargs"]["ignore_system_fonts"] = True
+            return subprocess.run(args, input=json.dumps(request), **kwargs)
+
         with Scratch() as scratch, \
+                mock.patch.object(pandoc, "subprocess", SimpleNamespace(run=compile_with_fixture_fonts)), \
                 mock.patch.object(pandoc, "FONT_CACHE", paths.CACHE / "fonts"), \
                 mock.patch.object(pandoc, "THEME_FONTS", paths.THEME / "typst/fonts"), \
                 mock.patch.object(pandoc, "FONTSOURCE_CACHE", paths.CACHE / "fonts-fontsource"), \
