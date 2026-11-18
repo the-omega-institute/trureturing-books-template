@@ -618,6 +618,25 @@ class AffectedPlanTest(unittest.TestCase):
                 if "/tests/" in path:
                     self.assertIn(path, selected["suites"])
 
+    def test_lock_refresh_only_selects_films_using_the_changed_declaration(self):
+        import json
+        lock = dict(repo="org/proofs", commit="1" * 40, declarations={"cited": {"line": 1}})
+        self.write("books/one/films/001-film/film.json", json.dumps({"lean": ["cited"]}))
+        self.write("trureturing.lock.json", json.dumps(lock))
+        old = planner.Tree(self.root, self.commit())
+        def films():
+            head = planner.Tree(self.root, self.commit())
+            return planner.impact(head, old, ["trureturing.lock.json"])["films"]
+        lock["declarations"]["other"] = {"line": 2}
+        self.write("trureturing.lock.json", json.dumps(lock))
+        self.assertEqual(films(), [])
+        lock["declarations"]["cited"]["line"] = 3
+        self.write("trureturing.lock.json", json.dumps(lock))
+        self.assertEqual(films(), ["one/001-film"])
+        lock["commit"] = "2" * 40
+        self.write("trureturing.lock.json", json.dumps(lock))
+        self.assertEqual(films(), ["one/001-film", "two/001-film"])
+
     def test_push_scope_ignores_stale_history_before_looking_for_costs(self):
         self.write("books/two/viz/a/model.js", "upstream\n")
         before = self.commit()

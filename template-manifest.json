@@ -564,7 +564,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "b08b38bac14fcdfaf72247beb4d948480885a6247503ffe2acf487cea714a5eb",
+      "sha256": "a6b45397dffc2e9c80b18dc60bcc1c92a17c78f3521ac429e81573748ff489be",
       "mode": "100644"
     },
     "tools/ci/pr_conventions.py": {
@@ -916,7 +916,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "5987be3320d4cabd26fabc7fcf41ee53ea9240a056008ae662b9e38e0a27cf77",
+      "sha256": "fe670b80e4824b551a97ee599e93001f3c788f4841dc3da69ec2fac0709e6b11",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {

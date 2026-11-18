@@ -302,6 +302,22 @@ def film_reads(tree, slug, film, meta):
     return scopes, sources | closure, uncertain
 
 
+def film_lock_inputs(tree, film):
+    """Only the pin and this film's resolved declarations enter its engine data."""
+    if tree is None or "trureturing.lock.json" not in tree.files:
+        return None
+    if not hasattr(tree, "_film_lock"):
+        tree._film_lock = tree.json("trureturing.lock.json")
+    lock = tree._film_lock
+    slug, ident = film.split("/")
+    path = f"books/{slug}/films/{ident}/film.json"
+    if (path not in tree.files or not isinstance(lock.get("declarations"), dict) or
+            not lock.get("repo") or not lock.get("commit")):
+        return None
+    gids = tree.json(path).get("lean") or []
+    return lock["repo"], lock["commit"], {gid: lock["declarations"].get(gid) for gid in gids}
+
+
 def _template_version_only(current, previous):
     """Prove release metadata or collaboration ownership changes without output readers.
 
@@ -450,6 +466,11 @@ def impact(current, previous, paths, *, full=False, template=False):
                 if film in all_films and (p in sources or any(scope_contains(p, src) and
                         not any(skip in "/" + p for skip in exclude) for src, exclude in scopes)):
                     matched_films.add(film)
+        if p == "trureturing.lock.json":
+            for film in matched_films.copy() - uncertain_films:
+                inputs = film_lock_inputs(current, film)
+                if inputs is not None and inputs == film_lock_inputs(previous, film):
+                    matched_films.remove(film)
         if p == "theme/tokens.json":
             # The video constructor reads tokens.mjs generated from this source.
             matched_films.update(all_films)
@@ -647,7 +668,7 @@ def published_still_cards(tree, slug):
         for chapter in summary.parse_summary(Path(name), text=tree.read(name)).chapters:
             if not chapter.path:
                 continue
-            for node in mdscan.walk(mdscan.parse_blocks(tree.read(prefix + chapter.path))):
+            for node in mdscan.walk(mdscan.parse_blocks(tree.read(str(PurePosixPath(prefix, chapter.path))))):
                 if isinstance(node, mdscan.Div) and model.kind_of(node) == "viz":
                     preset = (node.attrs.get("preset") or "").strip()
                     if viz.PRESET_RE.fullmatch(preset):
@@ -726,7 +747,7 @@ def active_deployment(root, repo, limit, get=api):
     """Use the live deployment as the publication baseline even after artifact expiry."""
     for item in get(f"repos/{repo}/deployments?environment=github-pages&per_page=100"):
         sha = item.get("sha")
-        if sha and ancestor(root, sha, limit):
+        if isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) and ancestor(root, sha, limit):
             statuses = get(f"repos/{repo}/deployments/{int(item['id'])}/statuses?per_page=1")
             if statuses and statuses[0].get("state") == "success":
                 return sha
@@ -1007,7 +1028,8 @@ def main():
                   get_revision=trusted_revision, get_deployment=active_deployment)
     Path("ci-plan.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     write_outputs(result)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    jobs = [name for name, selected in result["tasks"].items() if selected]
+    print("Selected CI jobs:", ", ".join(jobs) or "none", "(details in ci-plan.json)")
 
 
 if __name__ == "__main__":
