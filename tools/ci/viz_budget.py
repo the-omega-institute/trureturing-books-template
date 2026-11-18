@@ -84,6 +84,13 @@ def pack(execution, hints, workloads=None):
     return rows
 
 
+def runtime_identity(runtime):
+    """Ignore the runner image revision, which can vary within one matrix."""
+    if isinstance(runtime, dict):
+        return {key: value for key, value in runtime.items() if key != 'ImageVersion'}
+    return runtime
+
+
 def merge_reports(plan, reports):
     """Require exact successful current-run units before any parent coverage advances."""
     expected = plan.get('execution', {})
@@ -94,7 +101,8 @@ def merge_reports(plan, reports):
                 report.get('sha') != plan['sha'] or report.get('run_id') != plan['coverage'][profile]['run_id'] or
                 report.get('run_attempt') != plan['coverage'][profile]['run_attempt'] or
                 report.get('frames') != (1000 if profile == 'slow' else 0) or
-                report.get('runtime') != plan['coverage'][profile]['runtime'] or not isinstance(report.get('results'), list)):
+                runtime_identity(report.get('runtime')) != runtime_identity(plan['coverage'][profile]['runtime']) or
+                not isinstance(report.get('results'), list)):
             raise ValueError('incompatible browser execution report')
         for row in report['results']:
             unit = row.get('unit')
