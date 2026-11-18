@@ -14,6 +14,8 @@ import test_ci_performance as fixtures
 
 
 class BudgetTest(unittest.TestCase):
+    runtime = dict(ImageOS='ubuntu24', ImageVersion='20261111.370.1', TBOOK_TOOLCHAIN='toolchain')
+
     def test_heterogeneous_selected_sets_are_exact_and_deterministic_without_eight_cap(self):
         for size in (0, 1, 3, 8, 19, 62):
             execution = {f'suite-{i}': 'src' for i in range(size)}
@@ -56,18 +58,31 @@ class BudgetTest(unittest.TestCase):
 
     def fixture(self):
         return dict(sha='head', execution={'normal': {'owner#a': 'src', 'owner#b': 'src'}, 'slow': {}},
-                    coverage={p: dict(run_id='7', run_attempt='2', runtime={'image': 'one'}, timings={}) for p in ('normal', 'slow')})
+                    coverage={p: dict(run_id='7', run_attempt='2', runtime=self.runtime.copy(), timings={}) for p in ('normal', 'slow')})
 
     def report(self):
-        return dict(schema=budget.REPORT_SCHEMA, sha='head', run_id='7', run_attempt='2', runtime={'image': 'one'},
+        return dict(schema=budget.REPORT_SCHEMA, sha='head', run_id='7', run_attempt='2', runtime=self.runtime.copy(),
                     frames=0, profile='normal', results=[dict(unit=f'owner#{p}', seconds=3, exit_code=0, signal=None) for p in ('a', 'b')])
+
+    def test_reports_accept_rolling_image_versions_for_the_same_runtime(self):
+        plan, report = self.fixture(), self.report()
+        budget.merge_reports(plan, [
+            dict(report, results=report['results'][:1]),
+            dict(report, results=report['results'][1:],
+                 runtime=dict(self.runtime, ImageVersion='20261116.376.1')),
+        ])
+        self.assertEqual(set(plan['coverage']['normal']['timings']), {'owner#a', 'owner#b'})
+        self.assertEqual(plan['coverage']['normal']['runtime']['ImageVersion'], '20261111.370.1')
 
     def test_reports_require_exact_successful_units_profile_runtime_and_run_attempt(self):
         plan, report = self.fixture(), self.report()
         budget.merge_reports(plan, [report])
         self.assertEqual(set(plan['coverage']['normal']['timings']), {'owner#a', 'owner#b'})
         changes = [dict(sha='wrong'), dict(run_id='8'), dict(run_attempt='1'), dict(frames=1000),
-                   dict(profile='slow'), dict(runtime={'image': 'two'}), dict(schema='old'),
+                   dict(profile='slow'), dict(runtime=None),
+                   dict(runtime=dict(self.runtime, ImageOS='ubuntu22')),
+                   dict(runtime=dict(self.runtime, TBOOK_TOOLCHAIN='other')),
+                   dict(schema='old'),
                    dict(results=report['results'][:1]), dict(results=report['results'] * 2)]
         for change in changes:
             with self.subTest(change=change), self.assertRaises(ValueError):

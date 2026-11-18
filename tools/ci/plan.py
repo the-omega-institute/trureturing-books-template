@@ -619,8 +619,7 @@ def image_shards(tree, exports):
 
 
 def signature(tree, runtime):
-    if isinstance(runtime, dict):
-        runtime = {k: v for k, v in runtime.items() if k != "ImageVersion"}
+    runtime = viz_budget.runtime_identity(runtime)
     digest = hashlib.sha256(json.dumps([VERSION, runtime], sort_keys=True).encode())
     for entry in git(tree.root, "ls-tree", "-r", "-z", tree.sha).split(b"\0"):
         if not entry:
