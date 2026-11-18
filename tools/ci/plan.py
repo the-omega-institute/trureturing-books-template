@@ -683,6 +683,9 @@ def image_shards(tree, exports, *, previous=None, paths=(), full=False):
     shared = {"theme/tokens.json", "theme/generated/tokens.css", "package-lock.json",
               *("tools/node/" + name for name in (
                   "viz-thumbs.mjs", "viz-still-cache.mjs", "viz-common.mjs", "viz-server.mjs", "viz-testkit.mjs"))}
+    # These Python inputs implement the published citation and generated token contracts.
+    shared.update("tools/tbook/" + name + ".py" for name in
+                  ("config", "mdscan", "model", "summary", "theme", "viz"))
     shared_change = bool(shared.intersection(paths)) or any(p.startswith("theme/viz/") for p in paths)
     items = []
     for slug in sorted(slugs):
@@ -882,7 +885,10 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         if previous is None and mode != "full":
             revision = comparison
             if profile == "pages" and not revision and get_deployment:
-                deployed_sha = get_deployment(root, repo, limit)
+                try:
+                    deployed_sha = get_deployment(root, repo, limit)
+                except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+                    reasons.append(f"deployment lookup unavailable ({type(exc).__name__}); assemble the site")
                 revision = deployed_sha
             if not revision and profile != "pages" and get_revision:
                 try:

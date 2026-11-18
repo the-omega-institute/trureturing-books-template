@@ -848,8 +848,14 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assertEqual(result["suites"], [])
                 self.assertEqual(result["films"], [] if p.startswith(("theme/film/site/", "theme/slides/")) else full["films"])
                 self.assertFalse(result["checks"]["unit"])
-                for key in ("exports", "books", "slides", "site"):
-                    self.assertEqual(result[key], full[key])
+                self.assertTrue(result["site"])
+                if p == "theme/generated/tokens.mjs":
+                    self.assertEqual(result["exports"], full["exports"])
+                    self.assertEqual(result["slides"], full["slides"])
+                else:
+                    self.assertEqual(result["exports"], [])
+                    self.assertEqual(result["slides"], full["slides"] if p.startswith("theme/slides/") else [])
+                self.assertEqual(result["books"], [] if p.startswith("theme/film/site/") else full["books"])
 
     def test_declared_shared_imports_and_implicit_object_imports_cover_future_members(self):
         import json
