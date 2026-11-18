@@ -91,7 +91,7 @@ class PlanOutputBudgetTest(unittest.TestCase):
             self.assertEqual(selected["suites"], suites)
             self.assertEqual(selected["books"], ["one"])
             self.assertEqual(selected["films"], [])
-            self.assertEqual(selected["slides"], ["one/a", "one/b"])
+            self.assertEqual(selected["slides"], [])
             self.assertEqual(selected["exports"], [
                 dict(name="one-" + name, book="one", target=target, variant=variant)
                 for name, target, variant in (("html", "html", ""), ("pdf-screen", "pdf", "screen"), ("epub", "epub", ""))])
@@ -104,7 +104,7 @@ class PlanOutputBudgetTest(unittest.TestCase):
             self.assertEqual(sorted(plan["execution"][profile]), suites)
             self.assertEqual(sorted(plan["workloads"][profile]), suites)
             self.assertEqual(sorted(item for shard in matrix for item in shard["items"]), suites)
-        self.assertEqual(plan["tasks"], dict(validate=True, browser=False, stills=False, build=True, viz=True, **{"viz-slow": True}, media=True, films=False))
+        self.assertEqual(plan["tasks"], dict(validate=True, browser=False, stills=False, build=True, viz=True, **{"viz-slow": True}, media=False, films=False))
         output, summary = self.outputs(plan)
         self.assertIn(paths[0], output)
         self.assertNotIn("\\u7ae0", output)

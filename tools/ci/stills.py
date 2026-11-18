@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 
@@ -40,10 +42,33 @@ def prepare(items, dest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--items-file', required=True, type=Path)
-    parser.add_argument('--out', required=True, type=Path)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--items-file', type=Path)
+    mode.add_argument('--ensure-books', nargs='+', metavar='BOOK')
+    parser.add_argument('--out', type=Path)
     args = parser.parse_args()
-    prepare(json.loads(args.items_file.read_text()), args.out)
+    if args.items_file:
+        if not args.out:
+            parser.error('--items-file requires --out')
+        prepare(json.loads(args.items_file.read_text()), args.out)
+        return
+
+    # A cold export must be buildable even when none of its image sources changed.
+    # Restore required inputs first; install Chromium only if something needs capture.
+    books = {book.slug: book for book in config.load_books()}
+    theme.write()
+    installed = False
+    for slug in args.ensure_books:
+        book = books[slug]
+        derived.refresh(book)
+        missing = [unit.name.split("/", 1)[1] for unit in buildcache.viz_units(book)
+                   if buildcache.run(unit, None) == "missing"]
+        if missing:
+            if not installed and not os.environ.get("PW_CHROMIUM_PATH"):
+                subprocess.run(["npx", "--no-install", "playwright", "install", "--with-deps", "chromium"], check=True)
+                installed = True
+            derived.images(book, missing)
+
 
 
 if __name__ == '__main__':

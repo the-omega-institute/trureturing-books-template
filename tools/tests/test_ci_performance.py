@@ -588,6 +588,48 @@ class AffectedPlanTest(unittest.TestCase):
         self.assertEqual(sorted(i for row in rows for i in row['items']), ['one/a', 'two/a'])
         self.assertEqual(planner.image_shards(tree, [dict(book='one', target='html')]), [])
 
+    def test_stills_follow_capture_inputs_and_published_presets(self):
+        import json
+        prefix = "books/one/"
+        self.write(prefix + "viz/visualizations.json", json.dumps({"visualizations": [
+            {"id": "a", "status": "live", "capture_lock": "links"}, {"id": "b", "status": "live"}]}))
+        self.write(prefix + "zh/SUMMARY.md", "# Summary\n- [Chapter](chapter.md)\n")
+        old = planner.Tree(self.root, self.commit())
+        self.write(prefix + "zh/chapter.md", "Only prose changed.\n::: {.viz src=\"a\" preset=\"p\"}\n:::\n")
+        current = planner.Tree(self.root, self.commit())
+        exports = [dict(book="one", target="pdf"), dict(book="one", target="epub")]
+        def selected(head, paths):
+            return [item for row in planner.image_shards(head, exports, previous=old, paths=paths)
+                    for item in row["items"]]
+        self.assertEqual(selected(current, [prefix + "zh/chapter.md"]), [])
+        self.assertEqual(selected(current, ["trureturing.lock.json"]), ["one/b"])
+        self.assertEqual(selected(current, [prefix + "viz/a/model.js"]), ["one/a"])
+        self.write(prefix + "zh/chapter.md", '::: {.viz src="a" preset="new"}\n:::\n')
+        self.assertEqual(selected(planner.Tree(self.root, self.commit()), [prefix + "zh/chapter.md"]), ["one/a"])
+
+    def test_format_theme_and_test_changes_have_independent_consumers(self):
+        tree = planner.Tree(self.root, "HEAD")
+        for path, targets in (("theme/mdbook/head.hbs", {"html"}), ("theme/epub/book.css", {"epub"}),
+                              ("books/one/viz/tests/a.test.mjs", set()), ("theme/site/site.css", set())):
+            with self.subTest(path=path):
+                selected = planner.impact(tree, tree, [path])
+                self.assertEqual({v["target"] for v in selected["exports"]}, targets)
+                self.assertEqual(selected["site"], "/tests/" not in path)
+                if "/tests/" in path:
+                    self.assertIn(path, selected["suites"])
+
+    def test_push_scope_ignores_stale_history_before_looking_for_costs(self):
+        self.write("books/two/viz/a/model.js", "upstream\n")
+        before = self.commit()
+        self.write("docs/PUBLISHING.md", "docs only\n")
+        self.commit()
+        def unrelated(*args):
+            self.fail("documentary push requested historical coverage")
+        result = planner.plan(self.root, event="push", payload={"before": before}, repo="owner/books",
+                              branch="main", ref="refs/heads/main", get_baseline=unrelated, get_revision=unrelated)
+        self.assertFalse(any(result["tasks"].values()))
+        self.assertEqual(result["coverage"]["normal"]["paths"], ["docs/PUBLISHING.md"])
+
     def test_selected_tool_browser_classes_run_exactly_once_and_failure_blocks_coverage(self):
         modules = {}
         for name in planner.testing.BROWSER:
@@ -932,6 +974,7 @@ class AffectedPlanTest(unittest.TestCase):
         script = next(step["run"] for step in workflow_jobs(workflow)["build"] if step.get("name") == "Build")
         self.write("tbook", "#!/usr/bin/env python3\nimport json,sys\nfrom pathlib import Path\nPath('calls.json').write_text(json.dumps(sys.argv[1:]))\n")
         (self.root / "tbook").chmod(0o755)
+        self.write("tools/ci/stills.py", "import sys\nassert sys.argv[1:] == ['--ensure-books', 'one', 'two']\n")
         env = {"RUNNER_TEMP": str(self.root), "BOOKS_JSON": '["one","two"]', "TARGET": "pdf", "VARIANT": "screen"}
         run = run_bash(script, self.root, env)
         self.assertEqual(run.returncode, 0, run.stderr)
@@ -1023,7 +1066,8 @@ class AffectedPlanTest(unittest.TestCase):
             return {"sha": self.base}
         result = planner.plan(self.root, event="pull_request", payload=payload, repo="owner/books", branch="main",
                               ref="refs/pull/1/merge", get_baseline=baseline)
-        self.assertEqual(result["selections"]["normal"]["suites"], ["books/one/viz/tests/a.test.mjs", "books/two/viz/tests/b.test.mjs"])
+        self.assertEqual(result["selections"]["normal"]["suites"], ["books/one/viz/tests/a.test.mjs"])
+        self.assertEqual(result["coverage"]["normal"]["comparison"], base_tip)
         self.assertFalse(result["publish"])
         payload["pull_request"]["base"]["sha"] = self.base
         advanced = planner.plan(self.root, event="pull_request", payload=payload, repo="owner/books", branch="main",
@@ -1225,7 +1269,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
                 self.assert_films(pushed, ["one/001-film"], deferred=True)
                 self.finish(pushed)  # A second normal success must not erase the obligation either.
                 self.assert_films(self.select("workflow_dispatch"), ["one/001-film"])
-                self.assert_films(self.docs_pr(), ["one/001-film"])
+                self.assert_films(self.docs_pr(), [])
 
     def test_actual_pages_or_manual_film_success_allows_unchanged_consumers_to_skip(self):
         for producer in ("pages", "pages-disabled", "manual"):

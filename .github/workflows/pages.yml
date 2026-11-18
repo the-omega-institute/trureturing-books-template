@@ -70,6 +70,7 @@ jobs:
 
   probe:
     needs: plan
+    if: needs.plan.outputs.site == 'true'
     name: Is GitHub Pages enabled?
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -330,7 +331,7 @@ jobs:
           TBOOK_NEEDS_JSON
           python3 tools/ci/plan.py --workflow pages --verify --needs-file "$RUNNER_TEMP/ci-needs.json"
       - name: Record successful deployment coverage
-        if: needs.plan.outputs.publish == 'true' && needs.probe.outputs.enabled == 'true'
+        if: needs.plan.outputs.publish == 'true' && (needs.plan.outputs.site != 'true' || needs.probe.outputs.enabled == 'true')
         uses: actions/upload-artifact@v6
         with:
           name: tbook-coverage-pages
