@@ -895,6 +895,26 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assertTrue(all(part["items"] for part in parts))
                 self.assertEqual(sorted(x for p in parts for x in p["items"]), sorted(items))
 
+    def test_ci_and_pages_split_film_work_into_up_to_sixteen_jobs(self):
+        names = [f"film-{index:02d}" for index in range(15)]
+        for name in names:
+            self.write(f"books/one/films/{name}/film.json", "{}")
+        self.commit()
+
+        added = [f"one/{name}" for name in names]
+        cases = (
+            (self.make_plan(event="workflow_dispatch"), added),
+            (self.make_plan(workflow="pages", mode="full"),
+             sorted([*added, "one/001-film", "two/001-film"])),
+        )
+        for result, expected in cases:
+            with self.subTest(profiles=result["profiles"]):
+                parts = result["films"]
+                self.assertTrue(result["tasks"]["films"])
+                self.assertEqual(len(parts), min(len(expected), 16))
+                self.assertTrue(all(part["items"] for part in parts))
+                self.assertEqual(sorted(item for part in parts for item in part["items"]), expected)
+
     def test_export_groups_share_setup_without_expanding_execution_set(self):
         tree = planner.Tree(self.root, "HEAD")
         exact = planner.impact(tree, tree, [], full=True)["exports"]
