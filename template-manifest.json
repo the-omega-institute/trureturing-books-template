@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "36e1ec994183d0f361c915c9329c0d29cb4ef5cf97a61eecbafa278a06c93de8",
+      "sha256": "cbc1f54a8a7ce47a6143a12ef2e29667274f79dfdf48c96d0bf0b0e59cb830dd",
       "mode": "100644"
     },
     ".github/workflows/pr-conventions.yml": {
@@ -100,7 +100,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "e2b505437be27d34a05d9c45d5876edaa18928b2377693c06ff33867cb072f8f",
+      "sha256": "0f4e8c7c658cf39f89b081b349bfe9ac38f711097912b874439808df800ceef1",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -116,7 +116,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "1b72cca9727e74e40209032413fe4c942aa2943ec048700cdca041fcf654170d",
+      "sha256": "4e9028eff905017012d11a81452a89f3981e951a32a0db2f1b7ac286df713a91",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
@@ -160,7 +160,7 @@
       "mode": "100644"
     },
     "skills/book-release/SKILL.md": {
-      "sha256": "58204d0beeb255c267a0123d20d24854525df3ec4e39fb99a5b05fee0567f946",
+      "sha256": "fe8990c81a3582be938a98f47a86ccc75e578165da523ccf237b883231330ece",
       "mode": "100644"
     },
     "skills/book-slides/SKILL.md": {
@@ -563,8 +563,12 @@
       "sha256": "ef9fa79e244a6081a53fb657521c9c80894df2e69f513b220f0edee7cb2982f6",
       "mode": "100644"
     },
+    "tools/ci/pages.py": {
+      "sha256": "6f84fa22bfdab5fa95e274f500d597b1d3fb5fe2c295405de28072a7c69dd455",
+      "mode": "100644"
+    },
     "tools/ci/plan.py": {
-      "sha256": "7dd449c54b328feeb1a5a1b4be17d4de3e6bd4f8db0c5690236c28a47390f196",
+      "sha256": "dd62fcff8cef6619a12bbd0100350626916a94a7c1d1c79ce581ebf0d719ac70",
       "mode": "100644"
     },
     "tools/ci/pr_conventions.py": {
@@ -916,7 +920,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "03f614d6ea3447c42e6612740bed4a922162ebff0645f888f3de599532f13d27",
+      "sha256": "b32ccc8ee1650d6d10e364e6f723711e6eb9f2210be752fb55c289ade41fb697",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {
@@ -1068,7 +1072,7 @@
       "mode": "100644"
     },
     "tools/tests/test_template.py": {
-      "sha256": "02befa607e00b75ae260148ceff6ae23f71e5a5469568d74eea610d402cbb0e5",
+      "sha256": "d2cf9e4540e3f3b3831cd66ebd0c5f4768e6ad7fead55e5f910e59759b88d6c5",
       "mode": "100644"
     },
     "tools/tests/test_template_layers.py": {
@@ -1076,7 +1080,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "2a92ed64cbe6bdd1dcc76ceffd50e513736b4fe3ddbf41735b60268fe5174c3e",
+      "sha256": "48b2b1d1786e2fe7e594eeef44fc26b3451700f52987d2338c129983335d72eb",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {

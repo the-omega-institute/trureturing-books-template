@@ -746,11 +746,11 @@ def deployed(repo, sha, get=api):
     return False
 
 
-def active_deployment(root, repo, limit, get=api):
+def active_deployment(root, repo, limit=None, get=api):
     """Use the live deployment as the publication baseline even after artifact expiry."""
     for item in get(f"repos/{repo}/deployments?environment=github-pages&per_page=100"):
         sha = item.get("sha")
-        if isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) and ancestor(root, sha, limit):
+        if isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) and (limit is None or ancestor(root, sha, limit)):
             statuses = get(f"repos/{repo}/deployments/{int(item['id'])}/statuses?per_page=1")
             if statuses and statuses[0].get("state") == "success":
                 return sha
@@ -854,9 +854,9 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
     execution, matrices, workloads = {}, {}, {}
     live_execution, live_workloads = {}, {}
     template = repo == "the-omega-institute/trureturing-books-template"
-    deferred_films = event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
+    deferred_films = workflow == "ci" and event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
     # The tested merge parent and push "before" are independent of caches and coverage.
-    before = payload.get("before") if event == "push" else None
+    before = payload.get("before") if event == "push" and workflow == "ci" else None
     created = before == "0" * 40
     first_branch_push = created and ref.startswith("refs/heads/") and not base
     comparison = base or pr_base or (before if not created else None)
@@ -912,8 +912,9 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         selected = impact(current, previous, paths, full=mode == "full", template=template)
         if profile == "normal":
             stills = image_shards(current, selected["exports"], previous=previous, paths=paths, full=mode == "full")
-        if profile == "pages" and not (record or deployed_sha):
-            # A Git comparison cannot inherit a successful deployment identity.
+        if profile == "pages" and (event == "push" or not (record or deployed_sha)):
+            # A verified new push advances the live SHA even if all output units are reusable.
+            # Without prior deployment evidence, a manual run assembles the site too.
             selected["site"] = True
         if not record:
             reasons.append(f"{profile}: explicit full" if mode == "full" else f"{profile}: changes only, without coverage artifact")
