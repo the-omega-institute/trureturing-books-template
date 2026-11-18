@@ -1316,7 +1316,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
                 self.assert_films(unchanged, [])
                 self.finish(unchanged)  # Successful inheritance can advance actual film coverage too.
                 if producer == "pages":
-                    no_op = self.select(workflow="pages")
+                    no_op = self.select("workflow_dispatch", workflow="pages")
                     self.assertFalse(no_op["site"])
                     self.assertNotIn("films", no_op["coverage"])
                     self.finish(no_op, "pages")

@@ -920,7 +920,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "b32ccc8ee1650d6d10e364e6f723711e6eb9f2210be752fb55c289ade41fb697",
+      "sha256": "1552cbdf0e80877224937241643c83be9aeb684137d59af869c561d7235580eb",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {
