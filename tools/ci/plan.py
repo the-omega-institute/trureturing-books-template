@@ -302,6 +302,22 @@ def film_reads(tree, slug, film, meta):
     return scopes, sources | closure, uncertain
 
 
+def film_lock_inputs(tree, film):
+    """Only the pin and this film's resolved declarations enter its engine data."""
+    if tree is None or "trureturing.lock.json" not in tree.files:
+        return None
+    if not hasattr(tree, "_film_lock"):
+        tree._film_lock = tree.json("trureturing.lock.json")
+    lock = tree._film_lock
+    slug, ident = film.split("/")
+    path = f"books/{slug}/films/{ident}/film.json"
+    if (path not in tree.files or not isinstance(lock.get("declarations"), dict) or
+            not lock.get("repo") or not lock.get("commit")):
+        return None
+    gids = tree.json(path).get("lean") or []
+    return lock["repo"], lock["commit"], {gid: lock["declarations"].get(gid) for gid in gids}
+
+
 def _template_version_only(current, previous):
     """Prove release metadata or collaboration ownership changes without output readers.
 
@@ -384,6 +400,7 @@ def impact(current, previous, paths, *, full=False, template=False):
     all_films = {f for b in now.values() for f in b["films"]}
     all_slides = {s for b in now.values() for s in b["slides"]}
     selected_books, suites, films, slides = set(), set(), set(), set()
+    export_outputs = set()
     checks = dict(unit=False, theme=False, structure=False, viz_static=False, slides_static=False,
                   compat=False, manifest=template)
     reasons, path_reasons = set(), {}
@@ -408,6 +425,7 @@ def impact(current, previous, paths, *, full=False, template=False):
             # publish_assets copies optional runtimes/vendor even for browser nonreaders.
             # Preserve complete export/static/deck responsibility independently of execution.
             selected_books.add(slug)
+            export_outputs.update((slug, output) for output in now[slug]["outputs"])
             slides.update(now[slug]["slides"])
 
     def everything(reason, path=None):
@@ -448,6 +466,14 @@ def impact(current, previous, paths, *, full=False, template=False):
                 if film in all_films and (p in sources or any(scope_contains(p, src) and
                         not any(skip in "/" + p for skip in exclude) for src, exclude in scopes)):
                     matched_films.add(film)
+        if p == "trureturing.lock.json":
+            for film in matched_films.copy() - uncertain_films:
+                inputs = film_lock_inputs(current, film)
+                if inputs is not None and inputs == film_lock_inputs(previous, film):
+                    matched_films.remove(film)
+        if p == "theme/tokens.json":
+            # The video constructor reads tokens.mjs generated from this source.
+            matched_films.update(all_films)
         suites.update(matched_suites)
         films.update(matched_films)
         # Each path counts once per live consumer, even when both trees read it.
@@ -499,14 +525,17 @@ def impact(current, previous, paths, *, full=False, template=False):
                     continue
                 everything("unknown book path: ", p)
                 continue
-            site = True
+            local = "/".join(parts[2:])
+            test_input = local.startswith("viz/tests/")
+            site |= not test_input
             checks["structure"] = True
             if slug not in now:
                 reasons.add(f"removed book: {slug}; Pages rebuild removes obsolete output")
                 continue
-            selected_books.add(slug)  # existing export keys include the entire book, all languages
+            selected_books.add(slug)
+            if not test_input:
+                export_outputs.update((slug, output) for output in now[slug]["outputs"])
             b = now[slug]
-            local = "/".join(parts[2:])
             checks["viz_static"] = checks["slides_static"] = True
             # Unregistered suites have unknown file reads: widen to the owning book's suites.
             for suite in b["suites"]:
@@ -516,7 +545,10 @@ def impact(current, previous, paths, *, full=False, template=False):
             for film in set(b["films"]) & uncertain_films:
                 films.add(film)
                 reasons.add(f"unknown book-local film reads -> {film}")
-            if local == "viz/tests/execution-parts.json":
+            if local == "viz/tests/dependencies.json":
+                suites.update(suite for suite in b["suites"]
+                              if b["deps"].get(suite) != old.get(slug, {}).get("deps", {}).get(suite))
+            elif local == "viz/tests/execution-parts.json":
                 # Changes to a parent's finite execution contract select that parent
                 # in either tree, without widening already-declared nonreaders.
                 before = old.get(slug, {}).get("parts", {})
@@ -543,19 +575,34 @@ def impact(current, previous, paths, *, full=False, template=False):
                     slides.add(deck)
             else:
                 # Declared chapter readers above select only their own cited visualization.
-                slides.update(b["slides"])
                 languages = current.toml(f"books/{slug}/book.toml").get("book", {}).get("editions") or current.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
                 if local == "book.toml" or local.split("/")[0] not in languages:
+                    slides.update(b["slides"])
                     # Supported film constructors already describe their full reads;
                     # unknown readers above keep their own conservative responsibility.
                     path_reason("book metadata/resource or unknown local dependency: ", p)
             # Academic decks read chapters, figures and viz, beyond slides/ itself.
             for deck in b["slides"]:
-                if f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
+                if not test_input and f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
                     slides.add(deck)
             continue
         if p.startswith(("tools/", "theme/", "templates/", "i18n/")) or p == ".github/workflows/ci.yml":
-            shared_outputs("shared consumer input: ", p)
+            # These theme resources have distinct publication consumers. Test and
+            # film read edges are independent and are still propagated below.
+            if p.startswith(("theme/mdbook/", "theme/epub/", "theme/site/", "theme/film/", "theme/beamer/", "theme/slides/")):
+                site = True
+                area = p.split("/")[1]
+                for slug, book in now.items():
+                    for output in book["outputs"]:
+                        if (area, output) in (("mdbook", "html"), ("epub", "epub")):
+                            selected_books.add(slug)
+                            export_outputs.add((slug, output))
+                    if area in ("slides", "beamer"):
+                        slides.update(deck for deck in book["slides"] if area == "slides" or
+                                      f"books/{slug}/slides/{deck.split('/')[1]}/deck.toml" in current.files)
+                path_reason("publication theme: ", p)
+            else:
+                shared_outputs("shared consumer input: ", p)
             for slug, b in now.items():
                 for suite in b["suites"]:
                     # Both summaries must apply to the live reader. New or undeclared
@@ -588,14 +635,15 @@ def impact(current, previous, paths, *, full=False, template=False):
         if slug in now:
             selected_books.add(slug)
         checks["structure"] = True
-        site = True
+        site |= item in films or item in slides
     checks["viz_static"] |= bool(suites)
     checks["slides_static"] |= bool(slides)
     exports = []
     for slug in sorted(selected_books):
         for output in now[slug]["outputs"]:
-            target, _, variant = output.partition("-")
-            exports.append(dict(name=f"{slug}-{output}", book=slug, target=target, variant=variant))
+            if (slug, output) in export_outputs:
+                target, _, variant = output.partition("-")
+                exports.append(dict(name=f"{slug}-{output}", book=slug, target=target, variant=variant))
     for (prefix, suffix), (first, count) in path_reasons.items():
         more = f" (+{count - 1} more)" if count > 1 else ""
         reasons.add(f"{prefix}{first}{more}{suffix}")
@@ -606,15 +654,61 @@ def impact(current, previous, paths, *, full=False, template=False):
                 slides=sorted(slides), exports=exports, site=site, reasons=sorted(reasons))
 
 
-def image_shards(tree, exports):
-    """Disjoint cold-capture work, shared across all PDF variants and EPUB."""
+def published_still_cards(tree, slug):
+    """Project the publication parser onto the (preset, language) images it requests."""
+    from tbook import mdscan, model, summary, viz
+    cards = {}
+    root = f"books/{slug}/"
+    langs = tree.toml(root + "book.toml").get("book", {}).get("editions") or tree.toml("site.toml").get("site", {}).get("languages") or ["zh", "en"]
+    for lang in langs:
+        prefix = root + lang + "/"
+        name = prefix + "SUMMARY.md"
+        if name not in tree.files:
+            continue
+        for chapter in summary.parse_summary(Path(name), text=tree.read(name)).chapters:
+            if not chapter.path:
+                continue
+            for node in mdscan.walk(mdscan.parse_blocks(tree.read(str(PurePosixPath(prefix, chapter.path))))):
+                if isinstance(node, mdscan.Div) and model.kind_of(node) == "viz":
+                    preset = (node.attrs.get("preset") or "").strip()
+                    if viz.PRESET_RE.fullmatch(preset):
+                        ident = (node.attrs.get("src") or "").strip()
+                        cards.setdefault(ident, set()).add((lang, preset))
+    return cards
+
+
+def image_shards(tree, exports, *, previous=None, paths=(), full=False):
+    """Schedule capture workers for changed capture inputs or changed published card sets."""
     slugs = {item['book'] for item in exports if item['target'] in ('pdf', 'epub')}
+    shared = {"theme/tokens.json", "theme/generated/tokens.css", "package-lock.json",
+              *("tools/node/" + name for name in (
+                  "viz-thumbs.mjs", "viz-still-cache.mjs", "viz-common.mjs", "viz-server.mjs", "viz-testkit.mjs"))}
+    # These Python inputs implement the published citation and generated token contracts.
+    shared.update("tools/tbook/" + name + ".py" for name in
+                  ("config", "mdscan", "model", "summary", "theme", "viz"))
+    shared_change = bool(shared.intersection(paths)) or any(p.startswith("theme/viz/") for p in paths)
     items = []
     for slug in sorted(slugs):
-        name = f'books/{slug}/viz/visualizations.json'
-        if name in tree.files:
-            items.extend(f"{slug}/{v['id']}" for v in tree.json(name).get('visualizations', [])
-                         if v.get('status') == 'live')
+        prefix = f"books/{slug}/"
+        name = prefix + "viz/visualizations.json"
+        if name not in tree.files:
+            continue
+        all_images = full or not previous or shared_change or any(p.startswith(prefix + "assets/") for p in paths)
+        compare_cards = previous and not all_images and any(p in ("site.toml", prefix + "book.toml") or
+                (p.startswith(prefix) and p.endswith(".md")) for p in paths)
+        before = published_still_cards(previous, slug) if compare_cards else {}
+        after = published_still_cards(tree, slug) if compare_cards else {}
+        for entry in tree.json(name)["visualizations"]:
+            if entry.get("status") != "live":
+                continue
+            ident = entry["id"]
+            old = registry_entry(previous, slug, ident) or {}
+            if (all_images or old.get("status") != "live" or
+                    any(old.get(k) != entry.get(k) for k in ("thumbnail", "capture_lock")) or
+                    before.get(ident) != after.get(ident) or
+                    ("trureturing.lock.json" in paths and entry.get("capture_lock") != "links") or
+                    any(p.startswith(f"{prefix}viz/{ident}/") for p in paths)):
+                items.append(f"{slug}/{ident}")
     return shards(items, 12)
 
 
@@ -650,6 +744,17 @@ def deployed(repo, sha, get=api):
         if statuses and statuses[0].get("state") == "success":
             return True
     return False
+
+
+def active_deployment(root, repo, limit, get=api):
+    """Use the live deployment as the publication baseline even after artifact expiry."""
+    for item in get(f"repos/{repo}/deployments?environment=github-pages&per_page=100"):
+        sha = item.get("sha")
+        if isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) and ancestor(root, sha, limit):
+            statuses = get(f"repos/{repo}/deployments/{int(item['id'])}/statuses?per_page=1")
+            if statuses and statuses[0].get("state") == "success":
+                return sha
+    return None
 
 
 def trusted_baseline(root, repo, branch, workflow, profile, sig, limit, *, get=api, download=None):
@@ -723,7 +828,7 @@ def trusted_revision(root, repo, branch, workflow, limit):
 
 
 def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, slow=False,
-         mode="auto", base="", head="", get_baseline=trusted_baseline, get_revision=None, runtime="local"):
+         mode="auto", base="", head="", get_baseline=trusted_baseline, get_revision=None, get_deployment=None, runtime="local"):
     if mode not in ("auto", "full"):
         raise ValueError("mode must be auto or full")
     current = Tree(root, "HEAD")
@@ -747,60 +852,67 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         limit = pr_base
     selections, coverage = {}, {}
     execution, matrices, workloads = {}, {}, {}
-    live_execution, live_workloads = execution_inventory(current, with_workloads=True) if any(p in profiles for p in ("normal", "slow")) else ({}, {})
+    live_execution, live_workloads = {}, {}
     template = repo == "the-omega-institute/trureturing-books-template"
     deferred_films = event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
+    # The tested merge parent and push "before" are independent of caches and coverage.
+    before = payload.get("before") if event == "push" else None
+    created = before == "0" * 40
+    first_branch_push = created and ref.startswith("refs/heads/") and not base
+    comparison = base or pr_base or (before if not created else None)
+
+    def lookup(producer, profile):
+        try:
+            return get_baseline(root, repo, coverage_branch, producer, profile, sig, limit)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
+            reasons.append(f"{profile}/{producer}: baseline unavailable ({type(exc).__name__})")
+            return None
+
+    stills = []
     for profile in profiles:
         record = None
-        if mode != "full" or profile in ("normal", "slow"):
-            # A normal CI success may have deferred films. Only actual film responsibility
-            # coverage, from CI or Pages, can discharge them; no deployment proof is needed
-            # for a successful strict film build in an otherwise successful Pages run.
+        if not comparison and not first_branch_push and mode != "full":
             for producer in (("ci", "pages") if profile == "films" else (workflow,)):
-                try:
-                    candidate = get_baseline(root, repo, coverage_branch, producer, profile, sig, limit)
-                    if candidate and (not record or ancestor(root, record["sha"], candidate["sha"])):
-                        record = candidate
-                except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
-                    reasons.append(f"{profile}/{producer}: baseline unavailable ({type(exc).__name__})")
+                candidate = lookup(producer, profile)
+                if candidate and (not record or ancestor(root, record["sha"], candidate["sha"])):
+                    record = candidate
         cost_record = record
-        if mode == "full":
-            record = None  # Costs can guide full execution; they never supply its coverage.
+        deployed_sha = None
         previous, paths = None, []
         try:
-            if base and (not record or Tree(root, base).sha != record["sha"]):
-                record = None
-                reasons.append(f"{profile}: compare requested Git base; no inherited coverage")
             previous = Tree(root, record["sha"]) if record else None
             paths = changed_paths(root, previous.sha, current.sha) if previous else []
-            if pr_base and previous:
-                # Union the cumulative PR diff, even if the merged tree cancels a base edit.
-                merge_base = git(root, "merge-base", pr_base, payload["pull_request"]["head"]["sha"]).decode().strip()
-                paths = sorted(set(paths) | set(changed_paths(root, merge_base, payload["pull_request"]["head"]["sha"])))
         except subprocess.SubprocessError:
             previous, record, paths = None, None, []
             reasons.append(f"{profile}: incomplete Git coverage history; determine changed scope")
-        if previous is None and mode != "full":
-            revision = base
-            if not revision and get_revision:
+        if first_branch_push:
+            paths = sorted(current.files)
+        elif previous is None and mode != "full":
+            revision = comparison
+            if profile == "pages" and not revision and get_deployment:
+                try:
+                    deployed_sha = get_deployment(root, repo, limit)
+                except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+                    reasons.append(f"deployment lookup unavailable ({type(exc).__name__}); assemble the site")
+                revision = deployed_sha
+            if not revision and profile != "pages" and get_revision:
                 try:
                     revision = get_revision(root, repo, coverage_branch, "pages" if profile == "films" else workflow, limit)
                 except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
                     reasons.append(f"{profile}: revision lookup unavailable ({type(exc).__name__}); use Git event")
-            revision = revision or pr_base or payload.get("before") or "HEAD^"
+            revision = revision or "HEAD^"
             try:
                 previous = Tree(root, revision)
                 if not ancestor(root, previous.sha, current.sha):
                     raise ValueError("comparison base is not an ancestor of the tested tree")
                 paths = changed_paths(root, previous.sha, current.sha)
-                if pr_base:
-                    merge_base = git(root, "merge-base", pr_base, payload["pull_request"]["head"]["sha"]).decode().strip()
-                    paths = sorted(set(paths) | set(changed_paths(root, merge_base, payload["pull_request"]["head"]["sha"])))
             except subprocess.SubprocessError as exc:
                 raise ValueError("cannot determine changed scope; provide --base or explicitly request --mode full") from exc
             reasons.append(f"{profile}: Git diff from {previous.sha}; no inherited coverage")
         selected = impact(current, previous, paths, full=mode == "full", template=template)
-        if profile == "pages" and not record:
+        if profile == "normal":
+            stills = image_shards(current, selected["exports"], previous=previous, paths=paths, full=mode == "full")
+        if profile == "pages" and not (record or deployed_sha):
             # A Git comparison cannot inherit a successful deployment identity.
             selected["site"] = True
         if not record:
@@ -811,7 +923,13 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                                      run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT", "1"),
                                      inherited={k: record[k] for k in ("sha", "source_run", "artifact_id", "deployment_sha") if k in record} if record else None,
                                      paths=paths, comparison=previous.sha if previous else None)
+        if profile == "pages" and deployed_sha:
+            coverage[profile]["deployment_sha"] = deployed_sha
         if profile in ("normal", "slow"):
+            if (comparison or mode == "full") and selected["suites"]:
+                cost_record = lookup(workflow, profile)  # timings can only pack the selected work
+            if not live_execution and (selected["suites"] or cost_record):
+                live_execution, live_workloads = execution_inventory(current, with_workloads=True)
             live = {u: src for part in live_execution.values() for u, src in part.items()}
             raw_hints = cost_record.get("timings", {}) if cost_record and cost_record.get("runtime", runtime) == runtime else {}
             raw_hints = raw_hints if isinstance(raw_hints, dict) else {}
@@ -833,7 +951,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                   else [] if deferred_films else normal.get("films", []))
     tasks = dict(validate=bool(normal and any(normal["checks"].values())), build=bool(normal.get("exports")),
                  browser=bool(normal.get('browser_tests')),
-                 stills=bool(image_shards(current, normal.get('exports', []))),
+                 stills=bool(stills),
                  viz=bool(normal.get("suites")), **{"viz-slow": bool(selections.get("slow", {}).get("suites"))},
                  media=bool(normal.get("slides")), films=bool(film_items))
     result = dict(version=VERSION, event=event, entry="own" if own else "call", sha=current.sha, mode=mode,
@@ -841,7 +959,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                   viz=matrices.get("normal", []), slow=matrices.get("slow", []), execution=execution, workloads=workloads,
                   browser_budget=dict(target=viz_budget.TARGET, ceiling=viz_budget.CEILING, reserve=viz_budget.RESERVE, margin=viz_budget.MARGIN),
                   films=shards(film_items, MAX_FILM_SHARDS), browser=shards(normal.get('browser_tests', []), 8),
-                  stills=image_shards(current, normal.get('exports', [])),
+                  stills=stills,
                   exports=export_matrix(normal.get("exports", [])), slides=normal.get("slides", []),
                   site=selections.get("pages", {}).get("site", False), deferred_films=normal.get("films", []) if deferred_films else [],
                   publish=own and not event.startswith("pull_request") and (ref == f"refs/heads/{branch}" or
@@ -851,7 +969,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
 
 def verify_results(plan, results, *, pages=False, pages_enabled=True):
     expected = {"plan": True}
-    expected.update({"probe": True, "films": bool(plan.get('films')), "build": plan["site"],
+    expected.update({"probe": plan["site"], "films": bool(plan.get('films')), "build": plan["site"],
                      "deploy": plan["site"] and pages_enabled} if pages else plan["tasks"])
     failures = [f"{job}: expected success, got {results.get(job, {}).get('result', 'missing')}"
                 for job, selected in expected.items() if selected and results.get(job, {}).get("result") != "success"]
@@ -902,8 +1020,8 @@ def main():
         Path("coverage").mkdir(exist_ok=True)
         for profile, record in result["coverage"].items():
             if profile == "pages":
-                record["deployed"] = os.environ.get("PAGES_ENABLED") == "true"
-                record["deployment_sha"] = result["sha"] if result["site"] else record["inherited"]["deployment_sha"]
+                record["deployed"] = not result["site"] or os.environ.get("PAGES_ENABLED") == "true"
+                record["deployment_sha"] = result["sha"] if result["site"] else record.get("deployment_sha") or record["inherited"]["deployment_sha"]
             # Keep ancestry metadata bounded; retain authoritative run/artifact IDs, not recursively nested records.
             if record["inherited"]:
                 record["inherited"] = {k: record["inherited"][k] for k in ("sha", "source_run", "artifact_id")}
@@ -918,10 +1036,11 @@ def main():
     result = plan(Path.cwd(), event=event, payload=payload, repo=os.environ.get("GITHUB_REPOSITORY", "local/repo"),
                   branch=branch, ref=os.environ.get("GITHUB_REF", "local"), workflow=args.workflow, own=own,
                   slow=os.environ.get("SLOW_FRAMES") == "true", mode=args.mode, base=args.base, head=args.head, runtime=runtime,
-                  get_revision=trusted_revision)
+                  get_revision=trusted_revision, get_deployment=active_deployment)
     Path("ci-plan.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     write_outputs(result)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    jobs = [name for name, selected in result["tasks"].items() if selected]
+    print("Selected CI jobs:", ", ".join(jobs) or "none", "(details in ci-plan.json)")
 
 
 if __name__ == "__main__":

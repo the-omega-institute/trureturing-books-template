@@ -379,13 +379,16 @@ jobs:
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
-          TBOOK_STILLS_REQUIRE_CACHE: '1'
           TARGET: ${{ matrix.target }}
           BOOKS_JSON: ${{ toJSON(matrix.books) }}
           VARIANT: ${{ matrix.variant }}
         run: |
           python3 -c 'import json, os; books = json.loads(os.environ["BOOKS_JSON"]); assert books; print("\n".join(books))' > "$RUNNER_TEMP/selected-books"
           mapfile -t books < "$RUNNER_TEMP/selected-books"
+          if [[ "$TARGET" == pdf || "$TARGET" == epub ]]; then
+            python3 tools/ci/stills.py --ensure-books "${books[@]}"
+            export TBOOK_STILLS_REQUIRE_CACHE=1
+          fi
           args=()
           for book in "${books[@]}"; do args+=(--book "$book"); done
           ./tbook build "$TARGET" "${args[@]}" ${VARIANT:+--variant "$VARIANT"}
