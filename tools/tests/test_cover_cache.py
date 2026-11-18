@@ -12,6 +12,14 @@ from test_pandoc import fixture_site, have_typst, make_book
 from tbook import buildcache, cover, pandoc, paths
 
 
+def compile_with_fixture_fonts(args, *, input, **kwargs):
+    # The image installs the same family system-wide. Use the fixture's actual
+    # font files in the real compiler worker so their replacement is observable.
+    request = json.loads(input)
+    request["kwargs"]["ignore_system_fonts"] = True
+    return subprocess.run(args, input=json.dumps(request), **kwargs)
+
+
 class FontsourceConversionTests(TestCase):
     def setUp(self):
         self.real_root = paths.ROOT
@@ -78,6 +86,7 @@ class FontsourceConversionTests(TestCase):
 
     @skipUnless(have_typst(), "typst not available")
     def test_fontsource_update_with_retained_caches_matches_fresh_typst_cover(self):
+        self.enterContext(mock.patch.object(pandoc, "subprocess", SimpleNamespace(run=compile_with_fixture_fonts)))
         fonts = self.mapped_fonts()
         for src, _dst in fonts:
             original = self.real_root / src.relative_to(self.root)
@@ -193,13 +202,6 @@ class CoverCacheTests(TestCase):
         template = (paths.THEME / "typst/cover.typ").read_bytes()
         tokens = (paths.GENERATED / "tokens.typ").read_bytes()
         site = fixture_site()
-
-        def compile_with_fixture_fonts(args, *, input, **kwargs):
-            # The image installs the same family system-wide. Use the fixture's actual
-            # font files in the real compiler worker so their replacement is observable.
-            request = json.loads(input)
-            request["kwargs"]["ignore_system_fonts"] = True
-            return subprocess.run(args, input=json.dumps(request), **kwargs)
 
         with Scratch() as scratch, \
                 mock.patch.object(pandoc, "subprocess", SimpleNamespace(run=compile_with_fixture_fonts)), \
