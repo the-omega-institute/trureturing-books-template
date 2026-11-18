@@ -80,6 +80,19 @@ class BudgetTest(unittest.TestCase):
             budget.merge_reports(self.fixture(), [])
         budget.merge_reports(dict(execution={}, coverage={}), [])
 
+    def test_mixed_hosted_image_versions_supply_coverage_and_only_matching_timings(self):
+        plan, report = self.fixture(), self.report()
+        runtime = dict(ImageOS='ubuntu24', ImageVersion='old', TBOOK_TOOLCHAIN='')
+        plan['coverage']['normal']['runtime'] = runtime
+        matching = dict(report, runtime=runtime, results=report['results'][:1])
+        updated = dict(report, runtime=dict(runtime, ImageVersion='new'), results=report['results'][1:])
+        budget.merge_reports(plan, [matching, updated])
+        self.assertEqual(set(plan['coverage']['normal']['timings']), {'owner#a'})
+
+        for change in (dict(ImageOS='ubuntu22'), dict(TBOOK_TOOLCHAIN='other')):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'incompatible'):
+                budget.merge_reports(plan, [matching, dict(updated, runtime=dict(updated['runtime'], **change))])
+
 
 class ParentIntegrationTest(unittest.TestCase):
     setUp = fixtures.AffectedPlanTest.setUp

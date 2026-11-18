@@ -84,18 +84,28 @@ def pack(execution, hints, workloads=None):
     return rows
 
 
+def coverage_runtime(runtime):
+    # GitHub can roll out an image update between jobs in the same run.
+    if isinstance(runtime, dict):
+        return {key: value for key, value in runtime.items() if key != 'ImageVersion'}
+    return runtime
+
+
 def merge_reports(plan, reports):
     """Require exact successful current-run units before any parent coverage advances."""
     expected = plan.get('execution', {})
     seen = {p: {} for p in expected}
     for report in reports:
         profile = report.get('profile')
+        runtime = report.get('runtime')
         if (report.get('schema') != REPORT_SCHEMA or profile not in expected or
                 report.get('sha') != plan['sha'] or report.get('run_id') != plan['coverage'][profile]['run_id'] or
                 report.get('run_attempt') != plan['coverage'][profile]['run_attempt'] or
                 report.get('frames') != (1000 if profile == 'slow' else 0) or
-                report.get('runtime') != plan['coverage'][profile]['runtime'] or not isinstance(report.get('results'), list)):
+                coverage_runtime(runtime) != coverage_runtime(plan['coverage'][profile]['runtime']) or
+                not isinstance(report.get('results'), list)):
             raise ValueError('incompatible browser execution report')
+        comparable_timing = runtime == plan['coverage'][profile]['runtime']
         for row in report['results']:
             unit = row.get('unit')
             if unit not in expected[profile] or unit in seen[profile]:
@@ -103,10 +113,13 @@ def merge_reports(plan, reports):
             source = expected[profile][unit]
             if type(row.get('exit_code')) is not int or row['exit_code'] != 0 or row.get('signal') is not None or not valid_hint(dict(source=source, seconds=row.get('seconds')), source):
                 raise ValueError(f'failed or malformed browser execution result: {unit}')
-            seen[profile][unit] = dict(source=source, seconds=row['seconds'],
-                workload=plan.get('workloads', {}).get(profile, {}).get(unit, source),
-                sha=report['sha'], run_id=report['run_id'], run_attempt=report['run_attempt'], node=report.get('node'))
+            seen[profile][unit] = None
+            if comparable_timing:
+                seen[profile][unit] = dict(source=source, seconds=row['seconds'],
+                    workload=plan.get('workloads', {}).get(profile, {}).get(unit, source),
+                    sha=report['sha'], run_id=report['run_id'], run_attempt=report['run_attempt'], node=report.get('node'))
     for profile, execution in expected.items():
         if set(seen[profile]) != set(execution):
             raise ValueError(f'missing browser execution results: {profile}')
-        plan['coverage'][profile].setdefault('timings', {}).update(seen[profile])
+        plan['coverage'][profile].setdefault('timings', {}).update(
+            (unit, timing) for unit, timing in seen[profile].items() if timing is not None)
