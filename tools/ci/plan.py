@@ -856,7 +856,10 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
     template = repo == "the-omega-institute/trureturing-books-template"
     deferred_films = event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
     # The tested merge parent and push "before" are independent of caches and coverage.
-    comparison = base or pr_base or (payload.get("before") if event == "push" else None)
+    before = payload.get("before") if event == "push" else None
+    created = before == "0" * 40
+    first_branch_push = created and ref.startswith("refs/heads/") and not base
+    comparison = base or pr_base or (before if not created else None)
 
     def lookup(producer, profile):
         try:
@@ -868,7 +871,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
     stills = []
     for profile in profiles:
         record = None
-        if not comparison and mode != "full":
+        if not comparison and not first_branch_push and mode != "full":
             for producer in (("ci", "pages") if profile == "films" else (workflow,)):
                 candidate = lookup(producer, profile)
                 if candidate and (not record or ancestor(root, record["sha"], candidate["sha"])):
@@ -882,7 +885,9 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         except subprocess.SubprocessError:
             previous, record, paths = None, None, []
             reasons.append(f"{profile}: incomplete Git coverage history; determine changed scope")
-        if previous is None and mode != "full":
+        if first_branch_push:
+            paths = sorted(current.files)
+        elif previous is None and mode != "full":
             revision = comparison
             if profile == "pages" and not revision and get_deployment:
                 try:
@@ -895,7 +900,7 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
                     revision = get_revision(root, repo, coverage_branch, "pages" if profile == "films" else workflow, limit)
                 except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
                     reasons.append(f"{profile}: revision lookup unavailable ({type(exc).__name__}); use Git event")
-            revision = revision or pr_base or payload.get("before") or "HEAD^"
+            revision = revision or "HEAD^"
             try:
                 previous = Tree(root, revision)
                 if not ancestor(root, previous.sha, current.sha):

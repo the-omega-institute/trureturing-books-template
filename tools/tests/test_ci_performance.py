@@ -1343,7 +1343,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
 
     def test_tag_dedup_and_read_only_entries_preserve_film_responsibility(self):
         self.bootstrap()
-        tagged = self.select(ref="refs/tags/v1.0.0", own=False)
+        tagged = self.select(ref="refs/tags/v1.0.0", own=False, payload={"before": "0" * 40})
         self.assertEqual(tagged["deferred_films"], ["one/001-film"])
         self.assertFalse(tagged["tasks"]["films"])
         self.assertNotIn("films", tagged["coverage"])
