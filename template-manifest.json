@@ -1084,7 +1084,7 @@
       "mode": "100644"
     },
     "tools/tests/test_slides.py": {
-      "sha256": "43ba532ff056432ca446866120cb16e39f04341b4411d7ec4344632542c79592",
+      "sha256": "22949c1ee1f6a72a25e9b30c9e979bbcd6706c956b8a1f993c225779a667ee30",
       "mode": "100644"
     },
     "tools/tests/test_source_only.py": {

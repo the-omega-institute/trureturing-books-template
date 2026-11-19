@@ -375,8 +375,9 @@ class EmbedTest(unittest.TestCase):
         self.assertIn("<https://o.github.io/books/example-monograph/slides/overview/>", out)
         self.assertIn("图注。", out)
         self.assertTrue(out.rstrip().endswith(":::"))
-        with mock.patch.object(ctx.site, "base_url", ""):
-            out = slides.render_embed(self.env, _ctx(self.book, "en", "pandoc"), "", doc)
+        ctx = _ctx(self.book, "en", "pandoc")
+        ctx.site.base_url = ""
+        out = slides.render_embed(self.env, ctx, "", doc)
         self.assertIn("`example-monograph/slides/overview/en/`", out)
 
     def test_unknown_deck_reports(self):
