@@ -172,7 +172,7 @@ class SiteCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="tbook-site-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self.site = config.load_site()
+        self.site = replace(config.load_site(), pdf_release_only=False)
         self.build_root = self.tmp / "build"
         self.out = self.tmp / "out"
 

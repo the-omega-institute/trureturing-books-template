@@ -1076,7 +1076,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "64a54aad9a76b1c7075df255395783fff813186eb27297714a979dda9aa5c276",
+      "sha256": "d2027f00082a3dbd79d5fc244ecaa44f488503eaea40880a7af53115b8fab2f3",
       "mode": "100644"
     },
     "tools/tests/test_site_post_build.py": {
@@ -1084,7 +1084,7 @@
       "mode": "100644"
     },
     "tools/tests/test_slides.py": {
-      "sha256": "941bad3836c0193413fd4885ddedb92d8a35c2ea082de51668e60aa18df28d74",
+      "sha256": "43ba532ff056432ca446866120cb16e39f04341b4411d7ec4344632542c79592",
       "mode": "100644"
     },
     "tools/tests/test_source_only.py": {

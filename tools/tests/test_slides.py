@@ -19,6 +19,7 @@ import sys
 import tempfile
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -340,7 +341,7 @@ class ExampleDeckTest(unittest.TestCase):
 
 
 def _ctx(book, lang, target):
-    site = config.load_site()
+    site = replace(config.load_site(), pdf_release_only=False)
     return SimpleNamespace(site=site, book=book, edition=book.edition(lang), lang=lang, target=target,
                            issues=[], book_files=set(), book_prefix="_book")
 
@@ -499,7 +500,7 @@ class PublishTest(unittest.TestCase):
         self.addCleanup(patch.stop)
         self.tmp = Path(tempfile.mkdtemp(prefix="tbook-slides-pub-"))
         self.book = config.load_book("example-monograph")
-        self.site = config.load_site()
+        self.site = replace(config.load_site(), pdf_release_only=False)
         self.out = self.tmp / "build"
         base = slides.base_path(self.site)
         langs = {}
@@ -540,6 +541,19 @@ class PublishTest(unittest.TestCase):
         self.assertIn("Present online", index)
         self.assertIn("--tr-void", index)  # colours come from the generated tokens
         self.assertNotIn('href="/', index)  # only relative links
+
+    def test_release_only_does_not_copy_existing_slide_pdfs(self):
+        opts = replace(self.site, pdf_release_only=True)
+        dest = self.tmp / "_site" / self.book.slug / "slides"
+        name = slides.pdf_name(self.book, "overview", "en")
+        url = f"https://github.com/owner/books/releases/download/v1/{name}"
+        with (mock.patch.object(slides, "build_dir", return_value=self.out),
+              mock.patch.object(slides.releases, "pdf_assets", return_value={name: slides.releases.PdfAsset(url, 42)})):
+            slides.publish(opts, self.book, dest, build_missing=False)
+        self.assertEqual(list(dest.rglob("*.pdf")), [])
+        index = (dest / "index.html").read_text(encoding="utf-8")
+        self.assertIn(url, index)
+        self.assertNotIn(slides.pdf_name(self.book, "overview", "zh"), index)
 
     def test_stale_build_is_refused_without_building(self):
         with mock.patch.object(slides, "build_dir", lambda book: self.out), \
@@ -667,7 +681,7 @@ class FirstLanguageTest(ScratchDeckCase):
         out = fake_build(self.book, self.tmp / "build", pdfs=("en",))
         site_dir = self.tmp / "_site" / "slides"
         with mock.patch.object(slides, "build_dir", lambda book: out):
-            slides.publish(config.load_site(), self.book, site_dir, build_missing=False)
+            slides.publish(replace(config.load_site(), pdf_release_only=False), self.book, site_dir, build_missing=False)
         self.assertIn("<title>en</title>", (site_dir / "d1" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("<title>zh</title>", (site_dir / "d1" / "zh" / "index.html").read_text(encoding="utf-8"))
         self.assertTrue((site_dir / "d1" / "scratch-book-d1-en.pdf").is_file())
@@ -707,7 +721,7 @@ class StaleBuildTest(ScratchDeckCase):
         site_dir = self.tmp / "_site" / "slides"
         with mock.patch.object(slides, "build_dir", lambda b: out):
             with self.assertRaisesRegex(RuntimeError, r"d1 \(en\) was built for 'd1/en/'.*run ./tbook build slides"):
-                slides.publish(config.load_site(), book, site_dir, build_missing=False)
+                slides.publish(replace(config.load_site(), pdf_release_only=False), book, site_dir, build_missing=False)
             self.assertFalse((site_dir / "d1").exists())
 
             def rebuild(site, b, out_dir):
@@ -715,7 +729,7 @@ class StaleBuildTest(ScratchDeckCase):
                 return fake_build(b, out_dir)
 
             with mock.patch.object(slides, "build", side_effect=rebuild) as build:
-                slides.publish(config.load_site(), book, site_dir)
+                slides.publish(replace(config.load_site(), pdf_release_only=False), book, site_dir)
             build.assert_called_once()
         self.assertIn("<title>en</title>", (site_dir / "d1" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("<title>zh</title>", (site_dir / "d1" / "zh" / "index.html").read_text(encoding="utf-8"))
@@ -752,7 +766,7 @@ class PublishedPdfLinkTest(ScratchDeckCase):
             page.write_text(card + '\n<a href="../downloads/book.pdf">book</a>\n', encoding="utf-8")
             pages[(lang, rel)] = page
         with mock.patch.object(slides, "build_dir", lambda book: out):
-            slides.publish(config.load_site(), self.book, book_site / "slides", build_missing=False)
+            slides.publish(replace(config.load_site(), pdf_release_only=False), self.book, book_site / "slides", build_missing=False)
         zh = pages[("zh", "ch01.html")].read_text(encoding="utf-8")
         self.assertIn('href="../slides/d1/scratch-book-d1-zh.pdf"', zh)
         self.assertTrue((book_site / "slides" / "d1" / "scratch-book-d1-zh.pdf").is_file())
