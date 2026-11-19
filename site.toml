@@ -8,6 +8,8 @@ repo = ""
 base_url = ""
 # 站点界面语言；第一个为默认语言。每本书可以只启用其中一部分。
 languages = ["zh", "en"]
+# 设为 true 后，书籍与演示文稿 PDF 随 Release 发布，Pages 只提供 Release 附件链接。
+# pdf_release_only = true
 
 [site.title]
 zh = "trureturing 书库"

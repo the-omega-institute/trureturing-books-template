@@ -93,6 +93,9 @@ class Tree:
 
 def inventory(tree):
     site = tree.toml("site.toml")
+    pdf_release_only = site.get("site", {}).get("pdf_release_only", False)
+    if not isinstance(pdf_release_only, bool):
+        raise ValueError("site.toml: site.pdf_release_only must be a boolean")
     hide = site.get("books", {}).get("hide", [])
     if not isinstance(hide, list) or not all(isinstance(x, str) and x for x in hide):
         raise ValueError("site.toml: invalid books.hide")
@@ -152,7 +155,7 @@ def inventory(tree):
         has_viz = any(f.startswith(prefix + "viz/") for f in tree.files)
         books[slug] = dict(has_viz=has_viz, suites=suites, parts=declared, films=films, slides=sorted(decks), deps=deps,
                            outputs=[*( ["html"] if outputs.get("html", True) else []),
-                                    *("pdf-" + v for v in pdf), *( ["epub"] if outputs.get("epub", True) else [])])
+                                    *("pdf-" + v for v in pdf if not pdf_release_only), *( ["epub"] if outputs.get("epub", True) else [])])
     return books
 
 
@@ -926,7 +929,7 @@ def trusted_revision(root, repo, branch, workflow, limit):
 
 def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, slow=False,
          mode="auto", base="", head="", get_baseline=trusted_baseline, get_revision=None, get_deployment=None,
-         runtime="local", pages_branch_head=""):
+         runtime="local", pages_branch_head="", release_refresh_sha=""):
     if mode not in ("auto", "full"):
         raise ValueError("mode must be auto or full")
     current = Tree(root, "HEAD")
@@ -1012,7 +1015,8 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         selected = impact(current, previous, paths, full=mode == "full", template=template)
         if profile == "normal":
             stills = image_shards(current, selected["exports"], previous=previous, paths=paths, full=mode == "full")
-        if profile == "pages" and (event == "push" or pages_branch_head or not (record or deployed_sha)):
+        if profile == "pages" and (event == "push" or pages_branch_head or not (record or deployed_sha)
+                                   or current.sha == release_refresh_sha):
             # Advance the live commit even when all publication units can be reused.
             selected["site"] = True
         if not record:
@@ -1041,6 +1045,9 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
             execution[profile] = {u: src for suite in selected["suites"] for u, src in live_execution[suite].items()}
             workloads[profile] = {u: live_workloads[u] for u in execution[profile]}
             matrices[profile] = viz_budget.pack(execution[profile], hints, workloads[profile])
+        if profile == "pages" and release_refresh_sha and current.sha != release_refresh_sha:
+            selected["site"] = False
+            reasons.append("default branch advanced before the Release download refresh")
         selections[profile] = selected
     normal = selections.get("normal", {})
     if normal:
@@ -1143,7 +1150,8 @@ def main():
                   branch=branch, ref=os.environ.get("GITHUB_REF", "local"), workflow=args.workflow, own=own,
                   slow=os.environ.get("SLOW_FRAMES") == "true", mode=args.mode, base=args.base, head=args.head, runtime=runtime,
                   get_revision=trusted_revision, get_deployment=active_deployment,
-                  pages_branch_head=os.environ.get("TBOOK_TRURETURING_SHA", "") if args.workflow == "pages" else "")
+                  pages_branch_head=os.environ.get("TBOOK_TRURETURING_SHA", "") if args.workflow == "pages" else "",
+                  release_refresh_sha=os.environ.get("RELEASE_REFRESH_SHA", "") if args.workflow == "pages" else "")
     Path("ci-plan.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     write_outputs(result)
     jobs = [name for name, selected in result["tasks"].items() if selected]

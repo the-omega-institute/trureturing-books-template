@@ -2,8 +2,9 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
-## [Unreleased]
+## [1.7.0] - 2026-11-20
 
+- 增加 `site.toml` 的 `[site].pdf_release_only` 选项。开启后，常规 CI 和 Pages 跳过书籍与演示文稿的 PDF 导出。下载页显示实际发布的 GitHub Release 附件，并随附件变化刷新。来源是下游书库希望释放 Pages 的 PDF 存储空间。
 - 协作守则第 9 条收窄为只约束文档与书的正文：提交记录（提交说明、作者字段）与 PR 描述不再要求去除模型或工具标识。
 
 ## [1.6.4] - 2026-11-20

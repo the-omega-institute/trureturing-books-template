@@ -122,6 +122,8 @@ def build(targets: list[str], books: list[config.Book], langs: list[str] | None 
     want = set(targets)
     if "all" in want:
         want = set(TARGETS)
+        if "pdf" not in targets and not site.build_release_pdfs:
+            want.discard("pdf")
     for book in books:
         if want & {"html", "pdf", "epub", "slides"}:
             from . import figure

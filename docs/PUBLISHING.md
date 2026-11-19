@@ -25,7 +25,9 @@ EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动�
 
 ## 2. 站点
 
-`_site/` 是 GitHub Pages 的产物：书库首页（每本书一张卡片：封面、简介、在线阅读、下载）、每本书的落地页（目录、下载、验证摘要、可视化/视频/幻灯片）、mdBook 页面、下载文件与 `manifest.json`（机器可读清单：版本、文件、sha256、所钉的 trureturing 提交）。所有链接都是相对链接，站点可以挂在 `/<repo>/` 之下。
+`_site/` 是 GitHub Pages 的产物：书库首页（每本书一张卡片：封面、简介、在线阅读、下载）、每本书的落地页（目录、下载、验证摘要、可视化/视频/幻灯片）、mdBook 页面、下载文件与 `manifest.json`（机器可读清单：版本、文件、sha256、所钉的 trureturing 提交）。站内使用相对链接，站点可以挂在 `/<repo>/` 之下。
+
+在 `site.toml` 的 `[site]` 中设置 `pdf_release_only = true`，常规 CI 和 Pages 构建便会跳过书籍及演示文稿 PDF 导出。Pages 的下载链接直接指向已发布的 GitHub Release 附件（含公开预发布）。书籍按当前 `book.toml` 版本匹配文件名，演示文稿采用最近发布的同名附件。没有对应附件时隐藏该下载链接。Pages 会在已通过 CI 的主干上按发布节奏刷新下载链接。组装站点时需要可访问仓库的 GitHub CLI（`gh`）。本地仍可显式执行 `./tbook build pdf`，或用 `TBOOK_BUILD_RELEASE=1 ./tbook build slides` 导出演示文稿 PDF。
 
 本地预览：`./tbook serve`（默认端口 8765，自动挂在 Pages 子路径下；支持按字节范围请求，Safari 也能播放视频；`TBOOK_SERVE_HOST=0.0.0.0` 允许其他设备访问，例如用 iPhone 查看）。
 

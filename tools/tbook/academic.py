@@ -511,6 +511,61 @@ def stage_assets(site, book, lang, source, dest):
     return lines
 
 
+def _compile_edition(site, book, deck, out, lang, data, lock, executable, source):
+    directory = book.slides_dir / deck
+    theme = (directory / data["theme_dir"]).resolve() if data.get("theme_dir") else paths.THEME / "beamer"
+    stage = paths.BUILD / "stage" / book.slug / "beamer" / deck / lang
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+    generate_package(book, lang, source, lock, stage)
+    preamble = [rf"\usetheme{{{data.get('theme_name', 'LinZhang') if data.get('theme_dir') else 'TBookAcademic'}}}",
+                r"\usefonttheme[onlymath]{serif}", r"\usepackage{appendixnumberbeamer}", r"\usepackage{tbook-lean}",
+                r"\ifdefined\TBookNotes\setbeameroption{show notes}\else\setbeameroption{hide notes}\fi"]
+    if lang.startswith("zh"):
+        preamble.insert(0, r"\usepackage[fontset=fandol]{ctex}")
+    preamble += [rf"\definecolor{{TBookStructure}}{{HTML}}{{{data['structure_colour'][1:]}}}",
+                 r"\setbeamercolor{structure}{fg=TBookStructure}"]
+    for key, command in (("short_author", "author"), ("short_title", "title")):
+        if data.get(key):
+            # Preserve the author's raw long field, including coauthor/affiliation macros.
+            # Reusing \insertauthor would reinsert Beamer's display-only definitions into PDF metadata.
+            preamble += [rf"\let\TBookOriginal{command}\{command}",
+                         rf"\renewcommand{{\{command}}}[2][]{{\TBookOriginal{command}[{tex(data[key])}]{{#2}}}}"]
+    # Descriptor metadata wins over source defaults, for every edition.
+    for key, command in (("institution", "institute"), ("date", "date")):
+        if data.get(key):
+            preamble += [rf"\AtBeginDocument{{\{command}{{{tex(data[key])}}}}}"]
+    preamble += [rf"\providecommand{{\TBookCoauthors}}{{}}",
+                 rf"\renewcommand{{\TBookCoauthors}}{{{tex(data.get('coauthors', ''))}}}",
+                 r"\setbeamertemplate{navigation symbols}[default]" if data.get("navigation_symbols", False)
+                 else r"\setbeamertemplate{navigation symbols}{}"]
+    if data.get("institution_graphic"):
+        graphic = (directory / data["institution_graphic"]).resolve()
+        preamble += [rf"\titlegraphic{{\includegraphics[height=1.6cm]{{{graphic.as_posix()}}}}}"]
+    preamble += stage_assets(site, book, lang, source, stage)
+    (stage / "tbook-deck.tex").write_text("\n".join(preamble) + "\n", encoding="utf-8")
+    for notes in (False, True):
+        job = "notes" if notes else "audience"
+        # Stable wrapper names; no timestamps or random paths in the PDF metadata/ID.
+        wrapper = (r"\def\TBookNotes{1}" if notes else "")
+        wrapper += rf"\PassOptionsToClass{{compress,aspectratio={'43' if data['aspect'] == '4:3' else '169'}}}{{beamer}}" + "\n"
+        wrapper += source.path.read_text(encoding="utf-8")
+        (stage / f"{job}.tex").write_text(wrapper, encoding="utf-8")
+        cmd = [executable, "-X", "compile", f"{job}.tex", "--bundle", BUNDLE,
+               "--keep-logs", "-Z", "deterministic-mode", "-Z", f"search-path={theme}",
+               "-Z", f"search-path={directory.resolve()}"]
+        env = dict(os.environ, SOURCE_DATE_EPOCH=os.environ.get("SOURCE_DATE_EPOCH", EPOCH),
+                   TECTONIC_CACHE_DIR=os.environ.get("TECTONIC_CACHE_DIR", str(paths.CACHE / "tectonic")))
+        result = subprocess.run(cmd, cwd=stage, env=env, capture_output=True, text=True)
+        (stage / f"{job}-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+        if result.returncode:
+            raise RuntimeError(f"Tectonic failed: {stage / (job + '-build.log')}\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
+        filename = f"{deck}-{lang}{'-notes' if notes else ''}.pdf"
+        shutil.copy2(stage / f"{job}.pdf", out / filename)
+        print(f"  academic: {filename}", flush=True)
+
+
 def build_deck(site, book, deck, out):
     from . import slides
     data = settings(book, deck)
@@ -518,71 +573,28 @@ def build_deck(site, book, deck, out):
     errors = check_deck(book, deck, lock)
     if errors:
         raise RuntimeError("\n".join(x.format() for x in errors))
-    executable = engine()
-    directory = book.slides_dir / deck
-    theme = (directory / data["theme_dir"]).resolve() if data.get("theme_dir") else paths.THEME / "beamer"
+    executable = engine() if site.build_release_pdfs else None
     entry = {"kind": "academic", "langs": {}}
     for lang in data["editions"]:
         source = read_source(book, deck, lang, data)
-        stage = paths.BUILD / "stage" / book.slug / "beamer" / deck / lang
-        if stage.exists():
-            shutil.rmtree(stage)
-        stage.mkdir(parents=True)
-        generate_package(book, lang, source, lock, stage)
-        preamble = [rf"\usetheme{{{data.get('theme_name', 'LinZhang') if data.get('theme_dir') else 'TBookAcademic'}}}",
-                    r"\usefonttheme[onlymath]{serif}", r"\usepackage{appendixnumberbeamer}", r"\usepackage{tbook-lean}",
-                    r"\ifdefined\TBookNotes\setbeameroption{show notes}\else\setbeameroption{hide notes}\fi"]
-        if lang.startswith("zh"):
-            preamble.insert(0, r"\usepackage[fontset=fandol]{ctex}")
-        preamble += [rf"\definecolor{{TBookStructure}}{{HTML}}{{{data['structure_colour'][1:]}}}",
-                     r"\setbeamercolor{structure}{fg=TBookStructure}"]
-        for key, command in (("short_author", "author"), ("short_title", "title")):
-            if data.get(key):
-                # Preserve the author's raw long field, including coauthor/affiliation macros.
-                # Reusing \insertauthor would reinsert Beamer's display-only definitions into PDF metadata.
-                preamble += [rf"\let\TBookOriginal{command}\{command}",
-                             rf"\renewcommand{{\{command}}}[2][]{{\TBookOriginal{command}[{tex(data[key])}]{{#2}}}}"]
-        # Descriptor metadata wins over source defaults, for every edition.
-        for key, command in (("institution", "institute"), ("date", "date")):
-            if data.get(key):
-                preamble += [rf"\AtBeginDocument{{\{command}{{{tex(data[key])}}}}}"]
-        preamble += [rf"\providecommand{{\TBookCoauthors}}{{}}",
-                     rf"\renewcommand{{\TBookCoauthors}}{{{tex(data.get('coauthors', ''))}}}",
-                     r"\setbeamertemplate{navigation symbols}[default]" if data.get("navigation_symbols", False)
-                     else r"\setbeamertemplate{navigation symbols}{}"]
-        if data.get("institution_graphic"):
-            graphic = (directory / data["institution_graphic"]).resolve()
-            preamble += [rf"\titlegraphic{{\includegraphics[height=1.6cm]{{{graphic.as_posix()}}}}}"]
-        preamble += stage_assets(site, book, lang, source, stage)
-        (stage / "tbook-deck.tex").write_text("\n".join(preamble) + "\n", encoding="utf-8")
-        for notes in (False, True):
-            job = "notes" if notes else "audience"
-            # Stable wrapper names; no timestamps or random paths in the PDF metadata/ID.
-            wrapper = (r"\def\TBookNotes{1}" if notes else "")
-            wrapper += rf"\PassOptionsToClass{{compress,aspectratio={'43' if data['aspect'] == '4:3' else '169'}}}{{beamer}}" + "\n"
-            wrapper += source.path.read_text(encoding="utf-8")
-            (stage / f"{job}.tex").write_text(wrapper, encoding="utf-8")
-            cmd = [executable, "-X", "compile", f"{job}.tex", "--bundle", BUNDLE,
-                   "--keep-logs", "-Z", "deterministic-mode", "-Z", f"search-path={theme}",
-                   "-Z", f"search-path={directory.resolve()}"]
-            env = dict(os.environ, SOURCE_DATE_EPOCH=os.environ.get("SOURCE_DATE_EPOCH", EPOCH),
-                       TECTONIC_CACHE_DIR=os.environ.get("TECTONIC_CACHE_DIR", str(paths.CACHE / "tectonic")))
-            result = subprocess.run(cmd, cwd=stage, env=env, capture_output=True, text=True)
-            (stage / f"{job}-build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
-            if result.returncode:
-                raise RuntimeError(f"Tectonic failed: {stage / (job + '-build.log')}\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
-            filename = f"{deck}-{lang}{'-notes' if notes else ''}.pdf"
-            shutil.copy2(stage / f"{job}.pdf", out / filename)
-            print(f"  academic: {filename}", flush=True)
+        if executable:
+            _compile_edition(site, book, deck, out, lang, data, lock, executable, source)
         target = out / deck / lang
         target.mkdir(parents=True, exist_ok=True)
         title = data.get("title", {}).get(lang, deck)
         up = "" if lang == book.languages[0] else "../"
-        audience = up + slides.pdf_name(book, deck, lang)
-        notes = audience[:-4] + "-notes.pdf"
-        (target / "index.html").write_text(f'<!doctype html><html lang="{html.escape(lang)}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{html.escape(title)}</title><h1>{html.escape(title)}</h1><p><a href="{audience}">{html.escape(slides.t(lang, "pdf"))}</a> · <a href="{notes}">{html.escape(slides.t(lang, "notes_pdf"))}</a></p></html>\n', encoding="utf-8")
+        if site.pdf_release_only:
+            links = f'<a href="{up}../">{html.escape(config.s(lang, "ui.slides") or "Slides")}</a>'
+        else:
+            audience = up + slides.pdf_name(book, deck, lang)
+            notes = audience[:-4] + "-notes.pdf"
+            links = (f'<a href="{audience}">{html.escape(slides.t(lang, "pdf"))}</a> · '
+                     f'<a href="{notes}">{html.escape(slides.t(lang, "notes_pdf"))}</a>')
+        (target / "index.html").write_text(f'<!doctype html><html lang="{html.escape(lang)}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{html.escape(title)}</title><h1>{html.escape(title)}</h1><p>{links}</p></html>\n', encoding="utf-8")
         entry["langs"][lang] = {"dir": f"{deck}/{lang}", "site_path": slides.site_path(book, deck, lang),
-                               "pdf": f"{deck}-{lang}.pdf", "notes_pdf": f"{deck}-{lang}-notes.pdf", "slides": source.count}
+                               "pdf": f"{deck}-{lang}.pdf" if executable else "",
+                               "notes_pdf": f"{deck}-{lang}-notes.pdf" if executable else "",
+                               "slides": source.count}
     return entry
 
 

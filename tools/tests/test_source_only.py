@@ -24,7 +24,7 @@ class SourceOnlyTests(unittest.TestCase):
                 mock.patch.object(slides, "base_path", return_value="/books/"), \
                 mock.patch.object(buildcache, "node_version", return_value="22"):
             book = SimpleNamespace(slug="demo", dir=repo.root / "books/demo")
-            site = SimpleNamespace(repo="owner/books", base_url="")
+            site = SimpleNamespace(repo="owner/books", base_url="", build_release_pdfs=True)
             write(repo.root / ".gitignore", "*.svg\n")
             script = write(book.dir / "figures/demo.py", "source v1")
             helper = write(paths.TOOLS / "figkit/draw.py", "renderer v1")

@@ -8,7 +8,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from ci import pages_schedule, trusted_cache
-from tbook import lean
+from tbook import lean, releases
 
 
 class PagesScheduleTests(unittest.TestCase):
@@ -73,6 +73,25 @@ class PagesScheduleTests(unittest.TestCase):
             self.assertEqual(refresh(self.newer), "b" * 40)
             deployed["commit"] = "b" * 40
             self.assertEqual(refresh(self.newer), "")
+
+    def test_published_pdf_changes_refresh_only_after_ci_and_cooldown(self):
+        live = {"release_pdf_digest": releases.pdf_digest({})}
+        asset = releases.PdfAsset("https://github.com/owner/books/releases/download/v1/book.pdf", 42)
+
+        def due(head):
+            return pages_schedule.release_refresh_due(self.root, self.repo, "main", head, self.now, self.api,
+                                                       read_live=lambda _: live)
+
+        with patch.object(releases, "pdf_assets", return_value={"book.pdf": asset}) as get_assets:
+            self.assertFalse(due(self.head))
+            get_assets.assert_not_called()
+            self.assertTrue(due(self.newer))
+            live["release_pdf_digest"] = releases.pdf_digest({"book.pdf": asset})
+            self.assertFalse(due(self.newer))
+            get_assets.return_value = {}
+            self.assertTrue(due(self.newer))
+            self.statuses[1][0]["created_at"] = self.ago(19)
+            self.assertFalse(due(self.newer))
 
     def choose(self):
         candidate = pages_schedule.select(self.root, self.repo, "main", self.head, self.now, self.api)

@@ -44,9 +44,7 @@ def selected_slides(items):
             # Partial output must never be saved under the complete book's unit key.
             slidev = [d for d in names if not academic.is_academic(book.slides_dir / d)]
             if slidev:
-                run([slides._node(), str(paths.TOOLS / "node" / "slides-build.mjs"), "--book", slug,
-                     "--out", str(out.resolve()), "--base", slides.base_path(site),
-                     *[v for d in slidev for v in ("--deck", d)]])
+                slides._build_slidev(site, book, out, decks=slidev)
             for name in names:
                 if name not in slidev:
                     academic.build_deck(site, book, name, out)

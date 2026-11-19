@@ -539,7 +539,7 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
                      paths.ROOT / "package-lock.json")
               .text("base", slides.base_path(site))
               .text("base_url", site.base_url or "")
-              .text("no_pdf", os.environ.get("TBOOK_SLIDES_NO_PDF") == "1")
+              .text("no_pdf", os.environ.get("TBOOK_SLIDES_NO_PDF") == "1" or not site.build_release_pdfs)
               .text("no_check", os.environ.get("TBOOK_SLIDES_NO_CHECK") == "1")
               .text("node", node_version()))
     if isinstance(lean.Lock.read_spec(), lean.BranchLock):
@@ -592,11 +592,12 @@ def units(site: config.Site, books: Iterable[config.Book]) -> list[Unit]:
         for ed in book.editions:
             if book.outputs_html:
                 out.append(html_unit(site, book, ed.lang, build.html_dir(book.slug, ed.lang)))
-            if book.outputs_pdf or book.outputs_epub:
+            pdf = book.outputs_pdf if site.build_release_pdfs else ()
+            if pdf or book.outputs_epub:
                 out.append(pandoc_unit(site, book, ed.lang, pandoc.stage_dir_for(book, ed)))
-            if book.outputs_pdf:
+            if pdf:
                 out.append(typst_unit(site, book, ed.lang, pandoc.stage_dir_for(book, ed) / "main.typ"))
-            for variant in book.outputs_pdf:
+            for variant in pdf:
                 out.append(pdf_unit(site, book, ed.lang, variant,
                                     build.dist_dir(book.slug) / book.artifact(ed.lang, "pdf", variant)))
             if book.outputs_epub:

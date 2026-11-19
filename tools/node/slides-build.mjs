@@ -308,7 +308,7 @@ try {
           VITE_SITE_INDEX: `${up}../`,
           VITE_SITE_LANG: ed.lang,
           VITE_SITE_LANGS: JSON.stringify(siteLangs.map((l) => ({ lang: l, name: String(i18n(l)?.meta?.name ?? l), href: `${up}${l === primary ? '' : `${l}/`}` || './' }))),
-          VITE_SITE_PDF: NO_PDF ? '' : `${up}${pdfName(book.slug, deck, ed.lang)}`,
+          VITE_SITE_PDF: NO_PDF || process.env.TBOOK_SLIDES_RELEASE_ONLY === '1' ? '' : `${up}${pdfName(book.slug, deck, ed.lang)}`,
         };
         rmSync(dir, { recursive: true, force: true });
         mkdirSync(dir, { recursive: true });

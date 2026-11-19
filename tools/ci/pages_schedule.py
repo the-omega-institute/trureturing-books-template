@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 
 from ci.plan import Tree, ancestor, api, changed_paths, git, impact
 from ci.trusted_cache import PAGES_PUSH_TITLE
-from tbook import lean, pin
+from tbook import config, lean, pin, releases
 
 
 INTERVAL = timedelta(minutes=20)
@@ -49,12 +49,16 @@ def push_runs(repo, branch, workflow, get, **filters):
             and (run.get("head_repository") or {}).get("full_name") == repo]
 
 
-def live_trureturing(url):
+def live_manifest(url):
     # A cached copy could mask a new deployment. This endpoint is only used to
     # detect changes; the pin is always resolved against the upstream repository.
     req = Request(url.rstrip("/") + "/manifest.json", headers={"Cache-Control": "no-cache"})
     with urlopen(req, timeout=30) as response:
-        return json.load(response).get("trureturing") or {}
+        return json.load(response)
+
+
+def live_trureturing(url):
+    return live_manifest(url).get("trureturing") or {}
 
 
 def refresh_due(root, repo, branch, head, now, get=api):
@@ -74,6 +78,16 @@ def refresh_head(root, repo, branch, head, now, get=api, read_live=live_truretur
     target = pin.branch_head(spec)
     live = read_live(get(f"repos/{repo}/pages")["html_url"])
     return "" if (live.get("repo"), live.get("branch"), live.get("commit")) == (spec.repo, spec.branch, target) else target
+
+
+def release_refresh_due(root, repo, branch, head, now, get=api, read_live=live_manifest):
+    if not refresh_due(root, repo, branch, head, now, get):
+        return False
+    live = read_live(get(f"repos/{repo}/pages")["html_url"])
+    if "release_pdf_digest" not in live:
+        # The first deployment of the opt-in setting is handled by the regular push path.
+        return False
+    return live["release_pdf_digest"] != releases.pdf_digest(releases.pdf_assets(repo))
 
 
 def select(root, repo, branch, head, now, get=api):
@@ -117,6 +131,13 @@ def main():
     now = datetime.now(timezone.utc)
     run = select(root, repo, branch, "FETCH_HEAD", now)
     if not run:
+        if args.operation == "schedule" and config.load_site().pdf_release_only:
+            head = git(root, "rev-parse", "FETCH_HEAD").decode().strip()
+            if release_refresh_due(root, repo, branch, head, now):
+                print(f"Refreshing Release download links on verified commit {head}.")
+                subprocess.run(["gh", "workflow", "run", "pages.yml", "--repo", repo, "--ref", branch,
+                                "-f", f"release_refresh_sha={head}"], check=True, timeout=45)
+                return
         print("No verified Pages update is due.")
         return
 
