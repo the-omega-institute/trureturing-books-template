@@ -1050,6 +1050,44 @@ class BuildTest(unittest.TestCase):
         with self.assertRaises(tp.PandocError):
             tp.build_pdf(self.site, self.book, self.ed, self.model, None, "glossy", self.tmp / "x.pdf")
 
+    def test_epub_aligned_metric_space_and_conversion_diagnostics(self):
+        book = make_book(self.tmp / "cycle")
+        ed = book.edition("en")
+        source = ed.dir / "a.md"
+        formula = r"""
+$$
+\begin{aligned}
+&\sum_{i\in F}\theta_{c(i),c(\operatorname{next}_m(i))}
+-\sum_{i\in I_m\setminus F}\theta_{c(i),c(\operatorname{next}_m(i))}\\
+&\hspace{25mm}\le (|F|_{\mathbb R}-1)\pi .
+\end{aligned}
+$$
+"""
+        source.write_text(source.read_text() + "\n" + formula)
+        with patch.dict(os.environ, TBOOK_EPUBCHECK="0"):
+            out = tp.build_epub(self.site, book, ed, load_edition(ed), None,
+                                self.tmp / "cycle.epub", stage_dir=self.tmp / "stage-cycle")
+        with zipfile.ZipFile(out) as archive:
+            xhtml = next(archive.read(n).decode() for n in archive.namelist()
+                         if n.endswith(".xhtml") and b"NOTE-A-TEXT" in archive.read(n))
+        from xml.etree import ElementTree as ET
+        root = ET.fromstring(xhtml)
+        ns = "{http://www.w3.org/1998/Math/MathML}"
+        table = next(t for t in root.iter(ns + "mtable") if "≤" in "".join(t.itertext()))
+        self.assertEqual(len(table.findall(ns + "mtr")), 2)
+        self.assertIn("π", "".join(table.itertext()))
+        width = table.find(".//" + ns + "mspace").get("width")
+        self.assertTrue(width.endswith("em"), width)
+        self.assertAlmostEqual(float(width[:-2]),
+                               25 * 72.27 / 25.4 / 12, places=3)
+        self.assertNotIn('class="math display">$$', xhtml)
+        # Pandoc exits zero on an unsupported command. Preserve both the formula and parser details.
+        (self.tmp / "unsupported.md").write_text(r"$$\unknownEpubCommand{x}$$")
+        with self.assertRaises(tp.PandocError) as error:
+            tp.run_pandoc(["unsupported.md", "--to", "html5", "--mathml"], cwd=self.tmp)
+        self.assertIn(r"\unknownEpubCommand", str(error.exception))
+        self.assertIn("unexpected", str(error.exception))
+
     def test_epub(self):
         old = os.environ.get("TBOOK_EPUBCHECK")
         os.environ["TBOOK_EPUBCHECK"] = "0"

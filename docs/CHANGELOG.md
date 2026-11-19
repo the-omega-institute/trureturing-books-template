@@ -2,7 +2,9 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
-## [Unreleased]
+## [1.6.3] - 2026-11-20
+
+- EPUB 导出将公式中以毫米、厘米或英寸指定的横向间距换算为 Pandoc 支持的 TeX 点。遇到仍无法转换为 MathML 的公式时，构建会报告完整公式与解析错误。
 
 - CI 部分重跑时按原计划轮次、模式和分片读取浏览器报告，记录各分片实际执行的轮次以及最终汇总轮次。
 
