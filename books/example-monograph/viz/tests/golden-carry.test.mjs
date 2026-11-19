@@ -10,11 +10,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { readLock } from '../../../../tools/node/viz-common.mjs';
 import { session, stageFirstChecks, settle, until, cjkLeftovers, playsAfter, openStill } from '../../../../tools/node/viz-testkit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const BOOK = 'example-monograph', ID = 'golden-carry';
-const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'trureturing.lock.json'), 'utf8'));
+const lock = readLock();
 // This suite visits the hub, so materialize the two covers it displays on a clean checkout.
 for (const id of ['golden-carry', 'phase-torus']) {
   execFileSync(process.execPath, [path.join(ROOT, 'tools/node/viz-thumbs.mjs'), BOOK, id], { cwd: ROOT, stdio: 'inherit' });
