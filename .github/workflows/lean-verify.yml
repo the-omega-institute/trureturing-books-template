@@ -13,6 +13,13 @@ on:
   schedule:
     - cron: "37 4 * * 1" # Mondays 04:37 UTC
   workflow_call:
+    inputs:
+      trureturing_sha:
+        type: string
+        default: ''
+    secrets:
+      TRURETURING_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -28,6 +35,10 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TBOOK_TRURETURING_SHA: ${{ inputs.trureturing_sha }}
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       # Caches (pip, and the Lake workspace with its built .olean files, which the axiom check reads) are
       # restored and saved only outside pull-request events, as in .github/actions/setup: this repository runs
@@ -61,7 +72,7 @@ jobs:
         id: project
         run: |
           ./tbook lean-project
-          commit="$(python -c 'import json; print(json.load(open("trureturing.lock.json"))["commit"])')"
+          commit="$(python -c 'import json, sys; print(json.load(sys.stdin)["commit"])' < "${TBOOK_LOCK_SNAPSHOT:-trureturing.lock.json}")"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "toolchain=$(cat build/lean-verify/lean-toolchain)" >> "$GITHUB_OUTPUT"
           cat build/lean-verify/lakefile.toml

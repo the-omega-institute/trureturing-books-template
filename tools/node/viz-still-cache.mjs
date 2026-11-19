@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { ROOT, THEME_VIZ, TOKENS_CSS, FONTSOURCE } from './viz-common.mjs';
+import { ROOT, THEME_VIZ, TOKENS_CSS, FONTSOURCE, readLock } from './viz-common.mjs';
 
 export const digest = (data) => crypto.createHash('sha256').update(data).digest('hex');
 export const fileDigest = (file) => fs.existsSync(file) ? digest(fs.readFileSync(file)) : null;
@@ -39,12 +39,15 @@ export function inputKey(book, v) {
   // Opt-in constructor contract: the lock is used only to pin anchor hrefs,
   // never fetched or displayed. Evidence is validated separately before publication.
   if (v.capture_lock !== undefined && !['all', 'links'].includes(v.capture_lock)) throw new Error(`invalid capture_lock for ${v.id}`);
-  if (v.capture_lock !== 'links') add(path.join(ROOT, 'trureturing.lock.json'), 'lock');
+  if (v.capture_lock !== 'links') {
+    add(path.join(ROOT, 'trureturing.lock.json'), 'lock');
+    hash.update(readLock()?.commit || '');
+  }
   add(path.join(ROOT, 'package-lock.json'), 'packages');
   // Common book assets may be referenced from page CSS, SVG or JavaScript.
   add(path.join(book.dir, 'assets'), 'book-assets');
   add(FONTSOURCE, 'fonts');
-  for (const name of ['viz-thumbs.mjs', 'viz-still-cache.mjs', 'viz-common.mjs', 'viz-server.mjs', 'viz-testkit.mjs']) {
+  for (const name of ['viz-thumbs.mjs', 'viz-still-cache.mjs', 'viz-common.mjs', 'viz-server.mjs', 'viz-testkit.mjs', 'trureturing-lock.mjs']) {
     add(fileURLToPath(new URL(name, import.meta.url)), `capture/${name}`);
   }
   hash.update(JSON.stringify({ schema: 2, thumbnail: v.thumbnail || null, capture_lock: v.capture_lock || 'all' }));

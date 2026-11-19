@@ -13,6 +13,8 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
+import { readTrureturingLock } from './trureturing-lock.mjs';
+
 // tools/node/slides-lib.mjs -> repository root (TBOOK_ROOT overrides, as in tools/tbook/paths.py)
 export const ROOT = resolve(process.env.TBOOK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
 // Materialize palette derivatives for direct Node commands after a source-only checkout.
@@ -436,9 +438,7 @@ export function namedBook(slug, root = ROOT) {
 }
 
 export function loadLock(root = ROOT) {
-  const file = join(root, 'trureturing.lock.json');
-  if (!existsSync(file)) return null;
-  return JSON.parse(readFileSync(file, 'utf8'));
+  return readTrureturingLock(root);
 }
 
 // Source permalink of a locked declaration at the pinned commit (same as tbook.lean.Lock.source_url).

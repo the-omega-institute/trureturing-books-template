@@ -62,16 +62,22 @@ jobs:
         id: derived
         env:
           PYTHONPATH: tools
+          REF: ${{ inputs.ref }}
         run: |
           python3 - <<'PYTHON'
           import os
-          from tbook import config
-          enabled = any(book.raw.get("derived", {}).get("command") for book in config.load_books())
+          from tbook import config, lean
+          skip = isinstance(lean.Lock.read_spec(), lean.BranchLock) and not os.environ.get("REF")
+          enabled = not skip and any(book.raw.get("derived", {}).get("command") for book in config.load_books())
+          if skip:
+              print("The lock already follows the configured branch.")
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"skip={str(skip).lower()}\n")
               out.write(f"browsers={str(bool(enabled)).lower()}\n")
           PYTHON
 
       - name: Set up the toolchain
+        if: steps.derived.outputs.skip != 'true'
         uses: ./.github/actions/setup
         with:
           fonts: 'false'
@@ -79,6 +85,7 @@ jobs:
           browsers: ${{ steps.derived.outputs.browsers }}
 
       - name: Resolve the target commit
+        if: steps.derived.outputs.skip != 'true'
         id: target
         env:
           REF: ${{ inputs.ref }}
@@ -106,7 +113,7 @@ jobs:
         # Only on the default branch (scheduled runs always are): a run dispatched on another branch could
         # restore what that branch's code saved (docs/VERIFICATION.md §2).
         if: >-
-          steps.target.outputs.same != 'true' &&
+          steps.target.outputs.same == 'false' &&
           (github.event_name == 'schedule' ||
           github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
         uses: actions/cache@v5
@@ -117,7 +124,7 @@ jobs:
 
       - name: Pin
         id: pin
-        if: steps.target.outputs.same != 'true'
+        if: steps.target.outputs.same == 'false'
         env:
           TARGET: ${{ steps.target.outputs.target }}
         run: |

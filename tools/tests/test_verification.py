@@ -373,6 +373,28 @@ class PinBranchTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         return ledger
 
+    def test_follow_writes_branch_and_resolves_at_use(self):
+        self.use(FakeLedger(on_branch=True))
+        with mock.patch.object(lean, "ls_remote", side_effect=[COMMIT, OLD_COMMIT]) as ls:
+            report = pin.pin(follow=True)
+            self.assertTrue(report.written)
+            self.assertEqual(json.loads(paths.LOCK_FILE.read_text()), {
+                "schema": lean.LOCK_SCHEMA, "repo": TRU, "branch": "dev",
+            })
+            resolved = lean.Lock.load()
+            self.assertEqual(resolved.commit, OLD_COMMIT)
+            self.assertIn(GID_3V, resolved.declarations)
+            self.assertEqual(lean.Lock.load().commit, OLD_COMMIT)
+            self.assertEqual(ls.call_args_list, [mock.call(TRU, "refs/heads/dev")] * 2)
+        self.assertTrue(pin.pin(COMMIT, offline=True).written)
+        self.assertEqual(lean.Lock.load().commit, COMMIT)
+
+    def test_follow_rejects_an_untrusted_workflow_sha(self):
+        self.use(FakeLedger(on_branch=False))
+        with self.assertRaisesRegex(lean.LeanError, "cannot verify"):
+            pin.resolve_branch(lean.BranchLock(TRU, "dev"), commit=OLD_COMMIT)
+        self.assertEqual(paths.LOCK_FILE.read_text(encoding="utf-8"), self.before)
+
     def test_off_branch_commit_is_refused(self):
         led = self.use(FakeLedger(on_branch=False))
         report = pin.pin(OLD_COMMIT, offline=True)

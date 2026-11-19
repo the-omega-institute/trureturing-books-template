@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.6.0] - 2026-11-19
+
+- `./tbook pin --follow` 将 trureturing 分支直接写入锁文件。检查和构建解析当次使用的完整 SHA，Pages 定时跟随分支变化，标签发行记录实际 SHA。已有固定提交锁继续适用。
+
 ## [1.5.15] - 2026-11-19
 
 - 书内测试目录中的数据文件保留为生成器输入，共享可视化运行时变更覆盖只启用 HTML 的书籍。

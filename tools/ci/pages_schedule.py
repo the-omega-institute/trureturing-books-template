@@ -1,14 +1,17 @@
 """Choose the latest tested main commit within the Pages deployment cadence."""
 from datetime import datetime, timedelta, timezone
 import argparse
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from ci.plan import Tree, ancestor, api, changed_paths, git, impact
 from ci.trusted_cache import PAGES_PUSH_TITLE
+from tbook import lean, pin
 
 
 INTERVAL = timedelta(minutes=20)
@@ -46,6 +49,33 @@ def push_runs(repo, branch, workflow, get, **filters):
             and (run.get("head_repository") or {}).get("full_name") == repo]
 
 
+def live_trureturing(url):
+    # A cached copy could mask a new deployment. This endpoint is only used to
+    # detect changes; the pin is always resolved against the upstream repository.
+    req = Request(url.rstrip("/") + "/manifest.json", headers={"Cache-Control": "no-cache"})
+    with urlopen(req, timeout=30) as response:
+        return json.load(response).get("trureturing") or {}
+
+
+def refresh_due(root, repo, branch, head, now, get=api):
+    live, last_attempt = deployment_window(repo, now, get)
+    if not live or (last_attempt and now - last_attempt < INTERVAL):
+        return False
+    if not re.fullmatch(r"[a-f0-9]{40}", live) or not ancestor(root, live, head):
+        return False
+    return any(run["head_sha"] == head and run["status"] == "completed" and run["conclusion"] == "success"
+               for run in push_runs(repo, branch, "ci", get, status="success", head_sha=head))
+
+
+def refresh_head(root, repo, branch, head, now, get=api, read_live=live_trureturing):
+    spec = lean.Lock.read_spec()
+    if not isinstance(spec, lean.BranchLock) or not refresh_due(root, repo, branch, head, now, get):
+        return ""
+    target = pin.branch_head(spec)
+    live = read_live(get(f"repos/{repo}/pages")["html_url"])
+    return "" if (live.get("repo"), live.get("branch"), live.get("commit")) == (spec.repo, spec.branch, target) else target
+
+
 def select(root, repo, branch, head, now, get=api):
     live, last_attempt = deployment_window(repo, now, get)
     if last_attempt and now - last_attempt < INTERVAL:
@@ -74,11 +104,15 @@ def select(root, repo, branch, head, now, get=api):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("schedule", "verify"))
+    parser.add_argument("operation", choices=("schedule", "verify", "refresh"))
     args = parser.parse_args()
     repo = os.environ["GITHUB_REPOSITORY"]
     branch = os.environ["DEFAULT_BRANCH"]
     root = Path.cwd()
+    if args.operation == "refresh":
+        commit = refresh_head(root, repo, branch, os.environ["GITHUB_SHA"], datetime.now(timezone.utc))
+        print(commit)
+        return
     git(root, "fetch", "--no-tags", "origin", f"refs/heads/{branch}")
     now = datetime.now(timezone.utc)
     run = select(root, repo, branch, "FETCH_HEAD", now)

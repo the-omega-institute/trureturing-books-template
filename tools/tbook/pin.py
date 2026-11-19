@@ -89,6 +89,49 @@ def _check_branch(branch: str, commit: str = "") -> None:
                              "rule on a branch (default 'dev'), and only a branch can show that a commit was merged")
 
 
+def branch_head(spec: lean.BranchLock) -> str:
+    site = config.load_site()
+    if (spec.repo, spec.branch) != (site.trureturing_repo, site.trureturing_branch):
+        raise lean.LeanError("branch lock repository and branch must match site.toml [trureturing]; run ./tbook pin --follow")
+    _check_branch(spec.branch)
+    return lean.ls_remote(spec.repo, f"refs/heads/{spec.branch}")
+
+
+def _declarations(ledger: lean.Ledger, commit: str, cited: list[str], errors: list[str]) -> dict[str, dict]:
+    resolved = {}
+    for gid in cited:
+        try:
+            res = lean.resolve(ledger, commit, gid)
+        except lean.LeanError as exc:
+            errors.append(str(exc))
+            continue
+        lean.locate(ledger, commit, res)
+        resolved[gid] = res.to_lock()
+    return resolved
+
+
+def resolve_branch(spec: lean.BranchLock, *, commit: str = "", offline: bool = False) -> lean.Lock:
+    site = config.load_site()
+    if (spec.repo, spec.branch) != (site.trureturing_repo, site.trureturing_branch):
+        raise lean.LeanError("branch lock repository and branch must match site.toml [trureturing]; run ./tbook pin --follow")
+    _check_branch(spec.branch)
+    ledger = lean.Ledger(spec.repo, offline=offline)
+    if commit:
+        _check_branch(spec.branch, commit)
+        if not lean.SHA_RE.fullmatch(commit) or ledger.branch_contains(commit, spec.branch).on_branch is not True:
+            raise lean.LeanError(f"cannot verify {commit!r} on {spec.repo}/{spec.branch}")
+    elif offline:
+        raise lean.LeanError("--offline needs a resolved branch snapshot or a fixed SHA lock")
+    else:
+        commit = branch_head(spec)
+        ledger.record_on_branch(commit, spec.branch, f"head of {spec.branch}")
+    errors: list[str] = []
+    resolved = _declarations(ledger, commit, cited_gids(config.load_books()), errors)
+    if errors:
+        raise lean.LeanError(f"cannot resolve {spec.repo}/{spec.branch} at {commit}:\n" + "\n".join(errors))
+    return lean.Lock(repo=spec.repo, branch=spec.branch, commit=commit, declarations=resolved)
+
+
 def _target(ref: str | None, old: lean.Lock | None, *, refresh: bool, offline: bool, branch: str, repo: str,
             ledger) -> tuple[str, bool]:
     """(commit to pin, whether it is the head of ``branch`` by construction)."""
@@ -111,11 +154,19 @@ def _target(ref: str | None, old: lean.Lock | None, *, refresh: bool, offline: b
 
 
 def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
-        dry_run: bool = False) -> PinReport:
+        dry_run: bool = False, follow: bool = False) -> PinReport:
     site = config.load_site()
     branch = site.trureturing_branch
     _check_branch(branch)
-    old = lean.Lock.load()
+    spec = lean.Lock.read_spec()
+    if follow or (isinstance(spec, lean.BranchLock) and not ref):
+        target = lean.BranchLock(site.trureturing_repo, branch)
+        resolved = resolve_branch(target, offline=offline)
+        if not dry_run:
+            target.save()
+        return PinReport(commit=resolved.commit, previous=spec.commit if isinstance(spec, lean.Lock) else "",
+                         branch=branch, previous_branch=spec.branch if spec else "", written=not dry_run)
+    old = spec if isinstance(spec, lean.Lock) else None
     ledger = lean.Ledger(site.trureturing_repo, offline=offline)
     commit, head = _target(ref, old, refresh=refresh, offline=offline, branch=branch,
                            repo=site.trureturing_repo, ledger=ledger)
@@ -144,15 +195,7 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
                 return report
             report.warnings.append(msg + "; ./tbook check verifies it again")
     cited = cited_gids(config.load_books())
-    resolved: dict[str, dict] = {}
-    for gid in cited:
-        try:
-            res = lean.resolve(ledger, commit, gid)
-        except lean.LeanError as exc:
-            report.errors.append(str(exc))
-            continue
-        lean.locate(ledger, commit, res)
-        resolved[gid] = res.to_lock()
+    resolved = _declarations(ledger, commit, cited, report.errors)
     before = old.declarations if old else {}
     report.added = sorted(set(resolved) - set(before))
     report.removed = sorted(set(before) - set(cited))  # a cited GID that fails to resolve is Unresolved only

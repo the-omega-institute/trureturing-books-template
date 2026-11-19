@@ -59,6 +59,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
+      trureturing_sha: ${{ steps.lock.outputs.sha }}
       site: ${{ steps.plan.outputs.site }}
       publish: ${{ steps.plan.outputs.publish }}
       validate: ${{ steps.plan.outputs.validate }}
@@ -91,15 +92,30 @@ jobs:
           SLOW_FRAMES: ${{ inputs.slow_frames }}
         run: python3 tools/ci/plan.py
 
+      - name: Resolve the trureturing branch
+        id: lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        run: |
+          sha="$(./tbook resolve-lock --branch-head)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   validate:
     name: Validate selected inputs
     needs: plan
     if: needs.plan.outputs.validate == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Materialize the complete selected plan
         # toJSON escapes string newlines; the quoted here-document keeps data inert.
@@ -251,9 +267,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.browser_matrix) }}
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
       - name: Materialize the selected plan and browser shard
         run: |
           cat <<'TBOOK_PLAN_JSON' > "$RUNNER_TEMP/ci-plan.json"
@@ -286,9 +308,15 @@ jobs:
       contents: read
       actions: read
       pages: read
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
       - name: Set up capture tools
         uses: ./.github/actions/setup
         with:
@@ -334,9 +362,15 @@ jobs:
       actions: read
       # actions/configure-pages reads the Pages configuration (private repositories refuse it without this).
       pages: read
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -443,9 +477,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.viz_matrix) }}
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -477,9 +517,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.slow_matrix) }}
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -512,9 +558,15 @@ jobs:
       contents: read
       actions: read
       pages: read
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Materialize the complete selected plan
         # toJSON escapes string newlines; the quoted here-document keeps data inert.
@@ -600,9 +652,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.film_matrix) }}
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
