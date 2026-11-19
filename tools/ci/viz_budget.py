@@ -93,12 +93,17 @@ def runtime_identity(runtime):
 
 def read_shard_reports(plan, directory):
     """Bind each downloaded artifact to the planner attempt, profile, batch and units."""
+    matrices = (('normal', 'viz'), ('slow', 'slow'))
+    single_shard = sum(len(plan.get(matrix, [])) for _, matrix in matrices) == 1
     reports = []
-    for profile, matrix in (('normal', 'viz'), ('slow', 'slow')):
+    for profile, matrix in matrices:
         for shard in plan.get(matrix, []):
             attempt = plan['coverage'][profile]['run_attempt']
             artifact = f"tbook-viz-{attempt}-{profile}-{shard['batch']}"
             path = directory / artifact / f'{profile}.json'
+            # The download action extracts a single matched artifact into its destination.
+            if single_shard and not path.is_file():
+                path = directory / f'{profile}.json'
             if not path.is_file():
                 raise ValueError(f'missing browser execution report: {artifact}')
             report = json.loads(path.read_text())
