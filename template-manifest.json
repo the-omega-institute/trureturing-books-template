@@ -44,7 +44,7 @@
       "mode": "100644"
     },
     ".github/pull_request_template.md": {
-      "sha256": "e5fef59d9efa76a36b0c4184ad4f26f5ec289210223d402b61031a704bb500f0",
+      "sha256": "254eca71bafa9338b98342e9d7e19a44ef5b455861a388f4fefae4935e22b11b",
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
@@ -92,11 +92,11 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "91d03c6b22996cbd7f7687400856ee3f4c8115ae3171a5dbb137ca5ece8dfabe",
+      "sha256": "d0afcfdc2e4509451aca2d25f99d146846a6bbc4a532d9d7157d4cc8a68bb33c",
       "mode": "100644"
     },
     "CONTRIBUTING.md": {
-      "sha256": "f865cc2969d322faedeecb29833e20647d6345bb22ec6264cd7e52e77bfaa4bf",
+      "sha256": "831636213e015ed167e530aab62ab82ab283326ed86523e7f691d1c8b1fcb660",
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "b3c78c0420bbf2b7c42d4d22107dca618b70b87d76c46492e22219d6a3023ad3",
+      "sha256": "6f414fc81e1062751be0f66726804c550cdc50dea9322b85caaef2ff65811cd7",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -124,7 +124,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "b362ca65f283305038dcbd5ddb511e28c79592bed73c9c56a4ae366b0e549af0",
+      "sha256": "e972b0b7eacb3074f64c6f7184039426d5e53880987eb51f07246a9d05488519",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
@@ -180,7 +180,7 @@
       "mode": "100644"
     },
     "skills/book-write/SKILL.md": {
-      "sha256": "3a19379651794576f288b017ce3d5d38566bff8588ca44fa3bc94e39a05a039e",
+      "sha256": "60460542c1b3ba71d9b6479b61d91a819222711c0eed4d3cb06b6eb6aec7f373",
       "mode": "100644"
     },
     "skills/template-update/SKILL.md": {
