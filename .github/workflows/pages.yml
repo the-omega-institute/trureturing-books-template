@@ -1,4 +1,4 @@
-# Build every book (HTML, PDF, EPUB, visualizations, films, slides) and deploy _site/ to GitHub Pages
+# Build every book and deploy _site/ to GitHub Pages
 # (managed by the template).
 #
 # One-time setup: Settings → Pages → Build and deployment → Source: GitHub Actions.
@@ -31,6 +31,9 @@ on:
         type: choice
         options: [auto, full]
         default: auto
+      release_refresh_sha:
+        description: Verified default-branch commit for a scheduled refresh of Release download links
+        type: string
 
 permissions:
   contents: read
@@ -65,6 +68,7 @@ jobs:
       actions: write
       contents: read
       deployments: read
+      pages: read
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -125,6 +129,7 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_REFRESH_SHA: ${{ inputs.release_refresh_sha }}
           CI_WORKFLOW_REF: ${{ github.workflow_ref }}
           SELECTION_MODE: ${{ inputs.selection_mode || 'auto' }}
           TBOOK_TRURETURING_SHA: ${{ steps.lock.outputs.sha }}

@@ -605,7 +605,7 @@ jobs:
         continue-on-error: true
         run: python3 tools/ci/cache_store.py snapshot "$RUNNER_TEMP/build-cache-before.json"
 
-      - name: Build slides (HTML, browser checks, PDF)
+      - name: Build slides (HTML, browser checks, optional PDF)
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
@@ -634,7 +634,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
+      - name: Find slide PDFs
+        id: slide-pdfs
+        shell: bash
+        run: |
+          if compgen -G 'build/slides/*/*.pdf' >/dev/null; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload slide PDFs
+        if: steps.slide-pdfs.outputs.available == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: slides-pdf

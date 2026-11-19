@@ -267,6 +267,11 @@ class Site:
     book_order: list[str]
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
     book_hide: list[str] = field(default_factory=list)
+    pdf_release_only: bool = False
+
+    @property
+    def build_release_pdfs(self) -> bool:
+        return not self.pdf_release_only or os.environ.get("TBOOK_BUILD_RELEASE") == "1"
 
     @property
     def default_language(self) -> str:
@@ -332,6 +337,9 @@ def load_site() -> Site:
     books = raw.get("books", {})
     if not isinstance(books, dict):
         raise ConfigError("site.toml: books must be a table ([books])")
+    pdf_release_only = site.get("pdf_release_only", False)
+    if not isinstance(pdf_release_only, bool):
+        raise ConfigError("site.toml: site.pdf_release_only must be a boolean")
     return Site(
         root=paths.ROOT,
         repo=repo,
@@ -344,6 +352,7 @@ def load_site() -> Site:
         book_order=list(books.get("order", [])),
         raw=raw,
         book_hide=hide_patterns(books.get("hide")),
+        pdf_release_only=pdf_release_only,
     )
 
 

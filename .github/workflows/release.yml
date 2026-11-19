@@ -51,6 +51,7 @@ concurrency:
 
 env:
   PYTHONUNBUFFERED: '1'
+  TBOOK_BUILD_RELEASE: '1'
 
 jobs:
   plan:

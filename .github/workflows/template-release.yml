@@ -144,9 +144,12 @@ jobs:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
           TBOOK_FILMS: require
+          TBOOK_BUILD_RELEASE: '1'
         run: ./tbook build all
 
       - name: Export the build cache
+        env:
+          TBOOK_BUILD_RELEASE: '1'
         run: ./tbook cache export "$RUNNER_TEMP/build-cache"
 
       - name: Upload the build cache

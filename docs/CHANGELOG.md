@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.7.0] - 2026-11-20
+
+- 增加 `site.toml` 的 `[site].pdf_release_only` 选项。开启后，常规 CI 和 Pages 跳过书籍与演示文稿的 PDF 导出。下载页显示实际发布的 GitHub Release 附件，并随附件变化刷新。来源是下游书库希望释放 Pages 的 PDF 存储空间。
+
 ## [1.6.4] - 2026-11-20
 
 - 缩小 CI 导出的缓存传输。PDF 与 EPUB 单独恢复可视化静帧，HTML 和幻灯片直接按输入键查 Release。Pages 发布独立静帧库存，完整缓存和书籍导出差量分片启用低等级压缩。来源是下游书库一次普通 PR 的各导出分片重复下载 3.65 GB 的完整缓存。

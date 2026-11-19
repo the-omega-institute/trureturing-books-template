@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from . import academic, config, evidence, lean, paths
+from . import academic, config, evidence, lean, paths, releases
 from .model import OPEN, Issue
 
 PRIMARY_FILE = "slides.md"  # the edition of the book's first language
@@ -1760,10 +1760,11 @@ def render_embed(env, ctx, inner: str, doc) -> str:
             parts += ["", inner, ""]
         parts += [
             f'<div class="tr-media-links"><a href="{esc(href)}">{esc(t(lang, "present"))} ↗</a>'
-            f'<a href="{esc(pdf)}" download>{esc(t(lang, "pdf"))}</a></div>',
+            + (f'<a href="{esc(pdf)}" download>{esc(t(lang, "pdf"))}</a>' if not ctx.site.pdf_release_only else "")
+            + "</div>",
             "</aside>",
         ]
-        if academic.is_academic(book.slides_dir / src):
+        if not ctx.site.pdf_release_only and academic.is_academic(book.slides_dir / src):
             notes = pdf[:-4] + "-notes.pdf"
             parts.insert(-1, f'<p><a href="{esc(notes)}" download>{esc(t(lang, "notes_pdf"))}</a></p>')
         return "\n".join(parts)
@@ -1833,14 +1834,18 @@ def _build(site: config.Site, book: config.Book, out_dir: Path) -> None:
     (out_dir / MANIFEST).write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _build_slidev(site, book, out_dir):
+def _build_slidev(site, book, out_dir, *, decks=()):
     cmd = [_node(), str(paths.TOOLS / "node" / "slides-build.mjs"), "--book", book.slug,
            "--out", str(Path(out_dir).resolve()), "--base", base_path(site)]
-    if os.environ.get("TBOOK_SLIDES_NO_PDF") == "1":
+    for deck in decks:
+        cmd.extend(("--deck", deck))
+    if os.environ.get("TBOOK_SLIDES_NO_PDF") == "1" or not site.build_release_pdfs:
         cmd.append("--no-pdf")
     if os.environ.get("TBOOK_SLIDES_NO_CHECK") == "1":
         cmd.append("--no-check")
     env = dict(os.environ, TBOOK_ROOT=str(paths.ROOT))
+    if site.pdf_release_only:
+        env["TBOOK_SLIDES_RELEASE_ONLY"] = "1"
     if site.base_url:
         env.setdefault("TBOOK_BASE_URL", site.base_url)
     r = subprocess.run(cmd, cwd=paths.ROOT, env=env)
@@ -1856,7 +1861,8 @@ def read_manifest(out_dir: Path) -> dict[str, Any] | None:
     return data if data.get("schema") == MANIFEST_SCHEMA else None
 
 
-def _stale(book: config.Book, out_dir: Path, manifest: dict[str, Any] | None, base: str) -> str:
+def _stale(book: config.Book, out_dir: Path, manifest: dict[str, Any] | None, base: str,
+           *, require_pdf: bool = True) -> str:
     """Why the build in ``out_dir`` cannot be published as it is ('' when it can). Each edition is built for
     its path on the site (its links and language switcher say so): the site's base path, ``<deck>/`` for the
     book's first language and ``<deck>/<lang>/`` for the others, and the deck's languages."""
@@ -1875,7 +1881,7 @@ def _stale(book: config.Book, out_dir: Path, manifest: dict[str, Any] | None, ba
             if info.get("site_path") != want:
                 return (f"{deck} ({lang}) was built for {info.get('site_path')!r}, the site uses {want!r} "
                         f"({book.languages[0]} is the book's first language)")
-            if academic.is_academic(book.slides_dir / deck):
+            if require_pdf and academic.is_academic(book.slides_dir / deck):
                 for key in ("pdf", "notes_pdf"):
                     if not info.get(key) or not (out_dir / info[key]).is_file():
                         return f"academic deck {deck} ({lang}) is missing its {key}"
@@ -1904,7 +1910,7 @@ def publish(site: config.Site, book: config.Book, site_dir: Path, *, build_missi
     if build_missing:
         build(site, book, out)
     manifest = read_manifest(out)
-    why = _stale(book, out, manifest, base)
+    why = _stale(book, out, manifest, base, require_pdf=not site.pdf_release_only)
     if why:
         if not build_missing:
             raise RuntimeError(f"slides of {book.slug}: {why}; run ./tbook build slides --book {book.slug}")
@@ -1920,15 +1926,17 @@ def publish(site: config.Site, book: config.Book, site_dir: Path, *, build_missi
         for lang in [lang for lang in book.languages if lang in deck_langs(book, deck)]:
             info = built[lang]
             shutil.copytree(out / info["dir"], site_dir / info["site_path"], dirs_exist_ok=True)
-            if info.get("pdf") and (out / info["pdf"]).is_file():
+            if not site.pdf_release_only and info.get("pdf") and (out / info["pdf"]).is_file():
                 shutil.copy2(out / info["pdf"], site_dir / deck / pdf_name(book, deck, lang))
-            if info.get("notes_pdf") and (out / info["notes_pdf"]).is_file():
+            if not site.pdf_release_only and info.get("notes_pdf") and (out / info["notes_pdf"]).is_file():
                 shutil.copy2(out / info["notes_pdf"], site_dir / deck / (pdf_name(book, deck, lang)[:-4] + "-notes.pdf"))
     published = items(book)
     for it in published:
         it["built_pdf"] = {lang: (site_dir / it["id"] / it["pdf_name"][lang]).is_file() for lang in it["languages"]}
-    (site_dir / "index.html").write_text(index_html(site, book, published), encoding="utf-8")
-    _drop_unpublished_pdf_links(book, site_dir.parent, published)
+    release_pdfs = releases.pdf_assets(site.repo) if site.pdf_release_only else None
+    (site_dir / "index.html").write_text(index_html(site, book, published, release_pdfs), encoding="utf-8")
+    if not site.pdf_release_only:
+        _drop_unpublished_pdf_links(book, site_dir.parent, published)
     return published
 
 
@@ -1950,7 +1958,8 @@ def _drop_unpublished_pdf_links(book: config.Book, book_site: Path, decks: list[
                 page.write_text(new, encoding="utf-8")
 
 
-def index_html(site: config.Site, book: config.Book, decks: list[dict[str, Any]]) -> str:
+def index_html(site: config.Site, book: config.Book, decks: list[dict[str, Any]],
+               release_pdfs: dict[str, releases.PdfAsset] | None = None) -> str:
     """The bilingual slides index of a book (``_site/<slug>/slides/index.html``); Chinese by default."""
     langs = list(book.languages)
     primary = langs[0]
@@ -1973,10 +1982,17 @@ def index_html(site: config.Site, book: config.Book, decks: list[dict[str, Any]]
         rows = []
         for lang in d["languages"]:
             links = [f'<a href="{esc(site_path(book, d["id"], lang))}">{esc(t(lang, "present"))} ↗</a>']
-            if d.get("built_pdf", {}).get(lang, True):
-                links.append(f'<a href="{esc(d["id"])}/{esc(d["pdf_name"][lang])}" download>{esc(t(lang, "pdf"))}</a>')
-            if lang in d.get("notes_pdf", {}):
-                links.append(f'<a href="{esc(d["id"])}/{esc(d["pdf_name"][lang][:-4])}-notes.pdf" download>{esc(t(lang, "notes_pdf"))}</a>')
+            for kind in ("pdf", "notes_pdf"):
+                path = d.get(kind, {}).get(lang)
+                if not path:
+                    continue
+                if site.pdf_release_only:
+                    asset = (release_pdfs or {}).get(Path(path).name)
+                    if asset:
+                        links.append(f'<a href="{esc(asset.url)}">{esc(t(lang, kind))}</a>')
+                elif kind == "notes_pdf" or d.get("built_pdf", {}).get(lang, True):
+                    href = f"{d['id']}/{Path(path).name}"
+                    links.append(f'<a href="{esc(href)}" download>{esc(t(lang, kind))}</a>')
             rows.append(f'<p class="links" lang="{esc(config.bcp47(lang))}"><span class="ln">'
                         f'{esc(config.s(lang, "meta.name") or lang)}</span><span class="lk">{"".join(links)}</span></p>')
         blurb = pair(lambda lang, d=d: d["blurb"].get(lang) or d["info"].get(lang) or "")

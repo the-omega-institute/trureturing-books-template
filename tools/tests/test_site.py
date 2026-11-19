@@ -12,6 +12,7 @@ ledger is skipped without a trureturing checkout ($TRURETURING_DIR or ../truretu
 from __future__ import annotations
 
 import html.parser
+from dataclasses import replace
 import json
 import os
 import re
@@ -28,7 +29,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import tbook
-from tbook import config, doctor, lean, leanverify, paths, serve, site
+from tbook import config, doctor, lean, leanverify, paths, releases, serve, site
 
 GID_3V = "D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"
 GID_INT = "D5/S1/Deficit/DeficitInteger.deficit_integer"
@@ -243,6 +244,35 @@ class SiteHelpersTest(unittest.TestCase):
 
 
 class SiteBuildTest(SiteCase):
+    def test_release_only_downloads_use_assets_and_ignore_local_pdfs(self):
+        book = make_book(self.tmp)
+        fake_build(self.build_root, book)
+        self.site = replace(self.site, pdf_release_only=True)
+        name = book.artifact("zh", "pdf", "screen")
+        urls = "https://github.com/owner/books/releases/download/v1.2.3/"
+        slide = "test-book-overview-en.pdf"
+
+        def publish_slides(site_, book_, dest):
+            write(Path(dest) / "overview" / "en" / "index.html", "deck")
+
+        media = fake_media(slides_items=[SLIDES_ITEM], slides_publish=publish_slides)
+        assets = {name: releases.PdfAsset(urls + name, 1024),
+                  slide: releases.PdfAsset(urls + slide, 2048)}
+        for available in (assets, {}):
+            with self.subTest(available=bool(available)), mock.patch.object(releases, "pdf_assets", return_value=available):
+                out = self.run_build([book], media=media)
+                self.assertEqual(list(out.rglob("*.pdf")), [])
+                landing = (out / book.slug / "index.html").read_text()
+                hub = (out / "index.html").read_text()
+                self.assertEqual(urls + name in hub, bool(available))
+                self.assertEqual(urls + name in landing, bool(available))
+                self.assertEqual(urls + slide in landing, bool(available))
+                self.assertNotIn(book.artifact("en", "pdf", "print"), landing)
+                self.assertIn("downloads/" + book.artifact("zh", "epub"), landing)
+                manifest = json.loads((out / "manifest.json").read_text())
+                self.assertEqual(manifest["release_pdf_digest"], releases.pdf_digest(available))
+                self.assertNotIn("pdf", {f["kind"] for f in manifest["books"][0]["files"]})
+
     def test_full_build(self):
         book = make_book(self.tmp)
         fake_build(self.build_root, book)

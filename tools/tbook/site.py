@@ -46,6 +46,7 @@ import json
 import os
 import subprocess
 import posixpath
+
 import re
 import shutil
 import sys
@@ -56,7 +57,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from . import config, lean, mathrender, mdscan, paths, render
+from . import config, lean, mathrender, mdscan, paths, releases, render
 from .ledger import LEDGER_FILE
 from .model import OPEN, EditionModel, Env, load_book_models
 
@@ -338,6 +339,7 @@ class Download:
     variant: str  # screen | print | ""
     name: str
     size: int
+    url: str = ""
 
 
 @dataclass
@@ -350,6 +352,7 @@ class BookView:
     covers: dict[str, str] = field(default_factory=dict)  # edition lang → "cover-<lang>.png"
     built: dict[str, bool] = field(default_factory=dict)
     media: dict[str, list[dict]] = field(default_factory=dict)
+    release_pdfs: dict[str, releases.PdfAsset] | None = None
 
     @property
     def slug(self) -> str:
@@ -405,9 +408,11 @@ def _items(part: str, book: config.Book) -> list[dict]:
 
 
 def collect(site: config.Site, book: config.Book, bdir: Path, lock: lean.Lock | None,
-            models: dict[str, EditionModel] | None = None) -> BookView:
+            models: dict[str, EditionModel] | None = None, *,
+            release_pdfs: dict[str, releases.PdfAsset] | None = None) -> BookView:
     """What exists for ``book`` under ``bdir`` (``<out>/<slug>``), for the pages and the manifest."""
-    view = BookView(book=book, bdir=bdir, models=models if models is not None else load_book_models(book), lock=lock)
+    view = BookView(book=book, bdir=bdir, models=models if models is not None else load_book_models(book),
+                    lock=lock, release_pdfs=release_pdfs)
     for ed in book.editions:
         view.built[ed.lang] = (bdir / ed.lang / "index.html").is_file()
         cover = f"cover-{ed.lang}.png"
@@ -416,6 +421,11 @@ def collect(site: config.Site, book: config.Book, bdir: Path, lock: lean.Lock | 
         found = []
         for kind, variant in [("pdf", v) for v in config.PDF_VARIANTS] + [("epub", "")]:
             name = book.artifact(ed.lang, kind, variant)
+            if kind == "pdf" and release_pdfs is not None:
+                asset = release_pdfs.get(name) if variant in book.outputs_pdf else None
+                if asset:
+                    found.append(Download(kind, variant, name, asset.size, asset.url))
+                continue
             f = bdir / "downloads" / name
             if f.is_file():
                 found.append(Download(kind, variant, name, f.stat().st_size))
@@ -585,14 +595,15 @@ def publish_html(book: config.Book, bdir: Path, build_root: Path) -> None:
                 printed.write_text(fix_print_media(printed.read_text(encoding="utf-8")), encoding="utf-8")
 
 
-def publish_downloads(book: config.Book, bdir: Path, build_root: Path) -> None:
+def publish_downloads(book: config.Book, bdir: Path, build_root: Path, *, include_pdf: bool = True) -> None:
     src = build_root / "dist" / book.slug
     dst = bdir / "downloads"
     if dst.exists():
         shutil.rmtree(dst)
     if not src.is_dir():
         return
-    files = [f for f in sorted(src.iterdir()) if f.is_file() and not f.name.startswith(".")]
+    files = [f for f in sorted(src.iterdir()) if f.is_file() and not f.name.startswith(".")
+             and (include_pdf or f.suffix.lower() != ".pdf")]
     if not files:
         return
     dst.mkdir(parents=True)
@@ -807,7 +818,8 @@ def editions_html(bi: Bi, view: BookView, prefix: str) -> str:
         for d in view.downloads.get(lang, []):
             mime = "application/pdf" if d.kind == "pdf" else "application/epub+zip"
             dl = ' download' if d.kind == "epub" else ""
-            links.append(f'<a class="chip" href="{esc(prefix + "downloads/" + d.name)}" type="{mime}" '
+            href = d.url or prefix + "downloads/" + d.name
+            links.append(f'<a class="chip" href="{esc(href)}" type="{mime}" '
                          f'hreflang="{esc(ed.bcp47)}"{dl}>{bi.s(labels[(d.kind, d.variant)])} '
                          f'<small>{esc(human_size(d.size))}</small></a>')
         if not links:
@@ -1242,15 +1254,24 @@ def slides_section(bi: Bi, view: BookView) -> str:
             if h and _exists(view.bdir, h):
                 links.append(f'<a class="btn" href="{esc(h)}" hreflang="{esc(config.bcp47(lang))}" lang="{esc(config.bcp47(lang))}">'
                              f'{esc(config.s(lang, "meta.name") or lang)} <span aria-hidden="true">▸</span></a>')
-            p = str(pdfs.get(lang) or "")
-            if p and _exists(view.bdir, p):
-                size = human_size((view.bdir / p).stat().st_size)
-                links.append(f'<a class="chip" href="{esc(p)}" type="application/pdf" hreflang="{esc(config.bcp47(lang))}">'
-                             f'PDF <small>{esc(size)}</small></a>')
-            notes = str(it.get("notes_pdf", {}).get(lang) or "")
-            if notes and _exists(view.bdir, notes):
-                from . import slides
-                links.append(f'<a class="chip" href="{esc(notes)}" type="application/pdf">{esc(slides.t(lang, "notes_pdf"))}</a>')
+            for kind, path in (("pdf", pdfs.get(lang)), ("notes_pdf", it.get("notes_pdf", {}).get(lang))):
+                if not path:
+                    continue
+                if view.release_pdfs is None:
+                    if not _exists(view.bdir, path):
+                        continue
+                    href, size = path, (view.bdir / path).stat().st_size
+                else:
+                    asset = view.release_pdfs.get(Path(path).name)
+                    if not asset:
+                        continue
+                    href, size = asset.url, asset.size
+                if kind == "pdf":
+                    links.append(f'<a class="chip" href="{esc(href)}" type="application/pdf" hreflang="{esc(config.bcp47(lang))}">'
+                                 f'PDF <small>{esc(human_size(size))}</small></a>')
+                else:
+                    from . import slides
+                    links.append(f'<a class="chip" href="{esc(href)}" type="application/pdf">{esc(slides.t(lang, kind))}</a>')
             if links:
                 rows.append(f'<div class="deck-row" data-ed="{esc(lang)}">{"".join(links)}</div>')
         count = it.get("slides")
@@ -1432,7 +1453,8 @@ def _generated_at() -> str:
     return when.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -> dict:
+def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None,
+             release_pdfs: dict[str, releases.PdfAsset] | None = None) -> dict:
     """``manifest.json`` (schema ``trureturing-books.site.v1``)."""
     name, version = _template_info()
     books = []
@@ -1441,6 +1463,8 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
         files = []
         for ed in book.editions:
             for d in v.downloads.get(ed.lang, []):
+                if d.url:
+                    continue
                 f = v.bdir / "downloads" / d.name
                 files.append({"path": f"{book.slug}/downloads/{d.name}", "size": d.size, "sha256": _sha256(f),
                               "kind": d.kind, "lang": ed.lang, "variant": d.variant or None})
@@ -1449,7 +1473,7 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
                 f = v.bdir / cover
                 files.append({"path": f"{book.slug}/{cover}", "size": f.stat().st_size, "sha256": _sha256(f),
                               "kind": "cover", "lang": ed.lang, "variant": "screen"})
-        for it in v.media.get("slides", []):
+        for it in [] if site.pdf_release_only else v.media.get("slides", []):
             pdfs = it.get("pdf") if isinstance(it.get("pdf"), dict) else {}
             pdfs = dict(pdfs)
             for lang, rel in sorted(it.get("notes_pdf", {}).items()):
@@ -1480,6 +1504,7 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None) -
     from . import requests
     return {
         "schema": SCHEMA,
+        **({"release_pdf_digest": releases.pdf_digest(release_pdfs)} if release_pdfs is not None else {}),
         "generated_at": _generated_at(),
         "site": {"title": {lang: site.text(site.title, lang) for lang in site.languages},
                  "languages": site.languages, "base_url": site.base_url or None, "repo": site.repo or None},
@@ -1546,6 +1571,7 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
         unknown = parts - set(MEDIA_PARTS)
         if unknown:
             raise SiteError(f"only= accepts {', '.join(MEDIA_PARTS)}; got {', '.join(sorted(unknown))}")
+    release_pdfs = releases.pdf_assets(site.repo) if site.pdf_release_only else None
     lock = _load_lock()
     if parts is None:
         _reset(out)
@@ -1562,7 +1588,7 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
         models = load_book_models(book)
         if parts is None:
             publish_html(book, bdir, build_root)
-            publish_downloads(book, bdir, build_root)
+            publish_downloads(book, bdir, build_root, include_pdf=not site.pdf_release_only)
             publish_covers(site, book, bdir, models, lock)
         for part in MEDIA_PARTS:
             if book.slug in rebuilt and (parts is None or part in parts):
@@ -1571,7 +1597,7 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
                     problems.append(err)
         if book.slug in rebuilt and (parts is None or "films" in parts):
             publish_film_marks(book, bdir)
-        views.append(collect(site, book, bdir, lock, models))
+        views.append(collect(site, book, bdir, lock, models, release_pdfs=release_pdfs))
     langs = list(site.languages) or ["zh", "en"]
     math = render_title_math(views)
     versions = write_assets(out, katex=bool(math))
@@ -1582,7 +1608,7 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
     (out / "index.html").write_text(index_html(frame, views), encoding="utf-8")
     (out / "404.html").write_text(not_found_html(site), encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
-    (out / "manifest.json").write_text(json.dumps(manifest(site, views, lock), ensure_ascii=False, indent=2) + "\n",
+    (out / "manifest.json").write_text(json.dumps(manifest(site, views, lock, release_pdfs), ensure_ascii=False, indent=2) + "\n",
                                        encoding="utf-8")
     if problems:
         raise SiteError(f"site written to {out} with {len(problems)} problem(s):\n  " + "\n  ".join(problems))
