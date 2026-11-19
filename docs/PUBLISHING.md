@@ -47,6 +47,12 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 | `template-sync.yml` | 每周、手动（仅下游） | 升级到模板新版本并开 PR（标题使用 `chore(template): …`，冲突时在摘要中标注 `[conflicts]`，`.template-new` 文件一并提交） |
 | `template-release.yml` | tag `v*`（仅模板仓库） | 核对版本与清单，复用标签提交在默认分支上成功的 CI，无匹配记录时运行 CI，随后发布模板版本，附示例站点的构建缓存（同样先建草稿、上传后发布） |
 
+### Pages 跟随上游分支
+
+在 `site.toml` 的 `[trureturing]` 中设置 `pages_follow_branch = true` 后，每次 Pages 发布都会解析该节配置的 `branch`。每天 05:17 UTC 另查一次上游。若当前主干是已通过 CI 的线上版本，且线上 `manifest.json` 记录的上游提交有变化，就用同一书稿提交再次部署。每次发布先生成一份解析后的锁文件，再由影片分片和站点组装共用。解析或检查失败时保留线上版本。新站点的第一次部署由主干更新或手动发布触发。
+
+书稿 PR、本地构建和标签发布仍使用仓库中的 `trureturing.lock.json`。启用跟随模式后，定时 bump PR 停止，作者需要更新仓库锁文件时可运行 `./tbook pin` 或手动触发 `trureturing bump`。每次 Pages 发布使用的 SHA 可在其 `manifest.json` 的 `trureturing.commit` 查到。
+
 `ci.yml` 的选择检查从 JSON 文件读取完整计划；CI 与 Pages 的汇总从另一份 JSON 文件读取完整 `needs`，并直接使用其中的 `plan.outputs.plan`，没有第二份计划副本。工作流用带引号的 here-document 接收 `toJSON` 编码的数据，由运行器先写脚本再落盘；计划和汇总载荷不进入进程参数或环境变量，字符串中的换行与 shell 语法不会被执行。矩阵、检查条件、精确浏览器报告核对与覆盖来源保持原有契约；缺少计划、作业结果或执行报告仍使汇总失败。
 
 **仅修改书稿也运行 CI。** `books/<slug>/<lang>/*.md`（含子目录与 `SUMMARY.md`）属于出版输入，选择所属书的结构／多语言检查与启用的导出格式；没有浏览器套件读取该章，也不能省略这些工作。工程文档 `docs/` 与根目录说明的轻量规则不适用于书稿。推送普通工作分支尚未开 PR 时不会自动运行 CI；创建 PR、更新 PR 提交或合入 `main` 才会触发，编辑 PR 标题／正文只重跑命名检查。排查时先在 Actions 中按工作流和提交 SHA 找运行，再看 **Plan affected work** 的 `coverage.normal.paths` 与 `tasks`：没有运行、任务按计划跳过、排队和旧提交的 Pages 被跳过是不同情况；稳定的 **Check** 必须等所有已选任务成功。

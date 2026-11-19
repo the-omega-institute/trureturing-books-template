@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.6.0] - 2026-11-19
+
+- 下游书库可启用 `[trureturing].pages_follow_branch`。Pages 每次发布解析指定分支并记录实际提交，也会定时检查分支变化。书稿校验与标签发布使用已提交的锁文件。
+
 ## [1.5.15] - 2026-11-19
 
 - CI 按发布工作流与书籍导出的实际输入选择验证，Pages 比较最新已验证提交与线上版本的出版输入。缩小导出缓存的输入范围，Actions 缓存缺失时 CI、Pages 与 Release 可恢复成功主干构建的工件，再按单元查已发布的 Release。视频、静帧的 Actions 缓存只在库存变化或被淘汰时保存。

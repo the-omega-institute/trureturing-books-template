@@ -1545,6 +1545,7 @@ class DeploymentCoverageTest(unittest.TestCase):
         context = {"github.event.workflow_run.conclusion": "success",
                    "github.event.workflow_run.event": "push",
                    "github.event.workflow_run.head_repository.full_name": "owner/books",
+                   "github.event.schedule": "",
                    "github.repository": "owner/books"}
         self.assertTrue(gha_if(condition, event="workflow_run", ref="refs/heads/main", context=context))
         for change in ({"github.event.workflow_run.conclusion": "cancelled"},
@@ -1556,6 +1557,8 @@ class DeploymentCoverageTest(unittest.TestCase):
                                         context={**context, **change}))
         self.assertTrue(gha_if(condition, event="schedule", ref="refs/heads/main",
                                context={name: "" for name in context}))
+        self.assertFalse(gha_if(condition, event="schedule", ref="refs/heads/main",
+                                context={**context, "github.event.schedule": "17 5 * * *"}))
 
     def test_only_superseded_pull_requests_cancel_running_ci(self):
         import re

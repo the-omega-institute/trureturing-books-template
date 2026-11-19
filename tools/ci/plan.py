@@ -922,10 +922,15 @@ def trusted_revision(root, repo, branch, workflow, limit):
 
 
 def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, slow=False,
-         mode="auto", base="", head="", get_baseline=trusted_baseline, get_revision=None, get_deployment=None, runtime="local"):
+         mode="auto", base="", head="", get_baseline=trusted_baseline, get_revision=None, get_deployment=None,
+         runtime="local", pages_lock=None):
     if mode not in ("auto", "full"):
         raise ValueError("mode must be auto or full")
     current = Tree(root, "HEAD")
+    lock_name = "trureturing.lock.json"
+    if pages_lock is not None:
+        current.files.add(lock_name)
+        current.cache[lock_name] = pages_lock
     if head and Tree(root, head).sha != current.sha:
         raise ValueError("requested head does not match checkout")
     profiles = event_profiles(event, own, slow, workflow)
@@ -1003,10 +1008,13 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
             except subprocess.SubprocessError as exc:
                 raise ValueError("cannot determine changed scope; provide --base or explicitly request --mode full") from exc
             reasons.append(f"{profile}: Git diff from {previous.sha}; no inherited coverage")
+        if pages_lock is not None and (not previous or lock_name not in previous.files or
+                                       json.loads(pages_lock)["commit"] != previous.json(lock_name)["commit"]):
+            paths = sorted(set(paths) | {lock_name})
         selected = impact(current, previous, paths, full=mode == "full", template=template)
         if profile == "normal":
             stills = image_shards(current, selected["exports"], previous=previous, paths=paths, full=mode == "full")
-        if profile == "pages" and (event == "push" or not (record or deployed_sha)):
+        if profile == "pages" and (event == "push" or pages_lock is not None or not (record or deployed_sha)):
             # Advance the live commit even when all publication units can be reused.
             selected["site"] = True
         if not record:
@@ -1101,9 +1109,12 @@ def main():
     parser.add_argument("--mode", default=os.environ.get("SELECTION_MODE") or "auto")
     parser.add_argument("--base", default=os.environ.get("SELECTION_BASE", ""))
     parser.add_argument("--head", default=os.environ.get("SELECTION_HEAD", ""))
+    parser.add_argument("--pages-lock", type=Path, help="resolved snapshot used for this Pages build")
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--needs-file", type=Path, default=Path("ci-needs.json"))
     args = parser.parse_args()
+    if args.pages_lock and args.workflow != "pages":
+        parser.error("--pages-lock requires --workflow pages")
     if args.verify:
         results = json.loads(args.needs_file.read_text(encoding="utf-8"))
         # Use the plan from this exact needs fanout; do not maintain a second copy.
@@ -1130,7 +1141,8 @@ def main():
     result = plan(Path.cwd(), event=event, payload=payload, repo=os.environ.get("GITHUB_REPOSITORY", "local/repo"),
                   branch=branch, ref=os.environ.get("GITHUB_REF", "local"), workflow=args.workflow, own=own,
                   slow=os.environ.get("SLOW_FRAMES") == "true", mode=args.mode, base=args.base, head=args.head, runtime=runtime,
-                  get_revision=trusted_revision, get_deployment=active_deployment)
+                  get_revision=trusted_revision, get_deployment=active_deployment,
+                  pages_lock=args.pages_lock.read_text(encoding="utf-8") if args.pages_lock else None)
     Path("ci-plan.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     write_outputs(result)
     jobs = [name for name, selected in result["tasks"].items() if selected]

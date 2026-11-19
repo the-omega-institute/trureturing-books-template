@@ -14,12 +14,15 @@ from urllib.parse import urlencode
 
 PAGES_PUSH_TITLE = "Publish Pages for "
 PAGES_SCHEDULER_TITLE = "Select a Pages update"
+PAGES_REFRESH_TITLE = "Refresh trureturing on Pages"
 
 
 def pages_producer(run):
     title = run.get("display_title", "")
     if run.get("event") == "push":
         return not title.startswith(PAGES_PUSH_TITLE) or int(run.get("run_attempt", 1)) > 1
+    if run.get("event") == "schedule":
+        return title == PAGES_REFRESH_TITLE
     return run.get("event") in ("workflow_dispatch", "workflow_run") and title != PAGES_SCHEDULER_TITLE
 
 

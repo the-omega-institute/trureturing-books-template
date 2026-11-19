@@ -1,14 +1,17 @@
 """Choose the latest tested main commit within the Pages deployment cadence."""
 from datetime import datetime, timedelta, timezone
 import argparse
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from ci.plan import Tree, ancestor, api, changed_paths, git, impact
 from ci.trusted_cache import PAGES_PUSH_TITLE
+from tbook import config, lean, pin
 
 
 INTERVAL = timedelta(minutes=20)
@@ -46,6 +49,47 @@ def push_runs(repo, branch, workflow, get, **filters):
             and (run.get("head_repository") or {}).get("full_name") == repo]
 
 
+def follows_branch(site):
+    enabled = site.raw.get("trureturing", {}).get("pages_follow_branch", False)
+    if not isinstance(enabled, bool):
+        raise ValueError("site.toml: trureturing.pages_follow_branch must be a boolean")
+    return enabled
+
+
+def live_trureturing(url):
+    # A cached copy could mask a new deployment. This endpoint is only used to
+    # detect changes; the pin is always resolved against the upstream repository.
+    req = Request(url.rstrip("/") + "/manifest.json", headers={"Cache-Control": "no-cache"})
+    with urlopen(req, timeout=30) as response:
+        return json.load(response).get("trureturing") or {}
+
+
+def refresh_due(repo, branch, head, now, get=api):
+    live, last_attempt = deployment_window(repo, now, get)
+    if live != head or (last_attempt and now - last_attempt < INTERVAL):
+        return False
+    return any(run["head_sha"] == head and run["status"] == "completed" and run["conclusion"] == "success"
+               for run in push_runs(repo, branch, "ci", get, status="success", head_sha=head))
+
+
+def prepare_snapshot(site, repo, branch, head, *, refresh=False, get=api, read_live=live_trureturing):
+    """Write the lock used by all Pages jobs and return its immutable commit."""
+    if not follows_branch(site):
+        return ""
+    if refresh and not refresh_due(repo, branch, head, datetime.now(timezone.utc), get):
+        return ""
+    target = lean.ls_remote(site.trureturing_repo, f"refs/heads/{site.trureturing_branch}")
+    if refresh:
+        url = get(f"repos/{repo}/pages")["html_url"]
+        if read_live(url) == dict(repo=site.trureturing_repo, branch=site.trureturing_branch, commit=target):
+            return ""
+    report = pin.pin(target)
+    print(report.markdown())
+    if not report.written:
+        raise ValueError(f"cannot publish with trureturing at {target}")
+    return target
+
+
 def select(root, repo, branch, head, now, get=api):
     live, last_attempt = deployment_window(repo, now, get)
     if last_attempt and now - last_attempt < INTERVAL:
@@ -74,8 +118,15 @@ def select(root, repo, branch, head, now, get=api):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("schedule", "verify"))
+    parser.add_argument("operation", choices=("schedule", "verify", "snapshot", "refresh"))
     args = parser.parse_args()
+    if args.operation == "snapshot" or args.operation == "refresh":
+        commit = prepare_snapshot(config.load_site(), os.environ["GITHUB_REPOSITORY"],
+                                  os.environ["DEFAULT_BRANCH"], os.environ["GITHUB_SHA"],
+                                  refresh=args.operation == "refresh")
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write(f"commit={commit}\n")
+        return
     repo = os.environ["GITHUB_REPOSITORY"]
     branch = os.environ["DEFAULT_BRANCH"]
     root = Path.cwd()

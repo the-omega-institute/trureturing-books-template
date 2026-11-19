@@ -11,6 +11,7 @@
 name: Pages
 run-name: >-
   ${{ github.event_name == 'push' && format('Publish Pages for {0}', github.sha) ||
+      github.event.schedule == '17 5 * * *' && 'Refresh trureturing on Pages' ||
       github.event_name == 'workflow_dispatch' && 'Pages' || 'Select a Pages update' }}
 
 on:
@@ -18,6 +19,7 @@ on:
     branches: [main]
   schedule:
     - cron: '4-59/5 * * * *'
+    - cron: '17 5 * * *' # Refresh the upstream branch for the already published book revision.
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -36,7 +38,7 @@ permissions:
 
 concurrency:
   group: >-
-    ${{ (github.event_name == 'workflow_run' || github.event_name == 'schedule') && 'pages-scheduler' ||
+    ${{ (github.event_name == 'workflow_run' || (github.event_name == 'schedule' && github.event.schedule != '17 5 * * *')) && 'pages-scheduler' ||
         (github.event_name == 'push' && github.run_attempt == 1) && format('pages-register-{0}', github.sha) || 'pages' }}
   cancel-in-progress: false
 
@@ -55,7 +57,7 @@ jobs:
   schedule:
     name: Select a verified Pages update
     if: >-
-      github.event_name == 'schedule' ||
+      (github.event_name == 'schedule' && github.event.schedule != '17 5 * * *') ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
@@ -76,12 +78,13 @@ jobs:
         run: PYTHONPATH=tools python3 -m ci.pages_schedule schedule
 
   plan:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.run_attempt > 1)
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.run_attempt > 1) || github.event.schedule == '17 5 * * *'
     name: Plan affected work
     permissions:
       contents: read
       actions: read
       deployments: read
+      pages: read
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -90,6 +93,7 @@ jobs:
       publish: ${{ steps.plan.outputs.publish }}
       films: ${{ steps.plan.outputs.films }}
       film_matrix: ${{ steps.plan.outputs.film_matrix }}
+      lock_artifact: ${{ steps.snapshot_artifact.outputs.artifact-id }}
     steps:
       - name: Check out the tested tree and complete history
         uses: actions/checkout@v5
@@ -102,14 +106,36 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: PYTHONPATH=tools python3 -m ci.pages_schedule verify
+      - name: Resolve the trureturing snapshot
+        if: github.event_name != 'push' || steps.eligible.outputs.publish == 'true'
+        id: snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          OPERATION: ${{ github.event_name == 'schedule' && 'refresh' || 'snapshot' }}
+        run: PYTHONPATH=tools python3 -m ci.pages_schedule "$OPERATION"
+      - name: Share the trureturing snapshot
+        if: steps.snapshot.outputs.commit != ''
+        id: snapshot_artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-pages-lock-${{ github.run_attempt }}
+          path: trureturing.lock.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Select before installing or downloading caches
-        if: github.event_name == 'workflow_dispatch' || steps.eligible.outputs.publish == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.eligible.outputs.publish == 'true' || steps.snapshot.outputs.commit != ''
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
           CI_WORKFLOW_REF: ${{ github.workflow_ref }}
           SELECTION_MODE: ${{ inputs.selection_mode || 'auto' }}
-        run: python3 tools/ci/plan.py --workflow pages
+          SNAPSHOT_COMMIT: ${{ steps.snapshot.outputs.commit }}
+        run: |
+          args=()
+          if [ -n "$SNAPSHOT_COMMIT" ]; then args+=(--pages-lock trureturing.lock.json); fi
+          python3 tools/ci/plan.py --workflow pages "${args[@]}"
 
   probe:
     needs: plan
@@ -164,6 +190,12 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - name: Restore the trureturing snapshot
+        if: needs.plan.outputs.lock_artifact != ''
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: ${{ needs.plan.outputs.lock_artifact }}
+          merge-multiple: true
       - name: Set up film tools
         uses: ./.github/actions/setup
         with:
@@ -221,6 +253,12 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - name: Restore the trureturing snapshot
+        if: needs.plan.outputs.lock_artifact != ''
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: ${{ needs.plan.outputs.lock_artifact }}
+          merge-multiple: true
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -264,7 +302,7 @@ jobs:
         run: python3 tools/ci/cache_store.py merge --prefer-imported "$RUNNER_TEMP"/prepared-film-shards/*
 
       - name: Check
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || needs.plan.outputs.lock_artifact != ''
         env:
           # check asks GitHub's compare API whether the pinned trureturing commit is on the site.toml branch
           # (no trureturing checkout here); in GitHub Actions an unanswered question is an error.

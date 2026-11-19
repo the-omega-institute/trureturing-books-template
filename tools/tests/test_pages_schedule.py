@@ -3,7 +3,9 @@ from datetime import datetime, timedelta, timezone
 import subprocess
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from ci import pages_schedule, trusted_cache
@@ -52,6 +54,8 @@ class PagesScheduleTests(unittest.TestCase):
             return {"workflow_runs": self.ci}
         if path.endswith("/pages.yml/runs"):
             return {"workflow_runs": self.registrations.get(query["head_sha"][0], [])}
+        if path.endswith("/pages"):
+            return {"html_url": "https://books.example.org/"}
         self.fail(f"Unexpected endpoint: {endpoint}")
 
     def choose(self):
@@ -104,3 +108,37 @@ class PagesScheduleTests(unittest.TestCase):
         for event in ("schedule", "workflow_run"):
             self.assertFalse(trusted_cache.pages_producer(dict(
                 first, event=event, display_title=trusted_cache.PAGES_SCHEDULER_TITLE)))
+        self.assertTrue(trusted_cache.pages_producer(dict(
+            first, event="schedule", display_title=trusted_cache.PAGES_REFRESH_TITLE)))
+
+    def test_refresh_requires_the_live_book_commit_and_its_successful_push_ci(self):
+        self.assertFalse(pages_schedule.refresh_due(self.repo, "main", self.head, self.now, self.api))
+        self.assertFalse(pages_schedule.refresh_due(self.repo, "main", self.live, self.now, self.api))
+        self.ci.append(self.run_record(self.live))
+        self.assertTrue(pages_schedule.refresh_due(self.repo, "main", self.live, self.now, self.api))
+        self.statuses[1][0]["created_at"] = self.ago(19)
+        self.assertFalse(pages_schedule.refresh_due(self.repo, "main", self.live, self.now, self.api))
+
+    def test_refresh_pins_the_branch_head_only_when_the_live_snapshot_differs(self):
+        site = SimpleNamespace(raw={"trureturing": {"pages_follow_branch": True}},
+                               trureturing_repo="owner/trureturing", trureturing_branch="dev")
+        target = "a" * 40
+        live_manifest = dict(repo=site.trureturing_repo, branch="dev", commit=target)
+
+        def prepare():
+            return pages_schedule.prepare_snapshot(site, self.repo, "main", self.live,
+                                                   refresh=True, get=self.api, read_live=lambda _: live_manifest)
+
+        with (patch.object(pages_schedule, "refresh_due", return_value=True),
+              patch.object(pages_schedule.lean, "ls_remote", return_value=target) as resolve,
+              patch.object(pages_schedule.pin, "pin") as pin):
+            self.assertEqual(prepare(), "")
+            pin.assert_not_called()
+            live_manifest["commit"] = "b" * 40
+            pin.return_value = SimpleNamespace(written=True, markdown=lambda: "pin report")
+            self.assertEqual(prepare(), target)
+            resolve.assert_called_with("owner/trureturing", "refs/heads/dev")
+            pin.assert_called_once_with(target)
+            pin.return_value.written = False
+            with self.assertRaisesRegex(ValueError, "cannot publish"):
+                prepare()
