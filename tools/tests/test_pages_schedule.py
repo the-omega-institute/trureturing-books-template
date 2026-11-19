@@ -20,6 +20,8 @@ class PagesScheduleTests(unittest.TestCase):
         self.git("init", "-qb", "main")
         self.shas = []
         for name in ("live", "eligible", "newer", "head"):
+            (self.root / "site.toml").write_text(f'# {name}\n')
+            self.git("add", "site.toml")
             self.git("-c", "user.name=Test", "-c", "user.email=test@example.org",
                      "commit", "--allow-empty", "-qm", name)
             self.shas.append(self.git("rev-parse", "HEAD"))
@@ -64,6 +66,18 @@ class PagesScheduleTests(unittest.TestCase):
             self.run_record(self.head, status="in_progress"),
         ])
         self.assertEqual(self.choose(), self.newer)
+
+    def test_compares_net_publication_inputs_with_live_site(self):
+        self.git("checkout", "-q", self.live, "--", "site.toml")
+        (self.root / "README.md").write_text("Engineering notes")
+        self.git("add", "README.md")
+        self.git("-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "revert site and document")
+        self.head = self.git("rev-parse", "HEAD")
+        self.ci.append(self.run_record(self.head))
+        self.registrations[self.head] = [self.run_record(self.head)]
+        self.assertIsNone(self.choose())
+        self.deployments.clear()
+        self.assertEqual(self.choose(), self.head, "the first site still needs a deployment")
 
     def test_cooldown_uses_success_time_and_counts_failed_deployments(self):
         self.statuses[1][0]["created_at"] = self.ago(19)

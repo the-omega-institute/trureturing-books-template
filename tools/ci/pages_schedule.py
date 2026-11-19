@@ -7,7 +7,7 @@ import re
 import subprocess
 from urllib.parse import urlencode
 
-from ci.plan import ancestor, api, git
+from ci.plan import Tree, ancestor, api, changed_paths, git, impact
 from ci.trusted_cache import PAGES_PUSH_TITLE
 
 
@@ -64,6 +64,10 @@ def select(root, repo, branch, head, now, get=api):
         for run in push_runs(repo, branch, "pages", get, head_sha=sha):
             # Runs created under an earlier policy would replay its workflow on rerun.
             if run["head_sha"] == sha and run["display_title"] == PAGES_PUSH_TITLE + sha:
+                if live:
+                    changes = changed_paths(root, live, sha)
+                    if not changes or not impact(Tree(root, sha), Tree(root, live), changes)["site"]:
+                        return None
                 return run
     return None
 

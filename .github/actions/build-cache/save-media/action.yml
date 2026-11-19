@@ -1,0 +1,33 @@
+name: Save prepared media
+description: Save a changed video or image inventory from a default-branch producer.
+inputs:
+  target:
+    description: Build-cache target (films or viz-stills).
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Identify the current media inventory
+      id: inventory
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        key="$(python3 tools/ci/cache_store.py media-key "$TARGET")"
+        echo "key=$key" >> "$GITHUB_OUTPUT"
+        echo "prefix=${key%-*}-" >> "$GITHUB_OUTPUT"
+    - name: Look up the newest media cache without downloading it
+      id: latest
+      if: steps.inventory.outputs.key != ''
+      uses: actions/cache/restore@v5
+      with:
+        path: .cache/artifacts/${{ inputs.target }}
+        lookup-only: true
+        key: ${{ steps.inventory.outputs.prefix }}lookup
+        restore-keys: ${{ steps.inventory.outputs.prefix }}
+    - name: Save changed inventory
+      if: steps.inventory.outputs.key != '' && !startsWith(steps.latest.outputs.cache-matched-key, format('{0}-r', steps.inventory.outputs.key))
+      uses: actions/cache/save@v5
+      with:
+        path: .cache/artifacts/${{ inputs.target }}
+        key: ${{ steps.inventory.outputs.key }}-r${{ github.run_id }}-${{ github.run_attempt }}

@@ -27,6 +27,22 @@ class CacheStoreTest(unittest.TestCase):
         buildcache.store(unit)
         return unit
 
+    def test_media_key_tracks_only_its_target(self):
+        with Scratch() as scratch:
+            self.assertEqual(cache_store.media_key("films"), "")
+            out = scratch.root / "build/video.mp4"
+            write(out, "movie")
+            def store_video(title):
+                buildcache.store(buildcache.Unit("films", "book/movie", buildcache.Inputs().text("title", title), [out]))
+            store_video("first")
+            first = cache_store.media_key("films")
+            self.assertRegex(first, r"^film-cache-v1-[a-f0-9]{64}$")
+            self.store(scratch.root)
+            self.assertEqual(cache_store.media_key("films"), first)
+            self.assertEqual(cache_store.media_key("viz-stills"), "")
+            store_video("second")
+            self.assertNotEqual(cache_store.media_key("films"), first)
+
     def test_only_added_verified_entries_are_exported(self):
         with Scratch() as s:
             before = self.store(s.root)
@@ -191,6 +207,16 @@ class CacheStoreTest(unittest.TestCase):
 
 
 class CacheTransferWorkflowTest(unittest.TestCase):
+    def test_action_cache_miss_uses_a_verified_artifact_for_pr_main_and_release(self):
+        steps = action_steps("build-cache")
+        lookup = next(step for step in steps if step.get("id") == "trusted")
+        for event, ref in (("push", "refs/heads/main"), ("push", "refs/tags/v1"), ("pull_request", "refs/pull/1/merge")):
+            for film, store in (("", ""), ("film-cache-v1-123", ""), ("", "build-cache-v1-123")):
+                context = {"inputs.mode": "restore", "steps.film-restore.outputs.cache-matched-key": film,
+                           "steps.restore.outputs.cache-matched-key": store}
+                self.assertEqual(gha_if(lookup["if"], event=event, ref=ref, context=context), not (film or store))
+        self.assertIn("trusted_cache.py", lookup["run"])
+
     def test_complete_publishers_merge_the_independent_inventory(self):
         for workflow, job in (("ci.yml", "check"), ("pages.yml", "build"),
                               ("release.yml", "build"), ("template-release.yml", "site")):
@@ -233,8 +259,8 @@ class CacheTransferWorkflowTest(unittest.TestCase):
             merge = next(s for s in producer if "cache_store.py merge" in s.get("run", ""))
             self.assertIn("--prefer-imported", merge["run"])
             publish = next(s for s in producer if s.get("with", {}).get("name") == "tbook-film-store")
-            save = next(s for s in producer if s.get("with", {}).get("key", "").startswith("film-cache-v1-"))
-            self.assertEqual(save["with"]["path"], ".cache/artifacts/films")
+            save = next(s for s in producer if s.get("uses") == "./.github/actions/build-cache/save-media"
+                        and s["with"]["target"] == "films")
             self.assertEqual(publish["with"]["path"], ".cache/artifacts/films")
             context = {"steps.verified.outcome": "success", "needs.plan.outputs.films": "true",
                        "steps.cache-merge.outputs.entries": "1"}

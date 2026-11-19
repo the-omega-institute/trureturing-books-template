@@ -29,7 +29,11 @@ jobs:
     if: github.repository == 'the-omega-institute/trureturing-books-template'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     outputs:
+      verified_ci: ${{ steps.ci.outputs.run_id }}
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
@@ -71,9 +75,26 @@ jobs:
       - name: Manifest is up to date
         run: ./tbook template manifest --check
 
+      - name: Find successful default-branch CI for the tagged commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          if run_id="$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch="$DEFAULT_BRANCH" -f event=push -f head_sha="$sha" -f status=success \
+            --jq '.workflow_runs[] | select(.status == "completed" and .conclusion == "success" and
+                  .event == "push" and .head_repository.full_name == env.GITHUB_REPOSITORY and
+                  .head_branch == env.DEFAULT_BRANCH) | .id' | head -n 1)" && [[ -n "$run_id" ]]; then
+            echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+            echo "Using successful CI run $run_id for $sha." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   ci:
     name: CI
     needs: verify
+    if: needs.verify.outputs.verified_ci == ''
     # What ci.yml's jobs ask for (actions/configure-pages reads the Pages configuration); a called
     # workflow gets no more than its caller grants.
     permissions:
@@ -118,7 +139,7 @@ jobs:
           pages-url: ${{ steps.pages.outputs.base_url }}
 
       - name: Build everything
-        # ./tbook check runs in the job ci.
+        # The tagged tree is verified by default-branch CI or the called CI workflow.
         env:
           TBOOK_CACHE_REMOTE: '1'
           GITHUB_TOKEN: ${{ github.token }}
@@ -139,6 +160,9 @@ jobs:
   publish:
     name: Create the GitHub release
     needs: [verify, ci, site]
+    if: >-
+      !cancelled() && needs.verify.result == 'success' && needs.site.result == 'success' &&
+      (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.verify.outputs.verified_ci != ''))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

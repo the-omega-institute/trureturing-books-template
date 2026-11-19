@@ -608,15 +608,88 @@ class AffectedPlanTest(unittest.TestCase):
         self.assertEqual(selected(planner.Tree(self.root, self.commit()), [prefix + "zh/chapter.md"]), ["one/a"])
 
     def test_format_theme_and_test_changes_have_independent_consumers(self):
+        self.write("books/one/slides/a/deck.toml", 'kind="academic"\n')
+        self.commit()
         tree = planner.Tree(self.root, "HEAD")
-        for path, targets in (("theme/mdbook/head.hbs", {"html"}), ("theme/epub/book.css", {"epub"}),
-                              ("books/one/viz/tests/a.test.mjs", set()), ("theme/site/site.css", set())):
+        for path, targets, decks in (
+            ("theme/mdbook/head.hbs", {"html"}, []),
+            ("theme/epub/book.css", {"epub"}, []),
+            ("theme/typst/book.typ", {"pdf"}, []),
+            ("theme/typst/pandoc-template.typst", {"pdf"}, []),
+            ("theme/typst/cover.typ", {"pdf", "epub"}, []),
+            ("theme/typst/fonts/custom/font.otf", {"pdf", "epub"}, ["one/a"]),
+            ("theme/typst/nested/unused.typ", set(), []),
+            ("tools/filters/tr-book.lua", {"pdf", "epub"}, []),
+            ("theme/beamer/beamerthemeTBookAcademic.sty", set(), ["one/a"]),
+            ("theme/slides/styles/deck.css", set(), ["one/b", "two/a", "two/b"]),
+            ("books/one/viz/tests/a.test.mjs", set(), []),
+            ("theme/site/site.css", set(), []),
+            ("theme/site/site.js", set(), []),
+        ):
             with self.subTest(path=path):
                 selected = planner.impact(tree, tree, [path])
                 self.assertEqual({v["target"] for v in selected["exports"]}, targets)
+                self.assertEqual(selected["slides"], decks)
                 self.assertEqual(selected["site"], "/tests/" not in path)
                 if "/tests/" in path:
                     self.assertIn(path, selected["suites"])
+                    self.assertFalse(selected["checks"]["slides_static"])
+
+    def test_publication_keeps_custom_book_test_readers_from_both_trees(self):
+        path = "books/one/viz/tests/a.test.mjs"
+        clean = planner.Tree(self.root, self.base)
+        self.write("books/one/slides/a/slides.md", "[Fixture](../../viz/tests/a.test.mjs)\n")
+        slides = planner.Tree(self.root, self.commit())
+        self.assertEqual(planner.impact(slides, clean, [path])["slides"], ["one/a"])
+        self.assertEqual(planner.impact(slides, clean, [path])["exports"], [])
+        self.write("books/one/zh/chapter.md", "[Fixture](../viz/tests/a.test.mjs)\n")
+        book = planner.Tree(self.root, self.commit())
+        for current, previous in ((book, clean), (clean, book)):
+            result = planner.impact(current, previous, [path])
+            self.assertEqual({item["book"] for item in result["exports"]}, {"one"})
+            self.assertEqual(result["slides"], ["one/a"])
+            self.assertTrue(result["site"])
+
+    def test_release_and_cache_action_changes_select_direct_tests_and_declared_readers(self):
+        import json
+
+        paths = (".github/workflows/release.yml", ".github/workflows/template-release.yml",
+                 ".github/actions/build-cache/action.yml", ".github/actions/build-cache/helper.mjs")
+        expected = {
+            "test_ci_cache_store": ("CacheTransferWorkflowTest", "CacheStoreTest"),
+            "test_template": ("WorkflowTests", "OtherTemplateTest"),
+            "test_verification": ("BuildCacheWorkflowTests", "PullRequestCacheTests", "LockCheckTests"),
+            "test_hide": ("ReleasePlanTests", "OtherHideTest"),
+            "test_ci_transport": ("OtherPipelineTest",),
+            "test_container": ("ContainerTests",),
+        }
+        for module, classes in expected.items():
+            self.write(f"tools/tests/{module}.py", "import unittest\n" + "".join(
+                f"class {cls}(unittest.TestCase):\n    def test_ok(self): pass\n" for cls in classes))
+        deps = "books/one/viz/tests/dependencies.json"
+        data = json.loads((self.root / deps).read_text())
+        data["suites"]["a.test.mjs"] += list(paths)
+        self.write(deps, json.dumps(data))
+        old = planner.Tree(self.root, self.commit())
+        direct = {"test_ci_cache_store.CacheTransferWorkflowTest", "test_template.WorkflowTests",
+                  "test_verification.BuildCacheWorkflowTests", "test_verification.PullRequestCacheTests"}
+        for path in paths:
+            with self.subTest(path=path):
+                self.write(path, "name: Change\n")
+                head = planner.Tree(self.root, self.commit())
+                want = direct | ({"test_hide.ReleasePlanTests"} if path.endswith("/release.yml") else set())
+                for current, previous in ((head, old), (old, head)):
+                    selected = planner.impact(current, previous, [path])
+                    self.assertEqual(set(selected["unit_tests"]), want)
+                    self.assertEqual(selected["suites"], ["books/one/viz/tests/a.test.mjs"])
+                    for key in ("exports", "films", "slides", "browser_tests"):
+                        self.assertEqual(selected[key], [], key)
+                    self.assertFalse(selected["site"])
+                self.assertEqual(planner.signature(head, "runtime"), planner.signature(old, "runtime"))
+                old = head
+        self.write(".github/actions/setup/action.yml", "name: Changed setup\n")
+        self.assertNotEqual(planner.signature(planner.Tree(self.root, self.commit()), "runtime"),
+                            planner.signature(old, "runtime"))
 
     def test_lock_refresh_only_selects_films_using_the_changed_declaration(self):
         import json
@@ -756,7 +829,13 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assertEqual(result["films"], ["one/001-film", "two/001-film"] if solid else
                                  full["films"] if "i18n/" in path else [])
                 self.assertFalse(result["checks"]["unit"])
-                for key in ("exports", "books", "slides", "site"):
+                if path.startswith("theme/viz/"):
+                    self.assertEqual({item["target"] for item in result["exports"]}, {"pdf", "epub"})
+                    self.assertEqual(result["slides"], [])
+                else:
+                    self.assertEqual(result["exports"], full["exports"])
+                    self.assertEqual(result["slides"], full["slides"])
+                for key in ("books", "site"):
                     self.assertEqual(result[key], full[key], key)
 
     def test_shared_unknown_readers_span_books_and_both_summaries(self):
@@ -849,12 +928,8 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assertEqual(result["films"], [] if p.startswith(("theme/film/site/", "theme/slides/")) else full["films"])
                 self.assertFalse(result["checks"]["unit"])
                 self.assertTrue(result["site"])
-                if p == "theme/generated/tokens.mjs":
-                    self.assertEqual(result["exports"], full["exports"])
-                    self.assertEqual(result["slides"], full["slides"])
-                else:
-                    self.assertEqual(result["exports"], [])
-                    self.assertEqual(result["slides"], full["slides"] if p.startswith("theme/slides/") else [])
+                self.assertEqual(result["exports"], [])
+                self.assertEqual(result["slides"], full["slides"] if p.startswith("theme/slides/") else [])
                 self.assertEqual(result["books"], [] if p.startswith("theme/film/site/") else full["books"])
 
     def test_declared_shared_imports_and_implicit_object_imports_cover_future_members(self):

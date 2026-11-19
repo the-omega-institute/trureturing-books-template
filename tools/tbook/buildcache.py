@@ -300,16 +300,47 @@ def _python() -> str:
 
 
 def site_inputs(site: config.Site) -> Inputs:
-    """What every HTML, PDF and EPUB unit depends on: the tool and theme code (not the film pipeline in
-    theme/film/, which only films use), site settings, the lock file, the pinned packages, the site's
-    address (links and paths are built from it)."""
+    """Common edition inputs, including unclassified downstream theme resources."""
+    renderer_dirs = ("beamer", "epub", "film", "generated", "mdbook", "site", "slides", "typst", "viz")
     return (Inputs()
-            .files(paths.TOOLS / "tbook", paths.TOOLS / "filters", paths.TOOLS / "node", paths.TOOLS / "figkit", paths.THEME,
+            .files(paths.TOOLS / "tbook", paths.TOOLS / "node", paths.TOOLS / "figkit", paths.THEME,
                    paths.I18N_LOCAL, paths.SITE_TOML, paths.LOCK_FILE, paths.ROOT / "requirements.txt",
-                   paths.ROOT / "package-lock.json", exclude=("/theme/film/",))
+                   paths.ROOT / "package-lock.json", exclude=tuple(f"/theme/{d}/" for d in renderer_dirs))
             .text("base_url", site.base_url or "")
             .text("repo", site.repo or "")
             .text("python", _python()))
+
+
+def book_viz_test_reader(name: str, languages: Iterable[str], read: Callable[[], str], *, slides=False) -> bool:
+    """Whether a book source may consume its visualization test files."""
+    area = name.split("/", 1)[0]
+    suffix = Path(name).suffix
+    if slides:
+        if area == "slides" and suffix in {".js", ".mjs", ".cjs", ".ts", ".vue", ".sty", ".cls"}:
+            return True  # Local slide extensions can resolve imports or read files dynamically.
+        may_link = area == "slides" and suffix in {".md", ".tex", ".toml", ".css", ".html"}
+    else:
+        may_link = (area in languages and suffix == ".md") or name == "viz/visualizations.json"
+    if area == "figures" and suffix == ".py":
+        may_link = True
+    return may_link and bool(re.search(r"\btests/", urllib.parse.unquote(read()), re.IGNORECASE))
+
+
+def _book_inputs(book: config.Book, *, slides=False) -> Inputs:
+    """Keep the owning book's inputs, omitting the test tree unless a publication can read it."""
+    exclusion = f"/{_item_label(book.dir)}/viz/tests/"
+    files = _files_under(book.dir)
+    custom = getattr(book, "raw", {}).get("derived", {}).get("command") is not None
+    if not custom and any(exclusion in "/" + label for _, label in files):
+        for path, _ in files:
+            root = book.dir if path.is_relative_to(book.dir) else book.dir.resolve()
+            name = path.relative_to(root).as_posix()
+            if book_viz_test_reader(name, getattr(book, "languages", ()),
+                                    lambda: path.read_text(encoding="utf-8"), slides=slides):
+                custom = True
+                break
+    parts = [(label, file_digest(path)) for path, label in files if custom or exclusion not in "/" + label]
+    return Inputs(parts or [(_item_label(book.dir), "missing")])
 
 
 # --------------------------------------------------------------------------- units
@@ -343,7 +374,9 @@ class Unit:
 def html_unit(site: config.Site, book: config.Book, lang: str, out_dir: Path) -> Unit:
     from . import doctor
 
-    inputs = site_inputs(site).files(book.dir).text("mdbook", tool_version(doctor.mdbook_path() or ""))
+    inputs = (site_inputs(site).add(_book_inputs(book))
+              .files(paths.THEME / "mdbook", paths.GENERATED / "tokens.css")
+              .text("mdbook", tool_version(doctor.mdbook_path() or "")))
     return Unit("html", f"{book.slug}/{lang}", inputs.text("node", node_version()), [Path(out_dir)])
 
 
@@ -358,7 +391,7 @@ def _fonts() -> Inputs:
         families = sorted(pandoc._families(dirs))
     except Exception:  # noqa: BLE001 - no typst: the build fails on its own
         families = []
-    return Inputs().files(pandoc.FONT_CACHE).text("font families", families)
+    return Inputs().files(pandoc.FONT_CACHE, pandoc.THEME_FONTS).text("font families", families)
 
 
 def _pandoc_version() -> str:
@@ -377,7 +410,7 @@ def _dated(inputs: Inputs) -> Inputs:
 
 def pdf_unit(site: config.Site, book: config.Book, lang: str, variant: str, out_file: Path) -> Unit:
     source = typst_unit(site, book, lang, Path(out_file))
-    inputs = Inputs().text("typst source", source.key).add(_fonts())
+    inputs = Inputs().text("typst source", source.key).add(_staged_typst_theme()).add(_fonts())
     inputs.text("typst", series(package_version("typst")))
     return Unit("pdf", f"{book.slug}/{lang}/{variant}", _dated(inputs), [Path(out_file)])
 
@@ -412,30 +445,46 @@ def _publication_model_key(book: config.Book, lang: str, model: Any, inputs_key:
     return key
 
 
-def pandoc_unit(site: config.Site, book: config.Book, lang: str, out_dir: Path, *,
-                lock: Any = _DEFAULT_LOCK, model: Any = None) -> Unit:
-    """Variant-independent staging shared by all PDF variants and the EPUB of an edition.
-
-    Staging needs the renderer and Node, but no font discovery, Typst compilation or EPUB validation.
-    Those remain inputs of the final PDF/EPUB units.
-    """
+def _pandoc_inputs(site: config.Site, book: config.Book, lang: str, lock: Any, model: Any) -> Inputs:
+    """Inputs to the staged manuscript, media and metadata read by both converters."""
     from . import lean
 
     if lock is _DEFAULT_LOCK:
         lock = lean.Lock.load()
-    inputs = site_inputs(site).files(book.dir).text("node", node_version())
+    # Static visualizations use images captured from the visualization theme.
+    inputs = (site_inputs(site).add(_book_inputs(book))
+              .files(paths.THEME / "viz", paths.GENERATED / "tokens.css").text("node", node_version()))
     inputs.text("book settings", {k: v for k, v in vars(book).items() if k not in ("dir", "editions", "raw")})
     inputs.text("book raw metadata", json.dumps(book.raw, sort_keys=True, ensure_ascii=False, default=str))
     inputs.text("site metadata", [site.title, site.trureturing_repo, site.trureturing_branch])
     inputs.text("resolved lock", asdict(lock) if lock is not None else None)
     inputs.text("publication model", _publication_model_key(book, lang, model, inputs.key()))
-    return Unit("pandoc", f"{book.slug}/{lang}", _dated(inputs), [Path(out_dir)], relocatable=True, required=False)
+    return _dated(inputs)
+
+
+def is_staged_typst_asset(path: Path) -> bool:
+    """File types copied from the top level of theme/typst by pandoc._stage_theme."""
+    return path.suffix in {".typ", ".typst", ".tmTheme", ".svg", ".png"}
+
+
+def _staged_typst_theme() -> Inputs:
+    typst = paths.THEME / "typst"
+    files = sorted(p for p in typst.iterdir() if p.is_file() and is_staged_typst_asset(p)) if typst.is_dir() else []
+    return Inputs().files(paths.GENERATED / "tokens.typ", *files)
+
+
+def pandoc_unit(site: config.Site, book: config.Book, lang: str, out_dir: Path, *,
+                lock: Any = _DEFAULT_LOCK, model: Any = None) -> Unit:
+    """Cache the shared staging directory, including the Typst assets it copies."""
+    inputs = _pandoc_inputs(site, book, lang, lock, model).add(_staged_typst_theme())
+    return Unit("pandoc", f"{book.slug}/{lang}", inputs, [Path(out_dir)], relocatable=True, required=False)
 
 
 def typst_unit(site: config.Site, book: config.Book, lang: str, out_file: Path, *,
                lock: Any = _DEFAULT_LOCK, model: Any = None) -> Unit:
     """Pandoc's Typst source, converted once per edition and shared by all PDF variants."""
-    inputs = pandoc_unit(site, book, lang, Path(out_file).parent, lock=lock, model=model).inputs
+    inputs = (_pandoc_inputs(site, book, lang, lock, model)
+              .files(paths.THEME / "typst" / "pandoc-template.typst", paths.TOOLS / "filters"))
     inputs.text("pandoc", _pandoc_version())
     return Unit("typst", f"{book.slug}/{lang}", inputs, [Path(out_file)], relocatable=True, required=False)
 
@@ -460,11 +509,13 @@ def _epubcheck_mode() -> str:
 
 
 def epub_unit(site: config.Site, book: config.Book, lang: str, out_file: Path) -> Unit:
-    source = pandoc_unit(site, book, lang, Path(out_file).parent)
-    inputs = Inputs().text("pandoc stage", source.key).add(_fonts())
+    inputs = (_pandoc_inputs(site, book, lang, _DEFAULT_LOCK, None)
+              .files(paths.THEME / "epub" / "book.css", paths.THEME / "typst" / "cover.typ",
+                     paths.GENERATED / "tokens.typ", paths.TOOLS / "filters")
+              .add(_fonts()))
     inputs.text("pandoc", _pandoc_version()).text("typst", series(package_version("typst")))
     inputs.text("epubcheck", _epubcheck_mode())
-    return Unit("epub", f"{book.slug}/{lang}", _dated(inputs), [Path(out_file)])
+    return Unit("epub", f"{book.slug}/{lang}", inputs, [Path(out_file)])
 
 
 def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
@@ -474,9 +525,10 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
     checked in a browser (decks stored unchecked are not restored into a build that checks)."""
     from . import academic, slides
 
-    inputs = (Inputs()
-              .files(book.dir, paths.THEME / "slides", paths.TOKENS, paths.TOOLS / "figkit",
-                     paths.GENERATED, paths.I18N_THEME, paths.I18N_LOCAL, paths.TOOLS / "node",
+    decks = slides.deck_names(book)
+    academic_decks = [d for d in decks if academic.is_academic(book.slides_dir / d)]
+    inputs = (_book_inputs(book, slides=True)
+              .files(paths.TOKENS, paths.TOOLS / "figkit", paths.I18N_THEME, paths.I18N_LOCAL, paths.TOOLS / "node",
                      paths.TOOLS / "tbook" / "slides.py", paths.LOCK_FILE, paths.SITE_TOML,
                      paths.ROOT / "package-lock.json")
               .text("base", slides.base_path(site))
@@ -484,11 +536,11 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
               .text("no_pdf", os.environ.get("TBOOK_SLIDES_NO_PDF") == "1")
               .text("no_check", os.environ.get("TBOOK_SLIDES_NO_CHECK") == "1")
               .text("node", node_version()))
-    academic_decks = [d for d in slides.deck_names(book) if academic.is_academic(book.slides_dir / d)]
+    if len(decks) > len(academic_decks):
+        inputs.files(paths.THEME / "slides", paths.GENERATED / "tokens.css")
     if academic_decks:
-        inputs.files(book.dir, paths.THEME / "beamer", paths.TOOLS / "tbook",
-                     paths.TOKENS, paths.ROOT / "requirements.txt", paths.TOOLS / "install-tectonic.sh",
-                     paths.THEME / "typst" / "fonts").add(_fonts())
+        inputs.files(paths.THEME / "beamer", paths.TOOLS / "tbook",
+                     paths.ROOT / "requirements.txt", paths.TOOLS / "install-tectonic.sh").add(_fonts())
         inputs.text("tectonic", academic.ENGINE_VERSION).text("bundle", academic.BUNDLE)
         inputs.text("epoch", os.environ.get("SOURCE_DATE_EPOCH", academic.EPOCH))
         inputs.text("typst", package_version("typst"))

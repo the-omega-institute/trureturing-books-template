@@ -260,16 +260,80 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(len({checked, no_java, no_package, off}), 4)
         self.assertEqual(off, "off")
 
-    def test_book_units_do_not_depend_on_the_film_pipeline(self):
-        with Scratch() as s:
-            write(s.root / "theme" / "mdbook" / "book.css", "a")
-            write(s.root / "theme" / "film" / "render.js", "1")
-            site = SimpleNamespace(repo="o/r", base_url="https://o.github.io/r/")
-            k1 = buildcache.site_inputs(site).key()
-            write(s.root / "theme" / "film" / "render.js", "2")
-            self.assertEqual(buildcache.site_inputs(site).key(), k1)
-            write(s.root / "theme" / "mdbook" / "book.css", "b")
-            self.assertNotEqual(buildcache.site_inputs(site).key(), k1)
+    def test_publication_units_hash_the_theme_files_they_consume(self):
+        from tbook import pandoc
+
+        changes = {
+            "theme/site/site.css": set(),
+            "theme/site/site.js": set(),
+            "theme/mdbook/tr-book.css": {"html"},
+            "theme/epub/book.css": {"epub"},
+            "theme/typst/book.typ": {"pandoc", "pdf"},
+            "theme/typst/pandoc-template.typst": {"pandoc", "typst", "pdf"},
+            "theme/typst/cover.typ": {"pandoc", "pdf", "epub"},
+            "theme/typst/fonts/nested/a.otf": {"pdf", "epub"},
+            "theme/typst/nested/unused.typ": set(),
+            "theme/generated/tokens.typ": {"pandoc", "pdf", "epub"},
+            "theme/generated/tokens.css": {"html", "pandoc", "typst", "pdf", "epub", "slides"},
+            "theme/generated/tokens.mjs": set(),
+            "tools/filters/tr-book.lua": {"typst", "pdf", "epub"},
+            "theme/slides/styles/deck.css": {"slides"},
+            "theme/film/render.js": set(),
+            "theme/custom/layout.css": {"html", "pandoc", "typst", "pdf", "epub"},
+        }
+        with Scratch(git_repo=True) as s, ExitStack() as mocks:
+            for name, value in (("TOKENS", "theme/tokens.json"), ("GENERATED", "theme/generated"),
+                                ("I18N_THEME", "theme/i18n")):
+                mocks.enter_context(mock.patch.object(paths, name, s.root / value))
+            for name in ("node_version", "tool_version", "_pandoc_version", "package_version", "_epubcheck_mode"):
+                mocks.enter_context(mock.patch.object(buildcache, name, return_value="test"))
+            mocks.enter_context(mock.patch.object(pandoc, "THEME_FONTS", s.root / "theme/typst/fonts"))
+            mocks.enter_context(mock.patch.object(pandoc, "_families", return_value=[]))
+            for name in changes:
+                write(s.root / name, "before")
+            book_dir = s.root / "books/demo"
+            book_toml = write(book_dir / "book.toml", '[book]\ntitle="Demo"\neditions=["en"]\n')
+            write(book_dir / "en/SUMMARY.md", "# Summary\n\n- [Chapter](chapter.md)\n")
+            chapter = write(book_dir / "en/chapter.md", "# Chapter\n")
+            write(book_dir / "slides/intro/slides.md", "# Slides\n")
+            test_path = write(book_dir / "viz/tests/demo.test.mjs", "before")
+            write(s.root / "site.toml", '[site]\nrepo="owner/books"\n')
+            site = config.load_site()
+            out = s.root / "build/out"
+
+            def keys():
+                book = config.load_book("demo")
+                units = [
+                    buildcache.html_unit(site, book, "en", out),
+                    buildcache.pandoc_unit(site, book, "en", out),
+                    buildcache.typst_unit(site, book, "en", out),
+                    buildcache.pdf_unit(site, book, "en", "screen", out),
+                    buildcache.epub_unit(site, book, "en", out),
+                    buildcache.slides_unit(site, book, out),
+                ]
+                return {unit.target: unit.key for unit in units}
+
+            def assert_change(path, expected):
+                before = keys()
+                path.write_text(path.read_text() + " changed")
+                after = keys()
+                self.assertEqual({target for target in before if before[target] != after[target]}, expected)
+
+            for name, expected in changes.items():
+                with self.subTest(path=name):
+                    assert_change(s.root / name, expected)
+            assert_change(test_path, set())
+            write(book_dir / "slides/intro/slides.md", "# Slides\n\n[Fixture](../../viz/tests/demo.test.mjs)\n")
+            assert_change(test_path, {"slides"})
+            write(chapter, "# Chapter\n\n[Fixture](../viz/tests/demo.test.mjs)\n")
+            assert_change(test_path, set(keys()))
+            write(chapter, "# Chapter\n")
+            write(book_dir / "slides/intro/slides.md", "# Slides\n")
+            write(chapter, "# Chapter\n\n[Fixture](../viz/%74ests/demo.test.mjs)\n")
+            assert_change(test_path, set(keys()) - {"slides"})
+            write(chapter, "# Chapter\n")
+            write(book_toml, book_toml.read_text() + '\n[derived]\ncommand=["python3", "generate.py"]\n')
+            assert_change(test_path, set(keys()))
 
 
 # --------------------------------------------------------------------------- the local store
