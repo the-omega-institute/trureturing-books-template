@@ -49,7 +49,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 
 ### Pages 跟随上游分支
 
-在 `site.toml` 的 `[trureturing]` 中设置 `pages_follow_branch = true` 后，每次 Pages 发布都会解析该节配置的 `branch`。每天 05:17 UTC 另查一次上游。若当前主干是已通过 CI 的线上版本，且线上 `manifest.json` 记录的上游提交有变化，就用同一书稿提交再次部署。每次发布先生成一份解析后的锁文件，再由影片分片和站点组装共用。解析或检查失败时保留线上版本。新站点的第一次部署由主干更新或手动发布触发。
+在 `site.toml` 的 `[trureturing]` 中设置 `pages_follow_branch = true` 后，每次 Pages 发布都会解析该节配置的 `branch`。每天 05:17 UTC 另查一次上游。若当前主干已通过 CI、包含线上书稿提交，且线上 `manifest.json` 记录的上游提交有变化，就重新部署。每次发布先生成一份解析后的锁文件，再由影片分片和站点组装共用。解析或检查失败时保留线上版本。新站点的第一次部署由主干更新或手动发布触发。
 
 书稿 PR、本地构建和标签发布仍使用仓库中的 `trureturing.lock.json`。启用跟随模式后，定时 bump PR 停止，作者需要更新仓库锁文件时可运行 `./tbook pin` 或手动触发 `trureturing bump`。每次 Pages 发布使用的 SHA 可在其 `manifest.json` 的 `trureturing.commit` 查到。
 

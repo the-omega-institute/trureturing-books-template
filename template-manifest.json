@@ -120,7 +120,7 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "eb6eb716592ffaafca8582239db40f8200aa6f57db1dda8d1cfc320975c4718f",
+      "sha256": "ca00e1ea8536cff4ee7ed62f5a163be1e76584c9a9fe6582bd3ebbe850b4bab6",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
@@ -568,7 +568,7 @@
       "mode": "100644"
     },
     "tools/ci/pages_schedule.py": {
-      "sha256": "b5c3e2c554ef03710b17b6c3e51914eaf9c5b8ccd6bf4cfa7ba05262c161adb1",
+      "sha256": "48ae11e5ab4b211aba45f4fb7d0863266a6e30807398ee68da7c9e065205bd2e",
       "mode": "100644"
     },
     "tools/ci/plan.py": {
@@ -1028,7 +1028,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pages_schedule.py": {
-      "sha256": "afabc1aa261e56f1117297c779dc60198a2342d4bc69dd4b0aed4f6a664cd337",
+      "sha256": "dc821ab8cdc4b0cfe4b949c2ea36532a38b3557740cd5a6305794ebe9d46c86e",
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {

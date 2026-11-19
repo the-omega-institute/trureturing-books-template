@@ -64,9 +64,11 @@ def live_trureturing(url):
         return json.load(response).get("trureturing") or {}
 
 
-def refresh_due(repo, branch, head, now, get=api):
+def refresh_due(root, repo, branch, head, now, get=api):
     live, last_attempt = deployment_window(repo, now, get)
-    if live != head or (last_attempt and now - last_attempt < INTERVAL):
+    if not live or (last_attempt and now - last_attempt < INTERVAL):
+        return False
+    if not re.fullmatch(r"[a-f0-9]{40}", live) or not ancestor(root, live, head):
         return False
     return any(run["head_sha"] == head and run["status"] == "completed" and run["conclusion"] == "success"
                for run in push_runs(repo, branch, "ci", get, status="success", head_sha=head))
@@ -76,7 +78,7 @@ def prepare_snapshot(site, repo, branch, head, *, refresh=False, get=api, read_l
     """Write the lock used by all Pages jobs and return its immutable commit."""
     if not follows_branch(site):
         return ""
-    if refresh and not refresh_due(repo, branch, head, datetime.now(timezone.utc), get):
+    if refresh and not refresh_due(site.root, repo, branch, head, datetime.now(timezone.utc), get):
         return ""
     target = lean.ls_remote(site.trureturing_repo, f"refs/heads/{site.trureturing_branch}")
     if refresh:
