@@ -1112,7 +1112,8 @@ class PullRequestCacheTests(unittest.TestCase):
         when one triggers it, or when a workflow that one triggers calls it; and every workflow that can be called
         (workflow_call) is checked too, since a books repository may call it from its own pull-request workflow
         (lean-verify.yml's Lake and pip caches, re-review 4, item 1). So are the composite actions these workflows
-        use (.github/actions/setup, .github/actions/build-cache), for every value of their inputs."""
+        use (.github/actions/setup, .github/actions/build-cache, .github/actions/resolve-lock), for every
+        value of their inputs."""
         pr_events = set(PR_EVENTS)
         texts = {wf.name: wf.read_text(encoding="utf-8") for wf in self.WORKFLOWS.glob("*.yml")}
         todo = []
@@ -1152,7 +1153,7 @@ class PullRequestCacheTests(unittest.TestCase):
                     self.assertRegex(step, r"(?m)^\s+cache:\s*npm\s*$", name)
         self.assertIn("lean-verify.yml", seen)
         self.assertGreater(caches, 0, "ci.yml's .cache/trureturing step was examined")
-        self.assertEqual(actions, {"setup", "build-cache"})
+        self.assertEqual(actions, {"setup", "build-cache", "resolve-lock"})
         action_caches = 0
         for action in sorted(actions):
             for step in action_steps(action):
