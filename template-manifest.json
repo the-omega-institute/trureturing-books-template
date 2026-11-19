@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "e161a851c28729765287003ae53b034e1031ceb39612392072c75eb6990dc9df",
+      "sha256": "b3c78c0420bbf2b7c42d4d22107dca618b70b87d76c46492e22219d6a3023ad3",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -623,6 +623,10 @@
       "sha256": "9139a06fd0b910d0c1fd41db62decb56d425a2a9705af6ab45c8813eca3f0dcd",
       "mode": "100755"
     },
+    "tools/filters/epub-math.lua": {
+      "sha256": "efaee823fcc95730ad66e8176157afc1fa0f7551d24e07fd7641212fc5669a5f",
+      "mode": "100644"
+    },
     "tools/filters/tr-book.lua": {
       "sha256": "eb63e255a3f0fcf18eb3f2eded4a5fd44795c9c13adccc5ad3845e380a211fcf",
       "mode": "100644"
@@ -832,7 +836,7 @@
       "mode": "100644"
     },
     "tools/tbook/pandoc.py": {
-      "sha256": "5807185fee6dfaf02310b175d6c4e22788c4b277e72fadf2939b1bd03659f263",
+      "sha256": "8e73eb1a6697dcfa03f0724a6b78d052b417377b508b7bcdc0446e1be27df812",
       "mode": "100644"
     },
     "tools/tbook/paths.py": {
@@ -1040,7 +1044,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
-      "sha256": "ef03af15543ad2375a8920574dd828b36f72c1042599db099e1ed4642f90b32d",
+      "sha256": "b2bbaae88b8604cc177fd622624894dd10d9432264c6a3d51144379260f58f35",
       "mode": "100644"
     },
     "tools/tests/test_pdf_layout.py": {

@@ -204,6 +204,8 @@ def run_pandoc(args: list[str], *, cwd: Path, env: dict | None = None) -> str:
              if ln.strip() and not any(p.search(ln) for p in _PANDOC_NOISE) and not ln.startswith("  ")]
     if proc.returncode != 0:
         raise PandocError(f"pandoc failed ({proc.returncode}) in {paths.rel(cwd)}:\n{proc.stderr.strip()}")
+    if "--mathml" in args and "[WARNING] Could not convert TeX math" in proc.stderr:
+        raise PandocError(f"MathML conversion failed in {paths.rel(cwd)}:\n{proc.stderr.strip()}")
     for ln in lines:
         print(f"  pandoc: {ln}", file=sys.stderr)
     return proc.stdout
@@ -2070,7 +2072,7 @@ def build_epub(site, book, edition, model, lock, out_path: Path, *, stage_dir: P
         "--epub-cover-image", str(Path(extra["cover"]).relative_to(staged.dir)),
         "--css", "epub/book.css", "--metadata-file", "epub/metadata.json", "--syntax-highlighting", "none",
         "--resource-path", ".", "--wrap", "none",
-        *_filter_meta(edition.lang), *_filters(),
+        *_filter_meta(edition.lang), *_filters(), "--lua-filter", str(FILTERS / "epub-math.lua"),
     ]
     for font in extra["fonts"]:
         args += ["--epub-embed-font", str(font)]
