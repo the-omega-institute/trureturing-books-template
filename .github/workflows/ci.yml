@@ -797,10 +797,9 @@ jobs:
           github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
           steps.cache-merge.outputs.entries != '' && steps.cache-merge.outputs.entries != '0'
-        uses: actions/cache/save@v5
+        uses: ./.github/actions/build-cache/save-media
         with:
-          path: .cache/artifacts/films
-          key: film-cache-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          target: films
 
       - name: Publish reusable films for pull requests
         if: >-
@@ -822,10 +821,9 @@ jobs:
           steps.verified.outcome == 'success' && needs.plan.outputs.stills == 'true' &&
           github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
-        uses: actions/cache/save@v5
+        uses: ./.github/actions/build-cache/save-media
         with:
-          path: .cache/artifacts/viz-stills
-          key: image-cache-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          target: viz-stills
       - name: Publish reusable visualization images
         if: >-
           steps.verified.outcome == 'success' && needs.plan.outputs.stills == 'true' &&

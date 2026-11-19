@@ -10,6 +10,7 @@ keys or needs the publishing toolchain (in particular, the runner's font familie
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -177,6 +178,16 @@ def merge(root: Path, sources: list[Path], *, prefer_imported=False) -> int:
     return maintain(root, preferred=preferred)
 
 
+def media_key(target: str) -> str:
+    """Identify the prepared media inventory independently of unrelated units and run ids."""
+    keys = [(unit, key) for kind, unit, key, _ in buildcache.stored() if kind == target]
+    if not keys:
+        return ""
+    digest = hashlib.sha256(json.dumps(keys, separators=(",", ":")).encode()).hexdigest()
+    prefix = {"films": "film-cache-v1", "viz-stills": "image-cache-v1"}[target]
+    return f"{prefix}-{digest}"
+
+
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", type=Path, default=buildcache.store_root())
@@ -190,9 +201,14 @@ def main(argv=None) -> None:
     p = sub.add_parser("merge")
     p.add_argument("sources", nargs="*", type=Path)
     p.add_argument("--prefer-imported", action="store_true", help="retain current shard keys before older baseline keys")
+    key = sub.add_parser("media-key")
+    key.add_argument("target", choices=("films", "viz-stills"))
     sub.add_parser("maintain")
     args = parser.parse_args(argv)
     try:
+        if args.command == "media-key":
+            print(media_key(args.target))
+            return
         if args.command == "snapshot":
             count = snapshot(args.store, args.file)
         elif args.command == "export":

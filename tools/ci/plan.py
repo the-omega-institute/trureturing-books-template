@@ -21,7 +21,7 @@ import zipfile
 
 # This constructor is dependency-free and shared with the actual video unit.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tbook import film_inputs, template as template_metadata
+from tbook import buildcache, film_inputs, template as template_metadata
 from ci import viz_budget, testing, trusted_cache
 
 VERSION = 6
@@ -30,6 +30,18 @@ DEPENDENCIES = "tbook-ci-dependencies-v1"
 MAX_FILM_SHARDS = 16
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 JOBS = ("validate", "browser", "stills", "build", "viz", "viz-slow", "media", "films")
+BUILD_CACHE_ACTION = ".github/actions/build-cache/"
+CACHE_WORKFLOW_TESTS = {
+    "test_ci_cache_store.CacheTransferWorkflowTest",
+    "test_template.WorkflowTests",
+    "test_verification.BuildCacheWorkflowTests",
+    "test_verification.PullRequestCacheTests",
+}
+SCOPED_WORKFLOW_TESTS = {
+    BUILD_CACHE_ACTION: CACHE_WORKFLOW_TESTS,
+    ".github/workflows/release.yml": CACHE_WORKFLOW_TESTS | {"test_hide.ReleasePlanTests"},
+    ".github/workflows/template-release.yml": CACHE_WORKFLOW_TESTS,
+}
 
 
 def git(root, *args):
@@ -393,6 +405,64 @@ def adopt_unchanged_summaries(current, previous, now, old):
                 prior["deps"][suite] = deps
 
 
+def select_tests(current, previous, paths, *, full):
+    scoped = {p: SCOPED_WORKFLOW_TESTS[BUILD_CACHE_ACTION if p.startswith(BUILD_CACHE_ACTION) else p]
+              for p in paths if p.startswith(BUILD_CACHE_ACTION) or p in SCOPED_WORKFLOW_TESTS}
+    if full or not scoped:
+        return testing.select(current, previous, paths, full=full)
+    selected = testing.select(current, previous, set(paths) - scoped.keys())
+    direct = set().union(*scoped.values())
+    # The shared selector accepts source paths. Feed it the direct test modules,
+    # then keep only the classes that actually read the workflow or action.
+    sources = {f"tools/tests/{test.split('.')[0]}.py" for test in direct}
+    available = testing.select(current, previous, sources)
+    for kind in selected:
+        selected[kind] = sorted(set(selected[kind]) | (set(available[kind]) & direct))
+    return selected
+
+
+def publication_theme_readers(path):
+    """Export formats and deck kinds for theme resources with known consumers."""
+    prefix, _, name = path.rpartition("/")
+    if path.startswith("theme/typst/fonts/") or path == "theme/typst/fonts.sha256":
+        return {"pdf", "epub"}, {"academic"}
+    if prefix == "theme/typst" and buildcache.is_staged_typst_asset(PurePosixPath(name)):
+        return ({"pdf", "epub"} if name == "cover.typ" else {"pdf"}), set()
+    if path == "theme/generated/tokens.typ":
+        return {"pdf", "epub"}, set()
+    if path == "theme/generated/tokens.css":
+        return {"html", "pdf", "epub"}, {"slidev", "academic"}
+    if path.startswith("theme/viz/"):
+        return {"pdf", "epub"}, {"academic"}
+    for directory, formats, decks in (
+        ("theme/mdbook/", {"html"}, set()), ("theme/epub/", {"epub"}, set()),
+        ("theme/beamer/", set(), {"academic"}), ("theme/slides/", set(), {"slidev"}),
+        ("theme/site/", set(), set()), ("theme/film/", set(), set()),
+        ("tools/filters/", {"pdf", "epub"}, set()),
+    ):
+        if path.startswith(directory):
+            return formats, decks
+    if path == "theme/generated/tokens.mjs":
+        return set(), set()
+    return None
+
+
+def deck_kind(tree, deck):
+    slug, name = deck.split("/")
+    return "academic" if f"books/{slug}/slides/{name}/deck.toml" in tree.files else "slidev"
+
+
+def book_viz_test_reads(tree, slug, *, slides=False):
+    prefix = f"books/{slug}/"
+    raw = tree.toml(prefix + "book.toml")
+    if raw.get("derived", {}).get("command") is not None:
+        return True
+    languages = raw.get("book", {}).get("editions") or tree.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
+    return any(buildcache.book_viz_test_reader(path.removeprefix(prefix), languages,
+                                              lambda: tree.read(path), slides=slides)
+               for path in tree.files if path.startswith(prefix))
+
+
 def impact(current, previous, paths, *, full=False, template=False):
     now, old = inventory(current), inventory(previous) if previous else {}
     adopt_unchanged_summaries(current, previous, now, old)
@@ -438,6 +508,7 @@ def impact(current, previous, paths, *, full=False, template=False):
     if full:
         everything("full: explicit mode or unavailable comparable successful coverage")
     readers = []
+    test_readers = {}
     for tree, books in ((current, now), (previous, old)):
         if tree is not None and paths:
             readers.append((tree, books,
@@ -495,6 +566,9 @@ def impact(current, previous, paths, *, full=False, template=False):
             site = True
             reasons.add(f"publication workflow: {p}")
             continue
+        if p.startswith(BUILD_CACHE_ACTION) or p in SCOPED_WORKFLOW_TESTS:
+            reasons.add(f"workflow regression tests: {p}")
+            continue
         if p.startswith(".github/ISSUE_TEMPLATE/") or p in (
                 ".github/pull_request_template.md", ".github/workflows/pr-conventions.yml",
                 ".github/workflows/template-sync.yml", ".github/workflows/trureturing-bump.yml"):
@@ -533,10 +607,22 @@ def impact(current, previous, paths, *, full=False, template=False):
                 reasons.add(f"removed book: {slug}; Pages rebuild removes obsolete output")
                 continue
             selected_books.add(slug)
-            if not test_input:
-                export_outputs.update((slug, output) for output in now[slug]["outputs"])
             b = now[slug]
-            checks["viz_static"] = checks["slides_static"] = True
+            exports_read_tests, slides_read_tests = False, False
+            if test_input:
+                if slug not in test_readers:
+                    trees = (current, previous) if previous and slug in old else (current,)
+                    test_readers[slug] = (any(book_viz_test_reads(tree, slug) for tree in trees),
+                                          bool(b["slides"]) and any(book_viz_test_reads(tree, slug, slides=True)
+                                                                    for tree in trees))
+                exports_read_tests, slides_read_tests = test_readers[slug]
+                if slides_read_tests:
+                    slides.update(b["slides"])
+            site |= exports_read_tests
+            if not test_input or exports_read_tests:
+                export_outputs.update((slug, output) for output in now[slug]["outputs"])
+            checks["viz_static"] = True
+            checks["slides_static"] |= not test_input or slides_read_tests
             # Unregistered suites have unknown file reads: widen to the owning book's suites.
             for suite in b["suites"]:
                 if local != "viz/tests/dependencies.json" and (suite not in b["deps"] or (slug in old and suite not in old[slug]["deps"])):
@@ -583,23 +669,20 @@ def impact(current, previous, paths, *, full=False, template=False):
                     path_reason("book metadata/resource or unknown local dependency: ", p)
             # Academic decks read chapters, figures and viz, beyond slides/ itself.
             for deck in b["slides"]:
-                if not test_input and f"books/{deck.split('/')[0]}/slides/{deck.split('/')[1]}/deck.toml" in current.files:
+                if not test_input and deck_kind(current, deck) == "academic":
                     slides.add(deck)
             continue
         if p.startswith(("tools/", "theme/", "templates/", "i18n/")) or p == ".github/workflows/ci.yml":
-            # These theme resources have distinct publication consumers. Test and
-            # film read edges are independent and are still propagated below.
-            if p.startswith(("theme/mdbook/", "theme/epub/", "theme/site/", "theme/film/", "theme/beamer/", "theme/slides/")):
+            publication = publication_theme_readers(p)
+            if publication is not None:
                 site = True
-                area = p.split("/")[1]
+                formats, decks = publication
                 for slug, book in now.items():
                     for output in book["outputs"]:
-                        if (area, output) in (("mdbook", "html"), ("epub", "epub")):
+                        if output.partition("-")[0] in formats:
                             selected_books.add(slug)
                             export_outputs.add((slug, output))
-                    if area in ("slides", "beamer"):
-                        slides.update(deck for deck in book["slides"] if area == "slides" or
-                                      f"books/{slug}/slides/{deck.split('/')[1]}/deck.toml" in current.files)
+                    slides.update(deck for deck in book["slides"] if deck_kind(current, deck) in decks)
                 path_reason("publication theme: ", p)
             else:
                 shared_outputs("shared consumer input: ", p)
@@ -647,7 +730,7 @@ def impact(current, previous, paths, *, full=False, template=False):
     for (prefix, suffix), (first, count) in path_reasons.items():
         more = f" (+{count - 1} more)" if count > 1 else ""
         reasons.add(f"{prefix}{first}{more}{suffix}")
-    test_selection = testing.select(current, previous, paths, full=all_tests)
+    test_selection = select_tests(current, previous, paths, full=all_tests)
     checks["unit"] = bool(test_selection["unit_tests"])
     checks["browser"] = bool(test_selection["browser_tests"])
     return dict(**test_selection, checks=checks, books=sorted(selected_books), suites=sorted(suites), films=sorted(films),
@@ -719,7 +802,7 @@ def signature(tree, runtime):
         if not entry:
             continue
         name = entry.split(b"\t", 1)[1].decode()
-        if name.startswith(".github/actions/") or name in (
+        if (name.startswith(".github/actions/") and not name.startswith(BUILD_CACHE_ACTION)) or name in (
                 "package-lock.json", "requirements.txt", "theme/film/requirements.txt"):
             digest.update(entry + b"\0")
     return digest.hexdigest()

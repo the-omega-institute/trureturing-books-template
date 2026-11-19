@@ -1545,6 +1545,22 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0, "a release without its build cache is not created")
         self.assertEqual(calls, [])
 
+    def test_template_release_accepts_only_successful_ci_or_verified_reuse(self):
+        wf = self.WORKFLOWS / "template-release.yml"
+        lookup = next(s for s in workflow_jobs(wf)["verify"] if s.get("id") == "ci")
+        for selector in ('actions/workflows/ci.yml/runs', 'branch="$DEFAULT_BRANCH"', 'event=push',
+                         'head_sha="$sha"', 'status=success', '.head_repository.full_name == env.GITHUB_REPOSITORY'):
+            self.assertIn(selector, lookup["run"])
+        publish = wf.read_text().split("\n  publish:\n", 1)[1].split("    runs-on:", 1)[0]
+        guard = " ".join(publish.split("    if: >-", 1)[1].split())
+        for ci, verified, expected in (("success", "", True), ("skipped", "123", True),
+                                       ("skipped", "", False), ("failure", "123", False)):
+            ctx = {"needs.verify.result": "success", "needs.site.result": "success", "needs.ci.result": ci,
+                   "needs.verify.outputs.verified_ci": verified}
+            self.assertEqual(gha_if(guard, event="push", ref="refs/tags/v1", context=ctx), expected)
+            ctx["needs.site.result"] = "failure"
+            self.assertFalse(gha_if(guard, event="push", ref="refs/tags/v1", context=ctx))
+
     def test_template_release_attaches_the_example_site_cache(self):
         jobs = workflow_jobs(self.WORKFLOWS / "template-release.yml")
         runs = [s.get("run", "") for s in jobs["site"]]
