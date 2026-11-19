@@ -373,7 +373,10 @@ class PinBranchTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         return ledger
 
+    @mock.patch.dict(os.environ)
     def test_follow_writes_branch_and_resolves_at_use(self):
+        os.environ.pop("TBOOK_TRURETURING_SHA", None)
+        os.environ.pop("TBOOK_LOCK_SNAPSHOT", None)
         self.use(FakeLedger(on_branch=True))
         with mock.patch.object(lean, "ls_remote", side_effect=[COMMIT, OLD_COMMIT]) as ls:
             report = pin.pin(follow=True)
