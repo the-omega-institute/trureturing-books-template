@@ -581,7 +581,8 @@ class Sandbox:
         self.dir = copy_example(self.book)
         # load_site is cached and may belong to an earlier, already removed sandbox.
         # Repository hooks must run in this sandbox, just like its build/cache units.
-        self.site = dataclasses.replace(config.load_site(), root=self.root, repo="acme/books", base_url="")
+        self.site = dataclasses.replace(config.load_site(), root=self.root, repo="acme/books", base_url="",
+                                        pdf_release_only=False)
 
     def film(self) -> film.Film:
         return film.get(self.book, self.dir.name)

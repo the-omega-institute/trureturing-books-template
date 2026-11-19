@@ -244,6 +244,14 @@ class SiteHelpersTest(unittest.TestCase):
 
 
 class SiteBuildTest(SiteCase):
+    def test_empty_release_only_site_needs_no_github_access(self):
+        self.site = replace(self.site, pdf_release_only=True)
+        with mock.patch.object(releases, "pdf_assets") as fetch_assets:
+            out = self.run_build([])
+        fetch_assets.assert_not_called()
+        manifest = json.loads((out / "manifest.json").read_text())
+        self.assertEqual(manifest["release_pdf_digest"], releases.pdf_digest({}))
+
     def test_release_only_downloads_use_assets_and_ignore_local_pdfs(self):
         book = make_book(self.tmp)
         fake_build(self.build_root, book)
