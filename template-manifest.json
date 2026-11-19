@@ -36,7 +36,7 @@
       "mode": "100644"
     },
     ".github/actions/resolve-lock/action.yml": {
-      "sha256": "a3e0a90f31c00d919458430ef5d3db6f6c181038016110c1186b042947dce424",
+      "sha256": "52a49671ef004ae733921232eb8eb11491e28747723a1eca58d9db4804702478",
       "mode": "100644"
     },
     ".github/actions/setup/action.yml": {
@@ -700,7 +700,7 @@
       "mode": "100644"
     },
     "tools/node/viz-server.mjs": {
-      "sha256": "cc33a49dd9303471741253870406c7bd6b9a2d82b421c0c96f16ae4b05a9d158",
+      "sha256": "b2689949e7481eb53bf6343922a6f2cfc94f6d1a2067ac90ed1629da66bc0e7f",
       "mode": "100644"
     },
     "tools/node/viz-shots.mjs": {

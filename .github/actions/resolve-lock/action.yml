@@ -13,3 +13,4 @@ runs:
         if [ -s "$snapshot" ]; then
           echo "TBOOK_LOCK_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
           python3 -c 'import json, sys; print("trureturing at", json.load(open(sys.argv[1]))["commit"])' "$snapshot"
+        fi
