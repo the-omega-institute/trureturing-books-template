@@ -315,12 +315,15 @@ def book_viz_test_reader(name: str, languages: Iterable[str], read: Callable[[],
     """Whether a book source may consume its visualization test files."""
     area = name.split("/", 1)[0]
     suffix = Path(name).suffix
-    if slides and area == "slides" and suffix in {".js", ".mjs", ".cjs", ".ts", ".vue", ".sty", ".cls"}:
-        return True  # Local slide extensions can resolve imports or read files dynamically.
-    if ((area in languages and suffix == ".md") or name == "viz/visualizations.json" or
-            (slides and area == "slides" and suffix in {".md", ".tex", ".toml", ".css", ".html"})):
-        return bool(re.search(r"\btests(?:/|%2f)", read(), re.IGNORECASE))
-    return False
+    if slides:
+        if area == "slides" and suffix in {".js", ".mjs", ".cjs", ".ts", ".vue", ".sty", ".cls"}:
+            return True  # Local slide extensions can resolve imports or read files dynamically.
+        may_link = area == "slides" and suffix in {".md", ".tex", ".toml", ".css", ".html"}
+    else:
+        may_link = (area in languages and suffix == ".md") or name == "viz/visualizations.json"
+    if area == "figures" and suffix == ".py":
+        may_link = True
+    return may_link and bool(re.search(r"\btests/", urllib.parse.unquote(read()), re.IGNORECASE))
 
 
 def _book_inputs(book: config.Book, *, slides=False) -> Inputs:
@@ -330,7 +333,8 @@ def _book_inputs(book: config.Book, *, slides=False) -> Inputs:
     custom = getattr(book, "raw", {}).get("derived", {}).get("command") is not None
     if not custom and any(exclusion in "/" + label for _, label in files):
         for path, _ in files:
-            name = path.relative_to(book.dir if path.is_relative_to(book.dir) else book.dir.resolve()).as_posix()
+            root = book.dir if path.is_relative_to(book.dir) else book.dir.resolve()
+            name = path.relative_to(root).as_posix()
             if book_viz_test_reader(name, getattr(book, "languages", ()),
                                     lambda: path.read_text(encoding="utf-8"), slides=slides):
                 custom = True
@@ -521,9 +525,10 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
     checked in a browser (decks stored unchecked are not restored into a build that checks)."""
     from . import academic, slides
 
+    decks = slides.deck_names(book)
+    academic_decks = [d for d in decks if academic.is_academic(book.slides_dir / d)]
     inputs = (_book_inputs(book, slides=True)
-              .files(paths.THEME / "slides", paths.TOKENS, paths.TOOLS / "figkit",
-                     paths.GENERATED / "tokens.css", paths.I18N_THEME, paths.I18N_LOCAL, paths.TOOLS / "node",
+              .files(paths.TOKENS, paths.TOOLS / "figkit", paths.I18N_THEME, paths.I18N_LOCAL, paths.TOOLS / "node",
                      paths.TOOLS / "tbook" / "slides.py", paths.LOCK_FILE, paths.SITE_TOML,
                      paths.ROOT / "package-lock.json")
               .text("base", slides.base_path(site))
@@ -531,9 +536,10 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
               .text("no_pdf", os.environ.get("TBOOK_SLIDES_NO_PDF") == "1")
               .text("no_check", os.environ.get("TBOOK_SLIDES_NO_CHECK") == "1")
               .text("node", node_version()))
-    academic_decks = [d for d in slides.deck_names(book) if academic.is_academic(book.slides_dir / d)]
+    if len(decks) > len(academic_decks):
+        inputs.files(paths.THEME / "slides", paths.GENERATED / "tokens.css")
     if academic_decks:
-        inputs.files(paths.THEME / "beamer", paths.THEME / "viz", paths.TOOLS / "tbook",
+        inputs.files(paths.THEME / "beamer", paths.TOOLS / "tbook",
                      paths.ROOT / "requirements.txt", paths.TOOLS / "install-tectonic.sh").add(_fonts())
         inputs.text("tectonic", academic.ENGINE_VERSION).text("bundle", academic.BUNDLE)
         inputs.text("epoch", os.environ.get("SOURCE_DATE_EPOCH", academic.EPOCH))

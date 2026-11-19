@@ -572,7 +572,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "99bc628068e6e8c1383d914633f474a7b4bf352a773e4f3892369f544a3a086d",
+      "sha256": "1314f3c672de1f2818a274f6b584bee94da36ee2093bd8dc1144fb8955bee835",
       "mode": "100644"
     },
     "tools/ci/pr_conventions.py": {
@@ -740,7 +740,7 @@
       "mode": "100644"
     },
     "tools/tbook/buildcache.py": {
-      "sha256": "0e8bfe4b60cc19768c9c426d53ed977020693c6f809238fa57275e20f3dc885d",
+      "sha256": "96bf55b86bab1ddfb15bdb10d7cb033c8261318f0af9b3548d1894fb6f63bfb2",
       "mode": "100644"
     },
     "tools/tbook/check.py": {
@@ -916,7 +916,7 @@
       "mode": "100644"
     },
     "tools/tests/test_buildcache.py": {
-      "sha256": "a3fe76b541a9e5b7caf189e5fc828dfa33deaae6327122314ae5be9ea3f88b8b",
+      "sha256": "2b45b9828169a06f0a2abddb0583654abb0b9587ba90201e7a869548f70b7b3a",
       "mode": "100644"
     },
     "tools/tests/test_ci_cache_store.py": {
@@ -924,7 +924,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "762014b0c3e9c93a6bcfa43cc592b9c10d39524651c56e4ad342e4f76bc2edcc",
+      "sha256": "0e27e131fd2d839cb0f1b3b15bccd69e1a0213a3f780788506e57eb6df08d52f",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {

@@ -73,9 +73,7 @@ class Scratch:
         r = self.root
         for name, value in dict(ROOT=r, BOOKS=r / "books", BUILD=r / "build", SITE_OUT=r / "_site", CACHE=r / ".cache",
                                 TOOLS=r / "tools", THEME=r / "theme", SITE_TOML=r / "site.toml",
-                                LOCK_FILE=r / "trureturing.lock.json", I18N_LOCAL=r / "i18n",
-                                TOKENS=r / "theme/tokens.json", GENERATED=r / "theme/generated",
-                                I18N_THEME=r / "theme/i18n").items():
+                                LOCK_FILE=r / "trureturing.lock.json", I18N_LOCAL=r / "i18n").items():
             self.stack.enter_context(mock.patch.object(paths, name, value))
         self.stack.enter_context(mock.patch.dict(os.environ))
         for key in CACHE_ENV:
@@ -284,6 +282,9 @@ class KeyTests(unittest.TestCase):
             "theme/custom/layout.css": {"html", "pandoc", "typst", "pdf", "epub"},
         }
         with Scratch(git_repo=True) as s, ExitStack() as mocks:
+            for name, value in (("TOKENS", "theme/tokens.json"), ("GENERATED", "theme/generated"),
+                                ("I18N_THEME", "theme/i18n")):
+                mocks.enter_context(mock.patch.object(paths, name, s.root / value))
             for name in ("node_version", "tool_version", "_pandoc_version", "package_version", "_epubcheck_mode"):
                 mocks.enter_context(mock.patch.object(buildcache, name, return_value="test"))
             mocks.enter_context(mock.patch.object(pandoc, "THEME_FONTS", s.root / "theme/typst/fonts"))
@@ -328,6 +329,9 @@ class KeyTests(unittest.TestCase):
             assert_change(test_path, set(keys()))
             write(chapter, "# Chapter\n")
             write(book_dir / "slides/intro/slides.md", "# Slides\n")
+            write(chapter, "# Chapter\n\n[Fixture](../viz/%74ests/demo.test.mjs)\n")
+            assert_change(test_path, set(keys()) - {"slides"})
+            write(chapter, "# Chapter\n")
             write(book_toml, book_toml.read_text() + '\n[derived]\ncommand=["python3", "generate.py"]\n')
             assert_change(test_path, set(keys()))
 

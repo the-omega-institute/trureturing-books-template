@@ -431,13 +431,14 @@ def publication_theme_readers(path):
     if path == "theme/generated/tokens.typ":
         return {"pdf", "epub"}, set()
     if path == "theme/generated/tokens.css":
-        return {"html", "pdf", "epub"}, {"slidev", "academic"}
+        return {"html", "pdf", "epub"}, {"slidev"}
     if path.startswith("theme/viz/"):
-        return {"pdf", "epub"}, {"academic"}
+        return {"pdf", "epub"}, set()
     for directory, formats, decks in (
         ("theme/mdbook/", {"html"}, set()), ("theme/epub/", {"epub"}, set()),
         ("theme/beamer/", set(), {"academic"}), ("theme/slides/", set(), {"slidev"}),
         ("theme/site/", set(), set()), ("theme/film/", set(), set()),
+        ("theme/typst/", set(), set()),
         ("tools/filters/", {"pdf", "epub"}, set()),
     ):
         if path.startswith(directory):
@@ -452,15 +453,22 @@ def deck_kind(tree, deck):
     return "academic" if f"books/{slug}/slides/{name}/deck.toml" in tree.files else "slidev"
 
 
-def book_viz_test_reads(tree, slug, *, slides=False):
+def book_viz_test_reads(tree, slug, *, deck=None):
     prefix = f"books/{slug}/"
     raw = tree.toml(prefix + "book.toml")
     if raw.get("derived", {}).get("command") is not None:
         return True
     languages = raw.get("book", {}).get("editions") or tree.toml("site.toml").get("site", {}).get("languages", ["zh", "en"])
-    return any(buildcache.book_viz_test_reader(path.removeprefix(prefix), languages,
-                                              lambda: tree.read(path), slides=slides)
-               for path in tree.files if path.startswith(prefix))
+    for path in tree.files:
+        if not path.startswith(prefix):
+            continue
+        name = path.removeprefix(prefix)
+        parts = name.split("/")
+        if deck and len(parts) > 2 and parts[0] == "slides" and parts[1] != deck and not parts[1].startswith(("_", ".")):
+            continue
+        if buildcache.book_viz_test_reader(name, languages, lambda: tree.read(path), slides=deck is not None):
+            return True
+    return False
 
 
 def impact(current, previous, paths, *, full=False, template=False):
@@ -608,21 +616,21 @@ def impact(current, previous, paths, *, full=False, template=False):
                 continue
             selected_books.add(slug)
             b = now[slug]
-            exports_read_tests, slides_read_tests = False, False
+            exports_read_tests = False
+            test_decks = set()
             if test_input:
                 if slug not in test_readers:
                     trees = (current, previous) if previous and slug in old else (current,)
-                    test_readers[slug] = (any(book_viz_test_reads(tree, slug) for tree in trees),
-                                          bool(b["slides"]) and any(book_viz_test_reads(tree, slug, slides=True)
-                                                                    for tree in trees))
-                exports_read_tests, slides_read_tests = test_readers[slug]
-                if slides_read_tests:
-                    slides.update(b["slides"])
+                    test_decks = {deck for deck in b["slides"] if any(
+                        book_viz_test_reads(tree, slug, deck=deck.split("/")[1]) for tree in trees)}
+                    test_readers[slug] = any(book_viz_test_reads(tree, slug) for tree in trees), test_decks
+                exports_read_tests, test_decks = test_readers[slug]
+                slides.update(test_decks)
             site |= exports_read_tests
             if not test_input or exports_read_tests:
                 export_outputs.update((slug, output) for output in now[slug]["outputs"])
             checks["viz_static"] = True
-            checks["slides_static"] |= not test_input or slides_read_tests
+            checks["slides_static"] |= not test_input or bool(test_decks)
             # Unregistered suites have unknown file reads: widen to the owning book's suites.
             for suite in b["suites"]:
                 if local != "viz/tests/dependencies.json" and (suite not in b["deps"] or (slug in old and suite not in old[slug]["deps"])):
@@ -677,6 +685,7 @@ def impact(current, previous, paths, *, full=False, template=False):
             if publication is not None:
                 site = True
                 formats, decks = publication
+                checks["viz_static"] |= p.startswith("theme/viz/")
                 for slug, book in now.items():
                     for output in book["outputs"]:
                         if output.partition("-")[0] in formats:

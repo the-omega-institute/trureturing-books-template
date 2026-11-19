@@ -618,6 +618,7 @@ class AffectedPlanTest(unittest.TestCase):
             ("theme/typst/pandoc-template.typst", {"pdf"}, []),
             ("theme/typst/cover.typ", {"pdf", "epub"}, []),
             ("theme/typst/fonts/custom/font.otf", {"pdf", "epub"}, ["one/a"]),
+            ("theme/typst/nested/unused.typ", set(), []),
             ("tools/filters/tr-book.lua", {"pdf", "epub"}, []),
             ("theme/beamer/beamerthemeTBookAcademic.sty", set(), ["one/a"]),
             ("theme/slides/styles/deck.css", set(), ["one/b", "two/a", "two/b"]),
@@ -639,13 +640,14 @@ class AffectedPlanTest(unittest.TestCase):
         clean = planner.Tree(self.root, self.base)
         self.write("books/one/slides/a/slides.md", "[Fixture](../../viz/tests/a.test.mjs)\n")
         slides = planner.Tree(self.root, self.commit())
-        self.assertTrue(planner.impact(slides, clean, [path])["slides"])
+        self.assertEqual(planner.impact(slides, clean, [path])["slides"], ["one/a"])
         self.assertEqual(planner.impact(slides, clean, [path])["exports"], [])
         self.write("books/one/zh/chapter.md", "[Fixture](../viz/tests/a.test.mjs)\n")
         book = planner.Tree(self.root, self.commit())
         for current, previous in ((book, clean), (clean, book)):
             result = planner.impact(current, previous, [path])
             self.assertEqual({item["book"] for item in result["exports"]}, {"one"})
+            self.assertEqual(result["slides"], ["one/a"])
             self.assertTrue(result["site"])
 
     def test_release_and_cache_action_changes_select_direct_tests_and_declared_readers(self):
