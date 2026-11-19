@@ -596,7 +596,7 @@
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
-      "sha256": "6369a4c21f2bd24b2a88a4002207a50ecc7aa0b1cb7d6f887cfc0692b2c5328c",
+      "sha256": "9e6b3d0f826471573349514192a9a532a8a0047a928005cddf612e11a16fddb1",
       "mode": "100644"
     },
     "tools/ci/viz_budget.py": {
@@ -936,7 +936,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "ba5b060bf27a10371096a973f517354f498e92f4233a5a7c015700c50fce0581",
+      "sha256": "d577f0099614b31eff9f637b98d7bc736053c289ea2b21a1785a015f7bd0d997",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {

@@ -35,7 +35,9 @@ def find_media(repo: str, branch: str, artifact_name: str, get=api) -> tuple[int
     """Find retained media stores directly, independent of unrelated successful runs.
 
     Bound pagination by the initial artifact count. Each artifact still needs a
-    successful producer from one of the same approved workflows and events.
+    successful producer from an approved workflow and event. Prefer recently
+    uploaded image inventories. Film inventories are ordered by producer completion
+    so that a long-running publication can supply newer film entries.
     """
     workflows = {}
     for name in ("ci.yml", "pages.yml"):
@@ -65,8 +67,10 @@ def find_media(repo: str, branch: str, artifact_name: str, get=api) -> tuple[int
             if (name and run.get("head_repository", {}).get("full_name") == repo and
                     run.get("head_branch") == branch and own_event and
                     run.get("status") == "completed" and run.get("conclusion") == "success"):
-                candidates.append((run.get("updated_at") or run.get("created_at", ""),
-                                   run_id, int(artifact["id"])))
+                artifact_id = int(artifact["id"])
+                if artifact_name == "tbook-image-store":
+                    return run_id, artifact_id
+                candidates.append((run.get("updated_at") or run.get("created_at", ""), run_id, artifact_id))
     return max(candidates)[1:] if candidates else None
 
 
