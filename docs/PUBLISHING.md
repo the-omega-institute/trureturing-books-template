@@ -128,15 +128,17 @@ CI 精确项为 `books/<slug>/viz/tests/<id>.test.mjs#<part>`，未分部仍为�
 
 **慢帧复查（`viz-slow`）。** `--slow` 令 `VIZ_SLOW_FRAMES=1000`，用于发现固定等待时间造成的偶发失败。每周三的本工作流定时入口只选择 slow profile；手动运行由默认关闭的 `slow_frames` 控制，调用者也可明确传入。slow 使用独立成功基准：相同输入、运行时与检查定义已经覆盖时不开 runner；首次或基准失效按实际 Git 差异选择，无法比较时明确失败；不因覆盖工件缺失而全量慢帧复测。共享运行时、测试工具或 suite 改动后的本地复查仍见 [book-viz](../skills/book-viz/SKILL.md)。
 
-开发分支在 PR 上运行选择后的 CI，不再因分支 push 重复运行；尚未开 PR 时可手动运行。同一 PR 的更新提交会取代先前 CI，main 的执行允许完成，Pages 仍串行保存缓存并部署。默认分支名称若不是 main，需同步调整两个工作流的 push 分支过滤。分支保护要求稳定的 **Check** 与 **PR conventions**，后者校验标题和源分支，启用步骤见 [贡献与协作规范](../CONTRIBUTING.md)；媒体分片数量现在动态变化；若曾将单个矩阵检查设为必需检查，维护者须改为 Check。
+开发分支在 PR 上运行选择后的 CI，不再因分支 push 重复运行；尚未开 PR 时可手动运行。同一 PR 的更新提交会取代先前 CI，每次主干推送按提交各自排队并可并行执行，保留各推送范围的验证。Pages 串行保存缓存并部署。默认分支名称若不是 main，需同步调整两个工作流的 push 分支过滤。分支保护要求稳定的 **Check** 与 **PR conventions**，后者校验标题和源分支，启用步骤见 [贡献与协作规范](../CONTRIBUTING.md)；媒体分片数量现在动态变化；若曾将单个矩阵检查设为必需检查，维护者须改为 Check。
 
 ## 5. 构建缓存
 
-视频分片使用 `scope: films`：默认分支优先恢复 `film-cache-v1-`，PR 只读取可信成功 CI／Pages 发布的 `tbook-film-store`，恢复到 `.cache/artifacts/films/`。独立缓存不包含 PDF、EPUB 和静帧；视频工件按名称分页检索，分页范围由首次返回的工件总数限定，再校验其所属运行，不受最近 20 次无关成功运行的窗口限制；只有实际完成视频任务的 CI 汇总或成功完整构建的 Pages 发布它，纯导出 CI 不覆盖它。完整站点／Release 构建与 CI 汇总用 `film-baseline: true` 将最新可信视频库存先独立下载、逐条原子合并，再导入本次分片，保留未选影片的较新缓存；普通导出作业不额外下载这份库存。升级初期没有独立缓存时仍恢复旧完整缓存，并按旧归档的根目录解包。视频单元的输入键、完整性校验与 PR 信任边界沿用原契约；输入变化仍须重建。
+视频分片使用 `scope: films`：默认分支优先恢复 `film-cache-v1-`，PR 只读取可信成功 CI／Pages 发布的 `tbook-film-store`，恢复到 `.cache/artifacts/films/`。独立缓存不包含 PDF、EPUB 和静帧；视频工件按名称分页检索，分页范围由首次返回的工件总数限定，再校验其所属运行，不受最近 20 次无关成功运行的窗口限制；只有实际完成视频任务的 CI 汇总或成功完整构建的 Pages 发布它，纯导出 CI 不覆盖它。完整站点／Release 构建与 CI 汇总用 `film-baseline: true` 将最新可信视频库存先独立下载、逐条原子合并，再导入本次分片，保留未选影片的较新缓存；普通导出作业只恢复本格式所需的缓存。升级初期没有独立缓存时仍恢复旧完整缓存，并按旧归档的根目录解包。视频单元的输入键、完整性校验与 PR 信任边界沿用原契约；输入变化仍须重建。
 
-构建单元（每个语言版本的 HTML、每种 PDF、EPUB、每本书的幻灯片、每个视频）的输入没有变化时不再构建，而是恢复存下的产物（`tools/tbook/buildcache.py`；键与本地存储见 `docs/ARCHITECTURE.md`）。视频不是特例，与 PDF、幻灯片走同一条路。查找顺序：
+CI 中的 PDF、EPUB 导出只预取可视化静帧库存。默认分支优先查 `image-cache-v1-`，其他恢复走成功的默认分支 CI 或 Pages 运行发布的 `tbook-image-store`。库存缺少当前所需的静帧时，按输入键从 Release 恢复或生成。HTML 和幻灯片直接按单元输入键从 Release 恢复或构建。各格式继续使用相同的 Pages 地址计算链接和缓存键。
 
-1. 本地存储 `.cache/artifacts/`。在 GitHub Actions 中，组合动作 `.github/actions/build-cache` 在构建前恢复它（Actions 缓存，按前缀 `build-cache-v1-` 先找本次运行所在 ref 的最新一份，再找默认分支的），Actions 缓存未命中时从默认分支成功的 CI 或 Pages 运行恢复对应工件（完整存储为 `tbook-build-store`）。PR 直接走可信工件路径；
+构建单元（每个语言版本的 HTML、每种 PDF、EPUB、每本书的幻灯片、每个视频）的输入没有变化时不再构建，而是恢复存下的产物（`tools/tbook/buildcache.py`；键与本地存储见 `docs/ARCHITECTURE.md`）。完整站点、发行和 CI 汇总的查找顺序：
+
+1. 本地存储 `.cache/artifacts/`。在 GitHub Actions 中，组合动作 `.github/actions/build-cache` 在构建前恢复它（Actions 缓存，按前缀 `build-cache-v1-` 先找本次运行所在 ref 的最新一份，再找默认分支的），Actions 缓存未命中时从默认分支成功的 CI 或 Pages 运行恢复对应工件（完整存储为 `tbook-build-store`）；
 2. 设置了 `TBOOK_CACHE_REMOTE=1` 时（构建步骤都设置，并传入 `GITHUB_TOKEN`），查最新的 5 个附有 `build-cache.json` 的已发布 Release（手工发的、没有该文件的 Release 不占名额），下载对应的 `cache-*.tar`，核对 SHA-256 后恢复。没有任何 Actions 缓存的构建（新仓库、缓存被清除、PR）由此从整站 Release 恢复；
 3. 都没有时构建，并存入本地存储。
 
@@ -146,7 +148,7 @@ CI 精确项为 `books/<slug>/viz/tests/<id>.test.mjs#<part>`，未分部仍为�
 
 CI 的构建、幻灯片与影片作业在恢复后记录已验证条目的键，上传构建中新增的完整条目；CI 与 Pages 的影片分片同时交付所选影片的已验证命中条目，避免独立视频基准中的命中项在差量传输时丢失（`tools/ci/cache_store.py snapshot|export`；临时分片保留 1 天）。稳定 Check 先确认全部计划作业成功，再恢复已有存储，按本次运行尝试分别下载分片并逐条校验、原子合并，最后保存 Actions 缓存与 `tbook-build-store`。相同输入键可能因编码器而有不同字节，合并保留一份完整有效条目，绝不逐文件覆盖混合两种编码。Check 没有出版字体或工具，不重新计算 PDF 等当前键；它只保留每个单元两个已验证键，优先保留本次已选分片交付的键，再按创建时间取舍；这也保留回滚后命中的较早视频键；同时清理损坏条目、链接与其他未验证文件（动作 `prune: 'false'` 仅供 `check` 聚合使用）。这条写入链只在默认分支的 push、workflow_dispatch、schedule 中运行；PR、其他分支、失败或取消的计划均不发布聚合存储。除所选影片的命中条目外，仅新增条目跨作业上传；完整存储仍需在聚合时下载和发布；这部分传输成本不会消失。缓存传输失败只导致后续缓存未命中，不改变检查结果。
 
-PR 以及 Actions 缓存未命中的构建与发布均可复用默认分支产物。成功的 `ci.yml` 聚合与 `pages.yml` 构建上传 `tbook-build-store`（保留 7 天，含隐藏文件，不压缩已压缩的视频）。恢复步骤用 GitHub API 分别检查默认分支最近 100 次成功 CI 与 Pages 运行，从新到旧选择仍有工件的一次，核对 workflow ID、源仓库、分支、事件（push / workflow_dispatch，CI 另允许 schedule）、完成状态与结果，再按不可混淆的 run ID / artifact ID 下载。需要 `actions: read`；被调用的 CI 的调用者也须授予它。权限不足、工件过期或下载失败时照常构建，仍可从 Release 恢复。PR 自己的 Actions 缓存与工件始终不读；每个构建单元仍按当前输入键与逐文件摘要验证。信任边界见 `docs/VERIFICATION.md` §2。
+完整缓存未命中的构建、发布和汇总可复用默认分支产物。成功的 `ci.yml` 聚合与 `pages.yml` 构建以压缩等级 1 上传 `tbook-build-store`（保留 7 天，含隐藏文件）。恢复步骤用 GitHub API 分别检查默认分支最近 100 次成功 CI 与 Pages 运行，从新到旧选择仍有工件的一次，核对 workflow ID、源仓库、分支、事件（push / workflow_dispatch，CI 另允许 schedule）、完成状态与结果，再按不可混淆的 run ID / artifact ID 下载。需要 `actions: read`；被调用的 CI 的调用者也须授予它。权限不足、工件过期或下载失败时照常构建，仍可从 Release 恢复。独立静帧与影片缓存按工件名称查询，并对运行来源做同样的校验。只在默认分支成功的生产者中选取工件，每个构建单元仍按当前输入键与逐文件摘要验证。信任边界见 `docs/VERIFICATION.md` §2。
 
 仍会重复渲染的情形：改动了视频输入且缓存未命中的 PR 仍须渲染。CI 先选择待验证影片，再按完整影片动态分成最多 4 个非空分片，每片通过 `python tools/ci/films.py --selection-env CI_ITEMS` 执行分配的精确集合，所选影片各执行一次；空集合不开影片作业。所选影片缓存未命中时，缺工具链或渲染失败会使作业失败。合入后 Pages 渲染并保存新键，此后 PR 即可复用，无须等待发版。工件超过 7 天、从未成功构建 Pages，或 PR 的输入与默认分支和 Release 都不同，仍会重建。可视化同样先选择 suite，再动态分成最多 8 个非空分片，所选 suite 各执行一次，空集合不开作业。分片减少等待时间，冷构建总计算量不会随之减少；多个分片也会增加工具链安装开销与并发需求。
 

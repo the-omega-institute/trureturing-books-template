@@ -192,6 +192,33 @@ class TrustedCacheTest(unittest.TestCase):
                                             artifact_name="tbook-film-store"))
         self.assertNotIn("repos/owner/books/actions/runs/17", self.calls)
 
+    def test_image_lookup_stays_scoped_when_only_the_complete_store_exists(self):
+        self.assertIsNone(trusted_cache.find("owner/books", "main", self.api,
+                                            artifact_name="tbook-image-store"))
+        self.assertTrue(any("name=tbook-image-store" in call for call in self.calls))
+        self.assertFalse(any("/runs?" in call for call in self.calls))
+        self.artifact["name"] = "tbook-image-store"
+        self.assertEqual(trusted_cache.find("owner/books", "main", self.api,
+                                            artifact_name="tbook-image-store"), (17, 42))
+        self.run["event"] = "pull_request"
+        self.assertIsNone(trusted_cache.find("owner/books", "main", self.api,
+                                            artifact_name="tbook-image-store"))
+
+    def test_image_lookup_stops_after_the_first_verified_inventory(self):
+        self.artifact["name"] = "tbook-image-store"
+
+        def api(endpoint):
+            if "/actions/artifacts?" in endpoint:
+                return {"total_count": 2, "artifacts": [
+                    dict(self.artifact, workflow_run={"id": 17}),
+                    dict(self.artifact, id=40, workflow_run={"id": 16}),
+                ]}
+            return self.api(endpoint)
+
+        self.assertEqual(trusted_cache.find("owner/books", "main", api,
+                                            artifact_name="tbook-image-store"), (17, 42))
+        self.assertNotIn("repos/owner/books/actions/runs/16", self.calls)
+
     def test_film_restore_falls_back_to_legacy_store_at_the_correct_root(self):
         find = trusted_cache.find
         for dedicated in (True, False):

@@ -212,10 +212,43 @@ class CacheTransferWorkflowTest(unittest.TestCase):
         lookup = next(step for step in steps if step.get("id") == "trusted")
         for event, ref in (("push", "refs/heads/main"), ("push", "refs/tags/v1"), ("pull_request", "refs/pull/1/merge")):
             for film, store in (("", ""), ("film-cache-v1-123", ""), ("", "build-cache-v1-123")):
-                context = {"inputs.mode": "restore", "steps.film-restore.outputs.cache-matched-key": film,
+                context = {"inputs.mode": "restore", "inputs.scope": "all", "steps.film-restore.outputs.cache-matched-key": film,
                            "steps.restore.outputs.cache-matched-key": store}
                 self.assertEqual(gha_if(lookup["if"], event=event, ref=ref, context=context), not (film or store))
         self.assertIn("trusted_cache.py", lookup["run"])
+
+    def test_exports_only_restore_shared_stills_and_keep_pages_url(self):
+        jobs = workflow_jobs(GITHUB_DIR / "workflows" / "ci.yml")
+        build, slides = (next(s for s in jobs[job] if s.get("uses") == "./.github/actions/build-cache")
+                         for job in ("build", "media"))
+        self.assertEqual(build["with"]["scope"], "${{ matrix.target == 'html' && 'none' || 'images' }}")
+        self.assertEqual(slides["with"]["scope"], "none")
+        for step in (build, slides):
+            self.assertEqual(step["with"]["pages-url"], "${{ steps.pages.outputs.base_url }}")
+        steps = action_steps("build-cache")
+        for event, ref in (("push", "refs/heads/main"), ("pull_request", "refs/pull/1/merge")):
+            context = {"inputs.mode": "restore", "inputs.scope": "none",
+                       "inputs.pages-url": "https://example.org/books",
+                       "steps.trusted.outputs.artifact-id": "",
+                       "steps.film-baseline.outputs.artifact-scope": "",
+                       "steps.film-baseline.outputs.artifact-id": "",
+                       "inputs.film-baseline": "false",
+                       "steps.prune.outputs.changed": "",
+                       "steps.film-restore.outputs.cache-matched-key": "",
+                       "steps.restore.outputs.cache-matched-key": ""}
+            for step in steps:
+                if step.get("uses", "").startswith(("actions/cache", "actions/download-artifact")) or step.get("id") == "trusted":
+                    self.assertFalse(gha_if(step["if"], event=event, ref=ref, context=context), step["name"])
+            pages_url = next(s for s in steps if "TBOOK_BASE_URL" in s.get("run", ""))
+            self.assertTrue(gha_if(pages_url["if"], event=event, ref=ref, context=context))
+
+    def test_pages_publishes_stills_separately_from_the_complete_archive(self):
+        steps = workflow_jobs(GITHUB_DIR / "workflows" / "pages.yml")["build"]
+        upload = next(s for s in steps if s.get("with", {}).get("name") == "tbook-image-store")
+        self.assertEqual(upload["with"]["path"], ".cache/artifacts/viz-stills")
+        self.assertTrue(gha_if(upload["if"], event="push", ref="refs/heads/main"))
+        self.assertFalse(gha_if(upload["if"], event="workflow_dispatch", ref="refs/heads/feature"))
+        self.assertTrue(upload["continue-on-error"])
 
     def test_complete_publishers_merge_the_independent_inventory(self):
         for workflow, job in (("ci.yml", "check"), ("pages.yml", "build"),
