@@ -31,7 +31,7 @@
 # the workflows, so one push can save a planted entry in the pull request's cache scope and the next push,
 # with a clean final diff, would restore it (restore looks in that scope first). Runs of other branches and
 # tags read their own scope (which only their own code can write) and then the default branch's.
-# On a miss (including pull requests), restore the tbook-build-store artifact from a successful default-branch CI/Pages run
+# On a miss (including pull requests), restore the requested artifact from a successful default-branch CI/Pages run
 # (tools/ci/trusted_cache.py verifies its workflow ID, repository, branch, event and outcome; requires
 # actions: read). No PR-produced artifact is read. Missing or expired artifacts are cache misses.
 # Pull-request runs may also restore from published releases (TBOOK_CACHE_REMOTE=1), which only the
@@ -44,7 +44,7 @@ inputs:
     description: restore (before ./tbook build) or save (after it).
     required: true
   scope:
-    description: Restore the complete store (all), visualization images (images), or videos (films).
+    description: Restore the complete store (all), visualization images (images), videos (films), or only configure the URL (none).
     required: false
     default: all
   film-baseline:
@@ -63,13 +63,14 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Check the mode
-      if: inputs.mode != 'restore' && inputs.mode != 'save'
+    - name: Check the mode and scope
+      if: (inputs.mode != 'restore' && inputs.mode != 'save') || (inputs.scope != 'all' && inputs.scope != 'images' && inputs.scope != 'films' && inputs.scope != 'none')
       shell: bash
       env:
         MODE: ${{ inputs.mode }}
+        SCOPE: ${{ inputs.scope }}
       run: |
-        echo "::error title=build-cache::mode must be restore or save, got '$MODE'"
+        echo "::error title=build-cache::invalid mode '$MODE' or scope '$SCOPE'"
         exit 1
 
     - name: Require the CI aggregate for toolchain-free maintenance
@@ -102,7 +103,7 @@ runs:
 
     - name: Restore the build cache
       id: restore
-      if: inputs.mode == 'restore' && !startsWith(github.event_name, 'pull_request') && (inputs.scope != 'films' || steps.film-restore.outputs.cache-matched-key == '')
+      if: inputs.mode == 'restore' && inputs.scope != 'none' && !startsWith(github.event_name, 'pull_request') && (inputs.scope != 'films' || steps.film-restore.outputs.cache-matched-key == '')
       uses: actions/cache/restore@v5
       with:
         path: ${{ inputs.scope == 'images' && '.cache/artifacts/viz-stills' || '.cache/artifacts' }}
@@ -110,7 +111,7 @@ runs:
         restore-keys: ${{ inputs.scope == 'images' && 'image-cache-v1-' || 'build-cache-v1-' }}
 
     - name: Remember the restored store
-      if: inputs.mode == 'restore'
+      if: inputs.mode == 'restore' && inputs.scope != 'none'
       shell: bash
       env:
         MATCHED: ${{ steps.film-restore.outputs.cache-matched-key || steps.restore.outputs.cache-matched-key }}
@@ -120,7 +121,7 @@ runs:
 
     - name: Find a default branch CI/Pages cache artifact
       id: trusted
-      if: inputs.mode == 'restore' && steps.film-restore.outputs.cache-matched-key == '' && steps.restore.outputs.cache-matched-key == ''
+      if: inputs.mode == 'restore' && inputs.scope != 'none' && steps.film-restore.outputs.cache-matched-key == '' && steps.restore.outputs.cache-matched-key == ''
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}

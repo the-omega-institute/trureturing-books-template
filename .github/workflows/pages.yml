@@ -330,7 +330,7 @@ jobs:
           name: github-pages-${{ github.run_attempt }}
           path: _site
 
-      - name: Publish the build store for pull requests
+      - name: Publish the complete build store
         if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: actions/upload-artifact@v6
         with:
@@ -338,8 +338,28 @@ jobs:
           overwrite: true
           path: .cache/artifacts
           include-hidden-files: true
-          compression-level: 0
+          compression-level: 1
           if-no-files-found: warn
+          retention-days: 7
+
+      - name: Save reusable visualization images
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        continue-on-error: true
+        uses: ./.github/actions/build-cache/save-media
+        with:
+          target: viz-stills
+
+      - name: Publish reusable visualization images
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-image-store
+          overwrite: true
+          path: .cache/artifacts/viz-stills
+          include-hidden-files: true
+          compression-level: 0
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Save reusable film entries

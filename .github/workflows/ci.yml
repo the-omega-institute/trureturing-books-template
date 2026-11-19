@@ -44,8 +44,12 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'schedule' && '-schedule' || '' }}
-  # Finish default-branch producers so the next push can inherit their trusted evidence.
+  group: >-
+    ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{
+      github.event_name == 'push' && format('-{0}', github.sha) ||
+      github.event_name == 'schedule' && '-schedule' || '' }}
+  # Push plans compare the event's before and after commits. Give each push its own
+  # group so a burst of merges verifies every interval, without replacing pending runs.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -383,10 +387,13 @@ jobs:
         continue-on-error: true
         uses: actions/configure-pages@v6
 
-      - name: Restore the build cache (and use the Pages URL)
+      - name: Restore reusable export inputs (and use the Pages URL)
         uses: ./.github/actions/build-cache
         with:
+          # Book source changes invalidate prior export keys. Reuse the more stable
+          # image inputs and let the builder look up exact unit keys in releases.
           mode: restore
+          scope: ${{ matrix.target == 'html' && 'none' || 'images' }}
           pages-url: ${{ steps.pages.outputs.base_url }}
 
       - name: Download prepared visualization images
@@ -443,7 +450,7 @@ jobs:
           name: tbook-build-shard-${{ github.run_attempt }}-build-${{ strategy.job-index }}
           path: ${{ runner.temp }}/build-cache-shard
           include-hidden-files: true
-          compression-level: 0
+          compression-level: 1
           if-no-files-found: warn
           retention-days: 1
 
@@ -584,10 +591,11 @@ jobs:
         continue-on-error: true
         uses: actions/configure-pages@v6
 
-      - name: Restore the build cache (and use the Pages URL)
+      - name: Use the Pages URL for slide links and cache keys
         uses: ./.github/actions/build-cache
         with:
           mode: restore
+          scope: none
           pages-url: ${{ steps.pages.outputs.base_url }}
 
       - name: Snapshot restored build-cache entries
@@ -840,7 +848,7 @@ jobs:
           name: tbook-build-store
           path: .cache/artifacts
           include-hidden-files: true
-          compression-level: 0
+          compression-level: 1
           if-no-files-found: warn
           retention-days: 7
 

@@ -31,8 +31,8 @@ def api(endpoint: str):
     return json.loads(result.stdout)
 
 
-def find_films(repo: str, branch: str, get=api) -> tuple[int, int] | None:
-    """Find retained film stores directly, independent of unrelated successful runs.
+def find_media(repo: str, branch: str, artifact_name: str, get=api) -> tuple[int, int] | None:
+    """Find retained media stores directly, independent of unrelated successful runs.
 
     Bound pagination by the initial artifact count. Each artifact still needs a
     successful producer from one of the same approved workflows and events.
@@ -45,7 +45,7 @@ def find_films(repo: str, branch: str, get=api) -> tuple[int, int] | None:
             continue
         if workflow.get("path") == f".github/workflows/{name}":
             workflows[workflow["id"]] = name
-    query = urlencode({"name": "tbook-film-store", "per_page": 100})
+    query = urlencode({"name": artifact_name, "per_page": 100})
     endpoint = f"repos/{repo}/actions/artifacts?{query}"
     data = get(f"{endpoint}&page=1")
     pages = max(1, (int(data["total_count"]) + 99) // 100)
@@ -54,7 +54,7 @@ def find_films(repo: str, branch: str, get=api) -> tuple[int, int] | None:
         if page > 1:
             data = get(f"{endpoint}&page={page}")
         for artifact in data.get("artifacts", []):
-            if artifact.get("name") != "tbook-film-store" or artifact.get("expired", True):
+            if artifact.get("name") != artifact_name or artifact.get("expired", True):
                 continue
             run_id = int(artifact["workflow_run"]["id"])
             if run_id not in runs:
@@ -71,8 +71,8 @@ def find_films(repo: str, branch: str, get=api) -> tuple[int, int] | None:
 
 
 def find(repo: str, branch: str, get=api, *, artifact_name="tbook-build-store") -> tuple[int, int] | None:
-    if artifact_name == "tbook-film-store":
-        return find_films(repo, branch, get)
+    if artifact_name in ("tbook-film-store", "tbook-image-store"):
+        return find_media(repo, branch, artifact_name, get)
     query = urlencode({"branch": branch, "status": "success", "per_page": 100})
     runs = []
     for name in ("ci.yml", "pages.yml"):
@@ -105,7 +105,7 @@ def main() -> None:
         if name not in ('tbook-build-store', 'tbook-image-store', 'tbook-film-store'):
             raise ValueError('invalid cache artifact name')
         found = find(os.environ["GITHUB_REPOSITORY"], os.environ["DEFAULT_BRANCH"], artifact_name=name)
-        scope = 'films' if name == 'tbook-film-store' else 'all'
+        scope = {'tbook-film-store': 'films', 'tbook-image-store': 'images', 'tbook-build-store': 'all'}[name]
         if not found and name == 'tbook-film-store':
             # Older producers have only the complete store. Its archive includes
             # the films/ directory, so restore it at the store root during migration.
