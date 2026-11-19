@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.7.0",
+  "version": "1.7.2",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "3134927c7e3fc567ccf212f45909266da7ead7322e2471d6329d11e167b1afab",
+      "sha256": "2af7b9dd3fcefefa3423825637c2f35fb164c1313d276ca218c05bf9674f7dda",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -864,7 +864,7 @@
       "mode": "100644"
     },
     "tools/tbook/site.py": {
-      "sha256": "c3bc22f2d802d0d9859e7098d1ae4eb471c3ecd7fea1c1f05943787ad2f1fdf3",
+      "sha256": "8c11ef829c210045d879b70f83e68b2364dd7f7e0009994ff9804fd4c6d99888",
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
@@ -996,7 +996,7 @@
       "mode": "100644"
     },
     "tools/tests/test_film.py": {
-      "sha256": "d1ab229082069ebf0849d2c4261fb64a0f8efaf020a7caa072d010a16dcb8876",
+      "sha256": "9ca3a8e32624c1ee275d970677015a93460fededaa8ba755a99222e460adb7e4",
       "mode": "100644"
     },
     "tools/tests/test_film_solid.py": {
@@ -1076,7 +1076,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "d2027f00082a3dbd79d5fc244ecaa44f488503eaea40880a7af53115b8fab2f3",
+      "sha256": "2145df2cf5065f357bcdea5dc7ff55c8e733d38ac268352db5db3e15751bc946",
       "mode": "100644"
     },
     "tools/tests/test_site_post_build.py": {

@@ -2,6 +2,14 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.7.2] - 2026-11-20
+
+- CI 汇总兼容 GitHub Actions 将唯一浏览器分片直接解包到目标目录的行为。仍逐项核对运行轮次、分片内容和实际执行结果。
+
+## [1.7.1] - 2026-11-20
+
+- 启用 PDF 随 Release 发布时，只有包含书籍的站点才查询 GitHub 附件。隔离影片测试的站点配置，使启用此选项的书库可离线运行影片测试。
+
 ## [1.7.0] - 2026-11-20
 
 - 增加 `site.toml` 的 `[site].pdf_release_only` 选项。开启后，常规 CI 和 Pages 跳过书籍与演示文稿的 PDF 导出。下载页显示实际发布的 GitHub Release 附件，并随附件变化刷新。来源是下游书库希望释放 Pages 的 PDF 存储空间。
