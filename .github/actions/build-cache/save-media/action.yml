@@ -15,6 +15,7 @@ runs:
       run: |
         key="$(python3 tools/ci/cache_store.py media-key "$TARGET")"
         echo "key=$key" >> "$GITHUB_OUTPUT"
+        echo "prefix=${key%-*}-" >> "$GITHUB_OUTPUT"
     - name: Look up the newest media cache without downloading it
       id: latest
       if: steps.inventory.outputs.key != ''
@@ -22,8 +23,8 @@ runs:
       with:
         path: .cache/artifacts/${{ inputs.target }}
         lookup-only: true
-        key: ${{ inputs.target == 'films' && 'film-cache-v1-' || 'image-cache-v1-' }}lookup
-        restore-keys: ${{ inputs.target == 'films' && 'film-cache-v1-' || 'image-cache-v1-' }}
+        key: ${{ steps.inventory.outputs.prefix }}lookup
+        restore-keys: ${{ steps.inventory.outputs.prefix }}
     - name: Save changed inventory
       if: steps.inventory.outputs.key != '' && !startsWith(steps.latest.outputs.cache-matched-key, format('{0}-r', steps.inventory.outputs.key))
       uses: actions/cache/save@v5
