@@ -24,6 +24,20 @@ trusted_cache = ci_module("trusted_cache")
 films = ci_module("films")
 
 
+def write_browser_reports(write, plan):
+    import json
+    for profile, matrix in (("normal", "viz"), ("slow", "slow")):
+        for shard in plan.get(matrix, []):
+            record = plan["coverage"][profile]
+            attempt = record["run_attempt"]
+            artifact = f"tbook-viz-{attempt}-{profile}-{shard['batch']}"
+            write(f"viz-reports/{artifact}/{profile}.json", json.dumps(dict(
+                schema="tbook-viz-report-v1", profile=profile, sha=plan["sha"],
+                run_id=record["run_id"], run_attempt=attempt, runtime=record["runtime"],
+                frames=1000 if profile == "slow" else 0,
+                results=[dict(unit=u, seconds=1, exit_code=0, signal=None) for u in shard["items"]])))
+
+
 class TrustedCacheTest(unittest.TestCase):
     def setUp(self):
         self.run = dict(id=17, workflow_id=3, head_repository={"full_name": "owner/books"},
@@ -1285,17 +1299,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
         # Run --verify rather than manufacturing records that merely resemble successful coverage.
         shutil.rmtree(self.root / "coverage", ignore_errors=True)
         shutil.rmtree(self.root / "viz-reports", ignore_errors=True)
-        # This history fixture simulates successful browser jobs explicitly. The
-        # real child/report/Check boundary has independent failure regressions.
-        for profile, execution in result.get("execution", {}).items():
-            if not execution:
-                continue
-            record = result["coverage"][profile]
-            self.write(f"viz-reports/{profile}.json", json.dumps(dict(
-                schema="tbook-viz-report-v1", profile=profile, sha=result["sha"],
-                run_id=record["run_id"], run_attempt=record["run_attempt"], runtime=record["runtime"],
-                frames=1000 if profile == "slow" else 0,
-                results=[dict(unit=u, seconds=1, exit_code=0, signal=None) for u in execution])))
+        write_browser_reports(self.write, result)
         if workflow == "ci":
             results = {"plan": {"result": "success"}, **{
                 job: {"result": "success" if selected else "skipped"} for job, selected in result["tasks"].items()}}
@@ -1308,7 +1312,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
         self.write("ci-needs.json", json.dumps(results))
         script = Path(__file__).parents[1] / "ci/plan.py"
         verified = self.subprocess.run([sys.executable, str(script), "--workflow", workflow, "--verify"],
-                                      cwd=self.root, env=dict(os.environ, PAGES_ENABLED=str(enabled).lower()),
+                                      cwd=self.root, env=dict(os.environ, GITHUB_RUN_ATTEMPT="1", PAGES_ENABLED=str(enabled).lower()),
                                       capture_output=True, text=True)
         self.assertEqual(verified.returncode == 0, outcome == "success", verified.stderr)
         ident = self.next_run

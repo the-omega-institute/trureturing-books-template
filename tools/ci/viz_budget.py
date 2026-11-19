@@ -91,15 +91,36 @@ def runtime_identity(runtime):
     return runtime
 
 
-def merge_reports(plan, reports):
+def read_shard_reports(plan, directory):
+    """Bind each downloaded artifact to the planner attempt, profile, batch and units."""
+    reports = []
+    for profile, matrix in (('normal', 'viz'), ('slow', 'slow')):
+        for shard in plan.get(matrix, []):
+            attempt = plan['coverage'][profile]['run_attempt']
+            artifact = f"tbook-viz-{attempt}-{profile}-{shard['batch']}"
+            path = directory / artifact / f'{profile}.json'
+            if not path.is_file():
+                raise ValueError(f'missing browser execution report: {artifact}')
+            report = json.loads(path.read_text())
+            units = [row['unit'] for row in report['results']]
+            if report.get('profile') != profile or sorted(units) != sorted(shard['items']):
+                raise ValueError(f'incompatible browser shard: {artifact}')
+            reports.append(report)
+    return reports
+
+
+def merge_reports(plan, reports, *, check_attempt=None):
     """Require exact successful current-run units before any parent coverage advances."""
     expected = plan.get('execution', {})
     seen = {p: {} for p in expected}
     for report in reports:
         profile = report.get('profile')
-        if (report.get('schema') != REPORT_SCHEMA or profile not in expected or
+        planned = plan['coverage'].get(profile, {}).get('run_attempt')
+        produced = report.get('run_attempt')
+        latest = check_attempt or planned
+        if (not all(isinstance(n, str) and re.fullmatch(r'[1-9][0-9]*', n) for n in (planned, produced, latest)) or
+                not int(planned) <= int(produced) <= int(latest) or report.get('schema') != REPORT_SCHEMA or profile not in expected or
                 report.get('sha') != plan['sha'] or report.get('run_id') != plan['coverage'][profile]['run_id'] or
-                report.get('run_attempt') != plan['coverage'][profile]['run_attempt'] or
                 report.get('frames') != (1000 if profile == 'slow' else 0) or
                 runtime_identity(report.get('runtime')) != runtime_identity(plan['coverage'][profile]['runtime']) or
                 not isinstance(report.get('results'), list)):

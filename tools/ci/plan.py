@@ -1117,13 +1117,17 @@ def main():
         # Use the plan from this exact needs fanout; do not maintain a second copy.
         result = json.loads(results["plan"]["outputs"]["plan"])
         verify_results(result, results, pages=args.workflow == "pages", pages_enabled=os.environ.get("PAGES_ENABLED") == "true")
-        reports = [json.loads(p.read_text()) for p in Path("viz-reports").rglob("*.json")]
-        viz_budget.merge_reports(result, reports)
+        reports = viz_budget.read_shard_reports(result, Path("viz-reports"))
+        check_attempt = os.environ.get("GITHUB_RUN_ATTEMPT")
+        viz_budget.merge_reports(result, reports, check_attempt=check_attempt)
         Path("coverage").mkdir(exist_ok=True)
         for profile, record in result["coverage"].items():
             if profile == "pages":
                 record["deployed"] = not result["site"] or os.environ.get("PAGES_ENABLED") == "true"
                 record["deployment_sha"] = result["sha"] if result["site"] else record.get("deployment_sha") or record["inherited"]["deployment_sha"]
+            if check_attempt and check_attempt != record["run_attempt"]:
+                record["plan_attempt"] = record["run_attempt"]
+                record["run_attempt"] = check_attempt
             # Keep ancestry metadata bounded; retain authoritative run/artifact IDs, not recursively nested records.
             if record["inherited"]:
                 record["inherited"] = {k: record["inherited"][k] for k in ("sha", "source_run", "artifact_id")}

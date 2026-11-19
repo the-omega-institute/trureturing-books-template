@@ -182,15 +182,7 @@ class LargePlanTransportTest(unittest.TestCase):
 
     def reports(self, plan):
         shutil.rmtree(self.root / "viz-reports", ignore_errors=True)
-        for profile, execution in plan.get("execution", {}).items():
-            if not execution:
-                continue
-            record = plan["coverage"][profile]
-            self.write(f"viz-reports/{profile}.json", json.dumps(dict(
-                schema="tbook-viz-report-v1", profile=profile, sha=plan["sha"],
-                run_id=record["run_id"], run_attempt=record["run_attempt"], runtime=record["runtime"],
-                frames=1000 if profile == "slow" else 0,
-                results=[dict(unit=u, seconds=1, exit_code=0, signal=None) for u in execution])))
+        fixtures.write_browser_reports(self.write, plan)
 
     def step(self, workflow, job, marker):
         return next(s for s in workflow_jobs(GITHUB_DIR / "workflows" / workflow)[job]
@@ -256,6 +248,42 @@ class LargePlanTransportTest(unittest.TestCase):
                     if profile in ("normal", "slow"):
                         self.assertEqual(set(record["timings"]), set(plan["execution"][profile]))
 
+    def test_partial_rerun_uses_original_plan_and_checks_each_shard(self):
+        jobs = workflow_jobs(GITHUB_DIR / "workflows/ci.yml")
+        prefix = "tbook-viz-${{ needs.plan.outputs.plan_attempt }}-"
+        for job, profile in (("viz", "normal"), ("viz-slow", "slow")):
+            upload = next(s["with"] for s in jobs[job] if "actions/upload-artifact@" in s.get("uses", ""))
+            self.assertEqual(upload["name"], prefix + profile + "-${{ matrix.batch }}")
+            self.assertEqual(upload["overwrite"], "true")
+        download = next(s["with"] for s in jobs["check"] if s["with"].get("path") == "viz-reports")
+        self.assertEqual(download["pattern"], prefix + "*")
+        plan = self.large_plan(slow=True)
+        for record in plan["coverage"].values():
+            record["run_attempt"] = "1"
+        self.reports(plan)
+        needs = self.needs(plan)
+        step = self.step("ci.yml", "check", "--verify")
+        files = sorted((self.root / "viz-reports").glob("*/normal.json"))
+        self.assertGreaterEqual(len(files), 2)
+        first = json.loads(files[0].read_text())
+        retry = json.loads(files[1].read_text())
+        retry["run_attempt"] = "2"
+        files[1].write_text(json.dumps(retry))
+        with mock.patch.dict(os.environ, GITHUB_RUN_ATTEMPT="3"):
+            check = self.execute(step, needs)
+            self.assertEqual(check.returncode, 0, check.stderr)
+            record = json.loads((self.root / "coverage/normal.json").read_text())
+            self.assertEqual((record["plan_attempt"], record["run_attempt"]), ("1", "3"))
+            for report in (first, retry):
+                for row in report["results"]:
+                    self.assertEqual(record["timings"][row["unit"]]["run_attempt"], report["run_attempt"])
+            for invalid in (dict(retry, run_attempt="4"), dict(retry, run_id="another"),
+                            dict(retry, results=first["results"])):
+                files[1].write_text(json.dumps(invalid))
+                self.assert_rejected(step, needs)
+            files[1].unlink()
+            self.assert_rejected(step, needs)
+
     def test_pages_large_needs_preserves_assembly_deployment_and_film_responsibility(self):
         plan = self.large_plan(workflow="pages")
         step = self.step("pages.yml", "coverage", "--verify")
@@ -311,7 +339,7 @@ class LargePlanTransportTest(unittest.TestCase):
         for field, wrong in (("sha", "other-tree"), ("run_attempt", "other-attempt"),
                              ("runtime", {"ImageOS": "other-image"})):
             self.reports(plan)
-            path = self.root / "viz-reports/slow.json"
+            path = next((self.root / "viz-reports").glob("*/slow.json"))
             report = json.loads(path.read_text()); report[field] = wrong
             path.write_text(json.dumps(report))
             self.assert_rejected(step, needs)

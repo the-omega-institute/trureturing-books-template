@@ -58,6 +58,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
+      plan_attempt: ${{ github.run_attempt }}
       plan: ${{ steps.plan.outputs.plan }}
       trureturing_sha: ${{ steps.lock.outputs.sha }}
       site: ${{ steps.plan.outputs.site }}
@@ -498,7 +499,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: tbook-viz-${{ github.run_attempt }}-normal-${{ matrix.batch }}
+          name: tbook-viz-${{ needs.plan.outputs.plan_attempt }}-normal-${{ matrix.batch }}
+          overwrite: true
           path: viz-reports/normal.json
           if-no-files-found: error
           retention-days: 14
@@ -537,7 +539,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: tbook-viz-${{ github.run_attempt }}-slow-${{ matrix.batch }}
+          name: tbook-viz-${{ needs.plan.outputs.plan_attempt }}-slow-${{ matrix.batch }}
+          overwrite: true
           path: viz-reports/slow.json
           if-no-files-found: error
           retention-days: 14
@@ -727,7 +730,7 @@ jobs:
         if: needs.plan.outputs.viz == 'true' || needs.plan.outputs.viz_slow == 'true'
         uses: actions/download-artifact@v7
         with:
-          pattern: tbook-viz-${{ github.run_attempt }}-*
+          pattern: tbook-viz-${{ needs.plan.outputs.plan_attempt }}-*
           path: viz-reports
       - name: Require every planned job to succeed
         id: verified
