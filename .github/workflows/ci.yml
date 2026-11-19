@@ -109,7 +109,6 @@ jobs:
     timeout-minutes: 30
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -269,7 +268,6 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.browser_matrix) }}
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -310,7 +308,6 @@ jobs:
       pages: read
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -364,7 +361,6 @@ jobs:
       pages: read
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -479,7 +475,6 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.viz_matrix) }}
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -519,7 +514,6 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.slow_matrix) }}
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -560,7 +554,6 @@ jobs:
       pages: read
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -654,7 +647,6 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.film_matrix) }}
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
