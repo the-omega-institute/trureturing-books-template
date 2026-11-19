@@ -956,7 +956,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_slow.py": {
-      "sha256": "f5d9584203348ce9a5db79e4d410b15e7024a4dd387ef8e3c109e1d32153020f",
+      "sha256": "155b964dacb893bbed964a2ac398e1d3a76b9f6c661f153344c0ed8855dd9873",
       "mode": "100644"
     },
     "tools/tests/test_container.py": {
