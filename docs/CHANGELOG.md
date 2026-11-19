@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+- 协作守则第 9 条收窄为只约束文档与书的正文：提交记录（提交说明、作者字段）与 PR 描述不再要求去除模型或工具标识。
+
 ## [1.6.4] - 2026-11-20
 
 - 缩小 CI 导出的缓存传输。PDF 与 EPUB 单独恢复可视化静帧，HTML 和幻灯片直接按输入键查 Release。Pages 发布独立静帧库存，完整缓存和书籍导出差量分片启用低等级压缩。来源是下游书库一次普通 PR 的各导出分片重复下载 3.65 GB 的完整缓存。
