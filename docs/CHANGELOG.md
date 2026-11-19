@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+- CI 部分重跑时按原计划轮次、模式和分片读取浏览器报告，记录各分片实际执行的轮次以及最终汇总轮次。
+
 ## [1.6.2] - 2026-11-19
 
 - 移除 CI 与发行作业中的无效令牌值。分支快照解析继续在需要时读取配置的令牌。

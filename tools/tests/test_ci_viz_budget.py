@@ -211,13 +211,13 @@ class ChildRunnerTest(unittest.TestCase):
         run, success = self.run_child(units, fail='never')
         self.assertEqual(run.returncode, 0, run.stderr)
         result = dict(sha=success['sha'], execution={'normal': {u: 'source' for u in units}},
-                      tasks={'viz': True}, coverage={'normal': dict(run_id=success['run_id'],
+                      viz=[dict(batch='1', items=units)], tasks={'viz': True}, coverage={'normal': dict(run_id=success['run_id'],
                       run_attempt=success['run_attempt'], runtime=success['runtime'], inherited=None)})
         def verify(report):
             shutil.rmtree(self.root / 'coverage', ignore_errors=True)
             shutil.rmtree(self.root / 'viz-reports', ignore_errors=True)
             if report is not None:
-                self.write('viz-reports/normal.json', json.dumps(report))
+                self.write(f"viz-reports/tbook-viz-{success['run_attempt']}-normal-1/normal.json", json.dumps(report))
             self.write('ci-needs.json', json.dumps({
                 'plan': {'result': 'success', 'outputs': {'plan': json.dumps(result)}},
                 'viz': {'result': 'success'}}))

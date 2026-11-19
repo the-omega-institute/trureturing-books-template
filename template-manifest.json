@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "d1bb7180179bc32dbc90ca7d7723408a5e06448cf671e6bec2a1a1e0d893d68f",
+      "sha256": "7dcbf5bccad3a3c387bda6920dc6559aae96a00713ab9b1dfc93b7356fd43987",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "6bee12611be8ead18f1ff4df7b9b6e89410e97d8c80491cc03183c8ee985d201",
+      "sha256": "e161a851c28729765287003ae53b034e1031ceb39612392072c75eb6990dc9df",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -576,7 +576,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "72664afb3a1420c0d0e2c31298b7a30678c6328607e1a0cf987b63a9931399ab",
+      "sha256": "ff26ddfaaba8f607eccaab57fd8b12a5c513161ad7c8e295ddf51ac816bba926",
       "mode": "100644"
     },
     "tools/ci/pr_conventions.py": {
@@ -600,7 +600,7 @@
       "mode": "100644"
     },
     "tools/ci/viz_budget.py": {
-      "sha256": "9399d2205697f94c7d8b242073cf0a5dce98fbe6843504c090b455dd8064034e",
+      "sha256": "c2308b3a8ba291936cd16d562cf54bea147cf8400e4d087a45d8e51fcf9f8ba3",
       "mode": "100644"
     },
     "tools/container/Dockerfile": {
@@ -932,7 +932,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "40b31fadc3ff9b0031d0f12a0ae6fbe465cd954335f8ae5a65b6e59d344cc728",
+      "sha256": "3c503b9f6c8cb4f2b785eeddb8226f76d7d51f1f7a7df41fa506e737cde768e4",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {
@@ -944,11 +944,11 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_transport.py": {
-      "sha256": "07f94ea43e1d493f8d51f00eeb01f7ad21c9fb2831f50872674fab570813acc7",
+      "sha256": "8d8a66f4d4058a7ead6fc3c7cc45ce7b608b193cbfe03fa02992552b311c05f5",
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_budget.py": {
-      "sha256": "8229e95e153bdab22d3ab63a08132c5de8f88a76010575f7e3fb71f6e0288043",
+      "sha256": "3509064e10087c4688b85d9759532158691fdfd0453bbe25e6cb5966f67aaa5f",
       "mode": "100644"
     },
     "tools/tests/test_ci_viz_slow.py": {
