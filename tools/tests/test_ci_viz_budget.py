@@ -213,11 +213,13 @@ class ChildRunnerTest(unittest.TestCase):
         result = dict(sha=success['sha'], execution={'normal': {u: 'source' for u in units}},
                       viz=[dict(batch='1', items=units)], tasks={'viz': True}, coverage={'normal': dict(run_id=success['run_id'],
                       run_attempt=success['run_attempt'], runtime=success['runtime'], inherited=None)})
-        def verify(report):
+        def verify(report, *, single_download=False):
             shutil.rmtree(self.root / 'coverage', ignore_errors=True)
             shutil.rmtree(self.root / 'viz-reports', ignore_errors=True)
             if report is not None:
-                self.write(f"viz-reports/tbook-viz-{success['run_attempt']}-normal-1/normal.json", json.dumps(report))
+                path = ("viz-reports/normal.json" if single_download else
+                        f"viz-reports/tbook-viz-{success['run_attempt']}-normal-1/normal.json")
+                self.write(path, json.dumps(report))
             self.write('ci-needs.json', json.dumps({
                 'plan': {'result': 'success', 'outputs': {'plan': json.dumps(result)}},
                 'viz': {'result': 'success'}}))
@@ -233,10 +235,15 @@ class ChildRunnerTest(unittest.TestCase):
                        dict(success, results=success['results'] * 2)):
             self.assertNotEqual(verify(report).returncode, 0)
             self.assertFalse((self.root / 'coverage').exists())
-        check = verify(success)
-        self.assertEqual(check.returncode, 0, check.stderr)
-        record = json.loads((self.root / 'coverage/normal.json').read_text())
-        self.assertEqual(set(record['timings']), set(units))
+        for single_download in (False, True):
+            with self.subTest(single_download=single_download):
+                check = verify(success, single_download=single_download)
+                self.assertEqual(check.returncode, 0, check.stderr)
+                record = json.loads((self.root / 'coverage/normal.json').read_text())
+                self.assertEqual(set(record['timings']), set(units))
+        incomplete = dict(success, results=success['results'][:1])
+        self.assertNotEqual(verify(incomplete, single_download=True).returncode, 0)
+        self.assertFalse((self.root / 'coverage').exists())
 
 
 if __name__ == '__main__':
