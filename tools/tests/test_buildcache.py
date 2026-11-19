@@ -301,6 +301,9 @@ class KeyTests(unittest.TestCase):
             site = config.load_site()
             out = s.root / "build/out"
 
+            fixture = book_dir / "viz/tests/data.txt"
+            write(fixture, "data")
+
             def keys():
                 book = config.load_book("demo")
                 units = [
@@ -323,8 +326,6 @@ class KeyTests(unittest.TestCase):
                 with self.subTest(path=name):
                     assert_change(s.root / name, expected)
             assert_change(test_path, set())
-            fixture = book_dir / "viz/tests/data.txt"
-            write(fixture, "data")
             assert_change(fixture, set(keys()))
             write(book_dir / "slides/intro/slides.md", "# Slides\n\n[Fixture](../../viz/tests/demo.test.mjs)\n")
             assert_change(test_path, {"slides"})
