@@ -190,7 +190,6 @@ jobs:
       pages: read
     env:
       TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
-      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5

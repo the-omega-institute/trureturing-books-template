@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "8fb40679040de17f9c3cb4df3f4bbfa1c0b0526b6a409edbec4b47fe487430ed",
+      "sha256": "d1bb7180179bc32dbc90ca7d7723408a5e06448cf671e6bec2a1a1e0d893d68f",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -64,7 +64,7 @@
       "mode": "100644"
     },
     ".github/workflows/release.yml": {
-      "sha256": "a7dd0ae609b1b87d803988592fb06ef0290f038ab02994276a351a0173e03248",
+      "sha256": "5fafd59eaa1e202fed35e73226fa4413a7342822294f7367efb3d0bba372cde2",
       "mode": "100644"
     },
     ".github/workflows/template-release.yml": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "562481e810634fe0c11548048e4bbc6057d7babe5e2c250c59d064c04dc4432e",
+      "sha256": "6bee12611be8ead18f1ff4df7b9b6e89410e97d8c80491cc03183c8ee985d201",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
