@@ -62,11 +62,15 @@ def prepare(root: Path, toolchain: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--image-source", action="store_true", help="find the commit that supplied the image inputs")
     parser.add_argument("--image-key", action="store_true", help="identify the tracked image and validation inputs")
     parser.add_argument("--record", action="store_true", help="record image inputs at build time")
     parser.add_argument("--toolchain", type=Path, default=Path("/opt/tbook"))
     parser.add_argument("--root", type=Path, default=Path.cwd())
     args = parser.parse_args()
+    if args.image_source:
+        print(image_source(args.root))
+        return
     if args.image_key:
         print(image_key(args.root))
         return

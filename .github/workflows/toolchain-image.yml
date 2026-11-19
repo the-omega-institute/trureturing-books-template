@@ -194,16 +194,18 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             if ! docker buildx imagetools inspect "$verified" > /dev/null; then
               # A release can race the default-branch producer of these inputs.
-              PYTHONPATH=tools/ci:tools/container python3 - <<'PY'
-          import os
-          from pathlib import Path
-          from pages import wait_for_push
-          from prepare import image_source
-          sha = image_source(Path.cwd())
-          run = wait_for_push(os.environ["GITHUB_REPOSITORY"], "toolchain-image", os.environ["DEFAULT_BRANCH"], sha, minutes=95)
-          if run["conclusion"] != "success":
-              raise SystemExit(f"Toolchain producer {sha} did not pass: {run['html_url']}")
-          PY
+              source_sha="$(python3 tools/container/prepare.py --image-source)"
+              run=''
+              for _ in {1..12}; do
+                run="$(gh run list --workflow toolchain-image.yml --event push --branch "$DEFAULT_BRANCH" --commit "$source_sha" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+                if [[ -n "$run" ]]; then break; fi
+                sleep 10
+              done
+              if [[ -z "$run" ]]; then
+                echo "::error::No default-branch toolchain build found for $source_sha"
+                exit 1
+              fi
+              gh run watch "$run" --exit-status --interval 30
             fi
             docker buildx imagetools create --prefer-index=false --tag "$IMAGE:$GITHUB_REF_NAME" --tag "$IMAGE:sha-$GITHUB_SHA" "$verified"
           else
