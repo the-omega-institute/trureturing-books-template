@@ -311,10 +311,10 @@ class AffectedPlanTest(unittest.TestCase):
         paths = planner.changed_paths(self.root, old.sha, head.sha)
         return planner.impact(head, old, paths, template=True)
 
-    def make_plan(self, event="push", *, baseline=True, payload=None, **kwargs):
+    def make_plan(self, event="push", *, baseline=True, **kwargs):
         def get(*args):
             return {"sha": self.base, "source_run": 17, "artifact_id": 42} if baseline else None
-        return planner.plan(self.root, event=event, payload=payload or {}, repo="owner/books", branch="main",
+        return planner.plan(self.root, event=event, payload={}, repo="owner/books", branch="main",
                             ref="refs/heads/main", get_baseline=get, **kwargs)
 
     def test_documentary_change_only_manifest_no_consumers(self):
@@ -544,7 +544,7 @@ class AffectedPlanTest(unittest.TestCase):
                 fields = dict(line.split("=", 1) for line in output.read_text().splitlines())
                 self.assertTrue(json.loads(fields["validate"]))
                 self.assertTrue(json.loads(fields["build"]))
-                pages = self.make_plan(event="push", workflow="pages", payload={"before": self.base}, baseline=baseline)
+                pages = self.make_plan(event="workflow_run", workflow="pages", baseline=baseline)
                 self.assertTrue(pages["site"])
                 self.assertEqual(pages["sha"], head)
                 self.assertEqual(pages["coverage"]["pages"]["paths"], [path])
@@ -1065,13 +1065,12 @@ class AffectedPlanTest(unittest.TestCase):
     def test_pages_uses_own_deployment_profile_and_aggregate(self):
         self.write("docs/PUBLISHING.md", "new\n")
         self.commit()
-        result = self.make_plan(event="workflow_dispatch", workflow="pages")
+        result = self.make_plan(workflow="pages")
         self.assertFalse(result["site"])
         self.assertEqual(result["profiles"], ["pages"])
         planner.verify_results(result, {"plan": {"result": "success"}, "probe": {"result": "success"},
                                        "build": {"result": "skipped"}, "deploy": {"result": "skipped"}}, pages=True)
-        self.assertTrue(self.make_plan(event="workflow_dispatch", workflow="pages", baseline=False)["site"])
-        self.assertTrue(self.make_plan(event="push", workflow="pages")["site"])
+        self.assertTrue(self.make_plan(workflow="pages", baseline=False)["site"])
         result["site"] = True
         with self.assertRaises(ValueError):
             planner.verify_results(result, {"plan": {"result": "success"}, "probe": {"result": "success"},
@@ -1316,7 +1315,7 @@ class FilmResponsibilityCoverageTest(unittest.TestCase):
                 self.assert_films(unchanged, [])
                 self.finish(unchanged)  # Successful inheritance can advance actual film coverage too.
                 if producer == "pages":
-                    no_op = self.select("workflow_dispatch", workflow="pages")
+                    no_op = self.select(workflow="pages")
                     self.assertFalse(no_op["site"])
                     self.assertNotIn("films", no_op["coverage"])
                     self.finish(no_op, "pages")
@@ -1461,38 +1460,27 @@ class DeploymentCoverageTest(unittest.TestCase):
             if name == "push":
                 self.assertIn("branches: [main]", block)
 
-    def test_pages_only_accepts_ci_for_its_own_push(self):
-        with mock.patch.dict("sys.modules", {"plan": planner}):
-            pages = ci_module("pages")
-        sha = "a" * 40
-        own = dict(id=1, head_sha=sha, head_branch="main", event="push",
-                   head_repository={"full_name": "owner/books"}, status="completed")
-        for conclusion in ("success", "failure", "cancelled"):
-            matching = dict(own, conclusion=conclusion)
-            with mock.patch.object(pages, "push_runs", return_value=[matching]):
-                self.assertEqual(pages.wait_for_push("owner/books", "ci", "main", sha, 1), matching)
-        runs = [own, dict(own, head_sha="b" * 40), dict(own, head_branch="dev"),
-                dict(own, event="pull_request"), dict(own, head_repository={"full_name": "fork/books"})]
-        self.assertEqual(pages.push_runs("owner/books", "ci", "main", sha,
-                                         get=lambda _: {"workflow_runs": runs}), [own])
-
-    def test_pages_can_advance_before_main_head_but_cannot_roll_back(self):
-        with mock.patch.dict("sys.modules", {"plan": planner}):
-            pages = ci_module("pages")
-        old, candidate, head, divergent = ("a" * 40, "b" * 40, "c" * 40, "d" * 40)
-        history = [old, candidate, head]
-
-        def ancestor(_, ancestor_sha, descendant_sha):
-            return (ancestor_sha in history and descendant_sha in history
-                    and history.index(ancestor_sha) <= history.index(descendant_sha))
-
-        with mock.patch.object(pages, "ancestor", side_effect=ancestor):
-            for live, expected in ((None, True), (old, True), (candidate, False),
-                                   (head, False), (divergent, False)):
-                with self.subTest(live=live), mock.patch.object(pages, "active_deployment", return_value=live):
-                    self.assertEqual(pages.is_newer(Path("."), "owner/books", head, candidate), expected)
-            with mock.patch.object(pages, "active_deployment", return_value=old):
-                self.assertFalse(pages.is_newer(Path("."), "owner/books", head, divergent))
+    def test_pages_requires_successful_current_main_push_and_ignores_pr_completion(self):
+        import re
+        from test_verification import gha_if
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/pages.yml"
+        condition = " ".join(re.search(r"^    if: >-\n(.*?)^    name:", workflow.read_text(), re.M | re.S).group(1).split())
+        context = {"github.event.workflow_run.conclusion": "success",
+                   "github.event.workflow_run.event": "push",
+                   "github.event.workflow_run.head_repository.full_name": "owner/books",
+                   "github.repository": "owner/books", "github.sha": "current-sha",
+                   "github.event.workflow_run.head_sha": "current-sha"}
+        self.assertTrue(gha_if(condition, event="workflow_run", ref="refs/heads/main", context=context))
+        for change in ({"github.event.workflow_run.conclusion": "cancelled"},
+                       {"github.event.workflow_run.conclusion": "failure"},
+                       {"github.event.workflow_run.event": "pull_request"},
+                       {"github.event.workflow_run.head_repository.full_name": "fork/books"},
+                       {"github.event.workflow_run.head_sha": "older-sha"}):
+            with self.subTest(change=change):
+                self.assertFalse(gha_if(condition, event="workflow_run", ref="refs/heads/main",
+                                        context={**context, **change}))
+        self.assertTrue(gha_if(condition, event="workflow_dispatch", ref="refs/heads/main",
+                               context={name: "" for name in context}))
 
     def test_only_superseded_pull_requests_cancel_running_ci(self):
         import re
