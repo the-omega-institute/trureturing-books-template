@@ -125,7 +125,7 @@ git -C "$T" cat-file -e "$C:Golden/Frozen/state/<模块路径>.lean.json" && ech
 1. 确认要写的每条形式结论在 trureturing 中已有冻结声明：在 trureturing checkout 中搜索 `D5/`，或读 `Golden/Frozen/state/<module>.lean.json`。没有 → 若源文有证明，按 DOI 或源论文仓库地址、原文定位和对应 issue 登记显式书面证明，并关联每版证明；若确实开放，用 conjecture/problem。需要内核验证且已获授权时再走 `skills/theorem-formalize`。
 2. 在权威版本中写作；新增 GID 后运行 `./tbook pin --refresh`（不移动提交，只解析新引用）。
 3. 同步其他语言版本（同样的 id、lean、顺序）。
-4. `./tbook check` 必须 0 错误；处理警告（未列入 SUMMARY 的文件、未使用的锁条目）。
+4. `./tbook check` 必须 0 错误；处理警告（未列入 SUMMARY 的文件、未使用的锁条目）。只改正文文字（含定理环境属性、交叉引用及随之的钉版）时，本地验证到这一步与第 5 步的构建为止，不运行 `./tbook test`：受影响的浏览器套件、影片、幻灯片与导出检查由 PR 的 CI 执行（`CLAUDE.md` 第 8 条）。
 5. `./tbook build html --book <slug>`，检查构建日志与适用的自动检查结果。改动了公式或表格时，`./tbook build pdf epub --book <slug>` 也要跑：epubcheck 的错误与 PDF 的转换问题只在各自的构建里暴露（见“容易踩的坑”）。普通正文修改不默认截图或打开页面逐一查看；仅在出现相关错误或警告，或任务明确要求视觉／版式检查与修复时，按 [book-export](../book-export/SKILL.md) 排查受影响页面。
 6. 提交：说明改了哪些章节、新增了哪些 GID。提交说明与 PR 正文不写模型或生成工具的标识；创建 PR 的工具若在正文末尾自动追加了署名页脚，创建后把正文原样再保存一次，去掉它。
 
