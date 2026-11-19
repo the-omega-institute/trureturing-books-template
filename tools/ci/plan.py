@@ -22,7 +22,7 @@ import zipfile
 # This constructor is dependency-free and shared with the actual video unit.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import film_inputs, template as template_metadata
-from ci import viz_budget, testing
+from ci import viz_budget, testing, trusted_cache
 
 VERSION = 6
 SCHEMA = "tbook-ci-coverage-v1"
@@ -773,7 +773,8 @@ def trusted_baseline(root, repo, branch, workflow, profile, sig, limit, *, get=a
     runs = get(f"repos/{repo}/actions/workflows/{workflow}.yml/runs?{query}")["workflow_runs"]
     for run in runs:
         if not (run.get("workflow_id") == wf["id"] and run.get("head_repository", {}).get("full_name") == repo and
-                run.get("head_branch") == branch and run.get("event") in ({"push", "workflow_dispatch", "schedule"} | ({"workflow_run"} if workflow == "pages" else set())) and
+                run.get("head_branch") == branch and
+                (trusted_cache.pages_producer(run) if workflow == "pages" else run.get("event") in ("push", "workflow_dispatch", "schedule")) and
                 run.get("status") == "completed" and run.get("conclusion") == "success" and
                 str(run.get("id")) != os.environ.get("GITHUB_RUN_ID")):
             continue
@@ -820,7 +821,8 @@ def trusted_revision(root, repo, branch, workflow, limit):
     query = urlencode(dict(branch=branch, status="success", per_page=100))
     for run in api(f"repos/{repo}/actions/workflows/{workflow}.yml/runs?{query}")["workflow_runs"]:
         if (run.get("workflow_id") == wf["id"] and run.get("head_repository", {}).get("full_name") == repo and
-                run.get("head_branch") == branch and run.get("event") in ({"push", "workflow_dispatch", "schedule"} | ({"workflow_run"} if workflow == "pages" else set())) and
+                run.get("head_branch") == branch and
+                (trusted_cache.pages_producer(run) if workflow == "pages" else run.get("event") in ("push", "workflow_dispatch", "schedule")) and
                 run.get("status") == "completed" and run.get("conclusion") == "success" and
                 str(run.get("id")) != os.environ.get("GITHUB_RUN_ID") and ancestor(root, run["head_sha"], limit)):
             return run["head_sha"]
@@ -854,9 +856,9 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
     execution, matrices, workloads = {}, {}, {}
     live_execution, live_workloads = {}, {}
     template = repo == "the-omega-institute/trureturing-books-template"
-    deferred_films = event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
+    deferred_films = workflow == "ci" and event == "push" and (ref == f"refs/heads/{branch}" or ref.startswith("refs/tags/"))
     # The tested merge parent and push "before" are independent of caches and coverage.
-    before = payload.get("before") if event == "push" else None
+    before = payload.get("before") if workflow == "ci" and event == "push" else None
     created = before == "0" * 40
     first_branch_push = created and ref.startswith("refs/heads/") and not base
     comparison = base or pr_base or (before if not created else None)
@@ -912,8 +914,8 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
         selected = impact(current, previous, paths, full=mode == "full", template=template)
         if profile == "normal":
             stills = image_shards(current, selected["exports"], previous=previous, paths=paths, full=mode == "full")
-        if profile == "pages" and not (record or deployed_sha):
-            # A Git comparison cannot inherit a successful deployment identity.
+        if profile == "pages" and (event == "push" or not (record or deployed_sha)):
+            # Advance the live commit even when all publication units can be reused.
             selected["site"] = True
         if not record:
             reasons.append(f"{profile}: explicit full" if mode == "full" else f"{profile}: changes only, without coverage artifact")

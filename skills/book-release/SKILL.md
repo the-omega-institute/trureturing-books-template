@@ -13,7 +13,7 @@ description: 发布一本书或整个书库的版本时使用：更新版本号�
 
 ## 自动发布
 
-- **Pages**：每次推送到 `main`，`pages.yml` 运行 `./tbook check` 与 `./tbook build all`（含视频；无法渲染的视频让构建失败），把 `_site/` 部署到 GitHub Pages，视频由站点同源托管。首次使用需在 Settings → Pages → Source 选 “GitHub Actions”。
+- **Pages**：主干推送完成 CI 后或定时检查时，选择仍在主干历史中、比线上更新的最新已验证提交。自动发布间隔至少 20 分钟，失败的部署尝试也计入间隔。构建执行 `./tbook build all`，将 `_site/` 部署到 GitHub Pages。视频由站点同源托管，渲染失败会阻止发布。手动运行另做 `./tbook check`。首次使用需在 Settings → Pages → Source 选 “GitHub Actions”。
 - **CI**：每个 PR 与推送运行检查与构建（`ci.yml`，`media` 作业也构建视频，默认分支与 tag 的推送除外：那里由 `pages.yml` 与发版工作流构建），产物作为 artifact 上传，可下载审阅。
 - **构建缓存**：输入没有变化的单元（HTML、PDF、EPUB、幻灯片、视频）不再构建。`pages.yml` 在 `main` 上（push 或手动运行）保存 Actions 缓存，键为存储内容摘要加运行号 `build-cache-v1-<sha256>-r<run id>-<run attempt>`，内容与恢复到的相同时不再保存；分支与 tag 上的构建只恢复。PR 运行既不恢复也不保存 Actions 缓存（防投毒），只从最近 5 个已发布的整站 Release 恢复；新仓库或缓存被清除时同样从 Release 恢复。视频不再单独发 Release。
 

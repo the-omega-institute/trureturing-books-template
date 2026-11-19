@@ -1475,7 +1475,7 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         """The workflow that saves the store and renders films for it runs one run at a time; a later run
         restores what the earlier one saved instead of rendering the same film again."""
         text = (self.WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
-        self.assertRegex(text, r"(?m)^concurrency:\n  group: pages\n  cancel-in-progress: false$")
+        self.assertRegex(text, r"(?ms)^concurrency:\n  group: >-\n.*?\|\| 'pages' }}\n  cancel-in-progress: false$")
 
     def publish_step(self, workflow: str) -> dict:
         steps = workflow_jobs(self.WORKFLOWS / workflow)["publish"]
