@@ -149,7 +149,8 @@ def inventory(tree):
                 deps[suite] = patterns
         parts_path = prefix + "viz/tests/execution-parts.json"
         declared = viz_budget.parts(tree.json(parts_path), [PurePosixPath(s).name for s in suites]) if parts_path in tree.files else {}
-        books[slug] = dict(suites=suites, parts=declared, films=films, slides=sorted(decks), deps=deps,
+        has_viz = any(f.startswith(prefix + "viz/") for f in tree.files)
+        books[slug] = dict(has_viz=has_viz, suites=suites, parts=declared, films=films, slides=sorted(decks), deps=deps,
                            outputs=[*( ["html"] if outputs.get("html", True) else []),
                                     *("pdf-" + v for v in pdf), *( ["epub"] if outputs.get("epub", True) else [])])
     return books
@@ -608,7 +609,7 @@ def impact(current, previous, paths, *, full=False, template=False):
                 everything("unknown book path: ", p)
                 continue
             local = "/".join(parts[2:])
-            test_input = local.startswith("viz/tests/")
+            test_input = buildcache.viz_harness_file(local)
             site |= not test_input
             checks["structure"] = True
             if slug not in now:
@@ -685,8 +686,10 @@ def impact(current, previous, paths, *, full=False, template=False):
             if publication is not None:
                 site = True
                 formats, decks = publication
-                checks["viz_static"] |= p.startswith("theme/viz/")
                 for slug, book in now.items():
+                    if p.startswith("theme/viz/") and book["has_viz"]:
+                        checks["viz_static"] = True
+                        selected_books.add(slug)
                     for output in book["outputs"]:
                         if output.partition("-")[0] in formats:
                             selected_books.add(slug)

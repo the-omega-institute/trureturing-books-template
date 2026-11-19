@@ -311,6 +311,12 @@ def site_inputs(site: config.Site) -> Inputs:
             .text("python", _python()))
 
 
+def viz_harness_file(local: str) -> bool:
+    """Known harness files; other files under viz/tests may be input data for generators."""
+    return (local in ("viz/tests/dependencies.json", "viz/tests/execution-parts.json") or
+            re.fullmatch(r"viz/tests/[^/]+\.test\.mjs", local) is not None)
+
+
 def book_viz_test_reader(name: str, languages: Iterable[str], read: Callable[[], str], *, slides=False) -> bool:
     """Whether a book source may consume its visualization test files."""
     area = name.split("/", 1)[0]
@@ -322,16 +328,16 @@ def book_viz_test_reader(name: str, languages: Iterable[str], read: Callable[[],
     else:
         may_link = (area in languages and suffix == ".md") or name == "viz/visualizations.json"
     if area == "figures" and suffix == ".py":
-        may_link = True
+        return bool(re.search(r"\btests\b", read(), re.IGNORECASE))
     return may_link and bool(re.search(r"\btests/", urllib.parse.unquote(read()), re.IGNORECASE))
 
 
 def _book_inputs(book: config.Book, *, slides=False) -> Inputs:
     """Keep the owning book's inputs, omitting the test tree unless a publication can read it."""
-    exclusion = f"/{_item_label(book.dir)}/viz/tests/"
+    prefix = _item_label(book.dir) + "/"
     files = _files_under(book.dir)
     custom = getattr(book, "raw", {}).get("derived", {}).get("command") is not None
-    if not custom and any(exclusion in "/" + label for _, label in files):
+    if not custom and any(viz_harness_file(label.removeprefix(prefix)) for _, label in files):
         for path, _ in files:
             root = book.dir if path.is_relative_to(book.dir) else book.dir.resolve()
             name = path.relative_to(root).as_posix()
@@ -339,7 +345,7 @@ def _book_inputs(book: config.Book, *, slides=False) -> Inputs:
                                     lambda: path.read_text(encoding="utf-8"), slides=slides):
                 custom = True
                 break
-    parts = [(label, file_digest(path)) for path, label in files if custom or exclusion not in "/" + label]
+    parts = [(label, file_digest(path)) for path, label in files if custom or not viz_harness_file(label.removeprefix(prefix))]
     return Inputs(parts or [(_item_label(book.dir), "missing")])
 
 
