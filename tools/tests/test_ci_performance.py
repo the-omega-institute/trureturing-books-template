@@ -650,6 +650,20 @@ class AffectedPlanTest(unittest.TestCase):
             self.assertEqual(result["slides"], ["one/a"])
             self.assertTrue(result["site"])
 
+    def test_viz_fixture_data_and_html_only_runtime_consumers(self):
+        self.write("books/one/book.toml", "[outputs]\nhtml=true\npdf=false\nepub=false\n")
+        self.write("books/one/figures/probe.py", 'value = (root / "viz" / "tests" / filename).read_text()')
+        self.write("books/one/viz/tests/data.txt", "figure input")
+        tree = planner.Tree(self.root, self.commit())
+        runtime = planner.impact(tree, tree, ["theme/viz/kit.js"])
+        self.assertTrue(runtime["checks"]["viz_static"])
+        self.assertIn("one", runtime["books"])
+        self.assertFalse(any(row["book"] == "one" for row in runtime["exports"]))
+        for filename in ("data.txt", "a.test.mjs"):
+            fixture = planner.impact(tree, tree, ["books/one/viz/tests/" + filename])
+            self.assertEqual({row["book"] for row in fixture["exports"]}, {"one"})
+            self.assertTrue(fixture["site"])
+
     def test_release_and_cache_action_changes_select_direct_tests_and_declared_readers(self):
         import json
 

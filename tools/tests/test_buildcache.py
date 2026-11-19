@@ -323,6 +323,9 @@ class KeyTests(unittest.TestCase):
                 with self.subTest(path=name):
                     assert_change(s.root / name, expected)
             assert_change(test_path, set())
+            fixture = book_dir / "viz/tests/data.txt"
+            write(fixture, "data")
+            assert_change(fixture, set(keys()))
             write(book_dir / "slides/intro/slides.md", "# Slides\n\n[Fixture](../../viz/tests/demo.test.mjs)\n")
             assert_change(test_path, {"slides"})
             write(chapter, "# Chapter\n\n[Fixture](../viz/tests/demo.test.mjs)\n")
