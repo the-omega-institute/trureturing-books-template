@@ -12,6 +12,17 @@ import subprocess
 from urllib.parse import urlencode
 
 
+PAGES_PUSH_TITLE = "Publish Pages for "
+PAGES_SCHEDULER_TITLE = "Select a Pages update"
+
+
+def pages_producer(run):
+    title = run.get("display_title", "")
+    if run.get("event") == "push":
+        return not title.startswith(PAGES_PUSH_TITLE) or int(run.get("run_attempt", 1)) > 1
+    return run.get("event") in ("workflow_dispatch", "workflow_run") and title != PAGES_SCHEDULER_TITLE
+
+
 def api(endpoint: str):
     result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True, timeout=30, check=True)
     return json.loads(result.stdout)
@@ -47,9 +58,9 @@ def find_films(repo: str, branch: str, get=api) -> tuple[int, int] | None:
                 runs[run_id] = get(f"repos/{repo}/actions/runs/{run_id}")
             run = runs[run_id]
             name = workflows.get(run.get("workflow_id"))
-            events = {"push", "workflow_dispatch", "schedule" if name == "ci.yml" else "workflow_run"}
+            own_event = pages_producer(run) if name == "pages.yml" else run.get("event") in ("push", "workflow_dispatch", "schedule")
             if (name and run.get("head_repository", {}).get("full_name") == repo and
-                    run.get("head_branch") == branch and run.get("event") in events and
+                    run.get("head_branch") == branch and own_event and
                     run.get("status") == "completed" and run.get("conclusion") == "success"):
                 candidates.append((run.get("updated_at") or run.get("created_at", ""),
                                    run_id, int(artifact["id"])))
@@ -59,7 +70,7 @@ def find_films(repo: str, branch: str, get=api) -> tuple[int, int] | None:
 def find(repo: str, branch: str, get=api, *, artifact_name="tbook-build-store") -> tuple[int, int] | None:
     if artifact_name == "tbook-film-store":
         return find_films(repo, branch, get)
-    query = urlencode({"branch": branch, "status": "success", "per_page": 20})
+    query = urlencode({"branch": branch, "status": "success", "per_page": 100})
     runs = []
     for name in ("ci.yml", "pages.yml"):
         try:
@@ -69,11 +80,11 @@ def find(repo: str, branch: str, get=api, *, artifact_name="tbook-build-store") 
             found = get(f"repos/{repo}/actions/workflows/{name}/runs?{query}").get("workflow_runs", [])
         except (OSError, ValueError, subprocess.SubprocessError):
             continue
-        events = {"push", "workflow_dispatch", *({"schedule"} if name == "ci.yml" else {"workflow_run"})}
         runs += [run for run in found if (
             run.get("workflow_id") == workflow["id"] and
             run.get("head_repository", {}).get("full_name") == repo and
-            run.get("head_branch") == branch and run.get("event") in events and
+            run.get("head_branch") == branch and
+            (pages_producer(run) if name == "pages.yml" else run.get("event") in ("push", "workflow_dispatch", "schedule")) and
             run.get("status") == "completed" and run.get("conclusion") == "success")]
     # A long Pages build can upload fresh films after a later-started CI has
     # finished. Prefer the most recently completed producer, including reruns.
