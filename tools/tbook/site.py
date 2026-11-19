@@ -1571,7 +1571,10 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
         unknown = parts - set(MEDIA_PARTS)
         if unknown:
             raise SiteError(f"only= accepts {', '.join(MEDIA_PARTS)}; got {', '.join(sorted(unknown))}")
-    release_pdfs = releases.pdf_assets(site.repo) if site.pdf_release_only else None
+    site_books = list(books) if parts is None else _site_books(list(books), out)
+    release_pdfs = None
+    if site.pdf_release_only:
+        release_pdfs = releases.pdf_assets(site.repo) if site_books else {}
     lock = _load_lock()
     if parts is None:
         _reset(out)
@@ -1582,7 +1585,7 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
     removed = _remove_hidden_books(out, rebuilt)
     if removed:
         _warn(f"removed the pages of {', '.join(removed)} (hidden by site.toml [books].hide)")
-    for book in books if parts is None else _site_books(list(books), out):
+    for book in site_books:
         bdir = out / book.slug
         bdir.mkdir(parents=True, exist_ok=True)
         models = load_book_models(book)
