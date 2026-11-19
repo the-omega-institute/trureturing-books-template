@@ -42,6 +42,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from . import paths
@@ -861,6 +862,17 @@ def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
 # --------------------------------------------------------------------------- lock file
 
 
+@dataclass(frozen=True)
+class BranchLock:
+    repo: str
+    branch: str
+
+    def save(self, path: Path | None = None) -> None:
+        path = path or paths.LOCK_FILE
+        path.write_text(json.dumps(dict(schema=LOCK_SCHEMA, repo=self.repo, branch=self.branch),
+                                   ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 @dataclass
 class Lock:
     repo: str
@@ -871,20 +883,38 @@ class Lock:
     schema: str = LOCK_SCHEMA
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "Lock | None":
+    def read_spec(cls, path: Path | None = None) -> "Lock | BranchLock | None":
         path = path or paths.LOCK_FILE
         if not path.exists():
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("schema") != LOCK_SCHEMA:
             raise LeanError(f"{paths.rel(path)}: unsupported schema {data.get('schema')!r}")
+        if "commit" not in data:
+            if set(data) != {"schema", "repo", "branch"} or not all(
+                    isinstance(data[k], str) and data[k] for k in ("repo", "branch")):
+                raise LeanError(f"{paths.rel(path)}: a branch lock requires schema, repo and branch")
+            return BranchLock(data["repo"], data["branch"])
         if not SHA_RE.match(data.get("commit", "")):
             raise LeanError(f"{paths.rel(path)}: commit must be a full 40-hex SHA")
         return cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
                    pinned_at=data.get("pinned_at", ""), declarations=data.get("declarations", {}))
 
-    def save(self, path: Path | None = None) -> None:
-        path = path or paths.LOCK_FILE
+    @classmethod
+    def load(cls, path: Path | None = None, *, offline: bool = False) -> "Lock | None":
+        source = path or paths.LOCK_FILE
+        spec = cls.read_spec(source)
+        if isinstance(spec, BranchLock):
+            snapshot = os.environ.get("TBOOK_LOCK_SNAPSHOT") if path is None else None
+            if snapshot:
+                resolved = cls.read_spec(Path(snapshot))
+                if not isinstance(resolved, Lock) or (resolved.repo, resolved.branch) != (spec.repo, spec.branch):
+                    raise LeanError(f"trureturing snapshot does not match the branch lock: {snapshot}")
+                return resolved
+            return _resolve_branch_lock(source, spec, os.environ.get("TBOOK_TRURETURING_SHA", ""), offline)
+        return spec
+
+    def document(self) -> str:
         data = {
             "schema": self.schema,
             "repo": self.repo,
@@ -893,7 +923,10 @@ class Lock:
             "pinned_at": self.pinned_at,
             "declarations": {k: self.declarations[k] for k in sorted(self.declarations)},
         }
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+
+    def save(self, path: Path | None = None) -> None:
+        (path or paths.LOCK_FILE).write_text(self.document(), encoding="utf-8")
 
     def get(self, gid: str) -> Resolution | None:
         d = self.declarations.get(gid)
@@ -922,6 +955,13 @@ class Lock:
     @property
     def tree_url(self) -> str:
         return f"https://github.com/{self.repo}/tree/{self.commit}"
+
+
+@lru_cache(maxsize=4)
+def _resolve_branch_lock(path: Path, spec: BranchLock, commit: str, offline: bool) -> Lock:
+    from . import pin
+
+    return pin.resolve_branch(spec, commit=commit, offline=offline)
 
 
 def ls_remote(repo: str, ref: str) -> str:

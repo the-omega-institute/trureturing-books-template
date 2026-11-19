@@ -13,6 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { bookDirs, hiddenBy, hiddenError, hidePatterns } from './slides-lib.mjs';
+import { readTrureturingLock } from './trureturing-lock.mjs';
 
 export const ROOT = path.resolve(process.env.TBOOK_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
 export const BOOKS = path.join(ROOT, 'books');
@@ -73,8 +74,7 @@ export function writeRegistry(book, reg) {
 
 /** trureturing.lock.json, or null when it does not exist. */
 export function readLock() {
-  if (!fs.existsSync(LOCK_FILE)) return null;
-  return JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8'));
+  return readTrureturingLock(ROOT);
 }
 
 export function parseGid(gid) {

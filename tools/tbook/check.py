@@ -649,7 +649,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
     for path, msg in config.i18n_problems(i18n_langs):
         _err(issues, path, 0, msg)
     try:
-        lock = lean.Lock.load()
+        lock = lean.Lock.load(offline=offline)
     except (lean.LeanError, ValueError, KeyError) as exc:
         _err(issues, paths.LOCK_FILE, 0, f"unreadable lock: {exc}")
         lock = None

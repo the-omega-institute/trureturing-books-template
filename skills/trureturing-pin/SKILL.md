@@ -11,7 +11,7 @@ description: 升级或刷新本书库所钉的 trureturing 提交时使用（./t
 
 **权威**：`tools/tbook/pin.py` 的行为与 `./tbook check` 的输出。
 
-## 三种用法
+## 选择锁定方式
 
 本地上游默认使用 `~/trureturing`；用户显式指定的路径或已有 `TRURETURING_DIR` 优先。沿用形式化或研究步骤已选定的 checkout，不因切换 skill 改回相邻目录。运行本地命令前设置：
 
@@ -20,10 +20,13 @@ export TRURETURING_DIR="${TRURETURING_DIR:-$HOME/trureturing}"
 ```
 
 ```bash
+./tbook pin --follow     # 把分支名写入锁文件，构建与检查自动解析
 ./tbook pin              # 跟随 site.toml [trureturing].branch（默认 dev）到最新提交
 ./tbook pin <sha|ref>    # 钉到指定提交（完整或缩写 SHA）、分支或 tag
 ./tbook pin --refresh    # 不动提交；解析新增引用、清理不再使用的条目
 ```
+
+分支锁只记录仓库与分支。普通 `pin` 和 `pin --refresh` 保留分支锁并核对当前引用，`pin <完整 SHA>` 切回固定提交。分支锁不再需要定时 bump PR，Pages 会在每天 05:17 UTC 查上游并按需重新部署。
 
 加 `--dry-run` 只看报告不写锁文件；加 `--report build/pin.md` 把报告写成文件（PR 正文用，目录不存在时自动创建）。
 

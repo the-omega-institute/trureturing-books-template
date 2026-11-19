@@ -373,6 +373,28 @@ class PinBranchTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         return ledger
 
+    def test_follow_writes_branch_and_resolves_at_use(self):
+        self.use(FakeLedger(on_branch=True))
+        with mock.patch.object(lean, "ls_remote", side_effect=[COMMIT, OLD_COMMIT]) as ls:
+            report = pin.pin(follow=True)
+            self.assertTrue(report.written)
+            self.assertEqual(json.loads(paths.LOCK_FILE.read_text()), {
+                "schema": lean.LOCK_SCHEMA, "repo": TRU, "branch": "dev",
+            })
+            resolved = lean.Lock.load()
+            self.assertEqual(resolved.commit, OLD_COMMIT)
+            self.assertIn(GID_3V, resolved.declarations)
+            self.assertEqual(lean.Lock.load().commit, OLD_COMMIT)
+            self.assertEqual(ls.call_args_list, [mock.call(TRU, "refs/heads/dev")] * 2)
+        self.assertTrue(pin.pin(COMMIT, offline=True).written)
+        self.assertEqual(lean.Lock.load().commit, COMMIT)
+
+    def test_follow_rejects_an_untrusted_workflow_sha(self):
+        self.use(FakeLedger(on_branch=False))
+        with self.assertRaisesRegex(lean.LeanError, "cannot verify"):
+            pin.resolve_branch(lean.BranchLock(TRU, "dev"), commit=OLD_COMMIT)
+        self.assertEqual(paths.LOCK_FILE.read_text(encoding="utf-8"), self.before)
+
     def test_off_branch_commit_is_refused(self):
         led = self.use(FakeLedger(on_branch=False))
         report = pin.pin(OLD_COMMIT, offline=True)
@@ -1090,7 +1112,8 @@ class PullRequestCacheTests(unittest.TestCase):
         when one triggers it, or when a workflow that one triggers calls it; and every workflow that can be called
         (workflow_call) is checked too, since a books repository may call it from its own pull-request workflow
         (lean-verify.yml's Lake and pip caches, re-review 4, item 1). So are the composite actions these workflows
-        use (.github/actions/setup, .github/actions/build-cache), for every value of their inputs."""
+        use (.github/actions/setup, .github/actions/build-cache, .github/actions/resolve-lock), for every
+        value of their inputs."""
         pr_events = set(PR_EVENTS)
         texts = {wf.name: wf.read_text(encoding="utf-8") for wf in self.WORKFLOWS.glob("*.yml")}
         todo = []
@@ -1130,7 +1153,7 @@ class PullRequestCacheTests(unittest.TestCase):
                     self.assertRegex(step, r"(?m)^\s+cache:\s*npm\s*$", name)
         self.assertIn("lean-verify.yml", seen)
         self.assertGreater(caches, 0, "ci.yml's .cache/trureturing step was examined")
-        self.assertEqual(actions, {"setup", "build-cache"})
+        self.assertEqual(actions, {"setup", "build-cache", "resolve-lock"})
         action_caches = 0
         for action in sorted(actions):
             for step in action_steps(action):

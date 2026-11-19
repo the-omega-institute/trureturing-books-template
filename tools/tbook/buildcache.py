@@ -529,7 +529,7 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
     metadata, the slide theme and tools, the lock (cited GIDs), package-lock.json (Slidev, Playwright and its
     Chromium), the site's base path, Node's major version, and whether PDFs are exported and the decks
     checked in a browser (decks stored unchecked are not restored into a build that checks)."""
-    from . import academic, slides
+    from . import academic, lean, slides
 
     decks = slides.deck_names(book)
     academic_decks = [d for d in decks if academic.is_academic(book.slides_dir / d)]
@@ -542,6 +542,8 @@ def slides_unit(site: config.Site, book: config.Book, out_dir: Path) -> Unit:
               .text("no_pdf", os.environ.get("TBOOK_SLIDES_NO_PDF") == "1")
               .text("no_check", os.environ.get("TBOOK_SLIDES_NO_CHECK") == "1")
               .text("node", node_version()))
+    if isinstance(lean.Lock.read_spec(), lean.BranchLock):
+        inputs.text("resolved lock", lean.Lock.load().document())
     if len(decks) > len(academic_decks):
         inputs.files(paths.THEME / "slides", paths.GENERATED / "tokens.css")
     if academic_decks:

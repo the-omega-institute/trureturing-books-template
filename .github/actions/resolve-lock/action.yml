@@ -1,0 +1,16 @@
+name: Resolve trureturing branch lock
+description: Provide a resolved lock to all subsequent commands in this job.
+runs:
+  using: composite
+  steps:
+    - name: Materialize the lock
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        snapshot="$(mktemp "$RUNNER_TEMP/trureturing-lock.XXXXXX")"
+        ./tbook resolve-lock --branch-only > "$snapshot"
+        if [ -s "$snapshot" ]; then
+          echo "TBOOK_LOCK_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
+          python3 -c 'import json, sys; print("trureturing at", json.load(open(sys.argv[1]))["commit"])' "$snapshot"
+        fi

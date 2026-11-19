@@ -8,9 +8,10 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
-from . import __version__, config, paths
+from . import __version__, config, lean, paths
 
 
 def _langs_titles(values: list[str] | None) -> dict[str, str]:
@@ -65,7 +66,8 @@ def cmd_pin(args) -> int:
             print(f"pin: cannot write --report {args.report}: {exc}", file=sys.stderr)
             return 1
     try:
-        report = pin.pin(args.ref, refresh=args.refresh, offline=args.offline, dry_run=args.dry_run)
+        report = pin.pin(args.ref, refresh=args.refresh, offline=args.offline, dry_run=args.dry_run,
+                         follow=args.follow)
     except lean.LeanError as exc:
         print(f"pin: {exc}", file=sys.stderr)
         return 1
@@ -84,6 +86,23 @@ def cmd_pin(args) -> int:
         return 1
     if report.written:
         print(f"wrote {paths.rel(paths.LOCK_FILE)} at {report.commit}")
+    return 0
+
+
+def cmd_resolve_lock(args) -> int:
+    from . import pin
+
+    spec = lean.Lock.read_spec()
+    if args.branch_only and not isinstance(spec, lean.BranchLock):
+        return 0
+    if args.branch_head:
+        if isinstance(spec, lean.BranchLock):
+            print(pin.branch_head(spec))
+    else:
+        lock = lean.Lock.load()
+        if lock is None:
+            raise lean.LeanError("trureturing.lock.json is missing; run ./tbook pin")
+        print(lock.document(), end="")
     return 0
 
 
@@ -339,10 +358,16 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("ref", nargs="?", help="commit SHA (full or abbreviated), branch or tag; it must be on the "
                                           "site.toml branch (default: that branch's head)")
     c.add_argument("--refresh", action="store_true", help="keep the pinned commit; re-resolve cited GIDs")
+    c.add_argument("--follow", action="store_true", help="record the configured branch instead of its current SHA")
     c.add_argument("--offline", action="store_true")
     c.add_argument("--dry-run", action="store_true", help="report changes without writing the lock")
     c.add_argument("--report", help="also write the Markdown report to this file")
     c.set_defaults(fn=cmd_pin)
+
+    c = sub.add_parser("resolve-lock", help="print the resolved trureturing lock as JSON")
+    c.add_argument("--branch-head", action="store_true", help="print only the current SHA, for branch locks")
+    c.add_argument("--branch-only", action="store_true", help="output nothing for a fixed SHA lock")
+    c.set_defaults(fn=cmd_resolve_lock)
 
     c = sub.add_parser("build", help="build html, pdf, epub, viz, slides, films and the site")
     c.add_argument("targets", nargs="*", choices=["all", "html", "pdf", "epub", "viz", "slides", "films", "site"],
@@ -481,7 +506,19 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if (args.fn in (cmd_build, cmd_check, cmd_serve, cmd_lean_project, cmd_stats, cmd_media) and
+                not os.environ.get("TBOOK_LOCK_SNAPSHOT") and
+                isinstance(lean.Lock.read_spec(), lean.BranchLock)):
+            lock = lean.Lock.load(offline=getattr(args, "offline", False))
+            with tempfile.TemporaryDirectory(prefix="tbook-lock-") as directory:
+                snapshot = Path(directory) / "trureturing.lock.json"
+                lock.save(snapshot)
+                os.environ["TBOOK_LOCK_SNAPSHOT"] = str(snapshot)
+                try:
+                    return int(args.fn(args) or 0)
+                finally:
+                    del os.environ["TBOOK_LOCK_SNAPSHOT"]
         return int(args.fn(args) or 0)
-    except config.ConfigError as exc:
+    except (config.ConfigError, lean.LeanError) as exc:
         print(f"tbook: {exc}", file=sys.stderr)
         return 2

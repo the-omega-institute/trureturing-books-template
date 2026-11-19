@@ -116,8 +116,17 @@ export function createServer() {
       if (err || !st.isFile()) return send404();
       const headers = { 'content-type': typeOf(r.file), 'cache-control': 'no-cache', ...cors };
       if (r.pin) {
+        let body;
+        try {
+          body = pinLinks(fs.readFileSync(r.file, 'utf8'), readLock());
+        } catch (error) {
+          console.error(error.message);
+          res.writeHead(500, { 'content-type': TYPES['.txt'] });
+          res.end('Unable to render the visualization.\n');
+          return;
+        }
         res.writeHead(200, headers);
-        res.end(pinLinks(fs.readFileSync(r.file, 'utf8'), readLock()));
+        res.end(body);
         return;
       }
       res.writeHead(200, headers);

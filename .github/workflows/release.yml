@@ -59,6 +59,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       skip: ${{ steps.plan.outputs.skip }}
+      trureturing_sha: ${{ steps.lock.outputs.sha }}
       books: ${{ steps.plan.outputs.books }}
       title: ${{ steps.plan.outputs.title }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
@@ -154,11 +155,24 @@ jobs:
           print(f"release {tag}: {', '.join(b.slug for b in selected)}")
           PY
 
+      - name: Resolve the trureturing branch
+        if: steps.plan.outputs.skip != 'true'
+        id: lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        run: |
+          sha="$(./tbook resolve-lock --branch-head)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   lean-verify:
     name: Lean deep verification
     needs: plan
     if: needs.plan.outputs.skip != 'true' && vars.REQUIRE_LEAN_VERIFY == 'true'
     uses: ./.github/workflows/lean-verify.yml
+    with:
+      trureturing_sha: ${{ needs.plan.outputs.trureturing_sha }}
+    secrets: inherit
 
   build:
     name: Build the site and export the build cache
@@ -174,9 +188,15 @@ jobs:
       actions: read
       # actions/configure-pages reads the Pages configuration (private repositories refuse it without this).
       pages: read
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+      TRURETURING_TOKEN: ${ secrets.TRURETURING_TOKEN }
     steps:
       - name: Check out
         uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup

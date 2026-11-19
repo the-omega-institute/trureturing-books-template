@@ -4,9 +4,11 @@ import subprocess
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from ci import pages_schedule, trusted_cache
+from tbook import lean
 
 
 class PagesScheduleTests(unittest.TestCase):
@@ -52,7 +54,25 @@ class PagesScheduleTests(unittest.TestCase):
             return {"workflow_runs": self.ci}
         if path.endswith("/pages.yml/runs"):
             return {"workflow_runs": self.registrations.get(query["head_sha"][0], [])}
+        if path.endswith("/pages"):
+            return {"html_url": "https://books.example.org/"}
         self.fail(f"Unexpected endpoint: {endpoint}")
+
+    def test_upstream_refresh_requires_branch_lock_verified_books_and_changed_sha(self):
+        spec = lean.BranchLock("owner/trureturing", "dev")
+        deployed = dict(repo=spec.repo, branch=spec.branch, commit="a" * 40)
+
+        def refresh(head):
+            return pages_schedule.refresh_head(self.root, self.repo, "main", head, self.now, self.api,
+                                               read_live=lambda _: deployed)
+
+        with (patch.object(lean.Lock, "read_spec", return_value=spec),
+              patch.object(pages_schedule.pin, "branch_head", return_value="b" * 40) as resolve):
+            self.assertEqual(refresh(self.head), "")
+            resolve.assert_not_called()
+            self.assertEqual(refresh(self.newer), "b" * 40)
+            deployed["commit"] = "b" * 40
+            self.assertEqual(refresh(self.newer), "")
 
     def choose(self):
         candidate = pages_schedule.select(self.root, self.repo, "main", self.head, self.now, self.api)
