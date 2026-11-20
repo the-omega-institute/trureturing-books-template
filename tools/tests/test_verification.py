@@ -1516,7 +1516,8 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         log.write_text("", encoding="utf-8")
         summary = self.tmp / "summary.md"
         r = run_bash(self.publish_step(workflow)["run"], self.tmp, {
-            **env, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "GH_LOG": str(log), "FAKE_STATE": state,
+            "GITHUB_EVENT_NAME": "push", **env, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "GH_LOG": str(log), "FAKE_STATE": state,
             "GH_TOKEN": "t", "GH_REPO": "o/r", "GITHUB_REPOSITORY": "o/r", "GITHUB_STEP_SUMMARY": str(summary),
             "RUNNER_TEMP": str(self.tmp / "runner")})
         return r, log.read_text(encoding="utf-8").splitlines()
@@ -1566,6 +1567,13 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         env = {"TAG": "demo-v1.0.0", "TITLE": "Demo 1.0.0", "PRERELEASE": "false"}
         self.check_publish("release.yml", env, files, "")
         self.check_publish("release.yml", {**env, "PRERELEASE": "true"}, files, " --prerelease")
+        sha = "a" * 40
+        preview = {**env, "TAG": f"preview-dev-{sha}", "PRERELEASE": "true",
+                   "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_SHA": sha}
+        self.check_publish("release.yml", preview, files, " --prerelease --latest=false")
+        _, calls = self.run_publish("release.yml", "none", preview)
+        self.assertIn(f" --target {sha} --prerelease ",
+                      next(c for c in calls if c.startswith("release create ")))
         (self.tmp / "release" / "cache" / "build-cache.json").unlink()
         r, calls = self.run_publish("release.yml", "none", env)
         self.assertNotEqual(r.returncode, 0, "a release without its build cache is not created")
