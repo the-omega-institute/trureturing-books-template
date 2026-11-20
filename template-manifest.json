@@ -92,7 +92,7 @@
       "mode": "120000"
     },
     "CLAUDE.md": {
-      "sha256": "86ad3d76f1f8794a41601fdec410f181b8612e4030f617c2b2d276a7456e6d31",
+      "sha256": "c01fd72ae337392f8072df0eb5220136849a4d0560f73092c3ae3956c7767b44",
       "mode": "100644"
     },
     "CONTRIBUTING.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "8e88dff39c882cd96f01fa5c253bc6026fab643f8abb7f71dbdcbc0c3339f891",
+      "sha256": "83dee1ce2fe6db0cdb9c8b1f2940f133830a3f228752a8061c5ef0ff464e4adc",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
