@@ -43,7 +43,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 | --- | --- | --- |
 | `ci.yml` | PR、推送到 main、手动、被调用、每周 | 先由仅需标准库的 `tools/ci/plan.py` 生成计划，再启动选中的结构／Lean、theme、unit、manifest、静态媒体、模板兼容检查族，以及按书籍启用格式展开的导出、精确 suite、film 和 slide 集合；空集合不开 runner；同一导出格式合并所选书籍，复用一次安装。viz 最多 8 片。CI 与 Pages 的 film 最多 16 片，所选影片每部恰执行一次，选中 16 部以内时每部独占一片。稳定必需检查名仍为 **Check**，移到末尾用 `always()` 核对全部计划任务，失败、取消和意外跳过均不通过。调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
 | `pages.yml` | `main` 推送、CI 成功、每 5 分钟检查、手动 | 自动发布尝试间隔至少 20 分钟。每次从主干历史中选择比线上更新且已通过同提交 CI 的最新版本，从线上版本到该提交的净差异涉及出版输入时才组装，并在组装前再次核对。以最近成功部署为构建基准，`./tbook build all` 恢复未变单元、补建缺失单元、清理删除内容后部署。手动运行另做 `./tbook check`，可直接触发。Pages 未启用时只构建并提示。构建缓存见 §5 |
-| `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
+| `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`）或启用后的每日预览（§6.6） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；tag 发版中，只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
 | `trureturing-bump.yml` | 每周、手动 | 把所钉的 trureturing 提交升级到最新并开 PR；标题前缀 `[refused]`（目标提交不在 `site.toml` 的分支上或无法核实）、`[unresolved]`（有引用无法解析）、`[pin failed]`、`[check fails]`、`[review statements]` 提示需要处理的情况；前三种 PR 不改锁文件，与 `[check fails]` 一样以草稿开出 |
 | `template-sync.yml` | 每周、手动（仅下游） | 升级到模板新版本并开 PR（标题使用 `chore(template): …`，冲突时在摘要中标注 `[conflicts]`，`.template-new` 文件一并提交） |
@@ -172,7 +172,7 @@ tag（标签）是给某一个提交起的固定名字。分支（如 `main`）�
 
 ### 6.2 推送哪种 tag 会发版
 
-`release.yml` 只在推送名字符合下列形式的 tag 时运行，名字决定发布什么：
+`release.yml` 根据推送的 tag 名字确定发布范围。
 
 | tag | 发布什么 |
 | --- | --- |
@@ -212,6 +212,19 @@ tag（标签）是给某一个提交起的固定名字。分支（如 `main`）�
 - 不要在 GitHub 网页上用 “Draft a new release” 建发布。那样会先发布一个没有附件的 Release，随后运行的工作流遇到已发布的 Release 只更新标题与说明，PDF 与缓存文件就附不上去。
 - tag 打错了（名字或提交不对）而 Release 还没发布时，删掉重打：`git push origin :refs/tags/<tag>` 删除远端 tag，`git tag -d <tag>` 删除本地 tag，并在 Releases 页删除留下的草稿。已发布的版本不要复用 tag，发一个新的补丁版本。
 - 推送 tag 需要对仓库有写权限；只能推送分支的环境（例如受限的自动化会话）推不了 tag，由有权限的人推送。
+
+### 6.6 每日 dev 预览
+
+在书库默认分支的 `site.toml` 中启用。
+
+```toml
+[release]
+daily_dev_preview = true
+```
+
+GitHub Actions 每天 03:17 UTC 检查本书库的 `dev` 分支。默认关闭。启用后，如果 `dev` 上有尚未预览的提交，当天最多发布一次，tag 为 `preview-dev-<完整提交 SHA>`。从包含此工作流的默认分支建立 `dev`，并通过书库的开发流程更新它。当日已发布、提交已有预览或分支尚未建立时，工作流会跳过构建。
+
+在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用触发时 `dev` 的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在 Releases 页下载预览，Pages 继续发布默认分支的内容。
 
 ## 7. 学术报告 PDF
 

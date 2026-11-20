@@ -1260,19 +1260,21 @@ def granted(perms: dict[str, str], scope: str) -> str:
 
 
 def release_plan_script() -> str:
-    """The Python script of release.yml's "Resolve the tag" step (id: plan)."""
+    """The Python script of release.yml's "Resolve the release" step (id: plan)."""
     text = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
     m = re.search(r"\n\s+id: plan\n.*?python3 - <<'PY'\n(.*?)\n\s*PY\n", text, re.S)
     assert m, "release.yml: the plan step's script was not found"
     return textwrap.dedent(m.group(1))
 
 
-def run_release_plan(root: Path, tag: str, *, template_repo: bool = False) -> tuple[int, dict[str, str], str]:
+def run_release_plan(root: Path, tag: str, *, template_repo: bool = False,
+                     preview_sha: str = "") -> tuple[int, dict[str, str], str]:
     """Run the plan step for ``tag`` in the repository ``root``: (exit code, step outputs, log)."""
     out = root / "build" / "github-output.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("", encoding="utf-8")
     env = dict(os.environ, TAG=tag, TEMPLATE_REPO="true" if template_repo else "false", GITHUB_OUTPUT=str(out),
+               GITHUB_EVENT_NAME="workflow_dispatch" if preview_sha else "push", GITHUB_SHA=preview_sha,
                PYTHONPATH=str(root / "tools"), TBOOK_ROOT=str(root))
     r = subprocess.run([sys.executable, "-"], input=release_plan_script(), cwd=root, env=env, capture_output=True,
                        text=True)

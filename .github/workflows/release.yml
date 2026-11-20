@@ -1,4 +1,6 @@
 # Publish book releases (managed by the template).
+# Opt in on the default branch with site.toml [release].daily_dev_preview = true.
+# The schedule dispatches this workflow on dev so the build uses dev's commit and Actions cache scope.
 #
 #   git tag <slug>-v<version> && git push origin <slug>-v<version>   one book; <version> must equal
 #                                                                     books/<slug>/book.toml [book].version
@@ -39,6 +41,9 @@ on:
     tags:
       - '*-v*'
       - 'v*'
+  schedule:
+    - cron: '17 3 * * *' # 03:17 UTC daily
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -46,7 +51,7 @@ permissions:
 # One run per tag, not one group for all tags: a group keeps a single pending run and cancels the one
 # waiting before it, so tags pushed together would lose a release. Neither run saves the Actions cache.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'schedule' && 'preview-schedule' || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -54,26 +59,104 @@ env:
   TBOOK_BUILD_RELEASE: '1'
 
 jobs:
+  preview-enabled:
+    name: Read the default branch preview setting
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.setting.outputs.enabled }}
+    steps:
+      - name: Check whether previews are enabled
+        id: setting
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/contents/site.toml" -H 'Accept: application/vnd.github.raw+json' |
+            python3 -c '
+          import sys
+          import tomllib
+
+          config = tomllib.load(sys.stdin.buffer)
+          enabled = config.get("release", {}).get("daily_dev_preview") is True
+          print(f"enabled={str(enabled).lower()}")
+          ' >> "$GITHUB_OUTPUT"
+
+  dispatch-preview:
+    name: Queue a preview build on dev
+    needs: preview-enabled
+    if: >-
+      needs.preview-enabled.outputs.enabled == 'true' &&
+      (github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch &&
+        github.ref_type == 'branch' && github.ref_name != 'dev'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Dispatch Release on dev if the branch exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          dev="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/dev" \
+            --jq '.[] | select(.ref == "refs/heads/dev") | .object.sha')"
+          if [[ -z "$dev" ]]; then
+            echo "No dev branch yet."
+            exit 0
+          fi
+          gh workflow run release.yml --ref dev
+
   plan:
+    needs: preview-enabled
+    if: >-
+      !cancelled() && (github.event_name == 'push' ||
+      (needs.preview-enabled.outputs.enabled == 'true' && github.ref == 'refs/heads/dev'))
     name: Resolve the books to release
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      skip: ${{ steps.plan.outputs.skip }}
+      skip: ${{ steps.preview.outputs.skip || steps.plan.outputs.skip }}
+      tag: ${{ steps.plan.outputs.tag }}
       trureturing_sha: ${{ steps.lock.outputs.sha }}
       books: ${{ steps.plan.outputs.books }}
       title: ${{ steps.plan.outputs.title }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
     steps:
+      - &preview-check
+        name: Check whether a preview is due
+        id: preview
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          published="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.prerelease and (.draft | not) and (.tag_name | test("^preview-dev-[0-9a-f]{40}$"))) |
+                  [.tag_name, (.published_at | split("T")[0])] | @tsv')"
+          today="$(date -u +%F)"
+          if awk -v tag="preview-dev-$GITHUB_SHA" -v today="$today" \
+            '$1 == tag || $2 == today {found = 1} END {exit !found}' <<< "$published"; then
+            echo "A preview already covers dev at $GITHUB_SHA or was published today (UTC)."
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out
+        if: steps.preview.outputs.skip != 'true'
         uses: actions/checkout@v5
 
       - name: Set up Python
+        if: steps.preview.outputs.skip != 'true'
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Resolve the tag
+      - name: Resolve the release
+        if: steps.preview.outputs.skip != 'true'
         id: plan
         env:
           TAG: ${{ github.ref_name }}
@@ -81,13 +164,15 @@ jobs:
           PYTHONPATH: tools
         run: |
           python3 - <<'PY'
+          from datetime import datetime, timezone
           import os
           import re
           import sys
 
           from tbook import config
 
-          tag = os.environ["TAG"]
+          preview = os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
+          tag = f'preview-dev-{os.environ["GITHUB_SHA"]}' if preview else os.environ["TAG"]
           books = config.load_books()
           by_slug = {b.slug: b for b in books}
           out = open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8")
@@ -116,9 +201,17 @@ jobs:
           # site.toml [books].hide hides do not exist for releases either.
           hidden = config.hidden_books()
           slug = max((s for s in [*by_slug, *hidden] if tag.startswith(s + "-v")), key=len, default=None)
-          if slug in hidden:
+          if preview:
+              if not books:
+                  fail("there are no books (books/<slug>/book.toml) to preview")
+              selected = books
+              site = config.load_site()
+              today = datetime.now(timezone.utc).date()
+              title = f"{site.text(site.title, site.default_language)} · dev preview {today}"
+              prerelease = True
+          elif slug in hidden:
               fail(f"tag {tag} names books/{slug}, but {config.hidden_error([slug])}; or delete the tag")
-          if slug:
+          elif slug:
               book = by_slug[slug]
               version = tag[len(slug) + 2:]
               if version != book.version:
@@ -150,6 +243,7 @@ jobs:
               known = ", ".join(sorted(by_slug)) or "none"
               fail(f"tag {tag} names no book (expected <slug>-v<version> or v<version>; books: {known})")
           emit("skip", "false")
+          emit("tag", tag)
           emit("books", " ".join(b.slug for b in selected))
           emit("title", title.replace("\n", " "))
           emit("prerelease", "true" if prerelease else "false")
@@ -157,7 +251,7 @@ jobs:
           PY
 
       - name: Resolve the trureturing branch
-        if: steps.plan.outputs.skip != 'true'
+        if: steps.preview.outputs.skip != 'true' && steps.plan.outputs.skip != 'true'
         id: lock
         env:
           GH_TOKEN: ${{ github.token }}
@@ -255,7 +349,6 @@ jobs:
       - name: Collect assets and write the release notes
         env:
           BOOKS: ${{ needs.plan.outputs.books }}
-          TAG: ${{ github.ref_name }}
           LEAN_VERIFY: ${{ needs.lean-verify.result }}
           PYTHONPATH: tools
         run: |
@@ -296,7 +389,12 @@ jobs:
           assets = out / "assets"
           assets.mkdir(parents=True)
           lock = lean.Lock.load()
+          preview = os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
           notes = []
+          if preview:
+              commit = os.environ["GITHUB_SHA"]
+              url = f'https://github.com/{os.environ["GITHUB_REPOSITORY"]}/tree/{commit}'
+              notes += [f"**开发预览 · Development preview** · [`{commit[:12]}`]({url})", ""]
           missing = []
           for book in config.load_books(os.environ["BOOKS"].split()):
               titles = both(lambda l: book.edition(l).title if l in book.languages else "")
@@ -310,7 +408,7 @@ jobs:
                            + ", ".join(config.s(lang, "meta.name") or lang for lang in book.languages))
               notes.append(f"- {both(lambda l: loc(l, 'theorems'))}: {n}")
               url = site.book_url(book.slug)
-              if url:
+              if url and not preview:
                   notes.append(f"- {both(lambda l: config.s(l, 'ui.read_online'))}: {url}/")
               notes.append(f"- {both(lambda l: loc(l, 'assets'))}:")
               for ed in book.editions:
@@ -371,17 +469,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      # A retry of just the publish job may run after a later preview already went out.
+      - *preview-check
+
       - name: Download the release files
+        if: steps.preview.outputs.skip != 'true'
         uses: actions/download-artifact@v7
         with:
           name: release
           path: release
 
       - name: Create the release as a draft, upload every file, publish it
+        if: steps.preview.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.plan.outputs.tag }}
           TITLE: ${{ needs.plan.outputs.title }}
           PRERELEASE: ${{ needs.plan.outputs.prerelease }}
         run: |
@@ -404,10 +507,15 @@ jobs:
             # The draft of an earlier attempt: replace its files.
             gh release upload "$TAG" "${files[@]}" --clobber
           else
-            gh release create "$TAG" --draft --verify-tag --title "$TITLE" --notes-file release/notes.md "${files[@]}"
+            target=(--verify-tag)
+            if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+              target=(--target "$GITHUB_SHA" --prerelease)
+            fi
+            gh release create "$TAG" --draft "${target[@]}" --title "$TITLE" --notes-file release/notes.md "${files[@]}"
           fi
-          # Published only now, with every file in place.
+          # Publish after every file is in place.
           flags=(--draft=false)
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then flags+=(--latest=false); fi
           gh release edit "$TAG" "${flags[@]}"
           echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

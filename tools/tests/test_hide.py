@@ -316,6 +316,12 @@ class ReleasePlanTests(unittest.TestCase):
         self.assertEqual((rc, outputs.get("books")), (0, "my-book"), log)
 
 
+        sha = "a" * 40
+        rc, outputs, log = run_release_plan(root, "dev", preview_sha=sha)
+        self.assertEqual(rc, 0, log)
+        self.assertEqual((outputs["books"], outputs["tag"], outputs["prerelease"]),
+                         ("my-book", f"preview-dev-{sha}", "true"))
+
 # --------------------------------------------------------------------------- workflow steps
 
 
