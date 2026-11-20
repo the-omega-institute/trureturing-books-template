@@ -64,11 +64,16 @@
     });
   }
   function setLang(next) {
-    if (!LANGS.includes(next) || next === lang) return;
-    lang = next;
+    if (!LANGS.includes(next)) return;
     // inside the book the host page decides the language; do not overwrite the reader's own choice
     if (!embed) { try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ } }
-    try { const u = new URL(location.href); if (u.searchParams.has('lang')) { u.searchParams.set('lang', next); history.replaceState(null, '', u); } } catch (e) { /* ignore */ }
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('lang', next);
+      history.replaceState(history.state, '', url);
+    } catch (e) { /* ignore */ }
+    if (next === lang) return;
+    lang = next;
     applyLang();
     // a toast in the old language disappears at once instead of fading out over the new interface
     document.querySelectorAll('.toast').forEach((t) => { t.style.transition = 'none'; t.style.opacity = '0'; void t.offsetWidth; t.style.transition = ''; });

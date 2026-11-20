@@ -38,9 +38,10 @@
       var lang = b.getAttribute('data-lang-set');
       store(lang);
       apply(lang);
-      try {  // a ?lang= in the address would override the new choice on reload
-        var u = new URL(location.href);
-        if (u.searchParams.has('lang')) { u.searchParams.set('lang', lang); history.replaceState(null, '', u); }
+      try {
+        var url = new URL(location.href);
+        url.searchParams.set('lang', lang);
+        history.replaceState(history.state, '', url);
       } catch (e) { /* ignore */ }
     });
   });

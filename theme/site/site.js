@@ -69,12 +69,13 @@
   }
 
   function setLang(next) {
-    if (!known(next) || next === lang) return;
+    if (!known(next)) return;
     lang = next;
     try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ }
     try {
       var url = new URL(location.href);
-      if (url.searchParams.has("lang")) { url.searchParams.set("lang", next); history.replaceState(null, "", url); }
+      url.searchParams.set("lang", next);
+      history.replaceState(history.state, "", url);
     } catch (e) { /* ignore */ }
     apply();
   }
