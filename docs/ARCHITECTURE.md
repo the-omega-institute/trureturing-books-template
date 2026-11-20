@@ -315,7 +315,7 @@ manifest.json              机器可读清单（schema trureturing-books.site.v1
 
 所有站内链接都是相对链接（站点挂在 `/<repo>/` 下）。`./tbook serve` 在同样的子路径下预览（`TBOOK_SERVE_HOST=0.0.0.0` 可供局域网访问）；`./tbook build site --book x` 只装配选定的书；`./tbook build viz|films [--book x]` 只重新发布（选定书的）这些部分，书库首页与 `manifest.json` 仍列出 `_site/` 中已有的全部书；被 `[books] hide` 隐藏的书的 `_site/<slug>/` 在每次站点构建时删除（完整构建本来就先清空 `_site/`），其他内容不动。媒体发布失败时，站点其余部分仍会写出，命令以非零退出。
 
-mdBook 的 `<lang>/print.html` 不改写 iframe 的 `src` 与 video 的 `poster`；媒体块把相对本书的目标写在 `data-tr-src` / `data-tr-poster`，`site.publish_html` 据此修正。界面语言记在 localStorage 的 `tr-lang`，书库首页、落地页、可视化、视频页与幻灯片共用。
+mdBook 的 `<lang>/print.html` 不改写 iframe 的 `src` 与 video 的 `poster`；媒体块把相对本书的目标写在 `data-tr-src` / `data-tr-poster`，`site.publish_html` 据此修正。书库首页、书籍落地页、独立可视化、视频索引和幻灯片索引通过 localStorage 的 `tr-lang` 记住语言偏好。双语界面优先使用有效的 `?lang=`，并将其保存为后续页面的偏好。书籍正文由版本路径确定语言，双语书的正文会保存当前版本的语言，返回书籍首页的链接也会携带该语言。嵌入正文的可视化使用正文传入的语言，静帧捕获使用构建参数。
 
 ## 7. Python 组件接口
 

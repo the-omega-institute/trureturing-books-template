@@ -619,7 +619,9 @@ const { chromium } = require(path.join(process.env.TBOOK_ROOT_DIR, 'node_modules
   try {
     for (const job of jobs) {
       const page = await browser.newPage({ viewport: { width: job.width, height: job.height || 900 } });
-      await page.route(/^https?:\/\//, (route) => route.abort());  // web fonts: the declared stacks are what is tested
+      const origin = new URL(job.url).origin;
+      await page.route(/^https?:\/\//, (route) =>
+        new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
       await page.goto(job.url, { waitUntil: 'load' });
       out.push(await page.evaluate(job.expr));
       await page.close();
@@ -667,6 +669,33 @@ class BrowserLayoutTest(SiteCase):
                            env=dict(os.environ, TBOOK_ROOT_DIR=str(paths.ROOT), TBOOK_CHROMIUM=doctor.chromium_path()))
         self.assertEqual(r.returncode, 0, r.stderr)
         return json.loads(r.stdout)
+
+    def test_book_edition_links_and_landing_use_the_reading_language(self):
+        root = self.tmp / "edition-language"
+        script = (paths.THEME / "mdbook" / "tr-book.js").read_text(encoding="utf-8")
+        write(root / "tr-book.js", script)
+        write(root / "book" / "en" / "chapter.html",
+              '<!doctype html><div id="mdbook-menu-bar"><div class="right-buttons"></div></div>'
+              '<script>window.TR_EDITIONS = {current: "en", landing: "../", langs: '
+              '[{code: "zh", short: "中"}, {code: "en", short: "EN"}]}; window.path_to_root = "./";</script>'
+              '<script src="../../tr-book.js"></script>')
+        server = serve.make_server(0, root, base="/")
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base = f"http://127.0.0.1:{server.server_address[1]}/"
+        result, = self.browse([{"url": base + "book/en/chapter.html?highlight=example#section", "width": 1024,
+                               "expr": """({
+                                   edition: document.querySelector('a.tr-lang').href,
+                                   landing: document.querySelector('.tr-menu-home').href,
+                                   stored: localStorage.getItem('tr-lang')
+                               })"""}])
+        self.assertEqual(result, {
+            "edition": base + "book/zh/chapter.html?highlight=example#section",
+            "landing": base + "book/?lang=en",
+            "stored": "en",
+        })
 
     def test_cjk_search_teasers_are_bounded_and_show_the_match(self):
         """An unspaced paragraph must not fill the results page or lose a match far from its start."""
@@ -886,7 +915,8 @@ class SharedLanguageTest(unittest.TestCase):
     def setUpClass(cls):
         tmp = Path(tempfile.mkdtemp(prefix="tbook-language-"))
         cls.addClassCleanup(shutil.rmtree, tmp, True)
-        page = slides.index_html(config.load_site(), make_book(tmp), [])
+        with mock.patch.object(lean.Lock, "load", return_value=None):
+            page = slides.index_html(config.load_site(), make_book(tmp), [])
         script = page.split("\n<script>\n", 1)[1].split("\n</script>\n", 1)[0]
         cls.SCRIPTS = {**cls.SCRIPTS, "slides": write(tmp / "slides.js", script)}
 
@@ -909,10 +939,18 @@ class SharedLanguageTest(unittest.TestCase):
         for which in self.SCRIPTS:
             result = self.run_script(which, search="?lang=zh", stored={"tr-lang": "en"})
             self.assertEqual(result["lang"], "zh", which)
-            self.assertEqual(result["stored"], {"tr-lang": "en"}, which)
+            self.assertEqual(result["stored"], {"tr-lang": "zh"}, which)
             self.assertEqual(self.run_script(which, search="?lang=invalid", stored={"tr-lang": "en"})["lang"], "en", which)
             self.assertEqual(self.run_script(which, nav="en-US")["lang"], "zh" if which == "slides" else "en", which)
             self.assertEqual(self.run_script(which, nav="zh-TW")["lang"], "zh", which)
+
+    def test_language_from_a_shared_link_carries_over_to_the_next_page(self):
+        for which in self.SCRIPTS:
+            with self.subTest(which=which):
+                opened = self.run_script(which, search="?lang=en", stored={"tr-lang": "zh"})
+                next_page = self.run_script("site", search="?other=1#section", stored=opened["stored"])
+                self.assertEqual(next_page["lang"], "en")
+                self.assertEqual(next_page["url"], "https://x.org/repo/page/?other=1&lang=en#section")
 
     def test_selection_writes_a_shareable_url(self):
         for which in self.SCRIPTS:
@@ -929,6 +967,9 @@ class SharedLanguageTest(unittest.TestCase):
                     self.assertEqual(reopened["lang"], choice)
 
     def test_embedded_viz_keeps_the_saved_preference(self):
+        opened = self.run_script("viz", search="?embed=1&preset=example&lang=en", stored={"tr-lang": "zh"})
+        self.assertEqual(opened["lang"], "en")
+        self.assertEqual(opened["stored"], {"tr-lang": "zh"})
         result = self.run_script("viz", search="?embed=1&preset=example&lang=zh", stored={"tr-lang": "zh"}, click="en")
         self.assertEqual(result["lang"], "en")
         self.assertEqual(result["stored"], {"tr-lang": "zh"})

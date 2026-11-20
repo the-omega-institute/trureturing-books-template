@@ -39,14 +39,33 @@
      The choice is remembered under "tr-lang", shared with the library, the book landing pages, the films page and
      the slide decks, so a language picked anywhere on the site carries over ("trv-lang" is read for older choices). */
   const LANGS = ['zh', 'en'], KEY = 'tr-lang', OLD_KEYS = ['trv-lang'];
+  const standalone = !embed && !thumbMode && !shot;
+  function rememberLang(lang) {
+    if (standalone) {
+      try { localStorage.setItem(KEY, lang); } catch (e) { /* storage may be blocked */ }
+    }
+  }
+  function shareLang(lang) {
+    try {
+      const url = new URL(location.href);
+      if (url.searchParams.get('lang') === lang) return;
+      url.searchParams.set('lang', lang);
+      history.replaceState(history.state, '', url);
+    } catch (e) { /* ignore */ }
+  }
   function detectLang() {
-    const q = params.get('lang'); if (LANGS.includes(q)) return q;
+    const q = params.get('lang');
+    if (LANGS.includes(q)) {
+      rememberLang(q);
+      return q;
+    }
     try {
       for (const k of [KEY, ...OLD_KEYS]) { const s = localStorage.getItem(k); if (LANGS.includes(s)) return s; }
     } catch (e) { /* storage may be blocked */ }
     return /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
   }
   let lang = detectLang();
+  if (standalone) shareLang(lang);
   root.dataset.lang = lang;
   const langListeners = [];
   /** Pick the string for the current language. */
@@ -65,13 +84,8 @@
   }
   function setLang(next) {
     if (!LANGS.includes(next)) return;
-    // inside the book the host page decides the language; do not overwrite the reader's own choice
-    if (!embed) { try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ } }
-    try {
-      const url = new URL(location.href);
-      url.searchParams.set('lang', next);
-      history.replaceState(history.state, '', url);
-    } catch (e) { /* ignore */ }
+    rememberLang(next);
+    shareLang(next);
     if (next === lang) return;
     lang = next;
     applyLang();

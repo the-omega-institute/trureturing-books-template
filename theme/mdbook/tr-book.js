@@ -17,6 +17,10 @@
   if (!data) return;
   const S = data.strings || {};
   const doc = document;
+  const langs = data.langs || [];
+  if (langs.length > 1 && langs.some(({ code }) => code === data.current)) {
+    try { localStorage.setItem("tr-lang", data.current); } catch (e) { /* storage may be blocked */ }
+  }
 
   function fmt(template, vars) {
     return String(template || "").replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
@@ -70,7 +74,16 @@
 
   function editionURL(code) {
     const target = new URL("../" + encodeURIComponent(code) + "/" + encodeURI(pagePath()), root);
-    return target.href + location.hash;
+    target.search = location.search;
+    if (target.searchParams.has("lang")) target.searchParams.set("lang", code);
+    target.hash = location.hash;
+    return target.href;
+  }
+
+  function landingURL() {
+    const target = new URL(data.landing || "../", root);
+    if (langs.length > 1 && data.current) target.searchParams.set("lang", data.current);
+    return target.href;
   }
 
   // ------------------------------------------------------------------ menu bar
@@ -91,7 +104,6 @@
           make("span", { class: "tr-menu-verified-count", text: String(data.verified) })]));
     }
 
-    const langs = data.langs || [];
     if (langs.length > 1) {
       const nav = make("nav", { class: "tr-langs", "aria-label": S.editions || S.language || "Editions" });
       for (const lang of langs) {
@@ -112,7 +124,7 @@
 
     if (data.landing) {
       box.append(make("a", {
-        class: "tr-menu-home", href: new URL(data.landing, root).href,
+        class: "tr-menu-home", href: landingURL(),
         title: S.book_home, "aria-label": S.book_home,
       }, [svg(["M3 5.5h6.5a2.5 2.5 0 0 1 2.5 2.5v11a2 2 0 0 0-2-2H3z",
                "M21 5.5h-6.5A2.5 2.5 0 0 0 12 8v11a2 2 0 0 1 2-2h7z"])]));
@@ -125,7 +137,7 @@
     const box = doc.querySelector("#mdbook-sidebar .sidebar-scrollbox");
     if (!box || !root || box.querySelector(".tr-side-brand") || !(data.code || data.version)) return;
     const brand = make("a", {
-      class: "tr-side-brand", href: new URL(data.landing || "../", root).href, title: S.book_home,
+      class: "tr-side-brand", href: landingURL(), title: S.book_home,
     }, [make("span", { class: "tr-side-code", text: data.code || "" }),
         make("span", { class: "tr-side-version", text: data.version ? "v" + data.version : "" })]);
     box.prepend(brand);
