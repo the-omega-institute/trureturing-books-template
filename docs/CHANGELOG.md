@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.8.2] - 2026-11-20
+
+- 长推理与研究开始前须在 Issue 认领具体范围。贡献规范补充了重复认领的协调办法，以及合入 PR、仅有研究结论和任务终止时的结项方式。
+
 ## [1.8.1] - 2026-11-20
 
 - 每日预览的 PDF 通过该预览的 GitHub Release 下载。启用 `[site].pdf_release_only` 的官网仍从版本发行附件生成 PDF 链接。
