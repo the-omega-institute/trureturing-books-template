@@ -1076,7 +1076,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "6549b92c9fd15f00ae7c4ffb881da73df56195e35f7c7fe27424fb19094897cf",
+      "sha256": "4672ef52644048e5f4911495fb18d2b921bf35b7f1e6fbe69f3c7a68629b1c8e",
       "mode": "100644"
     },
     "tools/tests/test_site_post_build.py": {

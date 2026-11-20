@@ -887,7 +887,7 @@ class SharedLanguageTest(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp(prefix="tbook-language-"))
         cls.addClassCleanup(shutil.rmtree, tmp, True)
         page = slides.index_html(config.load_site(), make_book(tmp), [])
-        script = re.search(r"<script>(.*?)</script>", page, re.S)[1]
+        script = page.split("\n<script>\n", 1)[1].split("\n</script>\n", 1)[0]
         cls.SCRIPTS = {**cls.SCRIPTS, "slides": write(tmp / "slides.js", script)}
 
     def run_script(self, which: str, *, search: str = "", stored=None, nav: str = "zh-CN", click: str = "") -> dict:
