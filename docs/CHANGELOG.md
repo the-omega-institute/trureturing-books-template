@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+- 协作守则删去重复出现的第 11 条（源文件入库、派生产物按需生成），条文内容不变。
+
 ## [1.8.0] - 2026-11-20
 
 - 书库可在默认分支的 `site.toml` 中设置 `[release].daily_dev_preview = true`。每天检查书库的 `dev`，发现尚未发布的提交时构建并发布 GitHub 预览版，包含各可见书籍的下载附件和构建缓存。
