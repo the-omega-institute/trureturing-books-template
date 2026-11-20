@@ -18,6 +18,7 @@ remark = "注"
 proof = "证明"
 
 [badge]
+lean_source_title = "所钉源码提交中的 Lean 定理"
 written_proof = "书面证明"
 written_proof_title = "源文有书面证明；没有陈述同一结论的 Lean 内核验证声明"
 lean = "LEAN ✓"
@@ -59,6 +60,8 @@ verified_count = "条定理均经 Lean 内核验证"
 generated_note = "本页由构建自动生成，请勿手改。"
 
 [ledger]
+intro_source = "下表中的 Lean 引用链接到 {repo} 所钉提交中的声明。"
+col_state_source = "签名摘要"
 written_title = "书面证明"
 written_intro = "以下结果有 DOI 或源论文仓库、书内证明，并已登记形式化请求；未经 Lean 内核验证，不计入 LEAN ✓ 数量。"
 title = "形式化验证账本"
@@ -112,6 +115,7 @@ not_found_title = "页面不存在（404）"
 not_found_body = "这个地址没有对应的页面。请用目录或搜索继续阅读，或回到[本书主页](../)。"
 
 [pdf]
+verified_statement_source = "本书共有 {n} 条形式结论（定理、引理、命题、推论），每条都引用 {repo} 所钉提交中的 Lean 声明。书末形式化验证账本列出永久链接。"
 colophon = "版权信息"
 date = "日期"
 authors = "作者"
@@ -132,6 +136,8 @@ open_statement = "明确标为开放的问题与猜想：{n} 条。书中不把�
 lean_label = "Lean"
 
 [cover]
+stamp_caption_source = "条形式结论 · 引用 Lean 声明"
+pinned_source = "固定于"
 series = "TRURETURING · 形式化专著"
 stamp_caption = "条形式结论 · 内核验证"
 pinned = "冻结于"
@@ -140,6 +146,8 @@ pinned = "冻结于"
 colophon = "版权信息"
 
 [viz]
+hero_lede_source = "每个可视化都链接到所依据的书中章节、{repo} 中的 Lean 声明及页面计算。"
+legend_lean_source = "{repo} 中的 Lean 定理"
 back_to_book = "◂ 返回本书"
 back_to_hub = "◂ 可视化索引"
 tagline_em = "动画只改变看法，真值以 Lean 内核验证为准"
@@ -182,6 +190,9 @@ none = "本书还没有演示文稿。"
 not_built = "尚未构建"
 
 [film]
+hero_lede_source = "每部视频包含程序生成的动画、旁白和双语字幕。LEAN ✓ 链接到 {repo} 所钉提交中的 Lean 声明。"
+lean_title_source = "片中引用的 Lean 定理"
+badge_lean_source = "Lean 定理"
 back_to_book = "◂ 返回本书"
 film = "视频"
 film_n = "视频 {num}"
@@ -210,6 +221,7 @@ badge_computed = "屏幕上的计算 · 不是证明"
 pinned = "所钉提交"
 
 [site]
+verification_intro_source = "以下定理均引用 {repo} 所钉提交中的 Lean 声明。"
 skip = "跳到正文"
 lede = "本书库区分 Lean 内核验证、书面证明与开放问题；只有 LEAN ✓ 表示陈述同一结果的冻结声明。"
 nav_site = "站点信息"

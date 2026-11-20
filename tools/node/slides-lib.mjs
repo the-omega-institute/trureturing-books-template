@@ -14,6 +14,9 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import { readTrureturingLock } from './trureturing-lock.mjs';
+import { parseGid, sourceUrl } from './lean-gid.mjs';
+
+export { GID_RE, parseGid } from './lean-gid.mjs';
 
 // tools/node/slides-lib.mjs -> repository root (TBOOK_ROOT overrides, as in tools/tbook/paths.py)
 export const ROOT = resolve(process.env.TBOOK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
@@ -444,12 +447,11 @@ export function loadLock(root = ROOT) {
 // Source permalink of a locked declaration at the pinned commit (same as tbook.lean.Lock.source_url).
 export function leanSourceUrl(lock, gid) {
   if (!lock) return '';
-  const module = gid.slice(0, gid.indexOf('.')) || gid;
-  const line = lock.declarations?.[gid]?.line;
-  return `https://github.com/${lock.repo}/blob/${lock.commit}/${module}.lean${line ? `#L${line}` : ''}`;
+  const module = lock.mode === 'lean-source'
+    ? parseGid(gid, lock)?.module
+    : gid.slice(0, gid.indexOf('.')) || gid;
+  return module ? sourceUrl(lock, module, lock.declarations?.[gid]?.line) : '';
 }
-
-export const GID_RE = /^D[0-9]+\/S[0-9]+\/(?:[A-Za-z_][A-Za-z0-9_]*\/)*[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*$/;
 
 // --------------------------------------------------------------------------- decks
 

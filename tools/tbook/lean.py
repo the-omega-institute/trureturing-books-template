@@ -1,4 +1,4 @@
-"""Resolve Lean declarations against trureturing's frozen ledger at a pinned commit.
+"""Resolve Lean declarations against frozen state or Lean source at a pinned commit.
 
 In trureturing, a module's declarations are kernel-verified and frozen exactly when
 ``Golden/Frozen/state/<module>.lean.json`` exists (CLAUDE.md §1.3, the freeze rule).
@@ -14,8 +14,8 @@ or ``«…»``-escaped ones); its components are matched against the module's fr
 declarations exactly or as a suffix; exactly one match is required (as in trureturing's
 LeanReferenceResolver).
 
-State files are read from, in order: a local trureturing checkout (``$TRURETURING_DIR``
-or ``../trureturing``) via ``git show <commit>:<path>``; the cache under
+Files are read from, in order: a local checkout (``$TRURETURING_DIR`` or the sibling
+named after the repository) via ``git show <commit>:<path>``; the cache under
 ``.cache/trureturing/<commit>/``; ``raw.githubusercontent.com`` at the commit. A pull
 request's GitHub Actions run never reads the cache (``cache_trusted``): the cache it
 restores may have been saved by an earlier run of the same pull request, i.e. by its code.
@@ -32,6 +32,7 @@ describe output such as ``dev-12-g<sha>`` for the commit it abbreviates (``_bran
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -51,6 +52,7 @@ from . import paths
 # allow Greek and letter-like symbols, subscripts, ``'``, ``!`` and ``?``, and ``«…»`` escapes.
 GID_RE = re.compile(r"^(?P<module>D[0-9]+/S[0-9]+/(?:[A-Za-z_][A-Za-z0-9_]*/)*[A-Za-z_][A-Za-z0-9_]*)\.(?P<name>.+)$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+MODES = ("frozen-state", "lean-source")
 ABBREV_SHA_RE = re.compile(r"^[0-9a-f]{4,39}$")
 HEXISH_RE = re.compile(r"^[0-9a-fA-F]{4,40}$")  # a name that git and GitHub can also read as a commit SHA
 STATE_DIR = "Golden/Frozen/state"
@@ -61,6 +63,26 @@ STD_AXIOMS = ("propext", "Classical.choice", "Quot.sound")
 
 class LeanError(Exception):
     pass
+
+
+def source_settings(data: dict) -> tuple[str, str]:
+    """Validate the source settings shared by site.toml and both lock formats."""
+    mode = data.get("mode", "frozen-state")
+    if mode not in MODES:
+        raise LeanError(f"invalid mode {mode!r}; expected 'frozen-state' or 'lean-source'")
+    root = data.get("source_root", "")
+    if not isinstance(root, str) or root.startswith("/") or "\\" in root or ".." in root.split("/"):
+        raise LeanError("source_root must be a repository-relative path without '\\' or '..' components")
+    return mode, root.rstrip("/")
+
+
+def _source_fields(mode: str, source_root: str) -> dict[str, str]:
+    fields = {}
+    if mode != "frozen-state":
+        fields["mode"] = mode
+    if source_root:
+        fields["source_root"] = source_root
+    return fields
 
 
 # --------------------------------------------------------------------------- names
@@ -192,7 +214,10 @@ class Gid:
 
     @property
     def source_path(self) -> str:
-        return f"{self.module}.lean"
+        return self.source_path_for()
+
+    def source_path_for(self, source_root: str = "") -> str:
+        return f"{source_root}/{self.module}.lean" if source_root else f"{self.module}.lean"
 
     @property
     def blueprint_path(self) -> str:
@@ -204,7 +229,23 @@ class Gid:
         return name_components(self.name)
 
 
-def parse_gid(text: str) -> Gid:
+def parse_gid(text: str, *, mode: str = "frozen-state") -> Gid:
+    if mode not in MODES:
+        raise LeanError(f"unknown Lean source mode {mode!r}")
+    if mode == "lean-source":
+        s = text.strip()
+        slash = s.rfind("/")
+        dot = s.find(".", slash + 1)
+        if (re.search(r"[\s,]", s) or not slash + 1 < dot < len(s) - 1
+                or not all(is_identifier(c) for c in s[:dot].split("/"))):
+            raise LeanError(f"not a declaration GID: {text!r} "
+                            "(expected <module path>.<name>, e.g. Main.riemannHypothesis)")
+        module, name = s[:dot], s[dot + 1:]
+        try:
+            name_components(name)
+        except LeanError as exc:
+            raise LeanError(f"not a declaration GID: {text!r} ({exc})") from exc
+        return Gid(module, name)
     m = GID_RE.match(text.strip())
     if m:
         try:  # no whitespace or commas even inside «…»: they separate the GIDs of lean="…"
@@ -286,7 +327,7 @@ class HttpSource(Source):
         self.label = f"https://raw.githubusercontent.com/{repo}"
 
     def read(self, commit: str, path: str) -> bytes | None:
-        url = f"https://raw.githubusercontent.com/{self.repo}/{commit}/{path}"
+        url = f"https://raw.githubusercontent.com/{self.repo}/{commit}/{urllib.parse.quote(path)}"
         req = urllib.request.Request(url, headers={"User-Agent": "tbook"})
         token = os.environ.get("TRURETURING_TOKEN")
         if token:
@@ -307,15 +348,20 @@ class HttpSource(Source):
 
 
 class Ledger:
-    """Reads frozen state (and Lean sources) of trureturing at a commit."""
+    """Reads frozen state and Lean sources from the configured repository at a commit."""
 
-    def __init__(self, repo: str, *, offline: bool = False, checkout: Path | None = None):
+    def __init__(self, repo: str, *, offline: bool = False, checkout: Path | None = None,
+                 mode: str = "frozen-state", source_root: str = ""):
         self.repo = repo
         self.offline = offline
+        self.mode = mode
+        self.source_root = source_root.strip("/")
         self.cache = CacheSource(paths.CACHE / "trureturing", readable=cache_trusted())
         self.sources: list[Source] = []
         self.checkout: Path | None = None
-        for cand in [checkout, os.environ.get("TRURETURING_DIR"), paths.ROOT.parent / "trureturing"]:
+        sibling = paths.ROOT.parent / repo.rsplit("/", 1)[-1]
+        candidates = [checkout, os.environ.get("TRURETURING_DIR"), sibling]
+        for cand in candidates:
             if cand and (Path(cand) / ".git").exists():
                 self.checkout = Path(cand)
                 self.sources.append(GitSource(self.checkout))
@@ -674,7 +720,7 @@ class Resolution:
     module: str
     name: str  # fully qualified Lean name
     kind: str  # theorem | def | inductive | constructor | recursor | opaque
-    statement_id: str  # module statement digest from the state file
+    statement_id: str  # frozen module digest or normalized source signature digest
     line: int = 0  # line of the declaration in the .lean source (0 = unknown)
     signature: str = ""  # declaration header up to ':=' (best effort, informational)
 
@@ -685,7 +731,10 @@ class Resolution:
 
 
 def resolve(ledger: Ledger, commit: str, gid_text: str) -> Resolution:
-    gid = parse_gid(gid_text)
+    mode = getattr(ledger, "mode", "frozen-state")
+    gid = parse_gid(gid_text, mode=mode)
+    if mode == "lean-source":
+        return _resolve_source(ledger, commit, gid)
     state = ledger.state(commit, gid.module)
     if state is None:
         raise LeanError(
@@ -710,9 +759,15 @@ def resolve(ledger: Ledger, commit: str, gid_text: str) -> Resolution:
                       statement_id=str(state.get("statement_id", "")))
 
 
-DECL_KEYWORDS = r"(?:theorem|lemma|def|abbrev|instance|structure|inductive|class|opaque|axiom)"
+DECL_KINDS = {
+    "theorem": "theorem", "lemma": "theorem",
+    "def": "def", "abbrev": "def", "instance": "def",
+    "structure": "inductive", "inductive": "inductive", "class": "inductive",
+    "opaque": "opaque", "axiom": "axiom",
+}
+DECL_KEYWORDS = "(?:" + "|".join(DECL_KINDS) + ")"
 _MODIFIERS = r"(?:(?:private|protected|public|noncomputable|nonrec|partial|unsafe|meta)\s+)*"
-_DECL_RE = re.compile(r"^\s*(?P<head>(?:@\[[^\]]*\]\s*)*(?P<mods>" + _MODIFIERS + r")" + DECL_KEYWORDS
+_DECL_RE = re.compile(r"^\s*(?P<head>(?:@\[[^\]]*\]\s*)*(?P<mods>" + _MODIFIERS + r")(?P<keyword>" + DECL_KEYWORDS + ")"
                       + r"\s+(?P<name>(?:«[^»]*»|[^\s(){}\[\]⦃⦄:«])+))")
 _NAMESPACE_RE = re.compile(r"^\s*namespace\s+(?P<name>\S+)")
 _SECTION_RE = re.compile(r"^\s*(?:@\[[^\]]*\]\s*)*(?:(?:public|private|noncomputable|meta)\s+)*section\b"
@@ -757,11 +812,13 @@ def _blank_comments(text: str) -> str:
     return "".join(out)
 
 
-def _declarations(text: str) -> tuple[list[tuple[int, int, list[str], list[str]]], bool]:
-    """Non-private declaration headers of a Lean source as (offset, line, full name, written name), and
+def _declarations_with_kind(
+        text: str, *, include_private: bool = True,
+) -> tuple[list[tuple[int, int, list[str], list[str], str]], bool]:
+    """Declaration headers as (offset, line, full name, written name, kind), and
     whether its ``namespace`` / ``section`` / ``mutual`` / ``end`` scopes could not be followed."""
     scopes: list[tuple[str, str | None]] = []  # ("ns", component) | ("section", name) | ("mutual", None)
-    decls: list[tuple[int, int, list[str], list[str]]] = []
+    decls: list[tuple[int, int, list[str], list[str], str]] = []
     confused = False
     offset = 0
     attr: tuple[int, int] | None = None  # an attribute alone on the line(s) before a declaration
@@ -807,7 +864,10 @@ def _declarations(text: str) -> tuple[list[tuple[int, int, list[str], list[str]]
                 del scopes[-k:]
             continue
         m = _DECL_RE.match(line)
-        if not m or "private" in m.group("mods").split():
+        if not m:
+            continue
+        private = "private" in m.group("mods").split()
+        if private and not include_private:
             continue
         try:
             written = name_components(m.group("name").rstrip("."))
@@ -819,8 +879,50 @@ def _declarations(text: str) -> tuple[list[tuple[int, int, list[str], list[str]]
             full = [c for kind, c in scopes if kind == "ns"] + written
         if written:
             at = pending if pending and not m.group("head").startswith("@") else (start + m.start("head"), lineno)
-            decls.append((at[0], at[1], full, written))
+            if private:
+                full = ["_private", *full]  # keep the body boundary without exposing the declaration
+            decls.append((at[0], at[1], full, written, DECL_KINDS[m.group("keyword")]))
     return decls, confused
+
+
+def _declarations(text: str) -> tuple[list[tuple[int, int, list[str], list[str]]], bool]:
+    decls, confused = _declarations_with_kind(text, include_private=False)
+    return [(start, line, full, written) for start, line, full, written, _ in decls], confused
+
+
+def _written_matches(decls: list[tuple], target: list[str]) -> list:
+    fits = [d for d in decls if len(d[3]) <= len(target) and target[-len(d[3]):] == d[3]]
+    longest = max((len(d[3]) for d in fits), default=0)
+    return [d for d in fits if len(d[3]) == longest]
+
+
+def _resolve_source(ledger: Ledger, commit: str, gid: Gid) -> Resolution:
+    src_path = gid.source_path_for(ledger.source_root)
+    data = ledger.read(commit, src_path)
+    if not data:
+        raise LeanError(f"{gid.text}: source {src_path} not found at {commit[:12]}")
+    text = data.decode("utf-8", "replace")
+    decls, confused = _declarations_with_kind(text)
+    want = gid.parts
+    public = [d for d in decls if not is_private(d[2])]
+    matches = [d for d in public if d[2][-len(want):] == want]
+    if not matches and confused:
+        matches = _written_matches(public, want)
+    if not matches:
+        raise LeanError(f"{gid.text}: no declaration named {gid.name!r} in {src_path} at {commit[:12]}")
+    if len(matches) > 1:
+        names = ", ".join(name_to_str(d[2]) for d in matches)
+        raise LeanError(f"{gid.text}: ambiguous, matches {names}; write a longer name suffix")
+    start, lineno, full, _, kind = matches[0]
+    next_start = next((d[0] for d in decls if d[0] > start), len(text))
+    body = _blank_comments(text)[start:next_start]
+    if re.search(r"(?<![A-Za-z0-9_'])(?:sorry|admit)(?![A-Za-z0-9_'])", body):
+        raise LeanError(f"{gid.text}: declaration uses sorry/admit at {src_path}:{lineno}")
+    delimiter = re.search(r":=|\bwhere\b", body)
+    end = delimiter.start() if delimiter and delimiter.start() <= 2000 else min(len(body), 400)
+    signature = re.sub(r"\s+", " ", text[start:start + end]).strip()
+    statement_id = "sha256:" + hashlib.sha256(signature.encode("utf-8")).hexdigest()
+    return Resolution(gid.text, gid.module, name_to_str(full), kind, statement_id, lineno, signature[:600])
 
 
 def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
@@ -832,8 +934,10 @@ def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
     name that is a suffix of the full name count. Several candidates, or none, leave ``line`` at 0:
     a wrong line is worse than none (badges and ledger links point at it).
     """
+    if res.line > 0 and res.signature:
+        return
     try:
-        data = ledger.read(commit, f"{res.module}.lean")
+        data = ledger.read(commit, Gid(res.module, "x").source_path_for(getattr(ledger, "source_root", "")))
     except LeanError:
         return
     if not data:
@@ -846,9 +950,7 @@ def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
     decls, confused = _declarations(text)
     picks = [d for d in decls if d[2] == target]
     if not picks and confused:
-        fits = [d for d in decls if len(d[3]) <= len(target) and target[-len(d[3]):] == d[3]]
-        longest = max((len(d[3]) for d in fits), default=0)
-        picks = [d for d in fits if len(d[3]) == longest]
+        picks = _written_matches(decls, target)
     if len(picks) != 1:
         return
     start, res.line = picks[0][0], picks[0][1]
@@ -866,10 +968,13 @@ def locate(ledger: Ledger, commit: str, res: Resolution) -> None:
 class BranchLock:
     repo: str
     branch: str
+    mode: str = "frozen-state"
+    source_root: str = ""
 
     def save(self, path: Path | None = None) -> None:
         path = path or paths.LOCK_FILE
-        path.write_text(json.dumps(dict(schema=LOCK_SCHEMA, repo=self.repo, branch=self.branch),
+        path.write_text(json.dumps(dict(schema=LOCK_SCHEMA, repo=self.repo, branch=self.branch,
+                                        **_source_fields(self.mode, self.source_root)),
                                    ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -881,6 +986,8 @@ class Lock:
     pinned_at: str = ""
     declarations: dict[str, dict] = field(default_factory=dict)
     schema: str = LOCK_SCHEMA
+    mode: str = "frozen-state"
+    source_root: str = ""
 
     @classmethod
     def read_spec(cls, path: Path | None = None) -> "Lock | BranchLock | None":
@@ -890,15 +997,20 @@ class Lock:
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("schema") != LOCK_SCHEMA:
             raise LeanError(f"{paths.rel(path)}: unsupported schema {data.get('schema')!r}")
+        try:
+            mode, source_root = source_settings(data)
+        except LeanError as exc:
+            raise LeanError(f"{paths.rel(path)}: {exc}") from exc
         if "commit" not in data:
-            if set(data) != {"schema", "repo", "branch"} or not all(
-                    isinstance(data[k], str) and data[k] for k in ("repo", "branch")):
+            if not set(data) <= {"schema", "repo", "branch", "mode", "source_root"} or not all(
+                    isinstance(data.get(k), str) and data[k] for k in ("repo", "branch")):
                 raise LeanError(f"{paths.rel(path)}: a branch lock requires schema, repo and branch")
-            return BranchLock(data["repo"], data["branch"])
+            return BranchLock(data["repo"], data["branch"], mode=mode, source_root=source_root)
         if not SHA_RE.match(data.get("commit", "")):
             raise LeanError(f"{paths.rel(path)}: commit must be a full 40-hex SHA")
         return cls(repo=data["repo"], branch=data.get("branch", ""), commit=data["commit"],
-                   pinned_at=data.get("pinned_at", ""), declarations=data.get("declarations", {}))
+                   pinned_at=data.get("pinned_at", ""), declarations=data.get("declarations", {}),
+                   mode=mode, source_root=source_root)
 
     @classmethod
     def load(cls, path: Path | None = None, *, offline: bool = False) -> "Lock | None":
@@ -908,7 +1020,8 @@ class Lock:
             snapshot = os.environ.get("TBOOK_LOCK_SNAPSHOT") if path is None else None
             if snapshot:
                 resolved = cls.read_spec(Path(snapshot))
-                if not isinstance(resolved, Lock) or (resolved.repo, resolved.branch) != (spec.repo, spec.branch):
+                if not isinstance(resolved, Lock) or BranchLock(
+                        resolved.repo, resolved.branch, resolved.mode, resolved.source_root) != spec:
                     raise LeanError(f"trureturing snapshot does not match the branch lock: {snapshot}")
                 return resolved
             return _resolve_branch_lock(source, spec, os.environ.get("TBOOK_TRURETURING_SHA", ""), offline)
@@ -922,6 +1035,7 @@ class Lock:
             "commit": self.commit,
             "pinned_at": self.pinned_at,
             "declarations": {k: self.declarations[k] for k in sorted(self.declarations)},
+            **_source_fields(self.mode, self.source_root),
         }
         return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
@@ -938,19 +1052,29 @@ class Lock:
 
     # Links ------------------------------------------------------------------
     def blob(self, path: str, line: int = 0) -> str:
+        if self.mode == "lean-source" or self.source_root:
+            path = urllib.parse.quote(path, safe="/!'()*")
         url = f"https://github.com/{self.repo}/blob/{self.commit}/{path}"
         return url + (f"#L{line}" if line else "")
 
     def source_url(self, gid: str) -> str:
         res = self.get(gid)
-        g = parse_gid(gid)
-        return self.blob(g.source_path, res.line if res else 0)
+        g = parse_gid(gid, mode=self.mode)
+        return self.blob(g.source_path_for(self.source_root), res.line if res else 0)
 
     def state_url(self, gid: str) -> str:
-        return self.blob(parse_gid(gid).state_path)
+        if self.mode == "lean-source":
+            return self.source_url(gid)
+        return self.blob(parse_gid(gid, mode=self.mode).state_path)
 
     def blueprint_url(self, gid: str) -> str:
-        return self.blob(parse_gid(gid).blueprint_path)
+        if self.mode == "lean-source":
+            return ""
+        return self.blob(parse_gid(gid, mode=self.mode).blueprint_path)
+
+    @property
+    def repo_name(self) -> str:
+        return self.repo.rsplit("/", 1)[-1]
 
     @property
     def tree_url(self) -> str:

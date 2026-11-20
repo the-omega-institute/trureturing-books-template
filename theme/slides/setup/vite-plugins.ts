@@ -4,7 +4,7 @@
 //   lang      edition language derived from the entry file name (slides.md → the book's first language,
 //             book.toml editions[0]; slides.<lang>.md → lang)
 //   book/deck from the entry path books/<slug>/slides/<deck>/
-//   lock      {repo, commit, decls: {gid: {name, kind, line}}} read from trureturing.lock.json — the
+//   lock      {repo, commit, mode?, source_root?, decls: {gid: {name, kind, line}}} read from trureturing.lock.json — the
 //             only source that decides whether <LeanBadge> shows the green LEAN ✓
 //   text      the merged i18n table for `lang` (theme/i18n/<lang>.toml overridden by i18n/<lang>.toml)
 //
@@ -48,7 +48,13 @@ function data(entry: string) {
     lang,
     book,
     deck,
-    lock: lock ? { repo: String(lock.repo), commit: String(lock.commit), decls } : null,
+    lock: lock ? {
+      repo: String(lock.repo),
+      commit: String(lock.commit),
+      mode: lock.mode,
+      source_root: lock.source_root,
+      decls,
+    } : null,
     text: i18n(lang),
   }
 }

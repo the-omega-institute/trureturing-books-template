@@ -41,7 +41,7 @@ def _check_ref(model: EditionModel, issues: list[Issue], path: Path, line: int, 
              "numbered environments (theorem, definition, example …)")
 
 
-def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
+def check_env_policy(model: EditionModel, issues: list[Issue], *, mode: str = "frozen-state") -> None:
     for ch in model.chapters:
         for env in ch.envs + ch.media:
             where = (ch.path, env.line)
@@ -88,7 +88,7 @@ def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
                 _err(issues, *where, f"{env.kind} #{env.id}: open items must not cite Lean; if it is proved, make it a theorem")
             for gid in env.lean:
                 try:
-                    lean.parse_gid(gid)
+                    lean.parse_gid(gid, mode=mode)
                 except lean.LeanError as exc:
                     _err(issues, *where, str(exc))
             if env.kind in MEDIA:
@@ -119,7 +119,7 @@ def check_env_policy(model: EditionModel, issues: list[Issue]) -> None:
             _check_ref(model, issues, ch.path, line, ref)
         for line, gid in ch.lean_links:
             try:
-                lean.parse_gid(gid)
+                lean.parse_gid(gid, mode=mode)
             except lean.LeanError as exc:
                 _err(issues, ch.path, line, str(exc))
 
@@ -517,10 +517,15 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
     ``cited_elsewhere`` holds GIDs cited by books outside ``models_by_book`` (``check --book``), so
     their lock entries do not count as unused; ``None`` (unknown) skips the unused-entry warning.
     """
+    mode = site.trureturing_mode
+    if lock and (lock.mode, lock.source_root) != (mode, site.trureturing_source_root):
+        _err(issues, paths.LOCK_FILE, 0,
+             "lock mode and source_root must match site.toml [trureturing]; run ./tbook pin")
+        return
     cited: dict[str, list[tuple[Path, int, bool]]] = {}
     for path, line, gid in extra_cited or []:
         try:
-            lean.parse_gid(gid)
+            lean.parse_gid(gid, mode=mode)
         except lean.LeanError:
             continue  # reported by the media module's own check
         cited.setdefault(gid, []).append((path, line, False))
@@ -528,7 +533,7 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
         for model in models.values():
             for path, line, gid, env in model.cited_gids():
                 try:
-                    lean.parse_gid(gid)
+                    lean.parse_gid(gid, mode=mode)
                 except lean.LeanError:
                     continue  # reported by the policy check
                 cited.setdefault(gid, []).append((path, line, bool(env and env.kind in FORMAL)))
@@ -545,7 +550,7 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
         _err(issues, paths.LOCK_FILE, 0,
              f"lock was pinned against branch {lock.branch!r} but site.toml uses {branch!r}; run ./tbook pin "
              f"(or ./tbook pin --refresh to keep commit {lock.commit[:12]} if it is on {branch!r})")
-    ledger = lean.Ledger(lock.repo, offline=offline)
+    ledger = lean.Ledger(lock.repo, offline=offline, mode=lock.mode, source_root=lock.source_root)
     problem = lean.branch_problem(branch, lock.commit)
     anc = lean.Ancestry(None, "") if problem else ledger.branch_contains(lock.commit, branch)
     where = f"branch {branch!r} of {lock.repo}"
@@ -589,7 +594,7 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
         for fld in ("name", "kind", "module", "statement_id"):
             if getattr(live, fld) != getattr(res, fld):
                 _err(issues, paths.LOCK_FILE, 0,
-                     f"{gid}: lock says {fld}={getattr(res, fld)!r} but trureturing@{lock.commit[:12]} says "
+                     f"{gid}: lock says {fld}={getattr(res, fld)!r} but {lock.repo_name}@{lock.commit[:12]} says "
                      f"{getattr(live, fld)!r}; run ./tbook pin --refresh")
                 break
     if cited_elsewhere is None:
@@ -675,7 +680,7 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         models_by_book[book.slug] = models
         for model in models.values():
             issues.extend(model.issues)
-            check_env_policy(model, issues)
+            check_env_policy(model, issues, mode=site.trureturing_mode)
             check_orphans(model, issues)
             check_headings(model, issues)
             check_links(model, site, issues)

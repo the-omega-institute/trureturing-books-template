@@ -1569,6 +1569,13 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
         date = {"year": 1970, "month": 1, "day": 1, "iso": book.date}
     online = site.book_url(book.slug, lang) + "/" if site.base_url else ""
     s = lambda key: config.s(lang, key)  # noqa: E731
+    repo = lock.repo if lock else site.trureturing_repo
+    repo_name = repo.rsplit("/", 1)[-1]
+    source_mode = lock is not None and lock.mode == "lean-source"
+    verified = t(lang, "pdf.no_formal")
+    if formal:
+        verified = (t(lang, "pdf.verified_statement_source", n=formal, repo=repo_name) if source_mode
+                    else t(lang, "pdf.verified_statement", n=formal).replace("trureturing", repo_name))
     return {
         "schema": "trureturing-books.pdf-meta.v1",
         "slug": book.slug,
@@ -1597,7 +1604,7 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
         "formal_count": formal,
         "open_count": opens,
         "trureturing": {
-            "repo": lock.repo if lock else site.trureturing_repo,
+            "repo": repo if repo == "the-omega-institute/trureturing" else repo_name,
             "commit": lock.commit if lock else "",
             "short": lock.commit[:12] if lock else "",
             "url": lock.tree_url if lock else "",
@@ -1629,11 +1636,11 @@ def book_meta(site: config.Site, book: config.Book, edition: config.Edition, mod
             "typeset_value": t(lang, "pdf.typeset_value"),
             "source": t(lang, "pdf.source"),
             "online": t(lang, "pdf.online"),
-            "verified_statement": t(lang, "pdf.verified_statement", n=formal) if formal else t(lang, "pdf.no_formal"),
+            "verified_statement": verified,
             "open_statement": t(lang, "pdf.open_statement", n=opens) if opens else "",
             "series": t(lang, "cover.series"),
-            "stamp_caption": t(lang, "cover.stamp_caption"),
-            "pinned_short": t(lang, "cover.pinned"),
+            "stamp_caption": t(lang, "cover.stamp_caption_source" if source_mode else "cover.stamp_caption"),
+            "pinned_short": t(lang, "cover.pinned_source" if source_mode else "cover.pinned"),
         },
     }
 

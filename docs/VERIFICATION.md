@@ -1,14 +1,32 @@
 # 验证模型 · Verification model
 
-本书库区分三种状态：**Lean 内核验证、源文书面证明、开放问题。** 只有 `LEAN ✓` 结果承诺对应 trureturing 中已被 Lean 内核验证并冻结的声明，且固定在一个确切的提交上。`status="written-proof"` 表示有书面证明但没有陈述同一结果的冻结声明，不声称内核验证。 本文说明这条承诺如何被检查、检查到什么程度，以及什么仍需人工负责。
+本书库区分三种状态：**Lean 内核验证、源文书面证明、开放问题。** 在默认的 `frozen-state` 模式中，`LEAN ✓` 结果对应 trureturing 中已被 Lean 内核验证并冻结的声明，链接固定在一个确切的提交上。`status="written-proof"` 表示有书面证明但没有陈述同一结果的冻结声明，不声称内核验证。
+
+## 标准 Lean 仓库
+
+书库也可以在 `site.toml` 中选择 `lean-source` 模式，从所钉提交的 `.lean` 文件解析声明。
+
+```toml
+[trureturing]
+repo = "owner/lean-project"
+branch = "main"
+mode = "lean-source"
+source_root = "src"
+```
+
+`source_root` 是相对于仓库根目录的路径，默认为空字符串。路径末尾的 `/` 会被去掉，路径开头的 `/`、反斜杠及 `..` 路径分量均会报错。GID 的模块路径相对于该目录书写。上例中，`Main.riemannHypothesis` 在 `src/Main.lean` 中查找声明，`Riemann/Divisors₂.NatFacts.divisors₂` 在 `src/Riemann/Divisors₂.lean` 中查找声明。
+
+运行 `./tbook pin` 或 `./tbook pin --follow` 写入对应的锁文件。两种锁文件都记录所选模式及非空的源码目录，钉版与校验仍核对提交所属的分支。源码中的完整声明名或名称分量后缀须唯一匹配。`theorem` 与 `lemma` 可用于定理框，源码检查拒绝声明中直接出现的 `sorry` 或 `admit`。账本保存声明签名的摘要，引用及摘要均链接到所钉源码的声明位置。
+
+源码检查通过文本扫描定位声明并检查其内容。它的验证范围限于当前声明，内核校验和传递公理闭包由 Lean 项目及 `./tbook lean-project` 生成的深度验证执行（见下文）。
 
 ## 分支锁
 
-运行 `./tbook pin --follow` 可切换到分支锁，锁文件记录 `schema`、`repo` 和 `branch`。仓库与分支须与 `site.toml` 一致。校验和构建从分支取得完整 SHA，并从该提交解析当前书稿与媒体引用。产物中的源码链接和站点清单使用该 SHA。分支锁需要在线解析。需要提交一份可离线使用的锁文件时，可用 `./tbook pin <完整 SHA>` 固定提交。
+运行 `./tbook pin --follow` 可切换到分支锁，锁文件至少记录 `schema`、`repo` 和 `branch`。仓库、分支和源码设置须与 `site.toml` 一致。校验和构建从分支取得完整 SHA，并从该提交解析当前书稿与媒体引用。产物中的源码链接和站点清单使用该 SHA。分支锁需要在线解析。需要提交一份可离线使用的锁文件时，可用 `./tbook pin <完整 SHA>` 固定提交。
 
 下文的声明索引在固定 SHA 模式中提交到仓库，在分支模式中于运行时生成。工作流各作业共享计划确定的 SHA，标签发行的深度验证也使用这个 SHA。Pages 每天 05:17 UTC 检查上游变化，并用已通过 CI 的书稿发布新快照。
 
-## 1. 一条定理的身份链
+## 1. 冻结状态模式下一条定理的身份链
 
 ```
 书中环境  ::: {.theorem #thm-x lean="D5/S1/Deficit/DeficitThreeValued.deficit_three_valued"}

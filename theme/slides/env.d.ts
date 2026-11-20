@@ -5,7 +5,7 @@ declare module 'virtual:trureturing' {
     lang: string
     book: string
     deck: string
-    lock: { repo: string, commit: string, decls: Record<string, LockedDecl> } | null
+    lock: { repo: string, commit: string, mode?: 'frozen-state' | 'lean-source', source_root?: string, decls: Record<string, LockedDecl> } | null
     text: Record<string, any>
   }
   export default data

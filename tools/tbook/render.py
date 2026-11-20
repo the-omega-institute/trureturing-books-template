@@ -137,9 +137,14 @@ def lean_view(gid: str, lock: lean.Lock | None) -> dict:
     view = {"gid": gid, "name": "", "kind": "", "url": "", "state_url": "", "blueprint_url": "",
             "line": 0, "signature": "", "statement_id": "", "resolved": False}
     try:
-        g = lean.parse_gid(gid)
+        g = lean.parse_gid(gid, mode=lock.mode if lock else "frozen-state")
     except lean.LeanError:
-        return view
+        if lock:
+            return view
+        try:
+            g = lean.parse_gid(gid, mode="lean-source")
+        except lean.LeanError:
+            return view
     view["name"] = g.lean_module + "." + g.name if not g.name.startswith(g.lean_module) else g.name
     res = lock.get(gid) if lock else None
     if res:
@@ -237,7 +242,9 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
         badge, badge_title = config.s(lang, "badge.written_proof"), config.s(lang, "badge.written_proof_title")
     elif env.kind in FORMAL:
         if lean_verified(leans):
-            badge, badge_title = config.s(lang, "badge.lean"), config.s(lang, "badge.lean_title")
+            badge = config.s(lang, "badge.lean")
+            title_key = "badge.lean_source_title" if ctx.lock and ctx.lock.mode == "lean-source" else "badge.lean_title"
+            badge_title = config.s(lang, title_key)
         else:
             # The build never claims what the lock cannot back: red UNVERIFIED, as the slides do.
             unverified = True

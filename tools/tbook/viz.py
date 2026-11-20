@@ -452,7 +452,7 @@ def _line_of(text: str, viz_id: str) -> int:
 
 
 def _ledger_has(ledger: lean.Ledger | None, lock: lean.Lock | None, path: str) -> bool | None:
-    """Whether ``path`` exists in trureturing at the pinned commit (None when no offline source can tell)."""
+    """Check an explicit repo-relative path at the pinned commit (None if unavailable offline)."""
     if ledger is None or lock is None:
         return None
     try:
@@ -562,7 +562,7 @@ def check_native(book, *, lock: lean.Lock | None = None, ledger: lean.Ledger | N
             if "label" in ref and (not isinstance(ref["label"], str) or not ref["label"].strip()):
                 err(reg_file, line, f"{at}: lean[{k}].label must be a non-empty string when given")
             try:
-                lean.parse_gid(gid)
+                lean.parse_gid(gid, mode=lock.mode if lock else config.site_mode())
             except lean.LeanError:
                 err(reg_file, line, f"{at}: lean[{k}]: not a declaration GID: {gid}")
                 continue
@@ -799,7 +799,7 @@ def check_page(book, vid: str, page: Path, ids: set[str], *, lock=None, ledger=N
         line = text.count("\n", 0, text.find(value)) + 1 if value else 0
         if kind == "gid":
             try:
-                lean.parse_gid(value)
+                lean.parse_gid(value, mode=lock.mode if lock else config.site_mode())
             except lean.LeanError:
                 err(line, f'data-lean-gid="{value}" is not a declaration GID')
                 continue
@@ -850,7 +850,7 @@ def check(book) -> list[Issue]:
     if not book.viz_dir.exists():
         return []
     lock = _lock()
-    ledger = lean.Ledger(lock.repo, offline=True) if lock else None
+    ledger = lean.Ledger(lock.repo, offline=True, mode=lock.mode, source_root=lock.source_root) if lock else None
     issues = check_native(book, lock=lock, ledger=ledger)
     issues.extend(check_scripts(book))
     return issues
@@ -1133,7 +1133,14 @@ def hub_html(site, book, lock: lean.Lock | None = None) -> str:
     pin = ""
     if lock:
         pin = (f'<a class="pill" href="{esc(lock.tree_url)}" target="_blank" rel="noopener">LEAN '
-               f'<strong>trureturing@{esc(lock.commit[:7])} ↗</strong></a>')
+               f'<strong>{esc(lock.repo_name)}@{esc(lock.commit[:7])} ↗</strong></a>')
+    lede, legend_lean = _pair("hero_lede"), _pair("legend_lean")
+    if lock and lock.mode == "lean-source":
+        lede = _pair("hero_lede_source", repo=lock.repo_name)
+        legend_lean = _pair("legend_lean_source", repo=lock.repo_name)
+    elif lock and lock.repo_name != "trureturing":
+        lede = lede.replace("trureturing", esc(lock.repo_name))
+        legend_lean = legend_lean.replace("trureturing", esc(lock.repo_name))
     head_fonts = ""
     if fonts:
         head_fonts = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
@@ -1173,10 +1180,10 @@ def hub_html(site, book, lock: lean.Lock | None = None) -> str:
     <canvas id="field" aria-hidden="true"></canvas>
     <div class="hero-text">
       <h2 id="heroTitle">{_pair("hero_title")}</h2>
-      <p>{_pair("hero_lede")}</p>
+      <p>{lede}</p>
       <p class="tagline"><em>{_pair("tagline_em")}</em></p>
       <ul class="legend">
-        <li><span class="k ok">LEAN ✓</span>{_pair("legend_lean")}</li>
+        <li><span class="k ok">LEAN ✓</span>{legend_lean}</li>
         <li><span class="k">THEORY</span>{_pair("legend_theory")}</li>
         <li><span class="k num">NUM</span>{_pair("legend_num")}</li>
       </ul>

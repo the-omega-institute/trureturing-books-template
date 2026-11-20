@@ -47,13 +47,20 @@ def ledger_markdown(model: EditionModel, lock: lean.Lock | None,
     link = lambda target, text: f"[{text}]({href(target)})" if target.id else text  # noqa: E731  [@id] in titles
     lang = model.lang
     s = lambda key: config.s(lang, key)  # noqa: E731
-    out = [f"# {s('ledger.title')} {{#{LEDGER_ID} .unnumbered}}", "", s("ledger.intro"), ""]
+    source_mode = lock is not None and lock.mode == "lean-source"
+    intro = s("ledger.intro")
     if lock:
-        out += [f"{s('ui.pinned_at')} [`{lock.commit[:12]}`]({lock.tree_url}) · `{lock.repo}`", ""]
+        intro = (s("ledger.intro_source").format(repo=lock.repo_name) if source_mode
+                 else intro.replace("trureturing", lock.repo_name))
+    out = [f"# {s('ledger.title')} {{#{LEDGER_ID} .unnumbered}}", "", intro, ""]
+    if lock:
+        repo_label = lock.repo if lock.repo == "the-omega-institute/trureturing" else lock.repo_name
+        out += [f"{s('ui.pinned_at')} [`{lock.commit[:12]}`]({lock.tree_url}) · `{repo_label}`", ""]
     formal = [e for e in model.all_envs() if e.kind in FORMAL and e.status != "written-proof"]
     unverified = s("badge.unverified") or s("slides.badge_unverified") or "UNVERIFIED"
     if formal:
-        out += [f"| {s('ledger.col_item')} | {s('ledger.col_title')} | {s('ledger.col_decl')} | {s('ledger.col_state')} |",
+        state_column = s("ledger.col_state_source" if source_mode else "ledger.col_state")
+        out += [f"| {s('ledger.col_item')} | {s('ledger.col_title')} | {s('ledger.col_decl')} | {state_column} |",
                 "| --- | --- | --- | --- |"]
         for env in formal:
             decls = []
