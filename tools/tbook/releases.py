@@ -16,7 +16,7 @@ class PdfAsset:
 
 @lru_cache(maxsize=1)
 def pdf_assets(repo: str) -> dict[str, PdfAsset]:
-    """Index uploaded PDFs by filename, preferring the most recently published copy."""
+    """Index uploaded PDFs by filename, excluding daily dev previews."""
     if not repo:
         return {}
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
@@ -27,7 +27,8 @@ def pdf_assets(repo: str) -> dict[str, PdfAsset]:
     )
     published = sorted(
         (release for page in json.loads(data) for release in page
-         if not release["draft"] and release["published_at"]),
+         if not release["draft"] and release["published_at"]
+         and not re.fullmatch(r"preview-dev-[0-9a-f]{40}", release["tag_name"])),
         key=lambda release: release["published_at"], reverse=True,
     )
     assets = {}

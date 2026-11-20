@@ -224,7 +224,7 @@ daily_dev_preview = true
 
 GitHub Actions 每天 03:17 UTC 检查本书库的 `dev` 分支。默认关闭。启用后，如果 `dev` 上有尚未预览的提交，当天最多发布一次，tag 为 `preview-dev-<完整提交 SHA>`。从包含此工作流的默认分支建立 `dev`，并通过书库的开发流程更新它。当日已发布、提交已有预览或分支尚未建立时，工作流会跳过构建。
 
-在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用触发时 `dev` 的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在 Releases 页下载预览，Pages 继续发布默认分支的内容。
+在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用触发时 `dev` 的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在对应的 Releases 页面下载预览。官网的 PDF 下载页从版本发行附件生成链接。
 
 ## 7. 学术报告 PDF
 
