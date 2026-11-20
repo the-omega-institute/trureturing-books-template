@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "229dae1f978d9aec340d0d21f5f0fb91faa6b0089c60c32b7e0c732508af21da",
+      "sha256": "7ccaf7e00f43de7f408bee2abfbc76b3068246f4104d242d8278722a49333a2b",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -364,7 +364,7 @@
       "mode": "100644"
     },
     "theme/film/site/films.js": {
-      "sha256": "6cb9c5f7e0a6f1c4342e5fb4ba7e7184066d28e070d9bf67200679b8fbdf4988",
+      "sha256": "97d32fe62339135ee12ab3a93e75853d8d58ddd0d72a15c21986a0b4b6e81777",
       "mode": "100644"
     },
     "theme/film/tts.py": {
@@ -404,7 +404,7 @@
       "mode": "100644"
     },
     "theme/site/site.js": {
-      "sha256": "0b482e5db885fd5db55dfedb7cbe08dfb0ae66781008a60ab5487c65f33fde45",
+      "sha256": "5fcc21ee27f2a82e4208f54ff5ec4d80dcb00f99bfd7f2687729fba10a51c78c",
       "mode": "100644"
     },
     "theme/slides/README.md": {
@@ -536,7 +536,7 @@
       "mode": "100644"
     },
     "theme/viz/shell.js": {
-      "sha256": "9fcbe2814d96a30d6ed2f292766ad05756f3789f84cfbb2de69828f2206bb98a",
+      "sha256": "74e57c940737c76ba6a090e2ba1d56bcdb3f5353f5d160d52351e68d519d3abb",
       "mode": "100644"
     },
     "theme/viz/solid-core.js": {
@@ -868,7 +868,7 @@
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
-      "sha256": "04ba63d1ea3fc8e732a9bed72bcb08ff6f1939c75f1f8a708bb7cd9404aa1923",
+      "sha256": "9e140936e8924fa2379386042cb3ccd9dd2ab85629cf5877caec1238c24356ec",
       "mode": "100644"
     },
     "tools/tbook/stats.py": {
@@ -1076,7 +1076,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "2145df2cf5065f357bcdea5dc7ff55c8e733d38ac268352db5db3e15751bc946",
+      "sha256": "4672ef52644048e5f4911495fb18d2b921bf35b7f1e6fbe69f3c7a68629b1c8e",
       "mode": "100644"
     },
     "tools/tests/test_site_post_build.py": {
