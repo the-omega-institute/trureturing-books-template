@@ -776,7 +776,7 @@ def footer(frame: Frame) -> str:
     parts = [f"<span>{bi.s('ui.generated_note')}</span>"]
     right = []
     if frame.lock:
-        right.append(f'<a href="{esc(frame.lock.tree_url)}" rel="noopener">trureturing@<code>{esc(frame.lock.commit[:12])}</code></a>')
+        right.append(f'<a href="{esc(frame.lock.tree_url)}" rel="noopener">{esc(frame.lock.repo_name)}@<code>{esc(frame.lock.commit[:12])}</code></a>')
     if name:
         right.append(bi.t("template", name=name, version=version))
     if frame.site.repo:
@@ -899,7 +899,7 @@ def index_html(frame: Frame, views: list[BookView]) -> str:
     pills = [f'<span class="pill">{bi.s("ui.books")} <strong>{len(views)}</strong></span>',
              f'<span class="pill ok">LEAN ✓ <strong>{total}</strong></span>']
     if lock:
-        pills.append(f'<a class="pill" href="{esc(lock.tree_url)}" rel="noopener">trureturing '
+        pills.append(f'<a class="pill" href="{esc(lock.tree_url)}" rel="noopener">{esc(lock.repo_name)} '
                      f'<strong>@{esc(lock.commit[:12])} ↗</strong></a>')
     if site.repo:
         pills.append(f'<a class="pill" href="https://github.com/{esc(site.repo)}" rel="noopener">'
@@ -910,9 +910,10 @@ def index_html(frame: Frame, views: list[BookView]) -> str:
         f'<nav class="status" {bi.aria(lambda lang: t(lang, "nav_site"))}>{"".join(pills)}{lang_switch(frame)}</nav>'
         "</header>"
     )
+    badge_title = "badge.lean_source_title" if lock and lock.mode == "lean-source" else "badge.lean_title"
     legend = (
         '<ul class="legend">'
-        f'<li><span class="k ok">LEAN ✓</span>{bi.s("badge.lean_title")}</li>'
+        f'<li><span class="k ok">LEAN ✓</span>{bi.s(badge_title)}</li>'
         f'<li><span class="k warn">OPEN</span>{bi.s("badge.open_title")}</li>'
         + (f'<li><span class="k dim">PIN</span>{bi.s("ui.pinned_at")} <code>{esc(lock.commit[:12])}</code></li>' if lock else "")
         + "</ul>"
@@ -1097,7 +1098,11 @@ def verification_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str
         return f"<li>{ref(env)}{title(env, chip)}" + (f'<span class="decls">{"".join(decls)}</span>' if decls else "") + "</li>"
 
     formal = render.verified_envs(model.formal_envs(), lock)
-    out = [f'<p class="note">{esc(t(ui_lang, "verification_intro"))}</p>']
+    intro = t(ui_lang, "verification_intro")
+    if lock:
+        intro = (t(ui_lang, "verification_intro_source", repo=lock.repo_name) if lock.mode == "lean-source"
+                 else intro.replace("trureturing", lock.repo_name))
+    out = [f'<p class="note">{esc(intro)}</p>']
     if formal:
         head, rest = formal[:FORMAL_PREVIEW], formal[FORMAL_PREVIEW:]
         if len(formal) <= FORMAL_PREVIEW + 2:
@@ -1324,7 +1329,7 @@ def landing_html(frame: Frame, view: BookView) -> str:
     facts.append((bi.s("ui.language"), " · ".join(
         f'<span lang="{esc(ed.bcp47)}">{esc(config.s(ed.lang, "meta.name") or ed.lang)}</span>' for ed in book.editions)))
     if lock:
-        facts.append(("trureturing", f'<a href="{esc(lock.tree_url)}" rel="noopener"><code>{esc(lock.commit[:12])}</code></a>'))
+        facts.append((lock.repo_name, f'<a href="{esc(lock.tree_url)}" rel="noopener"><code>{esc(lock.commit[:12])}</code></a>'))
     facts_html = "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in facts)
 
     sections = [("contents", bi.s("ui.contents")), ("verification", bi.t("verification"))]

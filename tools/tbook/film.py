@@ -604,7 +604,7 @@ def validate_meta(meta: dict, film_dir: Path, book: config.Book, lock: lean.Lock
             err("film.json: lean lists a GID twice")
         for gid in gids:
             try:
-                lean.parse_gid(gid)
+                lean.parse_gid(gid, mode=lock.mode if lock else config.site_mode())
             except lean.LeanError as exc:
                 err(f"film.json: {exc}")
                 continue
@@ -994,7 +994,7 @@ def lean_refs(gids: list[str], lock: lean.Lock | None) -> list[dict]:
     out = []
     for gid in gids:
         try:
-            g = lean.parse_gid(gid)
+            g = lean.parse_gid(gid, mode=lock.mode if lock else config.site_mode())
         except lean.LeanError:
             continue
         res = lock.get(gid) if lock else None
@@ -1055,10 +1055,12 @@ def items(book) -> list[dict]:
     return out
 
 
-def engine_strings() -> dict[str, dict[str, str]]:
+def engine_strings(lock: lean.Lock | None = None) -> dict[str, dict[str, str]]:
     out = {}
     for lang in film_inputs.ENGINE_LANGUAGES:
         table = {key: t(lang, key) for key in ENGINE_STRING_KEYS}
+        if lock and lock.mode == "lean-source":
+            table["badge_lean"] = t(lang, "badge_lean_source")
         table["lean"] = config.s(lang, "badge.lean")
         table["open"] = config.s(lang, "badge.open")
         out[lang] = table
@@ -1098,7 +1100,7 @@ def engine_data(film: Film) -> dict:
         "lean": lean_refs(film.lean, lock),
         "pin": {"repo": lock.repo, "commit": lock.commit} if lock else {"repo": "", "commit": ""},
         "names": names,
-        "strings": engine_strings(),
+        "strings": engine_strings(lock),
     }
 
 
@@ -1268,7 +1270,8 @@ def _film_card(site: config.Site, film: Film, lock: lean.Lock | None, built: boo
         refs.append(f"<li>{chip}{link}</li>")
     lean_block = ""
     if refs:
-        lean_block = (f'<div class="lean"><h4>{_pair("lean_title")}</h4><ul>{"".join(refs)}</ul></div>')
+        title_key = "lean_title_source" if lock and lock.mode == "lean-source" else "lean_title"
+        lean_block = f'<div class="lean"><h4>{_pair(title_key)}</h4><ul>{"".join(refs)}</ul></div>'
     links = []
     if built:  # the videos film.json lists, the narrated one to download first (1080p when listed), then the cover
         primary = film.download()
@@ -1284,7 +1287,10 @@ def _film_card(site: config.Site, film: Film, lock: lean.Lock | None, built: boo
     subject = ""
     if commit:
         stale = lock is not None and not lock.commit.startswith(commit)
-        subject = (f'<p class="subject{" stale" if stale else ""}">{_pair("subject")} '
+        subject_label = _pair("subject")
+        if lock and lock.repo_name != "trureturing":
+            subject_label = subject_label.replace("trureturing", esc(lock.repo_name))
+        subject = (f'<p class="subject{" stale" if stale else ""}">{subject_label} '
                    f'<a href="https://github.com/{esc(repo)}/tree/{esc(commit)}" target="_blank" rel="noopener">'
                    f'<code>{esc(commit[:7])}</code></a>'
                    + (f'<br><span class="warn">{_pair("subject_stale")}</span>' if stale else "") + "</p>")
@@ -1318,7 +1324,12 @@ def hub_html(site: config.Site, book: config.Book, lock: lean.Lock | None = None
     pin = ""
     if lock:
         pin = (f'<a class="pill" href="{esc(lock.tree_url)}" target="_blank" rel="noopener">LEAN '
-               f'<strong>trureturing@{esc(lock.commit[:7])} ↗</strong></a>')
+               f'<strong>{esc(lock.repo_name)}@{esc(lock.commit[:7])} ↗</strong></a>')
+    lede = _pair("hero_lede")
+    if lock and lock.mode == "lean-source":
+        lede = _pair("hero_lede_source", repo=lock.repo_name)
+    elif lock and lock.repo_name != "trureturing":
+        lede = lede.replace("trureturing", esc(lock.repo_name))
     head_fonts = ""
     if fonts:
         head_fonts = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
@@ -1353,7 +1364,7 @@ def hub_html(site: config.Site, book: config.Book, lock: lean.Lock | None = None
 
   <section class="hero panel">
     <h2>{_pair("hero_title")}</h2>
-    <p>{_pair("hero_lede")}</p>
+    <p>{lede}</p>
   </section>
 
   <section class="films" aria-label="{esc(films_zh)} {esc(films_en)}">

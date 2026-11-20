@@ -1635,7 +1635,7 @@ def _check_citation(c: Citation, ed: DeckEdition, s: Slide, lock: lean.Lock | No
             err(ed.path, s.line, f'<{c.tag}> needs gid="<GID>" (a frozen Lean declaration) or status="open|argued|written-proof"')
         return
     try:
-        lean.parse_gid(c.gid)
+        lean.parse_gid(c.gid, mode=lock.mode if lock else config.site_mode())
     except lean.LeanError as exc:
         err(ed.path, s.line, str(exc))
         return

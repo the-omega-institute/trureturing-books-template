@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [Unreleased]
+
+- 书库可用 `[trureturing].mode = "lean-source"` 引用标准 Lean 仓库的源码声明，并用 `source_root` 指定源码目录。钉版、校验、账本和媒体链接支持这种引用。冻结状态仍是默认模式，现有书库无需迁移。
+
 ## [1.8.2] - 2026-11-20
 
 - 长推理与研究开始前须在 Issue 认领具体范围。贡献规范补充了重复认领的协调办法，以及合入 PR、仅有研究结论和任务终止时的结项方式。

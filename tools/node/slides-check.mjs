@@ -30,8 +30,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  DECK_RE, GID_RE, PRIMARY_FILE, ROOT, argParser, bcp47, booksWithDecks, citations, deckLangs, deckNames, editionFile,
-  loadLock, primaryLang, readEdition, stripCode, themeRef, toPosix,
+  DECK_RE, PRIMARY_FILE, ROOT, argParser, bcp47, booksWithDecks, citations, deckLangs, deckNames, editionFile,
+  loadLock, parseGid, primaryLang, readEdition, stripCode, themeRef, toPosix,
 } from './slides-lib.mjs';
 import { backdropState, BACKDROP_IMG } from './slides-backdrop.mjs';
 
@@ -154,7 +154,7 @@ for (const book of books) {
             if (!c.attrs.status) fail(`${here}: <${c.tag}> needs gid="<GID>" or status="open|argued|written-proof"`);
             continue;
           }
-          if (!GID_RE.test(c.gid)) { fail(`${here}: ${c.gid} is not a GID (<module path>.<name>, e.g. D5/S1/Deficit/DeficitThreeValued.deficit_three_valued)`); continue; }
+          if (!parseGid(c.gid, lock)) { fail(`${here}: ${c.gid} is not a GID (<module path>.<name>, e.g. D5/S1/Deficit/DeficitThreeValued.deficit_three_valued)`); continue; }
           const d = decls[c.gid];
           if (!d) fail(`${here}: ${c.gid} is not in trureturing.lock.json; slides may only cite declarations the lock resolves (cite it in the book and run ./tbook pin --refresh)`);
           // LEAN ✓ means a kernel-checked theorem; a definition gets the neutral badge only with kind="definition"

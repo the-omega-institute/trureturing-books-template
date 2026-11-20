@@ -67,14 +67,15 @@ class PinReport:
         return "\n".join(lines)
 
 
-def cited_gids(books: list[config.Book]) -> list[str]:
+def cited_gids(books: list[config.Book], *, mode: str | None = None) -> list[str]:
+    mode = config.site_mode() if mode is None else mode
     gids: set[str] = set()
     for book in books:
         found = [gid for model in load_book_models(book).values() for _, _, gid, _ in model.cited_gids()]
         found += [gid for _, _, gid in media_cited_gids(book)]
         for gid in found:
             try:
-                lean.parse_gid(gid)
+                lean.parse_gid(gid, mode=mode)
             except lean.LeanError:
                 continue
             gids.add(gid)
@@ -89,10 +90,16 @@ def _check_branch(branch: str, commit: str = "") -> None:
                              "rule on a branch (default 'dev'), and only a branch can show that a commit was merged")
 
 
-def branch_head(spec: lean.BranchLock) -> str:
-    site = config.load_site()
+def _check_branch_lock(spec: lean.BranchLock, site: config.Site) -> None:
     if (spec.repo, spec.branch) != (site.trureturing_repo, site.trureturing_branch):
         raise lean.LeanError("branch lock repository and branch must match site.toml [trureturing]; run ./tbook pin --follow")
+    if (spec.mode, spec.source_root) != (site.trureturing_mode, site.trureturing_source_root):
+        raise lean.LeanError("branch lock mode and source_root must match site.toml [trureturing]; run ./tbook pin --follow")
+
+
+def branch_head(spec: lean.BranchLock) -> str:
+    site = config.load_site()
+    _check_branch_lock(spec, site)
     _check_branch(spec.branch)
     return lean.ls_remote(spec.repo, f"refs/heads/{spec.branch}")
 
@@ -112,10 +119,9 @@ def _declarations(ledger: lean.Ledger, commit: str, cited: list[str], errors: li
 
 def resolve_branch(spec: lean.BranchLock, *, commit: str = "", offline: bool = False) -> lean.Lock:
     site = config.load_site()
-    if (spec.repo, spec.branch) != (site.trureturing_repo, site.trureturing_branch):
-        raise lean.LeanError("branch lock repository and branch must match site.toml [trureturing]; run ./tbook pin --follow")
+    _check_branch_lock(spec, site)
     _check_branch(spec.branch)
-    ledger = lean.Ledger(spec.repo, offline=offline)
+    ledger = lean.Ledger(spec.repo, offline=offline, mode=spec.mode, source_root=spec.source_root)
     if commit:
         _check_branch(spec.branch, commit)
         if not lean.SHA_RE.fullmatch(commit) or ledger.branch_contains(commit, spec.branch).on_branch is not True:
@@ -126,10 +132,12 @@ def resolve_branch(spec: lean.BranchLock, *, commit: str = "", offline: bool = F
         commit = branch_head(spec)
         ledger.record_on_branch(commit, spec.branch, f"head of {spec.branch}")
     errors: list[str] = []
-    resolved = _declarations(ledger, commit, cited_gids(config.load_books()), errors)
+    cited = cited_gids(config.load_books(), mode=spec.mode)
+    resolved = _declarations(ledger, commit, cited, errors)
     if errors:
         raise lean.LeanError(f"cannot resolve {spec.repo}/{spec.branch} at {commit}:\n" + "\n".join(errors))
-    return lean.Lock(repo=spec.repo, branch=spec.branch, commit=commit, declarations=resolved)
+    return lean.Lock(repo=spec.repo, branch=spec.branch, commit=commit, declarations=resolved,
+                     mode=spec.mode, source_root=spec.source_root)
 
 
 def _target(ref: str | None, old: lean.Lock | None, *, refresh: bool, offline: bool, branch: str, repo: str,
@@ -157,17 +165,18 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
         dry_run: bool = False, follow: bool = False) -> PinReport:
     site = config.load_site()
     branch = site.trureturing_branch
+    mode, source_root = site.trureturing_mode, site.trureturing_source_root
     _check_branch(branch)
     spec = lean.Lock.read_spec()
     if follow or (isinstance(spec, lean.BranchLock) and not ref):
-        target = lean.BranchLock(site.trureturing_repo, branch)
+        target = lean.BranchLock(site.trureturing_repo, branch, mode=mode, source_root=source_root)
         resolved = resolve_branch(target, offline=offline)
         if not dry_run:
             target.save()
         return PinReport(commit=resolved.commit, previous=spec.commit if isinstance(spec, lean.Lock) else "",
                          branch=branch, previous_branch=spec.branch if spec else "", written=not dry_run)
     old = spec if isinstance(spec, lean.Lock) else None
-    ledger = lean.Ledger(site.trureturing_repo, offline=offline)
+    ledger = lean.Ledger(site.trureturing_repo, offline=offline, mode=mode, source_root=source_root)
     commit, head = _target(ref, old, refresh=refresh, offline=offline, branch=branch,
                            repo=site.trureturing_repo, ledger=ledger)
     _check_branch(branch, commit)
@@ -194,7 +203,7 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
                 report.refused = msg
                 return report
             report.warnings.append(msg + "; ./tbook check verifies it again")
-    cited = cited_gids(config.load_books())
+    cited = cited_gids(config.load_books(), mode=mode)
     resolved = _declarations(ledger, commit, cited, report.errors)
     before = old.declarations if old else {}
     report.added = sorted(set(resolved) - set(before))
@@ -207,7 +216,7 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
         if a.get("kind") != b.get("kind"):
             diffs.append(f"kind {a.get('kind')} → {b.get('kind')}")
         if a.get("statement_id") != b.get("statement_id"):
-            diffs.append("module statement digest changed")
+            diffs.append("declaration signature digest changed" if mode == "lean-source" else "module statement digest changed")
         if diffs:
             report.changed.append((gid, "; ".join(diffs)))
         if int(a.get("line", 0) or 0) != int(b.get("line", 0) or 0):
@@ -216,7 +225,7 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
         return report
     lock = lean.Lock(repo=site.trureturing_repo, branch=branch, commit=commit,
                      pinned_at=(old.pinned_at if old and refresh and old.commit == commit else lean.now_utc()),
-                     declarations=resolved)
+                     declarations=resolved, mode=mode, source_root=source_root)
     lock.save()
     report.written = True
     return report

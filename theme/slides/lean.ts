@@ -2,6 +2,7 @@
 // A GID is verified for the slides exactly when the lock resolves it to a Lean theorem; the build
 // never guesses. A locked definition (or any other non-theorem) is only "defined in Lean".
 import tr from 'virtual:trureturing'
+import { parseGid, sourceUrl } from '../../tools/node/lean-gid.mjs'
 
 export interface LeanInfo {
   gid: string
@@ -21,17 +22,12 @@ export interface LeanInfo {
  */
 export type LeanState = 'lean' | 'defined' | 'unverified' | 'open' | 'argued' | 'written-proof'
 
-const GID_RE = /^(D[0-9]+\/S[0-9]+\/(?:[A-Za-z_][A-Za-z0-9_]*\/)*[A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][\w']*(?:\.[A-Za-z_][\w']*)*)$/
-
 export function leanInfo(gid: string | undefined): LeanInfo {
   const id = (gid ?? '').trim()
   const decl = tr.lock?.decls[id]
-  const m = GID_RE.exec(id)
-  const module = m?.[1] ?? ''
-  const fallback = m ? `${module.replaceAll('/', '.')}.${m[2]}` : id
-  const url = decl && tr.lock
-    ? `https://github.com/${tr.lock.repo}/blob/${tr.lock.commit}/${module}.lean${decl.line ? `#L${decl.line}` : ''}`
-    : ''
+  const g = parseGid(id, tr.lock)
+  const fallback = g ? `${g.module.replaceAll('/', '.')}.${g.name}` : id
+  const url = decl && tr.lock ? sourceUrl(tr.lock, g?.module ?? '', decl.line) : ''
   return { gid: id, locked: !!decl, theorem: decl?.kind === 'theorem', name: decl?.name || fallback, kind: decl?.kind ?? '', url }
 }
 

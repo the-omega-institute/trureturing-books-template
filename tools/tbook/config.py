@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from . import paths
+from . import lean, paths
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 LANG_RE = re.compile(r"^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$")
@@ -268,6 +268,8 @@ class Site:
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
     book_hide: list[str] = field(default_factory=list)
     pdf_release_only: bool = False
+    trureturing_mode: str = "frozen-state"
+    trureturing_source_root: str = ""
 
     @property
     def build_release_pdfs(self) -> bool:
@@ -324,6 +326,12 @@ def load_site() -> Site:
         raw = tomllib.load(fh)
     site = raw.get("site", {})
     tru = raw.get("trureturing", {})
+    if not isinstance(tru, dict):
+        raise ConfigError("site.toml: trureturing must be a table ([trureturing])")
+    try:
+        mode, source_root = lean.source_settings(tru)
+    except lean.LeanError as exc:
+        raise ConfigError(f"site.toml [trureturing]: {exc}") from exc
     repo = os.environ.get("TBOOK_REPO") or site.get("repo") or os.environ.get("GITHUB_REPOSITORY") or _git_remote_repo(paths.ROOT)
     base_url = os.environ.get("TBOOK_BASE_URL") or site.get("base_url") or pages_base_url(repo)
     if base_url and not base_url.endswith("/"):
@@ -353,7 +361,14 @@ def load_site() -> Site:
         raw=raw,
         book_hide=hide_patterns(books.get("hide")),
         pdf_release_only=pdf_release_only,
+        trureturing_mode=mode,
+        trureturing_source_root=source_root,
     )
+
+
+def site_mode() -> str:
+    """Mode for media validators that also run in standalone fixtures without site.toml."""
+    return load_site().trureturing_mode if paths.SITE_TOML.exists() else "frozen-state"
 
 
 def hide_patterns(value: Any) -> list[str]:

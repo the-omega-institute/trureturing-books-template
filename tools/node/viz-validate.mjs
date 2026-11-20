@@ -220,7 +220,7 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
       if (!ref || !nonEmpty(ref.gid)) { if (on('registry')) err(regFile, `${at}: lean[${k}] needs a "gid" (e.g. D5/S1/Deficit/DeficitThreeValued.deficit_three_valued)`); continue; }
       if (ref.label !== undefined && !nonEmpty(ref.label) && on('registry')) err(regFile, `${at}: lean[${k}].label must be a non-empty string when given`);
       if (!on('lean')) continue;
-      if (!parseGid(ref.gid)) err(regFile, `${at}: lean[${k}]: not a declaration GID: ${ref.gid}`);
+      if (!parseGid(ref.gid, lock)) err(regFile, `${at}: lean[${k}]: not a declaration GID: ${ref.gid}`);
       else if (!lock) err(regFile, `${at}: lean[${k}]: ${ref.gid} cannot be linked: trureturing.lock.json is missing (run ./tbook pin)`);
       else if (!(lock.declarations || {})[ref.gid]) err(regFile, `${at}: lean[${k}]: ${ref.gid} is not in trureturing.lock.json; cite it in a chapter and run ./tbook pin --refresh${unhideHint(book.slug)}`);
       else if (!FORMAL_KINDS.includes(lock.declarations[ref.gid].kind)) err(regFile, `${at}: lean[${k}]: ${ref.gid} is a Lean ${lock.declarations[ref.gid].kind}, not a theorem; lean lists the theorems the visualization cites (shown as LEAN ✓)`);
@@ -259,7 +259,7 @@ export function validateBook(book, { only = GROUPS, lock = readLock() } = {}) {
       for (const p of evidenceProblems(html)) warn(page, p.message);
       for (const r of pinnedRefs(html)) {
         if (r.kind === 'gid') {
-          if (!parseGid(r.value)) err(page, `data-lean-gid="${r.value}" is not a declaration GID`);
+          if (!parseGid(r.value, lock)) err(page, `data-lean-gid="${r.value}" is not a declaration GID`);
           else if (lock && !(lock.declarations || {})[r.value]) err(page, `data-lean-gid="${r.value}" is not in trureturing.lock.json; cite it in a chapter and run ./tbook pin --refresh${unhideHint(book.slug)}`);
           else if (lock && !FORMAL_KINDS.includes(lock.declarations[r.value].kind)) err(page, `data-lean-gid="${r.value}" names a Lean ${lock.declarations[r.value].kind}, not a theorem; data-lean-gid cites verified theorems (LEAN ✓); link a definition with data-trureturing-path="<module>.lean"`);
         } else if (!r.value || r.value.includes('..') || r.value.startsWith('/')) err(page, `data-trureturing-path="${r.value}" must be a repository-relative path`);

@@ -15,7 +15,9 @@ export function readTrureturingLock(root) {
   const snapshot = process.env.TBOOK_LOCK_SNAPSHOT;
   if (snapshot) {
     const effective = JSON.parse(readFileSync(snapshot, 'utf8'));
-    if (!/^[0-9a-f]{40}$/.test(effective.commit) || effective.repo !== lock.repo || effective.branch !== lock.branch) {
+    const sourceSettings = (data) => [data.mode ?? 'frozen-state', (data.source_root ?? '').replace(/\/+$/, '')];
+    if (!/^[0-9a-f]{40}$/.test(effective.commit) || effective.repo !== lock.repo || effective.branch !== lock.branch
+      || JSON.stringify(sourceSettings(effective)) !== JSON.stringify(sourceSettings(lock))) {
       throw new Error('trureturing snapshot does not match the branch lock');
     }
     return effective;

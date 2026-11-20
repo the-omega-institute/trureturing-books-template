@@ -14,6 +14,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { bookDirs, hiddenBy, hiddenError, hidePatterns } from './slides-lib.mjs';
 import { readTrureturingLock } from './trureturing-lock.mjs';
+import { blobUrl, parseGid, sourceUrl } from './lean-gid.mjs';
+
+export { parseGid };
 
 export const ROOT = path.resolve(process.env.TBOOK_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
 export const BOOKS = path.join(ROOT, 'books');
@@ -32,7 +35,6 @@ export const RESERVED = ['tests', 'assets'];
 export const RUNTIME_FILES = ['theme.css', 'shell.js', 'kit.js', 'solid-core.js', 'hub.css', 'hub.js', 'favicon.svg'];
 export const EXTERNAL_PREFIX = 'trureturing-visualize:';
 export const EXTERNAL_BASE = 'https://the-omega-institute.github.io/trureturing-visualize/viz/';
-const GID_RE = /^(D[0-9]+\/S[0-9]+\/(?:[A-Za-z_][A-Za-z0-9_]*\/)*[A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*)$/;
 
 export const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/') || '.';
 
@@ -77,27 +79,21 @@ export function readLock() {
   return readTrureturingLock(ROOT);
 }
 
-export function parseGid(gid) {
-  const m = GID_RE.exec(String(gid || '').trim());
-  return m ? { module: m[1], name: m[2] } : null;
-}
-
 /** Permalink of a declaration's Lean source at the pinned commit (same as tbook.lean.Lock.source_url). */
 export function leanUrl(lock, gid) {
-  const g = parseGid(gid);
+  const g = parseGid(gid, lock);
   if (!lock || !g) return '';
   const d = (lock.declarations || {})[gid];
-  const line = d && d.line ? `#L${d.line}` : '';
-  return `https://github.com/${lock.repo}/blob/${lock.commit}/${g.module}.lean${line}`;
+  return sourceUrl(lock, g.module, d?.line);
 }
 /** Permalink of any path of the trureturing repository at the pinned commit. */
 export function trureturingUrl(lock, p) {
-  return lock ? `https://github.com/${lock.repo}/blob/${lock.commit}/${String(p).replace(/^\/+/, '')}` : '';
+  return lock ? blobUrl(lock, String(p).replace(/^\/+/, '')) : '';
 }
 /** Short Lean name of a locked declaration (`deficit_three_valued`). */
 export function leanShortName(lock, gid) {
   const d = lock && (lock.declarations || {})[gid];
-  const full = d ? d.name : (parseGid(gid) || {}).name || gid;
+  const full = d ? d.name : (parseGid(gid, lock) || {}).name || gid;
   return String(full).split('.').pop();
 }
 
