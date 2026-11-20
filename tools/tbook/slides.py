@@ -2005,7 +2005,7 @@ def index_html(site: config.Site, book: config.Book, decks: list[dict[str, Any]]
             f'  <p class="blurb">{blurb}</p>\n  ' + "\n  ".join(rows) + "\n</article>"
         )
     body = "\n".join(cards) or f"<p>{pair(lambda lang: t(lang, 'none'))}</p>"
-    toggle = "".join(f'<button type="button" data-set-lang="{esc(lang)}">{esc(config.s(lang, "meta.short") or lang.upper())}</button>'
+    toggle = "".join(f'<button type="button" data-lang-set="{esc(lang)}">{esc(config.s(lang, "meta.short") or lang.upper())}</button>'
                      for lang in langs) if len(langs) > 1 else ""
     hide = "\n".join(f':root[data-lang="{lang}"] [class^="l-"]:not(.l-{lang}) {{ display: none; }}' for lang in langs)
     hide_default = f':root:not([data-lang]) [class^="l-"]:not(.l-{primary}) {{ display: none; }}'
@@ -2088,18 +2088,25 @@ footer p {{ margin: 4px 0; }}
 <script>
 (function () {{
   var langs = {json.dumps(langs)}, root = document.documentElement, key = "tr-lang";
-  function set(lang, save) {{
-    if (langs.indexOf(lang) < 0) return;
+  function apply(lang) {{
     root.setAttribute("data-lang", lang);
     root.lang = {json.dumps({lang: config.bcp47(lang) for lang in langs}, ensure_ascii=False)}[lang];
-    document.querySelectorAll("[data-set-lang]").forEach(function (b) {{ b.setAttribute("aria-pressed", String(b.getAttribute("data-set-lang") === lang)); }});
-    if (save) {{ try {{ localStorage.setItem(key, lang); }} catch (e) {{}} }}
+    document.querySelectorAll("[data-lang-set]").forEach(function (b) {{ b.setAttribute("aria-pressed", String(b.getAttribute("data-lang-set") === lang)); }});
   }}
   var q = new URLSearchParams(location.search).get("lang"), stored = null;
   try {{ stored = localStorage.getItem(key); }} catch (e) {{}}
-  set(q || stored || langs[0], !!q);
-  document.querySelectorAll("[data-set-lang]").forEach(function (b) {{
-    b.addEventListener("click", function () {{ set(b.getAttribute("data-set-lang"), true); }});
+  apply(langs.includes(q) ? q : langs.includes(stored) ? stored : langs[0]);
+  document.querySelectorAll("[data-lang-set]").forEach(function (b) {{
+    b.addEventListener("click", function () {{
+      var lang = b.getAttribute("data-lang-set");
+      apply(lang);
+      try {{ localStorage.setItem(key, lang); }} catch (e) {{}}
+      try {{
+        var url = new URL(location.href);
+        url.searchParams.set("lang", lang);
+        history.replaceState(history.state, "", url);
+      }} catch (e) {{}}
+    }});
   }});
 }})();
 </script>
