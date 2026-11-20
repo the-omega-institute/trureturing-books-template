@@ -17,6 +17,14 @@
     return null;
   }
   function store(v) { try { localStorage.setItem(KEY, v); } catch (e) { /* private mode: keep the choice for this page only */ } }
+  function share(lang) {
+    try {
+      var url = new URL(location.href);
+      if (url.searchParams.get('lang') === lang) return;
+      url.searchParams.set('lang', lang);
+      history.replaceState(history.state, '', url);
+    } catch (e) { /* ignore */ }
+  }
   function browser() { return /^zh/i.test(navigator.language || '') ? 'zh' : 'en'; }
   function apply(lang) {
     lang = lang === 'en' ? 'en' : 'zh';
@@ -29,20 +37,19 @@
   }
   var q = null;
   try { q = new URLSearchParams(location.search).get('lang'); } catch (e) { /* very old browsers */ }
-  apply(known(q) || stored() || browser());
+  if (known(q)) store(q);
+  var lang = known(q) || stored() || browser();
+  share(lang);
+  apply(lang);
   document.addEventListener('DOMContentLoaded', function () {
     apply(root.getAttribute('data-lang'));
     document.addEventListener('click', function (ev) {
       var b = ev.target.closest && ev.target.closest('[data-lang-set]');
       if (!b) return;
-      var lang = b.getAttribute('data-lang-set');
-      store(lang);
-      apply(lang);
-      try {
-        var url = new URL(location.href);
-        url.searchParams.set('lang', lang);
-        history.replaceState(history.state, '', url);
-      } catch (e) { /* ignore */ }
+      var next = b.getAttribute('data-lang-set');
+      store(next);
+      share(next);
+      apply(next);
     });
   });
 })();

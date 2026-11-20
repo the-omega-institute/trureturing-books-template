@@ -24,6 +24,17 @@
   try { meta = JSON.parse(root.getAttribute("data-lang-meta") || "{}"); } catch (e) { meta = {}; }
 
   function known(code) { return code && langs.indexOf(code) >= 0 ? code : null; }
+  function remember(lang) {
+    try { localStorage.setItem(KEY, lang); } catch (e) { /* storage may be blocked */ }
+  }
+  function share(lang) {
+    try {
+      var url = new URL(location.href);
+      if (url.searchParams.get("lang") === lang) return;
+      url.searchParams.set("lang", lang);
+      history.replaceState(history.state, "", url);
+    } catch (e) { /* ignore */ }
+  }
 
   function fromNavigator() {
     var prefs = [];
@@ -40,13 +51,17 @@
   function detect() {
     var q = null, stored = null;
     try { q = new URLSearchParams(location.search).get("lang"); } catch (e) { q = null; }
-    if (known(q)) return q;
+    if (known(q)) {
+      if (langs.length > 1) remember(q);
+      return q;
+    }
     try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }  // storage may be blocked
     if (known(stored)) return stored;
     return fromNavigator() || fallback;
   }
 
   var lang = detect();
+  if (langs.length > 1) share(lang);
 
   function apply() {
     root.setAttribute("data-lang", lang);
@@ -71,12 +86,8 @@
   function setLang(next) {
     if (!known(next)) return;
     lang = next;
-    try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ }
-    try {
-      var url = new URL(location.href);
-      url.searchParams.set("lang", next);
-      history.replaceState(history.state, "", url);
-    } catch (e) { /* ignore */ }
+    remember(next);
+    share(next);
     apply();
   }
 
