@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -100,7 +100,7 @@
       "mode": "100644"
     },
     "docs/ARCHITECTURE.md": {
-      "sha256": "d00c8b5c9225b7f4a2fdd5db9bbd489fddcc0c27864b4d6d317e2d285d592dcc",
+      "sha256": "8238b2e0a6f8b2fb3906ae4a14d0223497af80e1160bd457ec4919cf80a1266b",
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "822e13fe549dc5725794990c2f8c8a881c4d6f33a0cf9d719632909279c57ac5",
+      "sha256": "094da7affaa629d4766d27ae4fd6597a11dd1eb75134360a845a533b65284cf0",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -400,11 +400,11 @@
       "mode": "100644"
     },
     "theme/site/site.css": {
-      "sha256": "26fd9e8ec445ad4b52a84094804b36978ccf92fd1b7a739db95c4fcf87f4836b",
+      "sha256": "08db59336185ef7f1958fc2b017d222b2c0e60dceca0f7612e2cceefe61e3833",
       "mode": "100644"
     },
     "theme/site/site.js": {
-      "sha256": "993a11bcbf80234b621b603f502695d951213676c4c726a555d52f22bda71630",
+      "sha256": "9b72c64bb443c646f4a0849668b9ebdd324d77eab4e2c8e6b2550b098917bd39",
       "mode": "100644"
     },
     "theme/slides/README.md": {
@@ -868,7 +868,7 @@
       "mode": "100644"
     },
     "tools/tbook/site.py": {
-      "sha256": "5db00815d4a6fd91682f57abc5c1f22ebf6cd7f8a21a32b77f7d59fd0bee517a",
+      "sha256": "95b34eea95301abb9a27f215871f132085934e6e0e40ed02f1bf1362ffa9e3e5",
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
@@ -1084,7 +1084,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "1e32a5b9c6be4aa0c7158e0e95f954a3dcba8ec769b42a50de70a6685044b349",
+      "sha256": "c371ef5ebf524daf04352f33febe4f685d9b6261535a8672c7652921f4b035a6",
       "mode": "100644"
     },
     "tools/tests/test_site_post_build.py": {

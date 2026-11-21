@@ -113,13 +113,14 @@ a.logo:hover { color: var(--tr-ink); }
 .pill.warn strong { color: var(--tr-warn); }
 a.pill:hover { border-color: var(--tr-cyan); color: var(--tr-cyan); }
 .langs { display: inline-flex; border: 1px solid var(--hot); }
-.langs button {
+.langs a {
   background: transparent; border: 0; color: var(--tr-dim); cursor: pointer; min-width: 36px;
   font-family: var(--tr-font-data); font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; padding: 4px 10px;
+  text-align: center; text-decoration: none;
 }
-.langs button + button { border-left: 1px solid var(--hot); }
-.langs button:hover { color: var(--tr-cyan); }
-.langs button[aria-pressed="true"] { background: var(--tr-cyan); color: var(--tr-on-accent); }
+.langs a + a { border-left: 1px solid var(--hot); }
+.langs a:hover { color: var(--tr-cyan); }
+.langs a[aria-current="page"] { background: var(--tr-cyan); color: var(--tr-on-accent); }
 
 /* ---------- panels ---------- */
 .panel {
