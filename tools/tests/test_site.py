@@ -358,7 +358,9 @@ class SiteBuildTest(SiteCase):
         book = make_book(self.tmp)
         fake_build(self.build_root, book)
         out = self.run_build([book], media=fake_media(viz_items=[VIZ_ITEM], slides_items=[SLIDES_ITEM]))
-        for page in (out / "index.html", out / "test-book" / "index.html"):
+        for rel in ("index.html", "test-book/index.html", "en/index.html", "en/test-book/index.html",
+                    "zh/index.html", "zh/test-book/index.html"):
+            page = out / rel
             for tag, attr, value in parse(page.read_text()).links:
                 if value.startswith(("https://", "http://", "#")):
                     continue
@@ -367,6 +369,14 @@ class SiteBuildTest(SiteCase):
                 if value.endswith("/"):
                     target = target / "index.html"
                 self.assertTrue(target.exists(), f"{page.relative_to(out)}: broken {attr} {value}")
+
+    def test_language_routes_do_not_overwrite_a_book_with_the_same_slug(self):
+        book = make_book(self.tmp, "en")
+        fake_build(self.build_root, book)
+        out = self.run_build([book])
+        self.assertIn('href="./?lang=en" data-lang-set="en"', (out / "index.html").read_text())
+        self.assertIn('id="book-title"', (out / "en" / "index.html").read_text())
+        self.assertIn('data-page-lang="zh"', (out / "zh" / "en" / "index.html").read_text())
 
     def test_escaping(self):
         book = make_book(self.tmp, title_zh='<script>alert("x")</script>', title_en="A & B")
@@ -623,6 +633,9 @@ const { chromium } = require(path.join(process.env.TBOOK_ROOT_DIR, 'node_modules
       await page.route(/^https?:\/\//, (route) =>
         new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
       await page.goto(job.url, { waitUntil: 'load' });
+      if (job.startUrl) await page.waitForURL(job.startUrl);
+      if (job.click) await page.locator(job.click).click();
+      if (job.endUrl) await page.waitForURL(job.endUrl);
       out.push(await page.evaluate(job.expr));
       await page.close();
     }
@@ -669,6 +682,38 @@ class BrowserLayoutTest(SiteCase):
                            env=dict(os.environ, TBOOK_ROOT_DIR=str(paths.ROOT), TBOOK_CHROMIUM=doctor.chromium_path()))
         self.assertEqual(r.returncode, 0, r.stderr)
         return json.loads(r.stdout)
+
+    def test_localized_paths_preserve_legacy_query_and_fragment(self):
+        book = make_book(self.tmp)
+        fake_build(self.build_root, book)
+        out = self.run_build([book])
+        server = serve.make_server(0, out, base="/repo/")
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base = f"http://127.0.0.1:{server.server_address[1]}/repo/"
+        english = base + "en/test-book/?track=1#contents"
+        chinese = base + "zh/test-book/?track=1#contents"
+        result, hub = self.browse([
+            {"url": base + "test-book/?lang=en&track=1#contents", "startUrl": english,
+             "width": 1200, "click": '[data-lang-set="zh"]', "endUrl": chinese,
+             "expr": """({
+                 lang: document.documentElement.lang,
+                 preference: localStorage.getItem('tr-lang'),
+                 library: document.querySelector('a.crumb').href,
+                 chapter: document.querySelector('a[href$="/zh/ch01.html"]').href,
+                 current: document.querySelector('[aria-current="page"]').dataset.langSet
+             })"""},
+            {"url": base + "en/", "width": 1200,
+             "expr": """({
+                 lang: document.documentElement.lang,
+                 preference: localStorage.getItem('tr-lang'),
+                 book: document.querySelector('.more a').href
+             })"""},
+        ])
+        self.assertEqual(result, {"lang": "zh-CN", "preference": "zh", "library": base + "zh/",
+                                  "chapter": base + "test-book/zh/ch01.html", "current": "zh"})
+        self.assertEqual(hub, {"lang": "en", "preference": "en", "book": base + "en/test-book/"})
 
     def test_book_edition_links_and_landing_use_the_reading_language(self):
         root = self.tmp / "edition-language"
@@ -881,7 +926,7 @@ const root = { dataset: {}, lang: '', setAttribute(k, v) { attrs[k] = String(v);
                classList: { toggle() {} } };
 attrs['data-langs'] = 'zh en';
 attrs['data-default-lang'] = 'zh';
-const button = (lang) => ({ dataset: { langSet: lang }, getAttribute: (k) => (k === 'data-lang-set' ? lang : null), setAttribute() {},
+const button = (lang) => ({ dataset: { langSet: lang }, getAttribute: (k) => (k === 'data-lang-set' ? lang : null), setAttribute() {}, removeAttribute() {},
                             closest() { return this; }, addEventListener(ev, fn) { (handlers['btn-' + lang] = handlers['btn-' + lang] || []).push(fn); } });
 const buttons = [button('zh'), button('en')];
 const document = { documentElement: root, title: '', querySelectorAll: (s) => (s === '[data-lang-set]' ? buttons : []),
@@ -896,7 +941,7 @@ vm.runInNewContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
 (handlers.DOMContentLoaded || []).forEach((fn) => fn());
 if (click) {
   const b = buttons.find((x) => x.dataset.langSet === click);
-  (handlers['btn-' + click] || []).forEach((fn) => fn({ currentTarget: b, target: b }));
+  (handlers['btn-' + click] || []).forEach((fn) => fn({ currentTarget: b, target: b, preventDefault() {} }));
   (handlers.click || []).forEach((fn) => fn({ target: b }));
 }
 process.stdout.write(JSON.stringify({ lang: root.dataset.lang || attrs['data-lang'], stored: Object.fromEntries(store),

@@ -56,6 +56,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from . import config, lean, mathrender, mdscan, paths, releases, render
 from .ledger import LEDGER_FILE
@@ -700,22 +701,34 @@ class Frame:
     versions: dict[str, str]
     lock: lean.Lock | None
     math: dict[str, str] = field(default_factory=dict)  # KaTeX HTML of the formulas of theorem titles, by TeX
+    route_langs: tuple[str, ...] = ()
 
     def asset(self, prefix: str, name: str) -> str:
         v = self.versions.get(name)
         return f"{prefix}assets/{name}" + (f"?v={v}" if v else "")
 
+    def language_paths(self, lang: str, slug: str) -> dict[str, str]:
+        book = slug + "/" if slug else ""
+        source = (lang + "/" if lang else "") + book
+        return {
+            code: posixpath.relpath(code + "/" + book, source or ".") + "/"
+            for code in self.route_langs
+        }
+
 
 def page(frame: Frame, *, prefix: str, titles: Callable[[str], str], description: Callable[[str], str],
-         body: str, og_image: str = "", canonical: str = "") -> str:
+         body: str, og_image: str = "", canonical: str = "", lang: str = "", slug: str = "") -> str:
     langs = frame.bi.langs
-    default = langs[0]
+    default = lang or langs[0]
+    routes = frame.language_paths(lang, slug)
+    route_attrs = (f' data-page-lang="{esc(lang)}" data-language-paths="{esc(json.dumps(routes))}"'
+                   if routes else "")
     meta = {lang: {"bcp47": config.bcp47(lang)} for lang in langs}
     title_attrs = "".join(f' data-title-{esc(lang)}="{esc(titles(lang))}"' for lang in langs)
     fonts = _google_fonts()
     head = [
         "<!doctype html>",
-        f'<html lang="{esc(config.bcp47(default))}" data-lang="{esc(default)}" data-default-lang="{esc(default)}" '
+        f'<html lang="{esc(config.bcp47(default))}" data-lang="{esc(default)}" data-default-lang="{esc(default)}"{route_attrs} '
         f'data-langs="{esc(" ".join(langs))}" data-lang-meta="{esc(json.dumps(meta, ensure_ascii=False))}"{title_attrs}>',
         "<head>",
         '<meta charset="utf-8">',
@@ -758,16 +771,20 @@ def page(frame: Frame, *, prefix: str, titles: Callable[[str], str], description
     return "\n".join(head) + "\n"
 
 
-def lang_switch(frame: Frame) -> str:
+def lang_switch(frame: Frame, lang: str = "", slug: str = "") -> str:
     langs = frame.bi.langs
     if len(langs) < 2:
         return ""
-    buttons = "".join(
-        f'<button type="button" data-lang-set="{esc(lang)}" aria-pressed="{"true" if i == 0 else "false"}" '
-        f'lang="{esc(config.bcp47(lang))}" title="{esc(config.s(lang, "meta.name"))}">'
-        f'{esc(config.s(lang, "meta.short") or lang.upper())}</button>'
-        for i, lang in enumerate(langs))
-    return f'<div class="langs" role="group" {frame.bi.aria(lambda lang: t(lang, "lang_group"))}>{buttons}</div>'
+    routes = frame.language_paths(lang, slug)
+    neutral = ("../../" + slug + "/" if slug else "../") if lang else "./"
+    links = []
+    for code in langs:
+        href = routes.get(code) or f"{neutral}?lang={code}"
+        current = ' aria-current="page"' if code == (lang or langs[0]) else ""
+        links.append(f'<a href="{esc(href)}" data-lang-set="{esc(code)}"{current} '
+                     f'hreflang="{esc(config.bcp47(code))}" lang="{esc(config.bcp47(code))}" '
+                     f'title="{esc(config.s(code, "meta.name"))}">{esc(config.s(code, "meta.short") or code.upper())}</a>')
+    return f'<div class="langs" role="group" {frame.bi.aria(lambda lang: t(lang, "lang_group"))}>{"".join(links)}</div>'
 
 
 def footer(frame: Frame) -> str:
@@ -866,25 +883,27 @@ def media_line(bi: Bi, view: BookView, prefix: str) -> str:
     return f'<p class="media-links">{"".join(links)}</p>' if links else ""
 
 
-def book_card(frame: Frame, view: BookView) -> str:
+def book_card(frame: Frame, view: BookView, lang: str = "") -> str:
     bi, book = frame.bi, view.book
     slug = view.slug
+    landing = slug + "/"
+    content = ("../" if lang else "") + landing
     title = bi.text(lambda lang: config.pick(book.title, view.edition_for(lang), book.languages))
     sub = bi.text(lambda lang: config.pick(book.subtitle, view.edition_for(lang), book.languages)) if book.subtitle else ""
     desc = bi.text(lambda lang: config.pick(book.description, view.edition_for(lang), book.languages)) if book.description else ""
     hid = f"book-{slug}"
     return (
         f'<article class="book panel" aria-labelledby="{esc(hid)}">'
-        f'<a class="cover-link" href="{esc(slug)}/" tabindex="-1" aria-hidden="true">{cover_html(bi, view, slug + "/", alt=False)}</a>'
+        f'<a class="cover-link" href="{esc(landing)}" tabindex="-1" aria-hidden="true">{cover_html(bi, view, content, alt=False)}</a>'
         f'<div class="body">'
         f'<p class="code">{logo_html(book.code)} <span class="ver">· v{esc(book.version)}</span></p>'
-        f'<h3 id="{esc(hid)}"><a href="{esc(slug)}/">{title}</a></h3>'
+        f'<h3 id="{esc(hid)}"><a href="{esc(landing)}">{title}</a></h3>'
         + (f'<p class="subtitle">{sub}</p>' if sub else "")
         + (f'<p class="desc">{desc}</p>' if desc else "")
         + stats_html(bi, view)
-        + media_line(bi, view, slug + "/")
-        + editions_html(bi, view, slug + "/")
-        + f'<div class="more"><a class="btn" href="{esc(slug)}/">{bi.t("open_book")} <span aria-hidden="true">▸</span></a></div>'
+        + media_line(bi, view, landing)
+        + editions_html(bi, view, content)
+        + f'<div class="more"><a class="btn" href="{esc(landing)}">{bi.t("open_book")} <span aria-hidden="true">▸</span></a></div>'
         + "</div></article>"
     )
 
@@ -892,7 +911,7 @@ def book_card(frame: Frame, view: BookView) -> str:
 # --------------------------------------------------------------------------- library hub
 
 
-def index_html(frame: Frame, views: list[BookView]) -> str:
+def index_html(frame: Frame, views: list[BookView], lang: str = "") -> str:
     site, bi, lock = frame.site, frame.bi, frame.lock
     logo = logo_text(site)
     total = sum(len(v.verified()) for v in views)
@@ -907,7 +926,7 @@ def index_html(frame: Frame, views: list[BookView]) -> str:
     header = (
         '<header class="top">'
         f'<div class="brand"><a class="logo" href="./" data-text="{esc(logo)}">{logo_html(logo)}</a></div>'
-        f'<nav class="status" {bi.aria(lambda lang: t(lang, "nav_site"))}>{"".join(pills)}{lang_switch(frame)}</nav>'
+        f'<nav class="status" {bi.aria(lambda lang: t(lang, "nav_site"))}>{"".join(pills)}{lang_switch(frame, lang)}</nav>'
         "</header>"
     )
     badge_title = "badge.lean_source_title" if lock and lock.mode == "lean-source" else "badge.lean_title"
@@ -929,7 +948,7 @@ def index_html(frame: Frame, views: list[BookView]) -> str:
         + "</div></section>"
     )
     if views:
-        cards = "".join(book_card(frame, v) for v in views)
+        cards = "".join(book_card(frame, v, lang) for v in views)
         grid = f'<div class="books">{cards}</div>'
     else:
         grid = f'<p class="note">{bi.t("books_empty")}</p>'
@@ -943,9 +962,10 @@ def index_html(frame: Frame, views: list[BookView]) -> str:
     first_cover = ""
     if views and site.base_url and views[0].covers:
         first_cover = site.base_url + views[0].slug + "/" + next(iter(views[0].covers.values()))
-    return page(frame, prefix="", titles=lambda lang: site.text(site.title, lang),
+    canonical = site.base_url + lang + "/" if site.base_url and lang else site.base_url
+    return page(frame, prefix="../" if lang else "", titles=lambda lang: site.text(site.title, lang),
                 description=lambda lang: site.text(site.tagline, lang) or site.text(site.title, lang),
-                body=body, og_image=first_cover, canonical=site.base_url)
+                body=body, og_image=first_cover, canonical=canonical, lang=lang)
 
 
 # --------------------------------------------------------------------------- book landing page
@@ -963,7 +983,8 @@ def _chapter_counts(model: EditionModel, lock: lean.Lock | None) -> tuple[Counte
     return formal, opened
 
 
-def toc_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | None = None) -> str:
+def toc_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | None = None,
+             *, prefix: str = "") -> str:
     model = view.models.get(ed_lang)
     if model is None or model.summary is None:
         return f'<p class="note">{esc(t(ui_lang, "toc_missing"))}</p>'
@@ -981,7 +1002,7 @@ def toc_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | 
         tag_html = f'<span class="t-tags">{"".join(tags)}</span>' if tags else ""
         target = chapter_html(ch.path) if ch.path else ""
         if target and built and (root / target).is_file():
-            inner = f'<a href="{esc(ed_lang + "/" + target)}">{title}{tag_html}</a>'
+            inner = f'<a href="{esc(prefix + ed_lang + "/" + target)}">{title}{tag_html}</a>'
         else:
             inner = f'<span class="draft">{title}{tag_html}</span>'
         kids = "".join(item(c) for c in ch.children)
@@ -997,7 +1018,7 @@ def toc_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | 
         out.append(item(ch))
     ledger_page = chapter_html(LEDGER_FILE)
     if built and (root / ledger_page).is_file():
-        out.append(f'<li class="ledger"><a href="{esc(ed_lang + "/" + ledger_page)}">'
+        out.append(f'<li class="ledger"><a href="{esc(prefix + ed_lang + "/" + ledger_page)}">'
                    f'<span class="t-title">{esc(config.s(ed_lang, "ledger.title"))}</span>'
                    f'<span class="t-tags"><span class="k ok">LEAN ✓ {sum(formal.values())}</span></span></a></li>')
     note = ""
@@ -1070,7 +1091,8 @@ def title_html(markdown: str, math: dict[str, str] | None = None) -> str:
     return "".join(out)
 
 
-def verification_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | None = None) -> str:
+def verification_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str, str] | None = None,
+                      *, prefix: str = "") -> str:
     """The verification section of a landing page; ``math``: rendered formulas of titles (:func:`render_title_math`)."""
     model = view.models.get(ed_lang)
     lock = view.lock
@@ -1080,7 +1102,7 @@ def verification_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str
     def ref(env: Env) -> str:
         href = _env_href(view, ed_lang, env)
         text = esc(env.ref_text(ed_lang))
-        return f'<a class="ref" href="{esc(href)}">{text}</a>' if href else f'<span class="ref">{text}</span>'
+        return f'<a class="ref" href="{esc(prefix + href)}">{text}</a>' if href else f'<span class="ref">{text}</span>'
 
     def title(env: Env, chip: str = "") -> str:
         text = title_html(model.title_markdown(env), math) if env.title else ""  # [@id] shows its reference text
@@ -1133,7 +1155,7 @@ def verification_html(view: BookView, ed_lang: str, ui_lang: str, math: dict[str
         out.append(f'<p class="note">{esc(t(ui_lang, "open_none"))}</p>')
     ledger_page = chapter_html(LEDGER_FILE)
     if view.built.get(ed_lang) and (view.bdir / ed_lang / ledger_page).is_file():
-        out.append(f'<p><a class="btn" href="{esc(ed_lang + "/" + ledger_page)}">{esc(t(ui_lang, "ledger_link"))} '
+        out.append(f'<p><a class="btn" href="{esc(prefix + ed_lang + "/" + ledger_page)}">{esc(t(ui_lang, "ledger_link"))} '
                    f'<span aria-hidden="true">▸</span></a></p>')
     return "".join(out)
 
@@ -1155,16 +1177,21 @@ def _lean_chips(refs: list) -> str:
     return f'<div class="refs">{"".join(chips)}</div>' if chips else ""
 
 
-def viz_section(bi: Bi, view: BookView) -> str:
+def _media_url(prefix: str, target: str) -> str:
+    """Local media links are relative to the book's content directory."""
+    return target if not target or urlsplit(target).scheme or target.startswith("/") else prefix + target
+
+
+def viz_section(bi: Bi, view: BookView, prefix: str = "") -> str:
     items = view.media.get("viz") or []
     if not items:
         return ""
     langs = view.book.languages
     cards = []
     for it in items:
-        href = str(it.get("href") or "")
+        href = _media_url(prefix, str(it.get("href") or ""))
         thumb = str(it.get("thumb") or "")
-        img = (f'<img src="{esc(thumb)}" alt="" loading="lazy" decoding="async" width="1280" height="720">'
+        img = (f'<img src="{esc(_media_url(prefix, thumb))}" alt="" loading="lazy" decoding="async" width="1280" height="720">'
                if thumb and _exists(view.bdir, thumb) else "")
         code = esc(it.get("code") or it.get("id") or "")
         title = bi.text(lambda lang: _loc(it.get("title"), lang, langs))
@@ -1177,13 +1204,13 @@ def viz_section(bi: Bi, view: BookView) -> str:
             f'<div class="actions"><a class="btn" href="{esc(href)}">{bi.s("ui.open_fullscreen")} <span aria-hidden="true">▸</span></a></div>'
             "</div></article>")
     hub = str(items[0].get("hub") or "viz/")
-    more = (f'<a class="aside" href="{esc(hub)}">{bi.t("hub_viz")} ▸</a>' if _exists(view.bdir, hub) else "")
+    more = (f'<a class="aside" href="{esc(_media_url(prefix, hub))}">{bi.t("hub_viz")} ▸</a>' if _exists(view.bdir, hub) else "")
     return (f'<section id="viz" class="sec panel{_wide(items)}" aria-labelledby="viz-title">'
             f'<div class="sec-head"><h2 id="viz-title">{bi.s("ui.visualizations")}</h2>{more}</div>'
             f'<div class="mgrid">{"".join(cards)}</div></section>')
 
 
-def films_section(bi: Bi, view: BookView) -> str:
+def films_section(bi: Bi, view: BookView, prefix: str = "") -> str:
     """Film cards: poster, title, duration; the page on the site (``href``) and the video (``watch_url``).
 
     A video on the site (a relative ``watch_url``) that the build did not publish gets the item's ``note``
@@ -1197,7 +1224,7 @@ def films_section(bi: Bi, view: BookView) -> str:
         page_link = _loc(it.get("href"), bi.langs[0], langs)
         page_link = page_link if page_link and _exists(view.bdir, page_link) else ""
         poster = str(it.get("poster") or it.get("thumb") or "")
-        img = (f'<img src="{esc(poster)}" alt="" loading="lazy" decoding="async" width="1280" height="720">'
+        img = (f'<img src="{esc(_media_url(prefix, poster))}" alt="" loading="lazy" decoding="async" width="1280" height="720">'
                if poster and _exists(view.bdir, poster) else "")
 
         # a film with a video of its own never falls back to its page: without the video (not published, or not
@@ -1211,14 +1238,15 @@ def films_section(bi: Bi, view: BookView) -> str:
             return url or ("" if own_video else page_link)
 
         title = bi.text(lambda lang: _loc(it.get("title"), lang, langs) or str(it.get("id", "")))
-        heading = f'<a href="{esc(page_link)}">{title}</a>' if page_link else title
+        heading = f'<a href="{esc(_media_url(prefix, page_link))}">{title}</a>' if page_link else title
         summary = _loc(it.get("summary") or it.get("blurb") or it.get("description"), bi.langs[0], langs)
         summary_html = (f'<p class="sum">{bi.text(lambda lang: _loc(it.get("summary") or it.get("blurb") or it.get("description"), lang, langs))}</p>'
                         if summary else "")
         meta = " · ".join(esc(str(it.get(k))) for k in ("duration", "released") if it.get(k))
         def action(lang: str) -> str:
-            if watch_link(lang):
-                return (f'<a class="btn" href="{esc(watch_link(lang))}" rel="noopener">'
+            link = watch_link(lang)
+            if link:
+                return (f'<a class="btn" href="{esc(_media_url(prefix, link))}" rel="noopener">'
                         f'{esc(config.s(lang, "ui.watch"))} <span aria-hidden="true">▸</span></a>')
             note = _loc(it.get("note"), lang, langs)  # e.g. "video not built"
             return f'<span class="muted">{esc(note)}</span>' if note else ""
@@ -1227,19 +1255,19 @@ def films_section(bi: Bi, view: BookView) -> str:
         thumb_target = page_link or watch_link(bi.langs[0])
         cards.append(
             '<article class="mcard panel">'
-            + (f'<a class="thumb{"" if img else " blank"}" href="{esc(thumb_target)}" tabindex="-1" aria-hidden="true">{img}'
+            + (f'<a class="thumb{"" if img else " blank"}" href="{esc(_media_url(prefix, thumb_target))}" tabindex="-1" aria-hidden="true">{img}'
                f'<span class="code">{esc(it.get("code") or it.get("id") or "")}</span></a>' if thumb_target else "")
             + f'<div class="body"><h3>{heading}</h3>{summary_html}'
             + (f'<span class="meta-line">{meta}</span>' if meta else "")
             + f'{_lean_chips(it.get("lean"))}<div class="actions">{watch}</div></div></article>')
     hub = str(items[0].get("hub") or "films/")
-    more = f'<a class="aside" href="{esc(hub)}">{bi.t("hub_films")} ▸</a>' if _exists(view.bdir, hub) else ""
+    more = f'<a class="aside" href="{esc(_media_url(prefix, hub))}">{bi.t("hub_films")} ▸</a>' if _exists(view.bdir, hub) else ""
     return (f'<section id="films" class="sec panel{_wide(items)}" aria-labelledby="films-title">'
             f'<div class="sec-head"><h2 id="films-title">{bi.s("ui.films")}</h2>{more}</div>'
             f'<div class="mgrid">{"".join(cards)}</div></section>')
 
 
-def slides_section(bi: Bi, view: BookView) -> str:
+def slides_section(bi: Bi, view: BookView, prefix: str = "") -> str:
     """Deck cards: title, blurb, slide count; per deck language a row with the deck and its PDF."""
     items = view.media.get("slides") or []
     if not items:
@@ -1257,7 +1285,7 @@ def slides_section(bi: Bi, view: BookView) -> str:
             links = []
             h = str(hrefs.get(lang) or "")
             if h and _exists(view.bdir, h):
-                links.append(f'<a class="btn" href="{esc(h)}" hreflang="{esc(config.bcp47(lang))}" lang="{esc(config.bcp47(lang))}">'
+                links.append(f'<a class="btn" href="{esc(_media_url(prefix, h))}" hreflang="{esc(config.bcp47(lang))}" lang="{esc(config.bcp47(lang))}">'
                              f'{esc(config.s(lang, "meta.name") or lang)} <span aria-hidden="true">▸</span></a>')
             for kind, path in (("pdf", pdfs.get(lang)), ("notes_pdf", it.get("notes_pdf", {}).get(lang))):
                 if not path:
@@ -1265,7 +1293,7 @@ def slides_section(bi: Bi, view: BookView) -> str:
                 if view.release_pdfs is None:
                     if not _exists(view.bdir, path):
                         continue
-                    href, size = path, (view.bdir / path).stat().st_size
+                    href, size = _media_url(prefix, path), (view.bdir / path).stat().st_size
                 else:
                     asset = view.release_pdfs.get(Path(path).name)
                     if not asset:
@@ -1282,12 +1310,12 @@ def slides_section(bi: Bi, view: BookView) -> str:
         count = it.get("slides")
         meta = f'<span class="meta-line">{bi.t("slides_count", n=count)}</span>' if isinstance(count, int) and count else ""
         first = next((str(hrefs.get(lang)) for lang in deck_langs if hrefs.get(lang)), "")
-        heading = f'<a href="{esc(first)}">{title}</a>' if first and _exists(view.bdir, first) else title
+        heading = f'<a href="{esc(_media_url(prefix, first))}">{title}</a>' if first and _exists(view.bdir, first) else title
         cards.append('<article class="mcard panel"><div class="body">'
                      f'<h3>{heading}</h3><p class="sum">{blurb}</p>{meta}'
                      f'<div class="decks">{"".join(rows)}</div></div></article>')
     hub = str(items[0].get("index") or "slides/")
-    more = f'<a class="aside" href="{esc(hub)}">{bi.t("hub_slides")} ▸</a>' if _exists(view.bdir, hub) else ""
+    more = f'<a class="aside" href="{esc(_media_url(prefix, hub))}">{bi.t("hub_slides")} ▸</a>' if _exists(view.bdir, hub) else ""
     return (f'<section id="slides" class="sec panel{_wide(items)}" aria-labelledby="slides-title">'
             f'<div class="sec-head"><h2 id="slides-title">{bi.s("ui.slides")}</h2>{more}</div>'
             f'<div class="mgrid">{"".join(cards)}</div></section>')
@@ -1298,9 +1326,11 @@ def _wide(items: list) -> str:
     return " wide" if len(items) >= 3 else ""
 
 
-def landing_html(frame: Frame, view: BookView) -> str:
+def landing_html(frame: Frame, view: BookView, lang: str = "") -> str:
     site, bi, lock, book = frame.site, frame.bi, frame.lock, view.book
     langs = book.languages
+    assets = "../../" if lang else "../"
+    content = assets + book.slug + "/" if lang else ""
 
     def ed_text(value) -> Callable[[str], str]:
         return lambda lang: config.pick(value, view.edition_for(lang), langs)
@@ -1313,7 +1343,7 @@ def landing_html(frame: Frame, view: BookView) -> str:
         '<header class="top">'
         f'<div class="brand"><a class="crumb" href="../"><span aria-hidden="true">◂ </span>{bi.s("ui.back_to_library")}</a>'
         f'<p class="logo" data-text="{esc(book.code)}">{logo_html(book.code)}</p></div>'
-        f'<nav class="status" {bi.aria(lambda lang: t(lang, "nav_site"))}>{"".join(pills)}{lang_switch(frame)}</nav>'
+        f'<nav class="status" {bi.aria(lambda lang: t(lang, "nav_site"))}>{"".join(pills)}{lang_switch(frame, lang, book.slug)}</nav>'
         "</header>"
     )
     facts = []
@@ -1343,7 +1373,7 @@ def landing_html(frame: Frame, view: BookView) -> str:
 
     hero = (
         '<section class="book-hero panel" aria-labelledby="book-title">'
-        f'<figure class="cover">{cover_html(bi, view, "", alt=True, eager=True)}</figure>'
+        f'<figure class="cover">{cover_html(bi, view, content, alt=True, eager=True)}</figure>'
         '<div class="meta">'
         f'<p class="kicker">{logo_html(book.code)} <span class="ver">· v{esc(book.version)}</span></p>'
         f'<h1 id="book-title">{bi.text(ed_text(book.title))}</h1>'
@@ -1352,7 +1382,7 @@ def landing_html(frame: Frame, view: BookView) -> str:
         + stats_html(bi, view, extended=True)
         + f'<dl class="facts">{facts_html}</dl>'
         + f'<div id="downloads" class="downloads"><h2 class="sr-only">{bi.t("read_download")}</h2>'
-        + editions_html(bi, view, "")
+        + editions_html(bi, view, content)
         + (f'<p class="note">{bi.t("downloads_none")}</p>'
            if any(view.built.values()) and not any(view.downloads.values()) else "")
         + "</div>"
@@ -1363,7 +1393,8 @@ def landing_html(frame: Frame, view: BookView) -> str:
         '<section id="contents" class="sec panel" aria-labelledby="contents-title">'
         f'<div class="sec-head"><h2 id="contents-title">{bi.s("ui.contents")}</h2>'
         f'<span class="aside">{view.chapters()} · {bi.t("stat_chapters")}</span></div>'
-        + bi.block(lambda lang: (toc_html(view, view.edition_for(lang), lang, frame.math), view.edition_for(lang)))
+        + bi.block(lambda lang: (toc_html(view, view.edition_for(lang), lang, frame.math, prefix=content),
+                                 view.edition_for(lang)))
         + "</section>"
     )
     pin = ""
@@ -1375,10 +1406,11 @@ def landing_html(frame: Frame, view: BookView) -> str:
         f'<div class="sec-head"><h2 id="verification-title">{bi.t("verification")}</h2>'
         f'<span class="aside">LEAN ✓ {len(view.verified())} · OPEN {len(view.open_items())}</span></div>'
         + pin
-        + bi.block(lambda lang: (verification_html(view, view.edition_for(lang), lang, frame.math), view.edition_for(lang)))
+        + bi.block(lambda lang: (verification_html(view, view.edition_for(lang), lang, frame.math, prefix=content),
+                                 view.edition_for(lang)))
         + "</section>"
     )
-    media = viz_section(bi, view) + films_section(bi, view) + slides_section(bi, view)
+    media = viz_section(bi, view, content) + films_section(bi, view, content) + slides_section(bi, view, content)
     media = f'<div class="media">{media}</div>' if media else ""
     body = (f'{header}<main id="main" tabindex="-1">{hero}<div class="cols">{contents}{verification}</div>'
             f'{media}</main>{footer(frame)}')
@@ -1386,10 +1418,11 @@ def landing_html(frame: Frame, view: BookView) -> str:
     if site.base_url and view.covers:
         og = site.book_url(book.slug, view.covers.get(book.primary.lang) or next(iter(view.covers.values())))
     site_title = lambda lang: site.text(site.title, lang)  # noqa: E731
-    return page(frame, prefix="../",
+    canonical = site.base_url + (lang + "/" if lang else "") + book.slug + "/" if site.base_url else ""
+    return page(frame, prefix=assets,
                 titles=lambda lang: f"{ed_text(book.title)(lang)} · {site_title(lang)}",
                 description=lambda lang: ed_text(book.description)(lang) or ed_text(book.subtitle)(lang),
-                body=body, og_image=og, canonical=site.book_url(book.slug) + "/" if site.base_url else "")
+                body=body, og_image=og, canonical=canonical, lang=lang, slug=book.slug)
 
 
 # --------------------------------------------------------------------------- 404 and manifest
@@ -1607,13 +1640,25 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
             publish_film_marks(book, bdir)
         views.append(collect(site, book, bdir, lock, models, release_pdfs=release_pdfs))
     langs = list(site.languages) or ["zh", "en"]
+    book_slugs = {book.slug for book in site_books} | set(config.book_slugs())
+    route_langs = tuple(lang for lang in langs if lang not in book_slugs) if len(langs) > 1 else ()
     math = render_title_math(views)
     versions = write_assets(out, katex=bool(math))
     frame = Frame(site=site, bi=Bi(langs), versions=versions, lock=lock,
-                  math=math if KATEX_CSS in versions else {})  # no stylesheet: the formulas stay TeX
+                  math=math if KATEX_CSS in versions else {}, route_langs=route_langs)
     for v in views:
         (v.bdir / "index.html").write_text(landing_html(frame, v), encoding="utf-8")
     (out / "index.html").write_text(index_html(frame, views), encoding="utf-8")
+    for lang in route_langs:
+        directory = out / lang
+        directory.mkdir(exist_ok=True)
+        (directory / "index.html").write_text(index_html(frame, views, lang), encoding="utf-8")
+        for slug in removed:
+            (directory / slug / "index.html").unlink(missing_ok=True)
+        for v in views:
+            landing = directory / v.slug
+            landing.mkdir(exist_ok=True)
+            (landing / "index.html").write_text(landing_html(frame, v, lang), encoding="utf-8")
     (out / "404.html").write_text(not_found_html(site), encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     (out / "manifest.json").write_text(json.dumps(manifest(site, views, lock, release_pdfs), ensure_ascii=False, indent=2) + "\n",
