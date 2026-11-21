@@ -291,6 +291,28 @@ class PinTests(unittest.TestCase):
 class ReleasePlanTests(unittest.TestCase):
     """release.yml's plan: a tag naming a hidden book fails and says why; v* releases leave hidden books out."""
 
+    def test_preview_branch_setting_supports_legacy_dev_and_main(self):
+        script = step_script(ROOT / ".github/workflows/release.yml", "Select the preview branch")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "output"
+            env = {**os.environ, "GITHUB_OUTPUT": str(out), "GITHUB_REPOSITORY": "owner/books"}
+            for release, expected in (("", ""), ("daily_dev_preview = true", "dev"),
+                                      ('preview_branch = "main"', "main"),
+                                      ('daily_dev_preview = true\npreview_branch = ""', ""),
+                                      ('preview_branch = "not a ref"', None)):
+                with self.subTest(release=release):
+                    out.write_text("", encoding="utf-8")
+                    result = subprocess.run(
+                        ["bash", "-c", "gh() { cat; }\n" + script],
+                        input=f"[release]\n{release}\n", env=env, capture_output=True, text=True,
+                    )
+                    if expected is None:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn("must name a Git branch", result.stderr)
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(out.read_text(encoding="utf-8"), f"branch={expected}\n")
+
     def test_hidden_books_are_not_released(self):
         tmp = Path(tempfile.mkdtemp(prefix="tbook-hide-release-"))
         self.addCleanup(shutil.rmtree, tmp, True)
@@ -315,12 +337,14 @@ class ReleasePlanTests(unittest.TestCase):
         rc, outputs, log = run_release_plan(root, "my-book-v0.1.0")
         self.assertEqual((rc, outputs.get("books")), (0, "my-book"), log)
 
-
         sha = "a" * 40
-        rc, outputs, log = run_release_plan(root, "dev", preview_sha=sha)
-        self.assertEqual(rc, 0, log)
-        self.assertEqual((outputs["books"], outputs["tag"], outputs["prerelease"]),
-                         ("my-book", f"preview-dev-{sha}", "true"))
+        for branch, tag in (("dev", f"preview-dev-{sha}"), ("main", f"preview-{sha}")):
+            with self.subTest(branch=branch):
+                rc, outputs, log = run_release_plan(root, branch, preview_sha=sha)
+                self.assertEqual(rc, 0, log)
+                self.assertEqual((outputs["books"], outputs["tag"], outputs["prerelease"]),
+                                 ("my-book", tag, "true"))
+                self.assertIn(f" · {branch} preview ", outputs["title"])
 
 # --------------------------------------------------------------------------- workflow steps
 

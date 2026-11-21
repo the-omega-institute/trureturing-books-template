@@ -213,18 +213,20 @@ tag（标签）是给某一个提交起的固定名字。分支（如 `main`）�
 - tag 打错了（名字或提交不对）而 Release 还没发布时，删掉重打：`git push origin :refs/tags/<tag>` 删除远端 tag，`git tag -d <tag>` 删除本地 tag，并在 Releases 页删除留下的草稿。已发布的版本不要复用 tag，发一个新的补丁版本。
 - 推送 tag 需要对仓库有写权限；只能推送分支的环境（例如受限的自动化会话）推不了 tag，由有权限的人推送。
 
-### 6.6 每日 dev 预览
+### 6.6 每日预览
 
 在书库默认分支的 `site.toml` 中启用。
 
 ```toml
 [release]
-daily_dev_preview = true
+preview_branch = "main"
 ```
 
-GitHub Actions 每天 03:17 UTC 检查本书库的 `dev` 分支。默认关闭。启用后，如果 `dev` 上有尚未预览的提交，当天最多发布一次，tag 为 `preview-dev-<完整提交 SHA>`。从包含此工作流的默认分支建立 `dev`，并通过书库的开发流程更新它。当日已发布、提交已有预览或分支尚未建立时，工作流会跳过构建。
+GitHub Actions 每天 03:17 UTC 检查指定分支。该分支须包含支持此设置的 Release 工作流。`preview_branch` 优先于旧的 `daily_dev_preview = true` 设置，后者仍选择 `dev`。未配置预览分支和旧开关时默认关闭，显式设为 `preview_branch = ""` 也会关闭。
 
-在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用触发时 `dev` 的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在对应的 Releases 页面下载预览。官网的 PDF 下载页从版本发行附件生成链接。
+每个 UTC 日最多发布一次，每个提交最多预览一次。tag 为 `preview-<完整提交 SHA>`，`dev` 分支继续使用 `preview-dev-<完整提交 SHA>`。当日已发布、提交已有预览或分支尚未建立时，工作流会跳过构建。
+
+在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用启动时预览分支的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在对应的 Releases 页面下载预览。官网的 PDF 下载页从版本发行附件生成链接。
 
 ## 7. 学术报告 PDF
 

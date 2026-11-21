@@ -1,6 +1,6 @@
 # Publish book releases (managed by the template).
-# Opt in on the default branch with site.toml [release].daily_dev_preview = true.
-# The schedule dispatches this workflow on dev so the build uses dev's commit and Actions cache scope.
+# Set [release].preview_branch in site.toml on the default branch to opt in.
+# The schedule dispatches on the configured branch so the build uses its commit and Actions cache scope.
 #
 #   git tag <slug>-v<version> && git push origin <slug>-v<version>   one book; <version> must equal
 #                                                                     books/<slug>/book.toml [book].version
@@ -59,15 +59,15 @@ env:
   TBOOK_BUILD_RELEASE: '1'
 
 jobs:
-  preview-enabled:
-    name: Read the default branch preview setting
+  preview-settings:
+    name: Read the preview branch from the default branch
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      enabled: ${{ steps.setting.outputs.enabled }}
+      branch: ${{ steps.setting.outputs.branch }}
     steps:
-      - name: Check whether previews are enabled
+      - name: Select the preview branch
         id: setting
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,47 +75,56 @@ jobs:
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/contents/site.toml" -H 'Accept: application/vnd.github.raw+json' |
             python3 -c '
+          import subprocess
           import sys
           import tomllib
 
-          config = tomllib.load(sys.stdin.buffer)
-          enabled = config.get("release", {}).get("daily_dev_preview") is True
-          print(f"enabled={str(enabled).lower()}")
+          release = tomllib.load(sys.stdin.buffer).get("release", {})
+          branch = release.get("preview_branch", "dev" if release.get("daily_dev_preview") is True else "")
+          if not isinstance(branch, str) or (branch and subprocess.run(
+              ["git", "check-ref-format", f"refs/heads/{branch}"], check=False
+          ).returncode):
+              sys.exit("site.toml [release].preview_branch must name a Git branch or be empty")
+          print(f"branch={branch}")
           ' >> "$GITHUB_OUTPUT"
 
   dispatch-preview:
-    name: Queue a preview build on dev
-    needs: preview-enabled
+    name: Queue a preview build
+    needs: preview-settings
     if: >-
-      needs.preview-enabled.outputs.enabled == 'true' &&
+      needs.preview-settings.outputs.branch != '' &&
       (github.event_name == 'schedule' ||
-       (github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch &&
-        github.ref_type == 'branch' && github.ref_name != 'dev'))
+       (github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' &&
+        github.ref_name == github.event.repository.default_branch &&
+        github.ref_name != needs.preview-settings.outputs.branch))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
       actions: write
     steps:
-      - name: Dispatch Release on dev if the branch exists
+      - name: Dispatch Release if the preview branch exists
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          PREVIEW_BRANCH: ${{ needs.preview-settings.outputs.branch }}
         run: |
           set -euo pipefail
-          dev="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/dev" \
-            --jq '.[] | select(.ref == "refs/heads/dev") | .object.sha')"
-          if [[ -z "$dev" ]]; then
-            echo "No dev branch yet."
+          escaped_branch="$(jq -rn --arg branch "$PREVIEW_BRANCH" '$branch | @uri')"
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$escaped_branch" |
+            jq -r --arg ref "refs/heads/$PREVIEW_BRANCH" '.[] | select(.ref == $ref) | .object.sha')"
+          if [[ -z "$sha" ]]; then
+            echo "No preview branch named $PREVIEW_BRANCH yet."
             exit 0
           fi
-          gh workflow run release.yml --ref dev
+          gh workflow run release.yml --ref="$PREVIEW_BRANCH"
 
   plan:
-    needs: preview-enabled
+    needs: preview-settings
     if: >-
       !cancelled() && (github.event_name == 'push' ||
-      (needs.preview-enabled.outputs.enabled == 'true' && github.ref == 'refs/heads/dev'))
+      (github.event_name == 'workflow_dispatch' && needs.preview-settings.outputs.branch != '' &&
+       github.ref == format('refs/heads/{0}', needs.preview-settings.outputs.branch)))
     name: Resolve the books to release
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -136,12 +145,12 @@ jobs:
         run: |
           set -euo pipefail
           published="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-            --jq '.[] | select(.prerelease and (.draft | not) and (.tag_name | test("^preview-dev-[0-9a-f]{40}$"))) |
+            --jq '.[] | select(.prerelease and (.draft | not) and (.tag_name | test("^preview-(dev-)?[0-9a-f]{40}$"))) |
                   [.tag_name, (.published_at | split("T")[0])] | @tsv')"
           today="$(date -u +%F)"
-          if awk -v tag="preview-dev-$GITHUB_SHA" -v today="$today" \
-            '$1 == tag || $2 == today {found = 1} END {exit !found}' <<< "$published"; then
-            echo "A preview already covers dev at $GITHUB_SHA or was published today (UTC)."
+          if awk -v sha="$GITHUB_SHA" -v today="$today" \
+            '$1 == "preview-" sha || $1 == "preview-dev-" sha || $2 == today {found = 1} END {exit !found}' <<< "$published"; then
+            echo "A preview already covers the commit $GITHUB_SHA or was published today (UTC)."
             echo 'skip=true' >> "$GITHUB_OUTPUT"
           fi
 
@@ -172,7 +181,11 @@ jobs:
           from tbook import config
 
           preview = os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
-          tag = f'preview-dev-{os.environ["GITHUB_SHA"]}' if preview else os.environ["TAG"]
+          ref_name = os.environ["TAG"]
+          tag = ref_name
+          if preview:
+              prefix = "preview-dev-" if ref_name == "dev" else "preview-"
+              tag = prefix + os.environ["GITHUB_SHA"]
           books = config.load_books()
           by_slug = {b.slug: b for b in books}
           out = open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8")
@@ -207,7 +220,7 @@ jobs:
               selected = books
               site = config.load_site()
               today = datetime.now(timezone.utc).date()
-              title = f"{site.text(site.title, site.default_language)} · dev preview {today}"
+              title = f"{site.text(site.title, site.default_language)} · {ref_name} preview {today}"
               prerelease = True
           elif slug in hidden:
               fail(f"tag {tag} names books/{slug}, but {config.hidden_error([slug])}; or delete the tag")
@@ -466,6 +479,9 @@ jobs:
       !cancelled() && needs.build.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    concurrency:
+      group: ${{ github.event_name == 'workflow_dispatch' && 'release-preview-publish' || format('release-tag-publish-{0}', github.ref) }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
