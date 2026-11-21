@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.11.0] - 2026-11-21
+
+- 书库可以用 `[release].preview_branch` 指定每日预览分支，例如 `main`。原有每日 `dev` 预览设置仍有效。
+
 ## [1.10.0] - 2026-11-21
 
 - 多语言书库生成 `/zh/`、`/en/` 等语言首页，以及 `/en/<slug>/` 等书籍主页。旧的 `?lang=` 书库和书籍链接会跳转到相应的语言路径，并保留其他参数和锚点。正文仍通过 `/<slug>/<lang>/` 访问。已有书籍占用某个语言目录时，该语言的书库和书籍主页仍用 `?lang=` 访问。

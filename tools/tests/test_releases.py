@@ -19,6 +19,7 @@ class ReleaseAssetsTest(unittest.TestCase):
         old = asset("v1", "book.pdf")
         new = asset("v2", "book.pdf")
         preview_tag = f"preview-dev-{'a' * 40}"
+        main_preview_tag = f"preview-{'b' * 40}"
         beta_tag = "book-v3.0.0-beta.1"
         beta = asset(beta_tag, "beta.pdf")
         response = [[release("v1", "2026-01-01", old)],
@@ -27,6 +28,8 @@ class ReleaseAssetsTest(unittest.TestCase):
                              asset("v2", "book.epub")),
                      release(preview_tag, "2026-01-05", asset(preview_tag, "book.pdf"),
                              asset(preview_tag, "preview.pdf"), prerelease=True),
+                     release(main_preview_tag, "2026-01-06", asset(main_preview_tag, "book.pdf"),
+                             asset(main_preview_tag, "main-preview.pdf"), prerelease=True),
                      release(beta_tag, "2026-01-04", beta, prerelease=True)]]
         self.addCleanup(releases.pdf_assets.cache_clear)
         with patch.object(releases.subprocess, "check_output", return_value=json.dumps(response)) as run:
