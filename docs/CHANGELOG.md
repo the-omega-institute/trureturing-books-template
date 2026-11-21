@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.11.1] - 2026-11-21
+
+- 写作手册统一书内条目、媒体、冻结声明、论文、外部形式化证据与出版版本的引用示例，并说明双语原文定位。
+
 ## [1.11.0] - 2026-11-21
 
 - 书库可以用 `[release].preview_branch` 指定每日预览分支，例如 `main`。原有每日 `dev` 预览设置仍有效。
