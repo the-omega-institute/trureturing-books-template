@@ -172,12 +172,19 @@ class PageLinesTest(unittest.TestCase):
         book = config.load_book(self.root / "books/one")
         self.assertEqual(page_lines.check_book(book), [(self.root / "books/one/en/unlisted.md", 4, 3)])
         source = Path(__file__).resolve().parents[1]
-        run = subprocess.run([sys.executable, "-m", "tbook", "check", "--page-lines-only", "--book", "one"],
-                             cwd=self.root, capture_output=True, text=True, timeout=20,
-                             env={**os.environ, "PYTHONPATH": str(source), "TBOOK_ROOT": str(self.root)})
-        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
-        self.assertIn("unlisted.md:4", run.stdout)
-        self.assertIn("4 lines exceed book.max_page_lines = 3", run.stdout)
+        env = {**os.environ, "PYTHONPATH": str(source), "TBOOK_ROOT": str(self.root)}
+        for github_actions, location in (
+            ("false", "books/one/en/unlisted.md:4: "),
+            ("true", "::error file=books/one/en/unlisted.md,line=4::"),
+        ):
+            with self.subTest(github_actions=github_actions):
+                run = subprocess.run(
+                    [sys.executable, "-m", "tbook", "check", "--page-lines-only", "--book", "one"],
+                    cwd=self.root, capture_output=True, text=True, timeout=20,
+                    env={**env, "GITHUB_ACTIONS": github_actions},
+                )
+                self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+                self.assertIn(f"{location}4 lines exceed book.max_page_lines = 3", run.stdout)
 
 
 if __name__ == "__main__":
