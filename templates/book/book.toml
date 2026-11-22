@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["{{AUTHOR}}"]
 license = "CC-BY-4.0"
 editions = [{{EDITIONS}}]
+# 每个语言版本内的 Markdown 单页最多行数；含空行、注释和代码行。
+max_page_lines = 1000
 # 封面与站点卡片上的赛博朋克代号，形如 CODE//NAME。
 code = "{{CODE}}"
 # 出版日期（YYYY-MM-DD），进入 PDF/EPUB 元数据；留空则用构建当天（产物不能跨日复现）。

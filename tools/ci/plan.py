@@ -21,7 +21,7 @@ import zipfile
 
 # This constructor is dependency-free and shared with the actual video unit.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tbook import buildcache, film_inputs, template as template_metadata
+from tbook import buildcache, film_inputs, page_lines, template as template_metadata
 from ci import viz_budget, testing, trusted_cache
 
 VERSION = 6
@@ -961,6 +961,13 @@ def plan(root, *, event, payload, repo, branch, ref, workflow="ci", own=True, sl
     created = before == "0" * 40
     first_branch_push = created and ref.startswith("refs/heads/") and not base
     comparison = base or pr_base or (before if not created else None)
+    # Always enforce source budgets before coverage reuse, setup or network access.
+    # PRs compare the actual merge's first parent; pushes compare the event interval.
+    line_changes = changed_paths(root, comparison, current.sha) if comparison and mode != "full" else None
+    line_failures = page_lines.check_tree(current, line_changes)
+    if line_failures:
+        raise ValueError("Markdown page line limit exceeded:\n" + "\n".join(
+            f"{path}:{limit + 1}: {page_lines.message(actual, limit)}" for path, actual, limit in line_failures))
 
     def lookup(producer, profile):
         try:
