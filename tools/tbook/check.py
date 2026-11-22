@@ -660,7 +660,10 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         lock = None
     models_by_book: dict[str, dict[str, EditionModel]] = {}
     for book in books:
-        from . import derived
+        from . import derived, page_lines
+
+        for path, actual, limit in page_lines.check_book(book):
+            _err(issues, path, limit + 1, page_lines.message(actual, limit))
 
         try:
             derived.refresh(book)

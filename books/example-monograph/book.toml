@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["The Omega Institute"]
 license = "CC-BY-4.0"
 editions = ["zh", "en"]
+# 各版本 Markdown 页面的源码行数上限，包含空行与代码。
+max_page_lines = 1000
 code = "GOLDEN//OBSERVE"
 date = "2026-11-08"
 

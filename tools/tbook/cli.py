@@ -29,9 +29,14 @@ def _books(args) -> list[config.Book]:
 
 
 def cmd_check(args) -> int:
-    from . import check
-
-    issues = check.run(_books(args), offline=args.offline)
+    if getattr(args, "page_lines_only", False):
+        from . import page_lines
+        from .model import Issue
+        issues = [Issue("error", path, limit + 1, page_lines.message(actual, limit))
+                  for book in _books(args) for path, actual, limit in page_lines.check_book(book)]
+    else:
+        from . import check
+        issues = check.run(_books(args), offline=args.offline)
     gh = os.environ.get("GITHUB_ACTIONS") == "true"
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity != "error"]
@@ -347,6 +352,7 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--book", action="append", help="limit to a book slug (repeatable)")
     c.add_argument("--offline", action="store_true", help="do not fetch trureturing state over the network")
     c.add_argument("--strict", action="store_true", help="fail on warnings too")
+    c.add_argument("--page-lines-only", action="store_true", help="audit edition Markdown line limits without network or export tools")
     c.set_defaults(fn=cmd_check)
 
     c = sub.add_parser("requests", help="list formalization requests, grouped by issue and counted once per book/result")
@@ -507,6 +513,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         if (args.fn in (cmd_build, cmd_check, cmd_serve, cmd_lean_project, cmd_stats, cmd_media) and
+                not getattr(args, "page_lines_only", False) and
                 not os.environ.get("TBOOK_LOCK_SNAPSHOT") and
                 isinstance(lean.Lock.read_spec(), lean.BranchLock)):
             lock = lean.Lock.load(offline=getattr(args, "offline", False))

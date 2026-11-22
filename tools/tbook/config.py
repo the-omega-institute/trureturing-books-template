@@ -64,6 +64,13 @@ def duplicates(items: list[str]) -> list[str]:
     return out
 
 
+def page_line_limit(value: Any, where: str) -> int | None:
+    """An omitted page limit preserves existing books; booleans are not integers here."""
+    if value is not None and (type(value) is not int or value <= 0):
+        raise ConfigError(f"{where}: book.max_page_lines must be a positive integer")
+    return value
+
+
 def normalize_doi(value: Any, where: str = "book.doi") -> str:
     """Return a bare DOI, accepting the common DOI and Zenodo URL forms."""
     if value is None:
@@ -456,6 +463,7 @@ class Book:
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
     editions: list[Edition] = field(default_factory=list)
     unnumbered: dict[str, str] = field(default_factory=dict)
+    max_page_lines: int | None = None
 
     def edition(self, lang: str) -> Edition:
         for ed in self.editions:
@@ -563,6 +571,7 @@ def load_book(slug_or_dir: str | Path) -> Book:
         epub=dict(raw.get("epub", {})),
         raw=raw,
         unnumbered=dict(unnumbered),
+        max_page_lines=page_line_limit(meta.get("max_page_lines"), where),
     )
     book.editions = [Edition(book, lang) for lang in languages]
     return book
