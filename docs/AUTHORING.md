@@ -118,6 +118,8 @@ max_chapters = 39
 | `book.code` | 封面与站点卡片上的代号，形如 `GOLDEN//OBSERVE` |
 | `numbering.unnumbered` | 不参与章节计数的主章路径与独立定理前缀，适用于终章等整棵章节树，见下文 |
 | `outputs.html` / `pdf` / `epub` | 输出开关；`pdf = ["screen", "print"]`；可选加 `"academic"` 导出学术预印本版，省略配置或 `true` 仍只导出原两版 |
+| `html.fold.enable` | HTML 侧栏目录是否可折叠，默认 `true`。设置为 `false` 时展开全部子页 |
+| `html.fold.level` | HTML 侧栏默认展开几层，取 0 至 255 的整数，默认 `1`。设为 `0` 时只列各部标题与顶层条目。所有语言版本共用此设置，进入子页时自动展开当前路径 |
 | `pdf.academic_paper` | 学术预印本开本，默认 `a4`；仅影响 `academic`，排印规范见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md) |
 | `pdf.academic_tags` | 预印本的可选 PDF 结构标签，默认 `false` 以控制文件体积；`true` 时保留结构标签 |
 | `pdf.paper` | Typst 纸张名（`a4`、`a5`、`us-letter`、`iso-b5`…） |

@@ -29,6 +29,9 @@ editions = ["zh", "en"]
 
 [html]
 section-labels = true
+
+[html.fold]
+level = 0
 """
 
 
@@ -96,7 +99,10 @@ class UnnumberedTrees(unittest.TestCase):
             for file in ("coda", "coda-detail", "coda-deep"):
                 link = re.search(r'<a\b[^>]*href="' + file + r'\.html"[^>]*>(.*?)</a>', toc, re.S)
                 self.assertIsNotNone(link)
-                self.assertNotIn("section-number", link.group(1))
+                self.assertNotIn("<strong", link.group(1))
+            for child in ("coda-detail", "coda-deep"):
+                self.assertRegex(toc, r'<ol class="section"><li class="chapter-item "><span class="chapter-link-wrapper">'
+                                      rf'<a href="{child}\.html"')
             self.assertRegex(toc, r'two\.html[^>]*>\s*<strong[^>]*>2\.</strong>')
             self.assertIn('class="katex"', toc)
             self.assertIn("Coda.3", (out / "coda-deep.html").read_text())
