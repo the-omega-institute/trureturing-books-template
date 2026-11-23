@@ -20,7 +20,7 @@ from pathlib import Path
 from . import config, evidence, lean, mdscan, pandoc, paths, render, viz
 from .model import (DEFINITION, FORMAL, MEDIA, NUMBERED, OPEN, PROOF, WRITTEN_PROOF, EditionModel, Issue, load_book_models, kind_of,
                     media_cited_gids)
-from .summary import Chapter, Summary, chapter_prefix
+from .summary import Chapter, Summary, chapter_prefix, numbered_depth_message
 
 
 def _err(issues: list[Issue], path: Path | None, line: int, msg: str) -> None:
@@ -683,12 +683,16 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         models_by_book[book.slug] = models
         for model in models.values():
             issues.extend(model.issues)
-            if book.max_chapters is not None and model.summary is not None:
-                actual = model.summary.numbered_chapter_count()
-                if actual > book.max_chapters:
-                    _err(issues, model.summary.path, 0,
-                         f"{actual} top-level numbered chapters exceed book.max_chapters = {book.max_chapters}. "
-                         "Integrate content into an existing thematic chapter (--parent) or reorganize within the cap.")
+            if model.summary is not None:
+                if book.max_chapters is not None:
+                    actual = model.summary.numbered_chapter_count()
+                    if actual > book.max_chapters:
+                        _err(issues, model.summary.path, 0,
+                             f"{actual} top-level numbered chapters exceed book.max_chapters = {book.max_chapters}. "
+                             "Integrate content into an existing thematic chapter (--parent) or reorganize within the cap.")
+                if book.max_chapter_depth is not None:
+                    for ch in model.summary.exceeding_numbered_depth(book.max_chapter_depth):
+                        _err(issues, model.summary.path, ch.line, numbered_depth_message(ch, book.max_chapter_depth))
             check_env_policy(model, issues, mode=site.trureturing_mode)
             check_orphans(model, issues)
             check_headings(model, issues)

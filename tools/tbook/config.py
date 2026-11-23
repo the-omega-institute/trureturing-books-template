@@ -70,6 +70,12 @@ def _positive_book_limit(value: Any, where: str, key: str) -> int | None:
     return value
 
 
+def _nonnegative_book_limit(value: Any, where: str, key: str) -> int | None:
+    if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 0):
+        raise ConfigError(f"{where}: book.{key} must be a non-negative integer")
+    return value
+
+
 def page_line_limit(value: Any, where: str) -> int | None:
     return _positive_book_limit(value, where, "max_page_lines")
 
@@ -470,6 +476,7 @@ class Book:
     max_chapters: int | None = None
     fold_enable: bool = True
     fold_level: int = 1
+    max_chapter_depth: int | None = None
 
     def edition(self, lang: str) -> Edition:
         for ed in self.editions:
@@ -593,6 +600,7 @@ def load_book(slug_or_dir: str | Path) -> Book:
         unnumbered=dict(unnumbered),
         max_page_lines=page_line_limit(meta.get("max_page_lines"), where),
         max_chapters=_positive_book_limit(meta.get("max_chapters"), where, "max_chapters"),
+        max_chapter_depth=_nonnegative_book_limit(meta.get("max_chapter_depth"), where, "max_chapter_depth"),
     )
     book.editions = [Edition(book, lang) for lang in languages]
     return book

@@ -71,8 +71,19 @@ class Summary:
     def numbered_chapter_count(self) -> int:
         return sum(ch.depth == 0 and bool(ch.number) for ch in self.chapters)
 
+    def exceeding_numbered_depth(self, limit: int) -> list[Chapter]:
+        return [ch for ch in self.chapters if ch.numbered and ch.depth > limit]
+
     def files(self) -> list[str]:
         return [c.path for c in self.chapters if c.path]
+
+
+def numbered_depth_message(chapter: Chapter, limit: int) -> str:
+    return (
+        f"Numbered chapter {chapter.title!r} has depth {chapter.depth}, exceeding book.max_chapter_depth = {limit}. "
+        "Keep main chapters fluent and shallow. Move oversized or deeply nested technical derivations "
+        "to an unnumbered appendix configured in [numbering.unnumbered]."
+    )
 
 
 def _letters(n: int) -> str:
