@@ -39,14 +39,14 @@ description: 在书库中新建一本书、新增章节或新增一个语言版�
 
 ## 新章节
 
-### 先定归属与逻辑位置（严禁无脑往书末或最后一章末尾追加）
+### 先定归属、层级深度与逻辑位置（严禁无脑往书末追加或在主章深层套娃）
 
-新建任何章节或子节前，必须先通览全书目录（`SUMMARY.md`）、各部／各章职责边界与 `book.toml`（特别是 `max_chapters` 与 `[numbering.unnumbered]`），按[写作手册“新增章节与子节的归位原则”](../../docs/AUTHORING.md#新增章节与子节的归位原则)依次判断：
+新建任何章节或子节前，必须先通览全书目录（`SUMMARY.md`）、各部／各章职责边界与 `book.toml`（特别是 `max_chapters`、`max_chapter_depth` 与 `[numbering.unnumbered]`），按[写作手册“正文流畅与超大技术节下沉附录”](../../docs/AUTHORING.md#正文流畅与超大技术节下沉附录)及[“新增章节与子节的归位原则”](../../docs/AUTHORING.md#新增章节与子节的归位原则)依次判断：
 
 1. **能原位融合则不建新页**：对已有小节命题的深化、推广、等价刻画或补强，直接改写原小节（转用 `skills/book-write`），禁止为单次提交顺手新建页面。
-2. **独立子论题归入所属主题主章的逻辑位置**：按学科主题找到真正承载该问题的既有主章（严禁把全书最后一章／收官总纲章当作万能杂物筐），用 `--parent <主章>` 配合 `--before <同级目标>` 或 `--after <同级目标>` 插在该章论证递进的自然节点，随后同步改写前后小节过渡段与章导言。
-3. **技术支线归附录、铺路副产物留上游**：繁复技术引理或参考表归入附录，阶段性中间结果留上游仓库或 Issue。
-4. **审慎增设顶层主章**：仅当既有各章均无法容纳全新一级板块、且未达 `book.max_chapters` 上限时，才增设顶层主章，并必须用 `--before` 或 `--after` 放入全书结构的逻辑位置（不得排在收官总纲章或终章之后充当时间线尾巴）；若已达 `max_chapters` 上限，`./tbook new-chapter` 会直接拒绝顶层新章，须改为归入既有主章或重整既有章节。
+2. **独立主线子论题归入所属主题主章的浅层逻辑位置**：按学科主题找到真正承载该问题的既有主章（严禁把全书最后一章／收官总纲章当作万能杂物筐），用 `--parent <主章>` 配合 `--before <同级目标>` 或 `--after <同级目标>` 插在该章论证递进的自然节点，且不超过 `book.max_chapter_depth`（若已配置，`./tbook new-chapter` 会直接拒绝在编号主章下创建超深子页），随后同步改写前后小节过渡段与章导言。
+3. **超大技术节与深层推导归专题附录、铺路副产物留上游**：多页技术引理链、参数族穷举、资源账本及触及 `max_page_lines` 或 `max_chapter_depth` 的细密推导树，一律归入 `[numbering.unnumbered]` 专题附录（附录树豁免主章深度上限，可用 `--parent <附录或附录子节>` 展开），正文只留核心结论、直觉阐释、主线媒体与流畅过渡；阶段性中间结果留上游仓库或 Issue。
+4. **审慎增设顶层主章，不轻率另拆新书**：成熟专著技术篇幅膨胀时优先下沉专题附录、保持既有主章编号连贯，不轻易另开新书割裂整体结构；仅当既有各章均无法容纳全新一级板块、且未达 `book.max_chapters` 上限时，才增设顶层主章，并必须用 `--before` 或 `--after` 放入全书结构的逻辑位置（不得排在收官总纲章或终章之后充当时间线尾巴）；若已达 `max_chapters` 上限，`./tbook new-chapter` 会直接拒绝顶层新章，须改为归入既有主章、下沉专题附录或重整既有章节。
 
 ### 命令用法
 
@@ -55,14 +55,18 @@ description: 在书库中新建一本书、新增章节或新增一个语言版�
 ./tbook new-chapter <slug> ch02-name --before ch03-finale \
   --title zh="第二章 …" --title en="Chapter 2 …"
 
-# 在既有主章内按论证逻辑插入子章节（推荐常态用法）
+# 在既有主章内按论证逻辑插入浅层子章节（受 book.max_chapter_depth 约束）
 ./tbook new-chapter <slug> ch02-s01-projections --parent ch02-name --before ch02-s02-synthesis \
   --title zh="2.1 投影的几何" --title en="2.1 Geometry of projections"
 ./tbook new-chapter <slug> ch02-s01-s01-examples --parent ch02-s01-projections \
   --title zh="2.1.1 手算例子" --title en="2.1.1 Worked examples"
+
+# 深层技术证明树归入 [numbering.unnumbered] 专题附录（豁免 book.max_chapter_depth）
+./tbook new-chapter <slug> appendix-a-s01-proof-chain --parent appendix-a \
+  --title zh="A.1 完整技术证明链" --title en="A.1 Full technical proof chain"
 ```
 
-每个语言版本都要有 `--title` 且已有目录层级一致的 `SUMMARY.md`；命令先全部校验再写入，出错时不改任何文件。`--before` 与 `--after` 互斥（目标可带或不带 `.md`）：带 `--parent` 时目标必须是该父项的直接子项，`--after` 会插在目标及其全部后代之后；不带 `--parent` 时目标必须是顶层条目。仅在新建新书按序搭骨架等极少数场景省略 `--before`／`--after`：不带 `--parent` 时默认停在书末无编号附录及尾部 `[numbering.unnumbered]` 终章／附录条目之前，带 `--parent` 时停在父项子树末尾。
+每个语言版本都要有 `--title` 且已有目录层级一致的 `SUMMARY.md`；命令先全部校验再写入，出错时不改任何文件。`--before` 与 `--after` 互斥（目标可带或不带 `.md`）：带 `--parent` 时目标必须是该父项的直接子项，`--after` 会插在目标及其全部后代之后；不带 `--parent` 时目标必须是顶层条目。若配置了 `book.max_chapter_depth`，在编号主章子树内插入超深子页会被直接拒绝，而 `[numbering.unnumbered]` 终章与专题附录子树不受该深度上限限制。仅在新建新书按序搭骨架等极少数场景省略 `--before`／`--after`：不带 `--parent` 时默认停在书末无编号附录及尾部 `[numbering.unnumbered]` 终章／附录条目之前，带 `--parent` 时停在父项子树末尾。
 
 文件命名与已有大章的拆分步骤见 `docs/AUTHORING.md` 的“章节命名与长章拆分”。子章节仍使用所属主章的定理编号并接续计数；不会另起一章。插入中间位置后，同步核对受影响子节的显示编号、章导言列表与前后过渡衔接。
 

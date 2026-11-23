@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from . import config, paths
-from .summary import Chapter, Summary, SummaryError, parse_summary
+from .summary import Chapter, Summary, SummaryError, numbered_depth_message, parse_summary
 
 TEMPLATE = paths.TEMPLATES / "book"
 
@@ -206,8 +206,11 @@ def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | N
         added = [ch for ch in generated.chapters if ch.path == f"{name}.md"]
         if len(added) != 1 or len(generated.chapters) != len(parsed.chapters) + 1:
             raise config.ConfigError("chapter title must fit on one SUMMARY link line")
-        if added[0].section != "numbered" or added[0].depth != depth:
+        chapter = added[0]
+        if chapter.section != "numbered" or chapter.depth != depth:
             raise config.ConfigError(f"{paths.rel(ed.summary)}: generated chapter has unexpected nesting")
+        if book.max_chapter_depth is not None and chapter.numbered and chapter.depth > book.max_chapter_depth:
+            raise config.ConfigError(f"{paths.rel(ed.summary)}: {numbered_depth_message(chapter, book.max_chapter_depth)}")
         plan.append((ed, title, md, summary))
     created = []
     for ed, title, md, summary in plan:
