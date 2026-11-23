@@ -574,7 +574,11 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
             f"could not verify that pinned commit {lock.commit[:12]} is on {where}: {anc.detail}")
     for gid, uses in sorted(cited.items()):
         path, line, _ = uses[0]
-        res = lock.get(gid)
+        try:
+            res = lock.get(gid)
+        except lean.LeanError as exc:
+            _err(issues, paths.LOCK_FILE, 0, str(exc))
+            continue
         if res is None:
             _err(issues, path, line, f"{gid} is not in trureturing.lock.json; run ./tbook pin --refresh")
             continue
@@ -591,7 +595,7 @@ def check_lean(models_by_book: dict[str, dict[str, EditionModel]], lock: lean.Lo
             else:
                 _err(issues, path, line, str(exc))
             continue
-        for fld in ("name", "kind", "module", "statement_id"):
+        for fld in ("name", "kind", "module", "statement_id", "axioms"):
             if getattr(live, fld) != getattr(res, fld):
                 _err(issues, paths.LOCK_FILE, 0,
                      f"{gid}: lock says {fld}={getattr(res, fld)!r} but {lock.repo_name}@{lock.commit[:12]} says "

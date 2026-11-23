@@ -714,6 +714,17 @@ def github_branch_contains(repo: str, branch: str, commit: str) -> Ancestry:
 # --------------------------------------------------------------------------- resolution
 
 
+def frozen_axioms(row: dict, gid: str) -> list[str] | None:
+    """A14.2 records a measured proper subset. An omitted field gives only the allowed upper bound."""
+    if "axioms" not in row:
+        return None
+    values = row["axioms"]
+    if (not isinstance(values, list) or any(v not in STD_AXIOMS for v in values)
+            or values != sorted(set(values)) or len(values) == len(STD_AXIOMS)):
+        raise LeanError(f"{gid}: frozen axioms must be a sorted, unique proper subset of {STD_AXIOMS}")
+    return values
+
+
 @dataclass
 class Resolution:
     gid: str
@@ -723,11 +734,18 @@ class Resolution:
     statement_id: str  # frozen module digest or normalized source signature digest
     line: int = 0  # line of the declaration in the .lean source (0 = unknown)
     signature: str = ""  # declaration header up to ':=' (best effort, informational)
+    axioms: list[str] | None = None
+
+    @property
+    def axiom_status(self) -> str:
+        if self.axioms is None:
+            return "unknown"
+        return "depends" if self.axioms else "free"
 
     def to_lock(self) -> dict:
         d = asdict(self)
         d.pop("gid")
-        return d
+        return {key: value for key, value in d.items() if value is not None}
 
 
 def resolve(ledger: Ledger, commit: str, gid_text: str) -> Resolution:
@@ -742,21 +760,22 @@ def resolve(ledger: Ledger, commit: str, gid_text: str) -> Resolution:
             f"(no {gid.state_path}); only kernel-verified, frozen declarations may be cited"
         )
     want = gid.parts
-    matches: list[tuple[str, str]] = []
+    matches: list[tuple[str, dict]] = []
     for decl in state.get("declarations", []):
         comps = parse_name_key(decl["declaration_name_key"])
         if is_private(comps):
             continue
         if len(comps) >= len(want) and [str(c) for c in comps[-len(want):]] == want:
-            matches.append((name_to_str(comps), decl.get("kind", "")))
+            matches.append((name_to_str(comps), decl))
     if not matches:
         raise LeanError(f"{gid.text}: no frozen declaration named {gid.name!r} in {gid.state_path} at {commit[:12]}")
     if len(matches) > 1:
         names = ", ".join(m[0] for m in matches)
         raise LeanError(f"{gid.text}: ambiguous, matches {names}; write a longer name suffix")
-    full, kind = matches[0]
-    return Resolution(gid=gid.text, module=gid.module, name=full, kind=kind,
-                      statement_id=str(state.get("statement_id", "")))
+    full, row = matches[0]
+    return Resolution(gid=gid.text, module=gid.module, name=full, kind=row.get("kind", ""),
+                      statement_id=str(state.get("statement_id", "")),
+                      axioms=frozen_axioms(row, gid.text))
 
 
 DECL_KINDS = {
@@ -1048,7 +1067,8 @@ class Lock:
             return None
         return Resolution(gid=gid, module=d["module"], name=d["name"], kind=d["kind"],
                           statement_id=d.get("statement_id", ""), line=int(d.get("line", 0) or 0),
-                          signature=d.get("signature", ""))
+                          signature=d.get("signature", ""),
+                          axioms=frozen_axioms(d, gid) if self.mode == "frozen-state" else None)
 
     # Links ------------------------------------------------------------------
     def blob(self, path: str, line: int = 0) -> str:

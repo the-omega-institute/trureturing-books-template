@@ -402,6 +402,26 @@ class ContainerFenceTests(unittest.TestCase):
 class UnverifiedBadgeTests(unittest.TestCase):
     """Regression: the green LEAN ✓ badge and ledger links were shown for GIDs the lock does not resolve."""
 
+    def test_axiom_badge_and_ledger(self):
+        with Repo() as repo:
+            lock = make_lock()
+            env = repo.model.envs["thm-ok"]
+            row = lock.declarations[GID_OK]
+            row.update(axioms=[], libraries=["Mathlib"])
+            for target in ("mdbook", "pandoc"):
+                self.assertIn("LEAN ✓ · 无公理", repo.render("ch01.md", target, lock)[0])
+            env.lean.append(GID_DEF)
+            second = lock.declarations[GID_DEF]
+            second.update(kind="theorem", libraries=["OmegaMath"])
+            self.assertEqual(render.env_view(env, repo.ctx(lock=lock))["badge"], "LEAN ✓")
+            second["axioms"] = ["Quot.sound"]
+            self.assertEqual(render.env_view(env, repo.ctx(lock=lock))["badge"], "LEAN ✓ · 依赖公理")
+            self.assertIn("依赖公理 (`Quot.sound`)", ledger.ledger_markdown(repo.model, lock))
+            del row["axioms"]
+            self.assertIn("公理依赖未知", ledger.ledger_markdown(repo.model, lock))
+            lock.mode = "lean-source"
+            self.assertEqual(render.env_view(env, repo.ctx(lock=lock))["badge"], "LEAN ✓")
+
     def test_env_view(self):
         with Repo() as repo:
             ctx = repo.ctx()

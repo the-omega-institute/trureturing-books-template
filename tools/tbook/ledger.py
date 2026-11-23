@@ -59,6 +59,8 @@ def ledger_markdown(model: EditionModel, lock: lean.Lock | None,
     formal = [e for e in model.all_envs() if e.kind in FORMAL and e.status != "written-proof"]
     unverified = s("badge.unverified") or s("slides.badge_unverified") or "UNVERIFIED"
     if formal:
+        if lock and not source_mode:
+            out += [s("frozen.legend"), ""]
         state_column = s("ledger.col_state_source" if source_mode else "ledger.col_state")
         out += [f"| {s('ledger.col_item')} | {s('ledger.col_title')} | {s('ledger.col_decl')} | {state_column} |",
                 "| --- | --- | --- | --- |"]
@@ -73,7 +75,12 @@ def ledger_markdown(model: EditionModel, lock: lean.Lock | None,
                 decls.append(f"[`{_cell(name)}`]({url})" if url else f"`{_cell(name)}`")
                 if lock and res and res.kind in lean.FORMAL_KINDS:
                     sid = res.statement_id.split(":", 1)[-1][:10] if res.statement_id else "state"
-                    states.append(f"[`{sid}`]({lock.state_url(gid)})")
+                    state = f"[`{sid}`]({lock.state_url(gid)})"
+                    if not source_mode:
+                        state += " " + s("frozen." + res.axiom_status)
+                        if res.axioms:
+                            state += " (" + ", ".join(f"`{name}`" for name in res.axioms) + ")"
+                    states.append(state)
                 else:
                     verified = False
             if not verified:

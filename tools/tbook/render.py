@@ -135,7 +135,7 @@ def lean_view(gid: str, lock: lean.Lock | None) -> dict:
     """What the book shows for ``gid``. Links only when the lock resolves it (``resolved``):
     an unresolved GID is shown as text, never as a link that suggests the declaration exists."""
     view = {"gid": gid, "name": "", "kind": "", "url": "", "state_url": "", "blueprint_url": "",
-            "line": 0, "signature": "", "statement_id": "", "resolved": False}
+            "line": 0, "signature": "", "statement_id": "", "resolved": False, "axiom_status": ""}
     try:
         g = lean.parse_gid(gid, mode=lock.mode if lock else "frozen-state")
     except lean.LeanError:
@@ -150,6 +150,7 @@ def lean_view(gid: str, lock: lean.Lock | None) -> dict:
     if res:
         view.update(name=res.name, kind=res.kind, line=res.line, signature=res.signature,
                     statement_id=res.statement_id, resolved=True,
+                    axiom_status=res.axiom_status if lock.mode == "frozen-state" else "",
                     url=lock.source_url(gid), state_url=lock.state_url(gid),
                     blueprint_url=lock.blueprint_url(gid))
     return view
@@ -245,6 +246,11 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
             badge = config.s(lang, "badge.lean")
             title_key = "badge.lean_source_title" if ctx.lock and ctx.lock.mode == "lean-source" else "badge.lean_title"
             badge_title = config.s(lang, title_key)
+            statuses = {v["axiom_status"] for v in leans}
+            if "depends" in statuses:
+                badge += " · " + config.s(lang, "frozen.depends")
+            elif statuses == {"free"}:
+                badge += " · " + config.s(lang, "frozen.free")
         else:
             # The build never claims what the lock cannot back: red UNVERIFIED, as the slides do.
             unverified = True
