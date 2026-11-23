@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "14bc2dff19011bae404d2fa8ce874ef430965701b29c5f5a369da6afcbe699f1",
+      "sha256": "ae224e40fc50507ecbecab2118a7cc473667a7fb661356a339452aaee42232a0",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -136,7 +136,7 @@
       "mode": "100644"
     },
     "docs/VERIFICATION.md": {
-      "sha256": "29a8f438cd2e9ef5b19ed2320b91aba35565ebcf30348537fe5627d3ac9b96d3",
+      "sha256": "c71d96f5fd5fa7fe95174e556b612724a3d16488e4b633d22d7def34ca4b8e91",
       "mode": "100644"
     },
     "package-lock.json": {
@@ -188,7 +188,7 @@
       "mode": "100644"
     },
     "skills/theorem-formalize/SKILL.md": {
-      "sha256": "3a9baf0d6aa92b7a19818092c6abac41e1b2e928d381e2d3b283738034bce4c7",
+      "sha256": "bdf40ec59984ceb00ffce398e9ec33e8525ea0b89a88492e7f5794995fa12133",
       "mode": "100644"
     },
     "skills/trureturing-pin/SKILL.md": {
@@ -372,11 +372,11 @@
       "mode": "100644"
     },
     "theme/i18n/en.toml": {
-      "sha256": "c4172a7da2ee2ac93e2a36888cf051fa4c2896dc6574c39bbba75a927b6c011f",
+      "sha256": "0dc919d8a0a38bfb2b8d7e1bae7f2729f7f8e698584ec24013a1af59805f936d",
       "mode": "100644"
     },
     "theme/i18n/zh.toml": {
-      "sha256": "75712a09737313aad0add58a0544182b9fcd15b7a9618d5f3d49c6639479fb72",
+      "sha256": "4d57da78a32cc1cf043eb2addf8eadef8e1b2a160e85480eb8a06f992625a57f",
       "mode": "100644"
     },
     "theme/mdbook/favicon.svg": {
@@ -760,7 +760,7 @@
       "mode": "100644"
     },
     "tools/tbook/check.py": {
-      "sha256": "69ea16585273ef21abcc8fb874631e06ab40d8e9addbab9c48585aff8a3f5d27",
+      "sha256": "db43cbb2d18f087f3d225d28a9741d7046a056fa31da1890b00434e5557e82c5",
       "mode": "100644"
     },
     "tools/tbook/cli.py": {
@@ -808,15 +808,15 @@
       "mode": "100644"
     },
     "tools/tbook/lean.py": {
-      "sha256": "a67547d99621780803b9417476496ba0af845f85cef107ad9d0a77f7e0bfe49b",
+      "sha256": "3475e00c16eb59c881d129b82da717e88d262f480ca6220d06d8035533398b9c",
       "mode": "100644"
     },
     "tools/tbook/leanverify.py": {
-      "sha256": "d8706a855f6b2c83e334602c5f93104354e93cf21434ea4f3ce1f78cf17c6133",
+      "sha256": "bbbd71763439b163684bb782825cde53626cd1b4cf20c7c14c97cee173bc7b75",
       "mode": "100644"
     },
     "tools/tbook/ledger.py": {
-      "sha256": "ac0619e95f2d31397f485d3127c8faad1bfc9f21a020509514a83a21bfb636b4",
+      "sha256": "929da59beb86e163689abd766aea6127d97956f564cb73c7f50cba67d95f4400",
       "mode": "100644"
     },
     "tools/tbook/mathrender.py": {
@@ -848,7 +848,7 @@
       "mode": "100644"
     },
     "tools/tbook/pin.py": {
-      "sha256": "ec0d837e146c066d78e2fcbd3182c3c90536f0daaf9aae292b41e0d89b3a7d71",
+      "sha256": "c1677cdb2789fa762ea92667c379d75be9062698f379149cee6808f68a5b305e",
       "mode": "100644"
     },
     "tools/tbook/releases.py": {
@@ -856,7 +856,7 @@
       "mode": "100644"
     },
     "tools/tbook/render.py": {
-      "sha256": "57cb86d03f1e55d4ad8982d530b4b53c6940828d1b2fabfcf16c9a15b1c58fbb",
+      "sha256": "a6fa42aaa301ae97a82391d2df39f74730176424f843f2535b17ce8ad29c6546",
       "mode": "100644"
     },
     "tools/tbook/requests.py": {
@@ -972,7 +972,7 @@
       "mode": "100644"
     },
     "tools/tests/test_core.py": {
-      "sha256": "e7e494e24d0137b886b51e052a42a8539786803ad307219e0bfe9e26c87a5607",
+      "sha256": "e84eab612d24160050544c855740c0d3d84653b233aed06623d59900a0499987",
       "mode": "100644"
     },
     "tools/tests/test_cover_cache.py": {
@@ -1036,7 +1036,7 @@
       "mode": "100644"
     },
     "tools/tests/test_markdown.py": {
-      "sha256": "1c1041b9c36d8ea66aa03a1036a95018cc168559d6068f2048cabc1339cb3d85",
+      "sha256": "a254d3c5a6bcaa6dc6b6f181f70d2a53bab48f45b45badd3dff3bc01c9dc1097",
       "mode": "100644"
     },
     "tools/tests/test_migration_v0_2_0.py": {
@@ -1120,7 +1120,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "1e264defb97c3a43d088635bbadd6be320ce41937a5c887f0a7a45d5a200cc10",
+      "sha256": "1a4a030e4d317899ecef65c57980cbe035c097bf568efe7ef74a12b1cd9214ee",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {

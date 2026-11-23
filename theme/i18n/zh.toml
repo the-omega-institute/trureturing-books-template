@@ -59,6 +59,12 @@ pinned_at = "形式化依据：trureturing 提交"
 verified_count = "条定理均经 Lean 内核验证"
 generated_note = "本页由构建自动生成，请勿手改。"
 
+[frozen]
+free = "无公理"
+depends = "依赖公理"
+unknown = "公理依赖未知"
+legend = "公理标记取自每条冻结声明最近一次记录的传递公理闭包。空集标为“无公理”，非空集合列出所用公理。缺少实测集合时只能确定标准三公理上界。"
+
 [ledger]
 intro_source = "下表中的 Lean 引用链接到 {repo} 所钉提交中的声明。"
 col_state_source = "签名摘要"

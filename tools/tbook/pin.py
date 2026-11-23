@@ -217,6 +217,8 @@ def pin(ref: str | None = None, *, refresh: bool = False, offline: bool = False,
             diffs.append(f"kind {a.get('kind')} → {b.get('kind')}")
         if a.get("statement_id") != b.get("statement_id"):
             diffs.append("declaration signature digest changed" if mode == "lean-source" else "module statement digest changed")
+        if a.get("axioms") != b.get("axioms"):
+            diffs.append(f"frozen axioms {a.get('axioms', 'unknown')} → {b.get('axioms', 'unknown')}")
         if diffs:
             report.changed.append((gid, "; ".join(diffs)))
         if int(a.get("line", 0) or 0) != int(b.get("line", 0) or 0):

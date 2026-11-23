@@ -743,6 +743,19 @@ class SummaryParityTests(unittest.TestCase):
 
 
 class LockCheckTests(unittest.TestCase):
+    def test_stale_axiom_measurement_with_same_statement_pin(self):
+        with CoreRepo() as repo:
+            book = repo.book()
+            lock = make_lock()
+            lock.declarations[GID_INT]["axioms"] = []
+            live = FakeLedger()
+            live.states[lock.declarations[GID_INT]["module"]]["declarations"][1]["axioms"] = ["propext"]
+            with mock.patch.object(lean, "Ledger", return_value=live):
+                issues = []
+                check.check_lean({"demo": model.load_book_models(book)}, lock, config.load_site(), issues,
+                                 offline=True)
+            self.assertTrue(any("lock says axioms=[]" in i.message for i in issues))
+
     def test_book_filter_counts_other_books_citations(self):
         with CoreRepo() as repo:
             demo = repo.book()

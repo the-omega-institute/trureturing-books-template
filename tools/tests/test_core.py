@@ -760,6 +760,23 @@ class LeanTests(unittest.TestCase):
         self.assertEqual(lean.split_gids(f" {GID_3V}, {GID_INT}\n{GID_DEF} "), [GID_3V, GID_INT, GID_DEF])
         self.assertEqual(lean.split_gids(""), [])
 
+    def test_frozen_axioms_follow_the_selected_declaration(self):
+        led = FakeLedger()
+        rows = led.states[MOD_INT]["declarations"]
+        rows[0].update(axioms=["propext"], libraries=["OmegaMath"])
+        rows[1].update(axioms=[], libraries=["Mathlib"])
+        for gid, expected in ((GID_DEF, ["propext"]), (GID_INT, [])):
+            resolved = lean.resolve(led, COMMIT, gid)
+            lock = make_lock({gid: resolved.to_lock()})
+            self.assertEqual(lock.get(gid).axioms, expected)
+        del rows[1]["axioms"]
+        self.assertNotIn("axioms", lean.resolve(led, COMMIT, GID_INT).to_lock())
+        for invalid in (None, {}, "propext", ["sorryAx"], ["propext", "propext"],
+                        ["propext", "Quot.sound"], sorted(lean.STD_AXIOMS)):
+            rows[1]["axioms"] = invalid
+            with self.subTest(invalid=invalid), self.assertRaises(lean.LeanError):
+                lean.resolve(led, COMMIT, GID_INT)
+
     def test_resolve(self):
         led = FakeLedger()
         r = lean.resolve(led, COMMIT, GID_3V)

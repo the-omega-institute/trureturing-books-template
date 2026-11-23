@@ -22,7 +22,7 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 
 ### 0. 先找，再写
 
-1. 默认使用 `~/trureturing`；用户显式指定的路径或已有 `TRURETURING_DIR` 优先。用 `export TRURETURING_DIR="${TRURETURING_DIR:-$HOME/trureturing}"` 沿用选定位置；目录不存在时克隆到该位置：`git clone https://github.com/the-omega-institute/trureturing "$TRURETURING_DIR"`。核对上游工作区规则后，在该 checkout 中检索：`D5/` 的声明 → 钉版 mathlib → 其他。后续 skill 与钉版步骤继续使用同一变量，不重新选择路径。
+1. 默认使用 `~/trureturing`；用户显式指定的路径或已有 `TRURETURING_DIR` 优先。用 `export TRURETURING_DIR="${TRURETURING_DIR:-$HOME/trureturing}"` 沿用选定位置；目录不存在时克隆到该位置：`git clone https://github.com/the-omega-institute/trureturing "$TRURETURING_DIR"`。核对上游工作区规则后，在该 checkout 中检索：`D5/` 的冻结声明，再查 `src/OmegaMath/`、它使用的 `src/OmegaInit/` 及钉版 Mathlib 的对应声明。后续 skill 与钉版步骤继续使用同一变量，不重新选择路径。
 2. 找到 → 记下 GID（`<模块路径>.<声明名>`），确认 `Golden/Frozen/state/<模块路径>.lean.json` 里有它且 `kind` 为 `theorem`，回到本仓库写作即可。
 3. 找到但陈述不同 → 判断书中陈述能否作为它的忠实特例或推论；能，就在 trureturing 里补一条小定理（仍走下面的流程），不要在书里“近似地”引用。
 
@@ -34,6 +34,8 @@ description: 书里要写一条 trureturing 中尚未冻结的定理时使用：
 
 在 trureturing 仓库按它的 `skills/codex-formalize/SKILL.md` 工作：写 D5 Lean 与 Blueprint Scribe，`lake build`、无 `sorry`、只用标准公理，经它的 CI 与评审合入 `dev`，并完成冻结（状态片写入 `Golden/Frozen/state/`）。
 
+- 优先用 OmegaMath 构造证明。缺少可复用的通用定义或引理时，在 `src/OmegaMath/` 补齐，按主仓 `src/README.md` 对照钉版 Mathlib 的目录、命名空间与声明名。没有上游对应项的原创数学放在相邻专题目录，使用 `Omega original.` 标注。依赖 OmegaInit 的基础对象遵循其与官方 Lean Init 的对应规则。
+- D5 保存面向书中命题的声明，导入所需的具体模块，直接应用通用证明，再走 D5 的冻结入口。例如齐次坐标的正整数缩放复用 `Omega.Projective.kappa_scale`。冻结标记取自 D5 声明自身的 `axioms`，来源库仅用于定位实现。
 - 在 PR 说明里写明这条定理将被哪本书的哪一章引用。
 - 不要为了书的措辞去扭曲形式陈述；书跟随 Lean，不是反过来。
 
