@@ -362,6 +362,27 @@ class BookTomlTest(unittest.TestCase):
         self.assertTrue(out["print"]["enable"] and out["search"]["enable"])
         self.assertEqual(out["fold"], {"enable": True, "level": 1})
 
+    def test_fold_configuration(self):
+        for options, enable, level in (("level = 0", True, 0), ("enable = false", False, 1),
+                                       ("enable = true\nlevel = 255", True, 255)):
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as tmp:
+                root = write_book(Path(tmp))
+                with (root / "book.toml").open("a") as fh:
+                    fh.write(f"\n[html.fold]\n{options}\n")
+                book = config.load_book(root)
+                data = tomllib.loads(html.book_toml(self.site, book, book.primary, [], []))
+                self.assertEqual(data["output"]["html"]["fold"], {"enable": enable, "level": level})
+
+    def test_invalid_fold_configuration(self):
+        for key, value in (("html", "true"), ("html.fold", "0"), ("html.fold.enable", '"false"'),
+                           ("html.fold.level", "true"), ("html.fold.level", "-1"), ("html.fold.level", "256")):
+            with self.subTest(key=key, value=value), tempfile.TemporaryDirectory() as tmp:
+                root = write_book(Path(tmp))
+                path = root / "book.toml"
+                path.write_text(f"{key} = {value}\n" + path.read_text())
+                with self.assertRaisesRegex(config.ConfigError, re.escape(key)):
+                    config.load_book(root)
+
     def test_without_repository(self):
         site = dataclasses.replace(self.site, repo="", base_url="")
         out = tomllib.loads(html.book_toml(site, self.book, self.edition, [], []))["output"]["html"]

@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -104,11 +104,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "4d246688869e3004dabf8f15f3dc693edfdd340bd0c5aa45ecf2d3d773856b55",
+      "sha256": "574988739eaab852d2dba537b97843c409bcc51d851e950bb22c7c590ff24e4c",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "1a6bf2ffb77902a41a5abb641c60d9347ca9cbba6d876df723d50fba3c4ff240",
+      "sha256": "0538353a246a5d773fc060f8e146b3a7ef4f9083ac453e5d00fc8168b825d7f4",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -768,7 +768,7 @@
       "mode": "100644"
     },
     "tools/tbook/config.py": {
-      "sha256": "3400b6d1bb38b08b875a5e7a9e97349f4d342d06dedc8766909d9b4cf5b93d90",
+      "sha256": "e913533a58c438eb345a26ab0bb06115b1a0f90b832442dcdbb3b5540ce40855",
       "mode": "100644"
     },
     "tools/tbook/cover.py": {
@@ -804,7 +804,7 @@
       "mode": "100644"
     },
     "tools/tbook/html.py": {
-      "sha256": "3e01775d3338478c69b469d4f1e1245b7002313ec1c88f9d18b69c148853c79e",
+      "sha256": "3e293c64232ecdd61465abec4690018c939ce615b6865bccfc1cbba8c2be2b5c",
       "mode": "100644"
     },
     "tools/tbook/lean.py": {
@@ -821,10 +821,6 @@
     },
     "tools/tbook/mathrender.py": {
       "sha256": "341356248d6b913cb34f20b2d1210595f68b44f21c455ca4d725a6a308df5015",
-      "mode": "100644"
-    },
-    "tools/tbook/mdbook_numbering.py": {
-      "sha256": "51f6e5ee997298928c39a70d8775ac2fb66bc07bf09d495afb2b882f870954c3",
       "mode": "100644"
     },
     "tools/tbook/mdscan.py": {
@@ -1028,7 +1024,7 @@
       "mode": "100644"
     },
     "tools/tests/test_html.py": {
-      "sha256": "afa798b19322abe63a80a90b1af7199c8a1778db92646f0cb7c73d9dedae3eb9",
+      "sha256": "9d3f7beaed0db667c74d3982cc500b919b14034250999b93b7e1613f1c5d69cc",
       "mode": "100644"
     },
     "tools/tests/test_lean_source.py": {
@@ -1052,7 +1048,7 @@
       "mode": "100644"
     },
     "tools/tests/test_numbering.py": {
-      "sha256": "1934b1899db26a0c06049f3194fe53f73960c2e93d5777dfdc8ffe5d762e926f",
+      "sha256": "18c367eff467e495357a4a54b3a0db7aa8c48fbe2487662faede373255fcb690",
       "mode": "100644"
     },
     "tools/tests/test_page_lines.py": {

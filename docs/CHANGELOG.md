@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.14.0] - 2026-11-24
+
+- 书籍可以在 `[html.fold]` 中设置 `enable` 和 `level`，控制各语言 HTML 侧栏目录的折叠开关与默认展开深度。终章与附录等无编号子树也按目录层级折叠。
+
 ## [1.13.0] - 2026-11-24
 
 - 确立新增章节与子节的主题归位规范（根级守则第 12 条、写作手册、`book-new`、`book-write` 与贡献规范）：禁止无脑往书末或收官总纲章末尾顺手追加新章新节，明确“原位融合 → 按学科主题归入既有主章逻辑位置 → 支线入附录/上游 → 审慎增设主章”的四级决策流程。`./tbook new-chapter` 新增互斥的 `--before <章节>` 与 `--after <章节>` 定位参数（同时支持顶层与 `--parent` 子树内插入），并在默认顶层插入时自动停在书末无编号终章／附录（含 `[numbering.unnumbered]` 顶层尾部条目）之前；`book.toml` 新增可选正整数 `book.max_chapters` 限制顶层编号主章上限，由 `./tbook check` 与 `./tbook new-chapter` 共同校验。
