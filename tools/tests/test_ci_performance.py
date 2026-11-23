@@ -604,6 +604,22 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assert_markdown_publication(result, path)
                 self.assertFalse(result["publish"])
 
+    def test_chapter_cap_inputs_select_structure_validation(self):
+        paths = {
+            "books/one/book.toml": '[book]\ntitle = "test"\nmax_chapters = 1\n[outputs]\npdf = ["screen"]\n',
+            "books/one/zh/SUMMARY.md": "# Summary\n\n- [Chapter](chapter.md)\n",
+        }
+        for path, content in paths.items():
+            with self.subTest(path=path):
+                self.base = self.git("rev-parse", "HEAD")
+                self.write(path, content)
+                self.commit()
+                result = self.make_plan()
+                self.assertEqual(result["coverage"]["normal"]["paths"], [path])
+                self.assertTrue(result["tasks"]["validate"])
+                self.assertTrue(result["selections"]["normal"]["checks"]["structure"])
+                self.assertEqual(result["selections"]["normal"]["books"], ["one"])
+
     def test_link_only_reader_keeps_static_evidence_check_without_unrelated_browser_work(self):
         import json
         name = 'books/one/viz/tests/dependencies.json'

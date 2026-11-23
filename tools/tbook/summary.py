@@ -68,6 +68,9 @@ class Summary:
     def top_level(self) -> list[Chapter]:
         return [c for c in self.chapters if c.depth == 0]
 
+    def numbered_chapter_count(self) -> int:
+        return sum(ch.depth == 0 and bool(ch.number) for ch in self.chapters)
+
     def files(self) -> list[str]:
         return [c.path for c in self.chapters if c.path]
 

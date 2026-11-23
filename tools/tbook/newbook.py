@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from . import config, paths
-from .summary import SummaryError, parse_summary
+from .summary import Chapter, Summary, SummaryError, parse_summary
 
 TEMPLATE = paths.TEMPLATES / "book"
 
@@ -75,18 +75,87 @@ def _write_book(target: Path, slug: str, titles: dict[str, str], langs: list[str
 CHAPTER_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | None = None) -> list[Path]:
-    """Append ``- [title](name.md)`` to every edition's SUMMARY and create the files.
+def _chapter_path(name: str) -> str:
+    return name if name.endswith(".md") else name + ".md"
+
+
+def _last_descendant(chapter: Chapter) -> Chapter:
+    while chapter.children:
+        chapter = chapter.children[-1]
+    return chapter
+
+
+def _summary_indent(lines: list[str], chapter: Chapter) -> str:
+    line = lines[chapter.line - 1]
+    return line[:len(line) - len(line.lstrip(" \t"))]
+
+
+def _default_top_level_position(summary: Summary, lines: list[str]) -> tuple[int, str]:
+    # Keep the trailing unnumbered list chapters together with any mdBook suffix.
+    suffix = trailing = last_list_entry = None
+    for chapter in summary.top_level():
+        if chapter.section == "suffix":
+            suffix = chapter
+            break
+        if chapter.section == "numbered":
+            last_list_entry = chapter
+            trailing = None if chapter.number else trailing or chapter
+    anchor = trailing or suffix
+    reference = trailing or last_list_entry
+    return (anchor.line - 1 if anchor else len(lines),
+            _summary_indent(lines, reference) if reference else "")
+
+
+def _chapter_position(summary: Summary, lines: list[str], parent: str | None,
+                      target: str | None, *, before: bool) -> tuple[int, str, int]:
+    where = paths.rel(summary.path)
+    if parent is not None:
+        matches = [ch for ch in summary.chapters if ch.path == parent]
+        if len(matches) != 1 or matches[0].section != "numbered":
+            raise config.ConfigError(f"{where}: parent {parent!r} must name one numbered chapter")
+        ancestor = matches[0]
+        parent_file = summary.path.parent / parent
+        if not parent_file.is_file():
+            raise config.ConfigError(f"{paths.rel(parent_file)} not found")
+        siblings = ancestor.children
+        depth = ancestor.depth + 1
+        if target is None:
+            indent = (_summary_indent(lines, siblings[-1]) if siblings else _summary_indent(lines, ancestor) + "  ")
+            return _last_descendant(ancestor).line, indent, depth
+    else:
+        if target is None:
+            insert, indent = _default_top_level_position(summary, lines)
+            return insert, indent, 0
+        siblings = [ch for ch in summary.top_level() if ch.section == "numbered"]
+        depth = 0
+
+    matches = [ch for ch in siblings if ch.path == target]
+    if len(matches) != 1:
+        option = "--before" if before else "--after"
+        scope = f"a direct child of {parent!r}" if parent is not None else "a top-level list chapter"
+        raise config.ConfigError(f"{where}: {option} target {target!r} must name one chapter that is {scope}")
+    anchor = matches[0]
+    insert = anchor.line - 1 if before else _last_descendant(anchor).line
+    return insert, _summary_indent(lines, anchor), depth
+
+
+def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | None = None,
+                before: str | None = None, after: str | None = None) -> list[Path]:
+    """Insert ``- [title](name.md)`` in every edition's SUMMARY and create the files.
 
     All or nothing: every edition is validated (title, SUMMARY.md present and parseable, chapter
     not there yet) before any file is written, so a failure leaves the book as it was.
     """
     if not CHAPTER_RE.fullmatch(name):
         raise config.ConfigError(f"chapter file name {name!r} must be kebab-case")
+    if before is not None and after is not None:
+        raise config.ConfigError("--before and --after are mutually exclusive")
     book = config.named_book(slug)
-    parent_path = parent if parent is None or parent.endswith(".md") else parent + ".md"
+    parent_path = _chapter_path(parent) if parent is not None else None
+    target = before if before is not None else after
+    target_path = _chapter_path(target) if target is not None else None
     plan = []
-    placement = None
+    primary_shape = None
     for ed in book.editions:
         title = titles.get(ed.lang) or titles.get("*")
         if not title:
@@ -101,42 +170,29 @@ def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | N
         md = ed.dir / f"{name}.md"
         if md.exists():
             raise config.ConfigError(f"{paths.rel(md)} already exists")
+        source = ed.summary.read_text(encoding="utf-8")
         try:
-            parsed = parse_summary(ed.summary, unnumbered=book.unnumbered)
-            listed = parsed.files()
+            parsed = parse_summary(ed.summary, text=source, unnumbered=book.unnumbered)
         except SummaryError as exc:
             raise config.ConfigError(f"{paths.rel(exc.path)}:{exc.line}: {exc.message}") from None
-        if f"{name}.md" in listed:
+        if f"{name}.md" in parsed.files():
             raise config.ConfigError(f"{paths.rel(ed.summary)} already lists {name}.md")
-        lines = ed.summary.read_text(encoding="utf-8").splitlines(keepends=True)
-        indent = ""
-        insert = len(lines)
-        if parent_path is not None:
-            matches = [ch for ch in parsed.chapters if ch.path == parent_path]
-            if len(matches) != 1 or matches[0].section != "numbered":
-                raise config.ConfigError(f"{paths.rel(ed.summary)}: parent {parent_path!r} must name one numbered chapter")
-            ancestor = matches[0]
-            if not (ed.dir / parent_path).is_file():
-                raise config.ConfigError(f"{paths.rel(ed.dir / parent_path)} not found")
-            # Place the new child after the whole existing subtree, before any following part.
-            start = parsed.chapters.index(ancestor)
-            last = ancestor
-            for child in parsed.chapters[start + 1:]:
-                if child.depth <= ancestor.depth:
-                    break
-                last = child
-            insert = last.line
-            source_indent = re.match(r"[ \t]*", lines[ancestor.line - 1]).group().expandtabs(4)
-            indent = source_indent + "  "
+        if parent_path is not None or target_path is not None:
             shape = [(ch.path, ch.section, ch.number, ch.depth) for ch in parsed.chapters]
-            if placement is not None and shape != placement:
-                raise config.ConfigError("edition chapter hierarchy differs; align SUMMARY.md before adding a child")
-            placement = shape
-        else:
-            # mdBook forbids a numbered chapter after an unnumbered suffix.
-            suffix = next((ch for ch in parsed.chapters if ch.section == "suffix"), None)
-            if suffix is not None:
-                insert = suffix.line - 1
+            if primary_shape is not None and shape != primary_shape:
+                raise config.ConfigError(f"{paths.rel(ed.summary)}: edition chapter hierarchy differs. "
+                                         "Align SUMMARY.md across editions before adding a chapter.")
+            primary_shape = shape
+        if parent_path is None and book.max_chapters is not None:
+            actual = parsed.numbered_chapter_count()
+            if actual >= book.max_chapters:
+                raise config.ConfigError(
+                    f"{paths.rel(ed.summary)}: adding a top-level chapter would exceed "
+                    f"book.max_chapters = {book.max_chapters} ({actual} top-level numbered chapters already). "
+                    "Use --parent <chapter> [--before|--after <sibling>] or integrate into an existing section."
+                )
+        lines = source.splitlines(keepends=True)
+        insert, indent, depth = _chapter_position(parsed, lines, parent_path, target_path, before=before is not None)
         entry = f"{indent}- [{title}]({name}.md)\n"
         if insert and not lines[insert - 1].endswith("\n"):
             entry = "\n" + entry
@@ -150,6 +206,8 @@ def new_chapter(slug: str, name: str, titles: dict[str, str], *, parent: str | N
         added = [ch for ch in generated.chapters if ch.path == f"{name}.md"]
         if len(added) != 1 or len(generated.chapters) != len(parsed.chapters) + 1:
             raise config.ConfigError("chapter title must fit on one SUMMARY link line")
+        if added[0].section != "numbered" or added[0].depth != depth:
+            raise config.ConfigError(f"{paths.rel(ed.summary)}: generated chapter has unexpected nesting")
         plan.append((ed, title, md, summary))
     created = []
     for ed, title, md, summary in plan:
