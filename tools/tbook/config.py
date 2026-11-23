@@ -64,11 +64,14 @@ def duplicates(items: list[str]) -> list[str]:
     return out
 
 
-def page_line_limit(value: Any, where: str) -> int | None:
-    """An omitted page limit preserves existing books; booleans are not integers here."""
-    if value is not None and (type(value) is not int or value <= 0):
-        raise ConfigError(f"{where}: book.max_page_lines must be a positive integer")
+def _positive_book_limit(value: Any, where: str, key: str) -> int | None:
+    if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
+        raise ConfigError(f"{where}: book.{key} must be a positive integer")
     return value
+
+
+def page_line_limit(value: Any, where: str) -> int | None:
+    return _positive_book_limit(value, where, "max_page_lines")
 
 
 def normalize_doi(value: Any, where: str = "book.doi") -> str:
@@ -464,6 +467,7 @@ class Book:
     editions: list[Edition] = field(default_factory=list)
     unnumbered: dict[str, str] = field(default_factory=dict)
     max_page_lines: int | None = None
+    max_chapters: int | None = None
 
     def edition(self, lang: str) -> Edition:
         for ed in self.editions:
@@ -572,6 +576,7 @@ def load_book(slug_or_dir: str | Path) -> Book:
         raw=raw,
         unnumbered=dict(unnumbered),
         max_page_lines=page_line_limit(meta.get("max_page_lines"), where),
+        max_chapters=_positive_book_limit(meta.get("max_chapters"), where, "max_chapters"),
     )
     book.editions = [Edition(book, lang) for lang in languages]
     return book

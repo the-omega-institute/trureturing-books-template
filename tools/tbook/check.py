@@ -683,6 +683,12 @@ def run(books: list[config.Book], *, offline: bool = False) -> list[Issue]:
         models_by_book[book.slug] = models
         for model in models.values():
             issues.extend(model.issues)
+            if book.max_chapters is not None and model.summary is not None:
+                actual = model.summary.numbered_chapter_count()
+                if actual > book.max_chapters:
+                    _err(issues, model.summary.path, 0,
+                         f"{actual} top-level numbered chapters exceed book.max_chapters = {book.max_chapters}. "
+                         "Integrate content into an existing thematic chapter (--parent) or reorganize within the cap.")
             check_env_policy(model, issues, mode=site.trureturing_mode)
             check_orphans(model, issues)
             check_headings(model, issues)
