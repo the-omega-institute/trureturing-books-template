@@ -1035,7 +1035,7 @@ class PullRequestCacheTests(unittest.TestCase):
                      dict(event="push", ref="refs/heads/feature"),
                      dict(event="workflow_dispatch", ref="refs/heads/feature")]
         runs = {"ci.yml": trusted[:4],
-                "pages.yml": [trusted[1], dict(event="workflow_run", ref="refs/heads/main")],
+                "pages.yml": [trusted[0], trusted[1], dict(event="schedule", ref="refs/heads/main")],
                 "release.yml": trusted[2:4],
                 "trureturing-bump.yml": [trusted[1], trusted[4]]}
         for name, ok in runs.items():

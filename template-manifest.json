@@ -1116,7 +1116,7 @@
       "mode": "100644"
     },
     "tools/tests/test_template.py": {
-      "sha256": "3b4ee70c10570b2e594e86fdc9a4c52e9b53581522bbd206b3e13f1894b67ec3",
+      "sha256": "33d984ffcbcfae07fbd771fabab933dc3753376fa00d6c45fc3454db7b04a073",
       "mode": "100644"
     },
     "tools/tests/test_template_layers.py": {
@@ -1124,7 +1124,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "9bbe12af9b94b0983d82a854a508156c9ccbdd6129a1aab8564bcfbb104a6f30",
+      "sha256": "9683dd6d38ccff09264eee2acbf30c0358e4093c616029bc7eaef139ea5236cd",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {

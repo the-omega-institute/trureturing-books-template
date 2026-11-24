@@ -1345,8 +1345,9 @@ class WorkflowTests(unittest.TestCase):
 
     def test_reader(self):
         _, jobs = read_workflow(WORKFLOWS / "pages.yml")
-        self.assertEqual(set(jobs), {"register", "schedule", "plan", "probe", "films", "build", "deploy", "coverage"})
-        self.assertEqual(jobs["deploy"]["permissions"], {"pages": "write", "id-token": "write"})
+        self.assertEqual(set(jobs), {"plan", "admit", "probe", "films", "build", "deploy", "coverage"})
+        self.assertEqual(jobs["deploy"]["permissions"], {"contents": "read", "deployments": "write",
+                                                      "pages": "write", "id-token": "write"})
         self.assertTrue(any(u.startswith("actions/configure-pages@") for u in jobs["build"]["uses"]), jobs["build"]["uses"])
 
 
