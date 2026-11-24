@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 import json
 from pathlib import Path
 
 from . import config, lean, model, paths, render
 
 AXIOM_STATUSES = ("free", "depends", "unknown")
+
+
+def lean_axiom_counts(envs: Iterable[model.Env], lock: lean.Lock | None) -> dict[str, int]:
+    counts = Counter(render.env_axiom_status(env, lock) for env in envs)
+    return {status: counts[status] for status in AXIOM_STATUSES}
 
 
 def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=None) -> dict:
@@ -30,7 +36,7 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
         raise config.ConfigError("\n".join(errors))
     declarations: dict[str, dict] = {}
     counts = Counter()
-    axiom_counts = Counter()
+    axiom_counts = lean_axiom_counts(ed.formal_envs(), lock)
     chapters = []
 
     def cite(gid, where):
@@ -49,9 +55,6 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
         for env in doc.envs + doc.media:
             if env in doc.envs:
                 counts[env.kind] += 1
-                axiom_status = render.env_axiom_status(env, lock)
-                if axiom_status is not None:
-                    axiom_counts[axiom_status] += 1
                 if env.status == model.WRITTEN_PROOF:
                     counts["written_proof"] += 1
                 opening = " ".join(lines[env.line - 1:env.line + 1]).lower()
@@ -81,7 +84,7 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
         groups[group].append(gid)
     counts["lean_verified"] = sum(axiom_counts.values())
     return {"schema": "tbook.statistics.v1", "book": book.slug, "lang": ed.lang,
-            "lean_axioms": {status: axiom_counts[status] for status in AXIOM_STATUSES},
+            "lean_axioms": axiom_counts,
             "environments": {k: counts[k] for k in (*model.ENV_KINDS, "lean_verified", "written_proof", "literature")},
             "total": len(declarations), "kinds": dict(sorted(kinds.items())),
             "groups": groups, "declarations": dict(sorted(declarations.items())), "chapters": chapters}

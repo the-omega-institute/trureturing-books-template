@@ -58,7 +58,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
-from . import config, lean, mathrender, mdscan, paths, releases, render
+from . import config, lean, mathrender, mdscan, paths, releases, render, stats
 from .ledger import LEDGER_FILE
 from .model import OPEN, EditionModel, Env, load_book_models
 
@@ -806,11 +806,24 @@ def footer(frame: Frame) -> str:
 
 
 def stats_html(bi: Bi, view: BookView, *, extended: bool = False) -> str:
-    """Stat tiles (number above label); LEAN ✓ in green and OPEN in red only."""
+    """The book landing page adds the evidence breakdown to its Lean total."""
     def chip(cls: str, key: str) -> str:
         return bi.span(lambda lang: esc(config.s(lang, key)), cls=f"k {cls}")
 
-    items = [("ok", chip("ok", "badge.lean") + bi.t("stat_theorems"), len(view.verified()))]
+    lean_label = chip("ok", "badge.lean") + bi.t("stat_theorems")
+    if extended:
+        primary = view.primary
+        axiom_counts = stats.lean_axiom_counts(primary.formal_envs() if primary else (), view.lock)
+        rows = "".join(
+            f'<div class="{status}"><dt>{bi.s("frozen." + status)}</dt><dd>{n}</dd></div>'
+            for status, n in axiom_counts.items()
+        )
+        lean_tile = (f'<div class="stat ok"><dt>{lean_label}</dt><dd>{sum(axiom_counts.values())}</dd>'
+                     f'<dd class="stat-breakdown"><dl>{rows}</dl></dd></div>')
+    else:
+        lean_tile = f'<div class="stat ok"><dt>{lean_label}</dt><dd>{len(view.verified())}</dd></div>'
+
+    items = []
     if extended:
         items.append(("", bi.t("stat_decls"), len(view.declarations())))
     items.append(("warn", chip("warn", "badge.open") + bi.t("stat_open"), len(view.open_items())))
@@ -818,7 +831,7 @@ def stats_html(bi: Bi, view: BookView, *, extended: bool = False) -> str:
     if extended:
         items.append(("", bi.t("stat_chapters"), view.chapters()))
     tiles = "".join(f'<div class="stat {cls}"><dt>{label}</dt><dd>{n}</dd></div>' for cls, label, n in items)
-    return f'<dl class="stats">{tiles}</dl>'
+    return f'<dl class="stats">{lean_tile}{tiles}</dl>'
 
 
 def editions_html(bi: Bi, view: BookView, prefix: str) -> str:
