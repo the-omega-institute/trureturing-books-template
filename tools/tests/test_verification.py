@@ -1035,7 +1035,7 @@ class PullRequestCacheTests(unittest.TestCase):
                      dict(event="push", ref="refs/heads/feature"),
                      dict(event="workflow_dispatch", ref="refs/heads/feature")]
         runs = {"ci.yml": trusted[:4],
-                "pages.yml": [trusted[1], dict(event="workflow_run", ref="refs/heads/main")],
+                "pages.yml": [trusted[0], trusted[1], dict(event="schedule", ref="refs/heads/main")],
                 "release.yml": trusted[2:4],
                 "trureturing-bump.yml": [trusted[1], trusted[4]]}
         for name, ok in runs.items():
@@ -1514,7 +1514,7 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         """The workflow that saves the store and renders films for it runs one run at a time; a later run
         restores what the earlier one saved instead of rendering the same film again."""
         text = (self.WORKFLOWS / "pages.yml").read_text(encoding="utf-8")
-        self.assertRegex(text, r"(?ms)^concurrency:\n  group: >-\n.*?\|\| 'pages' }}\n  cancel-in-progress: false$")
+        self.assertRegex(text, r"(?m)^concurrency:\n  group: pages\n  cancel-in-progress: false$")
 
     def publish_step(self, workflow: str) -> dict:
         steps = workflow_jobs(self.WORKFLOWS / workflow)["publish"]
