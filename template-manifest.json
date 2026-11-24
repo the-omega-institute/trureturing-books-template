@@ -36,7 +36,7 @@
       "mode": "100644"
     },
     ".github/actions/resolve-lock/action.yml": {
-      "sha256": "c61c596c7f8f8b2f631be45aadb8f94cd8013b97765f1ed2d5bbb48c0331cf45",
+      "sha256": "52a49671ef004ae733921232eb8eb11491e28747723a1eca58d9db4804702478",
       "mode": "100644"
     },
     ".github/actions/setup/action.yml": {
@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "e60e01d53570a02ed47a594fd6fea2c63f33ba7c4d4671f7268ffcc2e1c98d6f",
+      "sha256": "fceee59d01f10ee319470f7526ad634d00e651b75c4093c81f060110cd063d58",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {

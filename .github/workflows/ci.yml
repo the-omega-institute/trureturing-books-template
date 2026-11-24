@@ -131,10 +131,21 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
+      - &download-lock
+        name: Download this plan's lock snapshot
         if: needs.plan.outputs.trureturing_sha != ''
+        uses: actions/download-artifact@v7
         with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+          artifact-ids: ${{ needs.plan.outputs.lock_artifact }}
+          path: ${{ runner.temp }}/planned-lock
+          merge-multiple: true
+      - &use-lock
+        name: Use the planned trureturing commit
+        if: needs.plan.outputs.trureturing_sha != ''
+        run: |
+          snapshot="$RUNNER_TEMP/planned-lock/trureturing-lock.json"
+          jq -e --arg sha "$TBOOK_TRURETURING_SHA" '.commit == $sha' "$snapshot" >/dev/null
+          echo "TBOOK_LOCK_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
 
       - name: Materialize the complete selected plan
         # toJSON escapes string newlines; the quoted here-document keeps data inert.
@@ -291,10 +302,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
       - name: Materialize the selected plan and browser shard
         run: |
           cat <<'TBOOK_PLAN_JSON' > "$RUNNER_TEMP/ci-plan.json"
@@ -332,10 +341,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
       - name: Set up capture tools
         uses: ./.github/actions/setup
         with:
@@ -386,10 +393,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -504,10 +509,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -545,10 +548,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -587,10 +588,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
 
       - name: Materialize the complete selected plan
         # toJSON escapes string newlines; the quoted here-document keeps data inert.
@@ -691,10 +690,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
-      - uses: ./.github/actions/resolve-lock
-        if: needs.plan.outputs.trureturing_sha != ''
-        with:
-          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
+      - *download-lock
+      - *use-lock
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
