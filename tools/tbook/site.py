@@ -1561,7 +1561,8 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None,
     return {
         "schema": SCHEMA,
         **({"release_pdf_digest": releases.pdf_digest(release_pdfs)} if release_pdfs is not None else {}),
-        **({"release_film_digest": releases.asset_digest(releases.film_assets(site.repo))} if site.film_release_only else {}),
+        **({"release_film_digest": releases.asset_digest(releases.film_assets(site.repo))} if site.film_release_only
+           and any(v.media.get("films") for v in views) else {}),
         "generated_at": _generated_at(),
         "site": {"title": {lang: site.text(site.title, lang) for lang in site.languages},
                  "languages": site.languages, "base_url": site.base_url or None, "repo": site.repo or None},

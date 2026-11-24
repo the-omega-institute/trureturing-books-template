@@ -368,7 +368,9 @@ class ValidationTest(unittest.TestCase):
         # the films page and the engine data never present the definition as verified
         created[0].write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
         f = film.get(self.book, "002-carry-rules")
-        card = film._film_card(config.load_site(), f, fake_lock())
+        site = dataclasses.replace(config.load_site(), film_release_only=True)
+        with mock.patch.object(film.releases, "film_assets", side_effect=AssertionError("unexpected network lookup")):
+            card = film._film_card(site, f, fake_lock())
         self.assertEqual(card.count('<span class="k ok">LEAN ✓</span>'), 1)
         self.assertIn('<li><span class="k">LEAN</span><a href="https://github.com/the-omega-institute/trureturing/blob/'
                       + "a" * 40 + '/D5/S1/Deficit/DeficitInteger.lean#L7"', card)

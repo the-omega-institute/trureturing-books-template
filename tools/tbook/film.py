@@ -1255,7 +1255,8 @@ def _google_fonts() -> str:
         return ""
 
 
-def _film_card(site: config.Site, film: Film, lock: lean.Lock | None, built: bool = False) -> str:
+def _film_card(site: config.Site, film: Film, lock: lean.Lock | None, built: bool = False,
+               downloads: dict[str, str] | None = None) -> str:
     """One film on the films page; ``built``: its videos are published next to the page (``<name>/<file>``)."""
     meta = film.meta or {}
     poster = f"{film.id}/{POSTER}" if film.poster.is_file() else ""
@@ -1288,10 +1289,9 @@ def _film_card(site: config.Site, film: Film, lock: lean.Lock | None, built: boo
         lean_block = f'<div class="lean"><h4>{_pair(title_key)}</h4><ul>{"".join(refs)}</ul></div>'
     links = []
     if site.film_release_only:
-        urls = _release_urls(site, film)
         for key, label in DOWNLOADS:
-            if key in urls:
-                links.append(f'<a class="btn" href="{esc(urls[key])}" type="video/mp4">⬇ MP4 · {_pair(label)}</a>')
+            if downloads and key in downloads:
+                links.append(f'<a class="btn" href="{esc(downloads[key])}" type="video/mp4">⬇ MP4 · {_pair(label)}</a>')
         if not built:
             links.append(f'<span class="note">{_pair("unbuilt")}</span>')
     elif built:  # the videos film.json lists, the narrated one to download first (1080p when listed), then the cover
@@ -1341,7 +1341,9 @@ def hub_html(site: config.Site, book: config.Book, lock: lean.Lock | None = None
     title_zh, title_en = config.pick(book.title, "zh", book.languages), config.pick(book.title, "en", book.languages)
     films_zh, films_en = config.s("zh", "ui.films"), config.s("en", "ui.films")
     fonts = _google_fonts()
-    cards = "\n".join(_film_card(site, f, lock, f.id in built) for f in all_films) or f'<p class="note">{_pair("none")}</p>'
+    cards = "\n".join(_film_card(site, f, lock, f.id in built,
+                                 _release_urls(site, f) if site.film_release_only else None)
+                      for f in all_films) or f'<p class="note">{_pair("none")}</p>'
     pin = ""
     if lock:
         pin = (f'<a class="pill" href="{esc(lock.tree_url)}" target="_blank" rel="noopener">LEAN '

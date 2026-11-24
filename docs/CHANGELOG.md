@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.21.1] - 2026-11-25
+
+- 启用影片 Release 模式时，空书库可离线组装站点。渲染独立影片卡片时使用发布环节提供的下载链接。
+
 ## [1.21.0] - 2026-11-25
 
 - 书库可在 `site.toml` 的 `[site]` 中开启 `film_release_only = true`。章节与影片页用 Media Chrome 播放同源 MP3，Canvas 按音轨时间绘制镜头。书籍 Release 附上所选影片的 MP4。模板默认沿用站内 MP4。
