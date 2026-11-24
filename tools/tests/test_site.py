@@ -339,6 +339,26 @@ class SiteBuildTest(SiteCase):
         self.assertIn("test-book/slides/overview/test-book-overview-zh.pdf", files)
         self.assertIn("test-book/cover-zh.png", files)
 
+    def test_book_landing_shows_lean_axiom_counts(self):
+        book = make_book(self.tmp)
+        lock = site_lock()
+        lock.declarations[GID_3V]["axioms"] = []
+        for edition in book.editions:
+            chapter = edition.dir / "ch01.md"
+            with chapter.open("a", encoding="utf-8") as target:
+                target.write(f'\n::: {{.theorem #thm-c lean="{GID_3V} {GID_INT}"}}\nZ\n:::\n')
+        out = self.run_build([book], lock=lock)
+
+        for lang in ("zh", "en"):
+            landing = (out / lang / book.slug / "index.html").read_text()
+            breakdown = landing.split('<dd class="stat-breakdown">', 1)[1].split("</dl>", 1)[0]
+            for status, count in (("free", 1), ("depends", 0), ("unknown", 2)):
+                row = breakdown.split(f'<div class="{status}">', 1)[1].split("</div>", 1)[0]
+                self.assertIn(config.s(lang, "frozen." + status), row)
+                self.assertIn(f"<dd>{count}</dd>", row)
+            self.assertIn('<dd>3</dd><dd class="stat-breakdown">', landing)
+        self.assertNotIn('class="stat-breakdown"', (out / "index.html").read_text())
+
     def test_academic_pdf_is_downloadable_and_in_manifest(self):
         book = make_book(self.tmp)
         fake_build(self.build_root, book)

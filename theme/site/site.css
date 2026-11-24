@@ -254,6 +254,15 @@ a.pill:hover { border-color: var(--tr-cyan); color: var(--tr-cyan); }
 .stat.ok dd { color: var(--tr-ok); text-shadow: var(--tr-fx-glow-ok); }
 .stat.warn { border-left-color: var(--tr-warn); }
 .stat.warn dd { color: var(--tr-warn); }
+.stat > .stat-breakdown {
+  order: -1; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--edge); text-shadow: none;
+}
+.stat-breakdown dl { display: grid; gap: 3px; margin: 0; }
+.stat-breakdown dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.stat-breakdown dt { display: block; white-space: normal; }
+.stat.ok .stat-breakdown dd { font-size: 12px; color: var(--tr-ink); text-shadow: none; }
+.stat.ok .stat-breakdown .free dd { color: var(--tr-axiom-free); }
+.stat.ok .stat-breakdown .depends dd { color: var(--tr-ok); }
 
 /* editions: one row per language edition; the row in the interface language is the current selection (amber) */
 .eds { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -443,6 +452,7 @@ details.more-items > summary { cursor: pointer; color: var(--tr-cyan); font-fami
   .book .cover-link img, .book .cover-link .cover-css { width: min(58%, 220px); height: auto; border: 1px solid var(--hot); }
   .stat { flex: 1 1 calc(33% - 8px); min-width: 0; padding-inline: 8px 6px; }
   .stat dt { white-space: normal; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .stat:has(> .stat-breakdown) { flex-basis: 100%; }
   .book .body { padding: 14px 14px 16px; }
   .book-hero { grid-template-columns: minmax(0, 1fr); }
   .book-hero .cover { border-right: 0; border-bottom: 1px solid var(--edge); padding: 20px 0; }
