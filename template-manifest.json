@@ -372,11 +372,11 @@
       "mode": "100644"
     },
     "theme/film/site/player.html": {
-      "sha256": "ccbcc1cd45b61e0cc803f83ed4321fa3eff4a90df6ce40cdd3c50b4ae34e87d1",
+      "sha256": "f91f83ac6f2cb7baa1321797dce4567ffdef3c01ae5a14b688b14939cfb472bd",
       "mode": "100644"
     },
     "theme/film/site/player.js": {
-      "sha256": "d428e32cc02df5de62daabf35241d0a07dc85795d996a144ccaaff150662e86d",
+      "sha256": "8a14e7acf4125d90b96eb70d8db6566ea886de9259455a892b780714a116b33d",
       "mode": "100644"
     },
     "theme/film/tts.py": {

@@ -1,6 +1,8 @@
 // Media Chrome owns the transport and fullscreen controls. Sample the audio
 // clock directly so a seek, stall or rate change always lands on the same frame.
 (() => {
+  const controller = document.querySelector('media-controller');
+  controller.fullscreenElement = document.getElementById('stage');
   const audio = document.querySelector('audio');
   const cover = document.getElementById('cover');
   const alert = document.getElementById('error');
