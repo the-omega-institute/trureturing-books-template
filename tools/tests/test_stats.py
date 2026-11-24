@@ -60,6 +60,34 @@ Open.
             self.assertEqual(data['chapters'][0]['top'], data['chapters'][1]['top'])
             self.assertEqual([c['via'] for c in data['declarations'][A]['citations']], ['environment', 'inline'])
 
+    def test_axiom_breakdown_counts_theorem_environments_by_badge(self):
+        with Repo() as repo:
+            book = repo.book()
+            evidence_lock = lock()
+            evidence_lock.declarations[A]["axioms"] = []
+            evidence_lock.declarations[B]["axioms"] = ["Quot.sound"]
+            old = "D5/S3/Test.historical"
+            evidence_lock.declarations[old] = {"module": "D5/S3/Test", "name": "historical", "kind": "theorem"}
+            citations = [(A,), (A,), (A, B, old), (A, old), (D,)]
+            boxes = [
+                f'::: {{.theorem #result-{index} lean="{" ".join(gids)}"}}\nResult.\n:::\n'
+                for index, gids in enumerate(citations)
+            ]
+            write(book.editions[0].dir / "ch01.md", "# One\n\n" + "\n".join(boxes))
+            data = stats.collect(book, lock=evidence_lock)
+
+            self.assertEqual(data["lean_axioms"], {"free": 2, "depends": 1, "unknown": 1})
+            self.assertEqual(data["environments"]["lean_verified"], 4)
+            for lang in ("zh", "en"):
+                for view in ("summary", "evidence"):
+                    _, rows = stats.table(data, view, lang)
+                    total = rows.index([config.s(lang, "stats.verified"), 4])
+                    self.assertEqual(rows[total + 1:total + 4], [
+                        [config.s(lang, "frozen.free"), 2],
+                        [config.s(lang, "frozen.depends"), 1],
+                        [config.s(lang, "frozen.unknown"), 1],
+                    ])
+
     def test_unresolved_citation_fails_instead_of_inflating_verified_totals(self):
         with Repo() as repo:
             book = repo.book()

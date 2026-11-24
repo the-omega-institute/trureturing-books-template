@@ -8,6 +8,8 @@ from pathlib import Path
 
 from . import config, lean, model, paths, render
 
+AXIOM_STATUSES = ("free", "depends", "unknown")
+
 
 def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=None) -> dict:
     """Count the authoritative edition. Exclude index citations, retaining its authored environments.
@@ -28,6 +30,7 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
         raise config.ConfigError("\n".join(errors))
     declarations: dict[str, dict] = {}
     counts = Counter()
+    axiom_counts = Counter()
     chapters = []
 
     def cite(gid, where):
@@ -46,8 +49,9 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
         for env in doc.envs + doc.media:
             if env in doc.envs:
                 counts[env.kind] += 1
-                if render.env_verified(env, lock):
-                    counts["lean_verified"] += 1
+                axiom_status = render.env_axiom_status(env, lock)
+                if axiom_status is not None:
+                    axiom_counts[axiom_status] += 1
                 if env.status == model.WRITTEN_PROOF:
                     counts["written_proof"] += 1
                 opening = " ".join(lines[env.line - 1:env.line + 1]).lower()
@@ -75,7 +79,9 @@ def collect(book: config.Book, *, exclude: tuple[str, ...] | None = None, lock=N
         env = any(c["via"] == "environment" for c in d["citations"])
         group = ("theorems" if d["kind"] == "theorem" else "definitions") if env else "inline"
         groups[group].append(gid)
+    counts["lean_verified"] = sum(axiom_counts.values())
     return {"schema": "tbook.statistics.v1", "book": book.slug, "lang": ed.lang,
+            "lean_axioms": {status: axiom_counts[status] for status in AXIOM_STATUSES},
             "environments": {k: counts[k] for k in (*model.ENV_KINDS, "lean_verified", "written_proof", "literature")},
             "total": len(declarations), "kinds": dict(sorted(kinds.items())),
             "groups": groups, "declarations": dict(sorted(declarations.items())), "chapters": chapters}
@@ -137,7 +143,11 @@ def table(data: dict, view: str, lang: str, group: str = "all") -> tuple[list[st
     options({"src": view, "group": group})
     s = lambda key: config.s(lang, "stats." + key)
     counts = data["environments"]
+    axiom_counts = data.get("lean_axioms")
+    axiom_rows = ([[config.s(lang, "frozen." + status), axiom_counts[status]] for status in AXIOM_STATUSES]
+                  if axiom_counts is not None else [])
     evidence_rows = [[s("verified"), counts["lean_verified"]],
+                     *axiom_rows,
                      [s("written"), counts["written_proof"]],
                      [s("open"), counts["conjecture"] + counts["problem"]],
                      [s("definitions"), counts["definition"]]]

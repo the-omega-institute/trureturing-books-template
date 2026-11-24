@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -104,11 +104,11 @@
       "mode": "100644"
     },
     "docs/AUTHORING.md": {
-      "sha256": "bd21e947888a69e58c43836ab97929ac95298393268734e10b3338398b3cf28a",
+      "sha256": "ce38b8bc0ae8f04e3aa1167ffde835c7aba8755023caaee1b1caa87136fc50d3",
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "e3e5663ce32c80f1978fccdce947c9014429c31f398f7b8d25a33d021d143511",
+      "sha256": "fa8a79b1ba592196f85fd3fed772a6589cf2b50295803dcf62c62e1f8585062c",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -856,7 +856,7 @@
       "mode": "100644"
     },
     "tools/tbook/render.py": {
-      "sha256": "c0515a9887d59a7b309d01bc21bf530f98a8474907b6e334377af77104465935",
+      "sha256": "9853fe73433724a9b59acbcb044de5275984c9d0dcddd02928a73d8ac76d74cb",
       "mode": "100644"
     },
     "tools/tbook/requests.py": {
@@ -876,7 +876,7 @@
       "mode": "100644"
     },
     "tools/tbook/stats.py": {
-      "sha256": "81ee44d1070b2d27b65f67e03d56950724736d6990960f5d3cf56d421590decd",
+      "sha256": "6b8c742849148f5e9f1308cd04da15fe7798895fb720e61128d4eae82ad15a4f",
       "mode": "100644"
     },
     "tools/tbook/summary.py": {
@@ -1104,7 +1104,7 @@
       "mode": "100644"
     },
     "tools/tests/test_stats.py": {
-      "sha256": "52600b5ad36db21f7536f0e8e2b752ed6ff55626536a7dcf3eff27607c84101e",
+      "sha256": "fd03808728376c3dcdb9bfdc86ae53bdedfd28b7beaf29d3b77af8b1f640c700",
       "mode": "100644"
     },
     "tools/tests/test_still_cache.py": {

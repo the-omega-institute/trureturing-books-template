@@ -161,9 +161,24 @@ def lean_verified(views: list[dict]) -> bool:
     return bool(views) and all(v["resolved"] and v["kind"] in lean.FORMAL_KINDS for v in views)
 
 
+def _axiom_status(views: list[dict]) -> str:
+    statuses = {v["axiom_status"] for v in views}
+    if "depends" in statuses:
+        return "depends"
+    return "free" if statuses == {"free"} else "unknown"
+
+
+def env_axiom_status(env: Env, lock: lean.Lock | None) -> str | None:
+    """Classify an environment's Lean badge. None means it has no verified Lean badge."""
+    if env.kind not in FORMAL or env.status != "lean":
+        return None
+    views = [lean_view(g, lock) for g in env.lean]
+    return _axiom_status(views) if lean_verified(views) else None
+
+
 def env_verified(env: Env, lock: lean.Lock | None) -> bool:
-    """A formal environment the build shows as LEAN ✓: its citations pass :func:`lean_verified`."""
-    return env.kind in FORMAL and env.status == "lean" and lean_verified([lean_view(g, lock) for g in env.lean])
+    """A formal environment the build shows as LEAN ✓."""
+    return env_axiom_status(env, lock) is not None
 
 
 def verified_envs(envs: list[Env], lock: lean.Lock | None) -> list[Env]:
@@ -247,12 +262,10 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
             badge = config.s(lang, "badge.lean")
             title_key = "badge.lean_source_title" if ctx.lock and ctx.lock.mode == "lean-source" else "badge.lean_title"
             badge_title = config.s(lang, title_key)
-            statuses = {v["axiom_status"] for v in leans}
-            axiom_free = statuses == {"free"}
-            if "depends" in statuses:
-                badge += " · " + config.s(lang, "frozen.depends")
-            elif axiom_free:
-                badge += " · " + config.s(lang, "frozen.free")
+            axiom_status = _axiom_status(leans)
+            axiom_free = axiom_status == "free"
+            if axiom_status != "unknown":
+                badge += " · " + config.s(lang, "frozen." + axiom_status)
         else:
             # The build never claims what the lock cannot back: red UNVERIFIED, as the slides do.
             unverified = True
