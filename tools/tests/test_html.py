@@ -688,7 +688,7 @@ class BuildExampleTest(unittest.TestCase):
             for page in self.pages(ed.lang):
                 if page.name == "print.html":
                     continue
-                for m in re.finditer(r'<section class="tr-env [^"]*tr-status-lean" id="([^"]+)"[^>]*>\s*'
+                for m in re.finditer(r'<section class="tr-env [^"]*tr-status-lean(?: tr-axiom-free)?" id="([^"]+)"[^>]*>\s*'
                                      r'<header class="tr-env-head">.*?<a class="tr-badge tr-badge-lean" href="([^"]+)"',
                                      self.main(page), re.S):
                     seen.add(m.group(1))

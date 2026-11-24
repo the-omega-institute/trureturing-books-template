@@ -8,7 +8,8 @@
  *                                   ayu: deep space, darker canvas)
  *   light · rust                  → paper palette (rust: warm paper)
  *
- * Colour semantics: green (ok) only for Lean-verified; amber for the current selection
+ * Lean verification uses green (ok), with blue for documented axiom-free results.
+ * Amber is for the current selection
  * and focus; red (warn) for open problems; violet for argued-but-not-verified.
  */
 
@@ -406,6 +407,7 @@ code.katex-fallback[data-display] { display: block; padding: 0.6em 0.9em; white-
 }
 html.light .tr-env::before, html.rust .tr-env::before, html.coal .tr-env::before { box-shadow: none; }
 .tr-env.tr-status-lean { --tr-env-accent: var(--tr-ok); }
+.tr-env.tr-status-lean.tr-axiom-free { --tr-env-accent: var(--tr-axiom-free); }
 .tr-env.tr-status-open { --tr-env-accent: var(--tr-warn); }
 .tr-env.tr-status-definition { --tr-env-accent: var(--tr-cyan); }
 .tr-env.tr-status-informal { --tr-env-accent: var(--tr-dim); background: color-mix(in srgb, var(--tr-env-bg, var(--tr-panel)) 55%, transparent); }
@@ -456,10 +458,10 @@ html.light .tr-env::before, html.rust .tr-env::before, html.coal .tr-env::before
   white-space: nowrap;
   text-decoration: none;
 }
-.tr-badge-lean { color: var(--tr-ok) !important; background: color-mix(in srgb, var(--tr-ok) 9%, transparent); }
+.tr-badge-lean { color: var(--tr-env-accent) !important; background: color-mix(in srgb, var(--tr-env-accent) 9%, transparent); }
 .tr-badge-open { color: var(--tr-warn) !important; background: color-mix(in srgb, var(--tr-warn) 9%, transparent); }
-a.tr-badge-lean:hover { box-shadow: var(--tr-fx-glow-ok); text-decoration: none; }
-html.light a.tr-badge-lean:hover, html.rust a.tr-badge-lean:hover, html.coal a.tr-badge-lean:hover { box-shadow: none; background: color-mix(in srgb, var(--tr-ok) 16%, transparent); }
+a.tr-badge-lean:hover { box-shadow: 0 0 12px color-mix(in srgb, var(--tr-env-accent) 35%, transparent); text-decoration: none; }
+html.light a.tr-badge-lean:hover, html.rust a.tr-badge-lean:hover, html.coal a.tr-badge-lean:hover { box-shadow: none; background: color-mix(in srgb, var(--tr-env-accent) 16%, transparent); }
 
 .tr-env-lean {
   display: flex; flex-wrap: wrap; gap: 0.3em 1em;

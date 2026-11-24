@@ -8,8 +8,8 @@
  *
  * Reading-system themes own the page: no page background and no body text colour are set
  * here; only accents (links, environment frames, badges, tables) use the palette.
- * Colour semantics (shared with theme/mdbook/tr-book.css): --tr-ok = Lean-verified only
- * (badge and frame of formal results); --tr-warn = open; --tr-dim = informal remarks and
+ * Lean-verified badges and frames use --tr-ok, with --tr-axiom-free for documented axiom-free
+ * results. --tr-warn = open; --tr-dim = informal remarks and
  * proofs; --tr-cyan = labels, structure and links.
  */
 
@@ -141,6 +141,7 @@ section.tr-env {
 :root section.tr-env p:last-child { margin-bottom: 0; }
 
 section.tr-status-lean { border-left-color: var(--tr-ok); }
+section.tr-status-lean.tr-axiom-free { border-left-color: var(--tr-axiom-free); }
 section.tr-status-definition { border-left-color: var(--tr-cyan); }
 section.tr-status-open { border-left-color: var(--tr-warn); }
 section.tr-status-informal {
@@ -160,7 +161,7 @@ header.tr-env-head {
   letter-spacing: 0.01em;
   color: var(--tr-cyan);
 }
-/* labels stay cyan; green marks only the LEAN ✓ badge and frame (as in theme/mdbook) */
+/* The label stays cyan while the frame and badge show the verification colour. */
 .tr-status-open .tr-env-label { color: var(--tr-warn); }
 .tr-status-informal .tr-env-label { color: var(--tr-dim); }
 .tr-env-title { font-weight: 600; }
@@ -179,6 +180,7 @@ header.tr-env-head {
   white-space: nowrap;
 }
 .tr-badge-lean { color: var(--tr-ok); }
+.tr-axiom-free .tr-badge-lean { color: var(--tr-axiom-free); }
 .tr-badge-open { color: var(--tr-warn); }
 
 footer.tr-env-lean {

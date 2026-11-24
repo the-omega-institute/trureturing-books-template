@@ -11,7 +11,8 @@
 // and `horizontalrule`, which Pandoc's Typst writer emits for `---`.
 //
 // Colours come only from theme/generated/tokens.typ (tr-screen / tr-paper). Semantics:
-// green (ok) = Lean-verified only (LEAN ✓ badge, frame of formal results, ledger kicker),
+// green (ok) = Lean-verified (LEAN ✓ badge, frame of formal results, ledger kicker),
+// blue = LEAN ✓ badge and frame for documented axiom-free results,
 // red (warn) = open problems, dim = informal remarks and proofs, cyan = labels, links and
 // structure, magenta = decorative accents. Amber ("now") and violet ("argued") have no
 // role in a static book and are not used.
@@ -136,8 +137,9 @@
 
 // badge-url: where the badge links ("" for none; tools/filters/tr-env.lua passes it, so an
 // UNVERIFIED badge never links even when the footer links a declaration the lock resolves).
-#let tr-env(kind: "", status: "", label: "", number: "", ref: "", title: none, badge: "", badge-url: "", lean: (), id: "", body) = {
-  let c = status-colour(status)
+#let tr-env(kind: "", status: "", label: "", number: "", ref: "", title: none,
+  badge: "", badge-url: "", axiom-free: false, lean: (), id: "", body) = {
+  let c = if axiom-free { pal.axiom-free } else { status-colour(status) }
   let light = status == "informal"
   let head = {
     text(font: f-display, weight: "bold", fill: label-colour(status), size: 0.95em, tracking: 0.02em, ref)

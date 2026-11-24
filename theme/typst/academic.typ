@@ -87,7 +87,7 @@
 }
 
 #let tr-env(kind: "", status: "", label: "", number: "", ref: "", title: none,
-  badge: "", badge-url: "", lean: (), id: "", body) = {
+  badge: "", badge-url: "", axiom-free: false, lean: (), id: "", body) = {
   block(width: 100%, above: 1.15em, below: 1em, breakable: true, {
     set par(first-line-indent: 0pt)
     block(below: 0.4em, sticky: true, {
@@ -95,8 +95,14 @@
       if title != none { text([#S.title_open#title#S.title_close]) }
       if badge != "" {
         h(0.7em)
-        let mark = box(text(size: 7pt,
-          fill: if status == "lean" { tr-paper.ok } else if status == "open" { tr-paper.warn } else if status == "written-proof" { tr-paper.violet } else { secondary }, badge))
+        let mark-colour = if axiom-free { tr-paper.axiom-free } else if status == "lean" {
+          tr-paper.ok
+        } else if status == "open" {
+          tr-paper.warn
+        } else if status == "written-proof" {
+          tr-paper.violet
+        } else { secondary }
+        let mark = box(text(size: 7pt, fill: mark-colour, badge))
         if status == "lean" and badge-url != "" { link(badge-url, mark) } else { mark }
       }
     })
