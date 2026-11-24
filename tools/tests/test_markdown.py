@@ -408,14 +408,20 @@ class UnverifiedBadgeTests(unittest.TestCase):
             env = repo.model.envs["thm-ok"]
             row = lock.declarations[GID_OK]
             row.update(axioms=[], libraries=["Mathlib"])
-            for target in ("mdbook", "pandoc"):
-                self.assertIn("LEAN ✓ · 无公理", repo.render("ch01.md", target, lock)[0])
+            mdbook, _ = repo.render("ch01.md", "mdbook", lock)
+            self.assertIn('class="tr-env tr-theorem tr-status-lean tr-axiom-free"', mdbook)
+            self.assertIn("LEAN ✓ · 无公理", mdbook)
+            pandoc, _ = repo.render("ch01.md", "pandoc", lock)
+            self.assertIn('tr-axiom-free="1"', pandoc)
+            self.assertIn("LEAN ✓ · 无公理", pandoc)
             env.lean.append(GID_DEF)
             second = lock.declarations[GID_DEF]
             second.update(kind="theorem", libraries=["OmegaMath"])
-            self.assertEqual(render.env_view(env, repo.ctx(lock=lock))["badge"], "LEAN ✓")
+            view = render.env_view(env, repo.ctx(lock=lock))
+            self.assertEqual((view["badge"], view["axiom_free"]), ("LEAN ✓", False))
             second["axioms"] = ["Quot.sound"]
-            self.assertEqual(render.env_view(env, repo.ctx(lock=lock))["badge"], "LEAN ✓ · 依赖公理")
+            view = render.env_view(env, repo.ctx(lock=lock))
+            self.assertEqual((view["badge"], view["axiom_free"]), ("LEAN ✓ · 依赖公理", False))
             self.assertIn("依赖公理 (`Quot.sound`)", ledger.ledger_markdown(repo.model, lock))
             del row["axioms"]
             self.assertIn("公理依赖未知", ledger.ledger_markdown(repo.model, lock))

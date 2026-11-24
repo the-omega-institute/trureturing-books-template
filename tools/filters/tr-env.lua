@@ -178,6 +178,7 @@ local function render_typst(div, a)
     "lean: " .. typst_lean(lean_entries(a)),
     "id: " .. typst_str(id),
   }
+  if a["tr-axiom-free"] == "1" then args[#args + 1] = "axiom-free: true" end
   local out = pandoc.Blocks({ pandoc.RawBlock("typst", "#tr-env(" .. table.concat(args, ", ") .. ")[") })
   out:extend(div.content)
   out:insert(pandoc.RawBlock("typst", "]" .. typst_label(id)))
@@ -192,6 +193,7 @@ local function render_html(div, a)
   local unverified = (a["tr-unverified"] or "") ~= ""
   local classes = { "section", "tr-env", "tr-" .. kind, "tr-status-" .. status }
   if unverified then classes[#classes + 1] = "tr-unverified" end
+  if a["tr-axiom-free"] == "1" then classes[#classes + 1] = "tr-axiom-free" end
   local attr = pandoc.Attr(div.identifier, classes, { { "data-kind", kind } })
 
   if kind == "proof" then

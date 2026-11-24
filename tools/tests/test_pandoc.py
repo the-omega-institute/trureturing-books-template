@@ -715,6 +715,14 @@ class LuaFilterTest(unittest.TestCase):
         self.assertIn('<span class="tr-dangling">nothing</span>', out)
         self.assertIn('<a href="#thm-x">the theorem</a>', out)
 
+    def test_axiom_free_badge_style(self):
+        source = ENV_MD.replace('tr-status="lean"', 'tr-status="lean" tr-axiom-free="1"')
+        epub = run_filters(source, "html5", self.META)
+        self.assertIn('class="tr-env tr-theorem tr-status-lean tr-axiom-free"', epub)
+        self.assertIn('href="https://example.org/X.lean#L3" class="tr-badge tr-badge-lean"', epub)
+        typst = run_filters(source, "typst", self.META)
+        self.assertIn('id: "thm-x", axiom-free: true', typst)
+
     def test_generic_fallback(self):
         out = run_filters(ENV_MD, "markdown", self.META)
         self.assertIn("**Theorem 1.2** (Bound on $c$)", out)

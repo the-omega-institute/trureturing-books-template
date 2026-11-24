@@ -157,7 +157,7 @@ def lean_view(gid: str, lock: lean.Lock | None) -> dict:
 
 
 def lean_verified(views: list[dict]) -> bool:
-    """True when every cited declaration resolves in the lock to a Lean theorem (the green badge)."""
+    """True when every cited declaration resolves in the lock to a Lean theorem."""
     return bool(views) and all(v["resolved"] and v["kind"] in lean.FORMAL_KINDS for v in views)
 
 
@@ -239,6 +239,7 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
     status = env.status
     leans = [lean_view(g, ctx.lock) for g in env.lean] if status != "written-proof" else []
     unverified = False
+    axiom_free = False
     if status == "written-proof":
         badge, badge_title = config.s(lang, "badge.written_proof"), config.s(lang, "badge.written_proof_title")
     elif env.kind in FORMAL:
@@ -247,9 +248,10 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
             title_key = "badge.lean_source_title" if ctx.lock and ctx.lock.mode == "lean-source" else "badge.lean_title"
             badge_title = config.s(lang, title_key)
             statuses = {v["axiom_status"] for v in leans}
+            axiom_free = statuses == {"free"}
             if "depends" in statuses:
                 badge += " · " + config.s(lang, "frozen.depends")
-            elif statuses == {"free"}:
+            elif axiom_free:
                 badge += " · " + config.s(lang, "frozen.free")
         else:
             # The build never claims what the lock cannot back: red UNVERIFIED, as the slides do.
@@ -272,6 +274,7 @@ def env_view(env: Env, ctx: RenderContext) -> dict:
         "title_text": title,  # plain text
         "status": status,
         "unverified": unverified,
+        "axiom_free": axiom_free,
         "badge": badge,
         "badge_title": badge_title,
         "badge_url": badge_url,
@@ -455,7 +458,11 @@ def esc(text: str) -> str:
 
 def mdbook_env(env: Env, view: dict, inner: str) -> str:
     """HTML wrapper understood by theme/mdbook/tr-book.css (blank lines keep Markdown inside)."""
-    classes = f"tr-env tr-{env.kind} tr-status-{view['status']}" + (" tr-unverified" if view.get("unverified") else "")
+    classes = f"tr-env tr-{env.kind} tr-status-{view['status']}"
+    if view["unverified"]:
+        classes += " tr-unverified"
+    if view["axiom_free"]:
+        classes += " tr-axiom-free"
     head = [f'<span class="tr-env-label">{esc(view["ref_text"])}</span>']
     if env.kind == "proof":
         head = [f'<span class="tr-env-label">{esc(view["label"])}</span>']
@@ -561,8 +568,10 @@ def pandoc_env(env: Env, view: dict, inner: str) -> str:
         kv["tr-badge-title"] = view["badge_title"]
         if view.get("badge_url"):
             kv["tr-badge-url"] = view["badge_url"]
-    if view.get("unverified"):
+    if view["unverified"]:
         kv["tr-unverified"] = "1"
+    if view["axiom_free"]:
+        kv["tr-axiom-free"] = "1"
     if view["lean"]:
         kv["tr-lean"] = " ".join(lv["gid"] for lv in view["lean"])
         kv["tr-lean-name"] = " ".join(lv["name"] or lv["gid"] for lv in view["lean"])

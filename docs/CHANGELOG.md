@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.17.0] - 2026-11-24
+
+- HTML、PDF 和 EPUB 的 Lean 定理徽章用蓝色标记冻结记录明确无公理的结果。一个定理框引用多条声明时，每条都明确无公理才显示蓝色。
+
 ## [1.16.0] - 2026-11-24
 
 - 定理框与书末验证账本读取冻结声明的 `axioms`，区分无公理、实际依赖公理以及缺少测量记录。深度验证核对显式记录的公理集合。已有固定锁可用 `./tbook pin --refresh` 同步注记。
