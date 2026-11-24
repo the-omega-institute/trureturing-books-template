@@ -10,6 +10,8 @@ base_url = ""
 languages = ["zh", "en"]
 # 设为 true 后，书籍与演示文稿 PDF 随 Release 发布，Pages 只提供 Release 附件链接。
 # pdf_release_only = true
+# 开启后 Pages 实时绘制影片，完整 MP4 随书籍 Release 发布。
+# film_release_only = true
 
 [site.title]
 zh = "trureturing 书库"

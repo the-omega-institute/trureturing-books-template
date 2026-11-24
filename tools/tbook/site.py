@@ -393,13 +393,13 @@ def _media_module(part: str):
         return None
 
 
-def _items(part: str, book: config.Book) -> list[dict]:
+def _items(part: str, book: config.Book, site: config.Site) -> list[dict]:
     mod = _media_module(part)
     fn = getattr(mod, "items", None) if mod else None
     if fn is None:
         return []
     try:
-        items = fn(book)
+        items = fn(book, site=site) if part == "films" else fn(book)
     except NotImplementedError:
         return []
     except Exception as exc:  # noqa: BLE001
@@ -432,7 +432,7 @@ def collect(site: config.Site, book: config.Book, bdir: Path, lock: lean.Lock | 
                 found.append(Download(kind, variant, name, f.stat().st_size))
         view.downloads[ed.lang] = found
     for part in MEDIA_PARTS:
-        view.media[part] = [i for i in _items(part, book) if _item_published(bdir, part, i)]
+        view.media[part] = [i for i in _items(part, book, site) if _item_published(bdir, part, i)]
     return view
 
 
@@ -500,7 +500,7 @@ _BOOK_PATH_TAG_RE = re.compile(r'<(?:iframe|video|source)\b(?=(?:[^>"]|"[^"]*")*
 _FILM_FIGURE_RE = re.compile(r'(<figure\b(?=(?:[^>"]|"[^"]*")*\sdata-tr-video=")(?:[^>"]|"[^"]*")*>)((?:(?!</figure\b).)*)',
                              re.I | re.S)
 # the start tag of the embed's player (tbook.film _local_player)
-_FILM_PLAYER_RE = re.compile(r'<video\b(?=(?:[^>"]|"[^"]*")*\sclass="[^"]*\btr-film-player\b)(?:[^>"]|"[^"]*")*>', re.I)
+_FILM_PLAYER_RE = re.compile(r'<(?:iframe|video)\b(?=(?:[^>"]|"[^"]*")*\sclass="[^"]*\btr-film-player\b)(?:[^>"]|"[^"]*")*>', re.I)
 FILM_UNBUILT = "tr-film-unbuilt"
 # preload of the player when the site hosts its video (as tbook.film writes it) and when it does not: the hidden
 # player of an unbuilt film must not request the missing file
@@ -547,7 +547,12 @@ def mark_films(page_html: str, bdir: Path) -> str:
             names.append(FILM_UNBUILT)
         if names or _attr(tag, "class", None) is not None:
             tag = _set_attr(tag, "class", " ".join(names))
-        content = _FILM_PLAYER_RE.sub(lambda v: _set_attr(v.group(0), "preload", FILM_PRELOAD[built]), content)
+        def mark_player(match):
+            player = match.group(0)
+            if player.lower().startswith("<iframe"):
+                return player.replace(' srcdoc=""', "") if built else _set_attr(player, "srcdoc", "")
+            return _set_attr(player, "preload", FILM_PRELOAD[built])
+        content = _FILM_PLAYER_RE.sub(mark_player, content)
         return tag + content
 
     return _FILM_FIGURE_RE.sub(repl, page_html)
@@ -642,7 +647,7 @@ def publish_media(site: config.Site, book: config.Book, part: str, dest: Path) -
     mod = _media_module(part)
     if mod is None:
         return None
-    if not _items(part, book):
+    if not _items(part, book, site):
         if dest.exists():
             shutil.rmtree(dest)
         return None
@@ -1556,6 +1561,7 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None,
     return {
         "schema": SCHEMA,
         **({"release_pdf_digest": releases.pdf_digest(release_pdfs)} if release_pdfs is not None else {}),
+        **({"release_film_digest": releases.asset_digest(releases.film_assets(site.repo))} if site.film_release_only else {}),
         "generated_at": _generated_at(),
         "site": {"title": {lang: site.text(site.title, lang) for lang in site.languages},
                  "languages": site.languages, "base_url": site.base_url or None, "repo": site.repo or None},

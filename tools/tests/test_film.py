@@ -84,7 +84,7 @@ def errors(issues) -> list[str]:
 
 
 def ctx_for(book: config.Book, lang: str, target: str) -> render.RenderContext:
-    site = config.load_site()
+    site = dataclasses.replace(config.load_site(), film_release_only=False)
     return render.RenderContext(site=site, book=book, edition=book.edition(lang), model=None,
                                 lock=lean.Lock.load(), target=target)
 
@@ -582,7 +582,7 @@ class Sandbox:
         # load_site is cached and may belong to an earlier, already removed sandbox.
         # Repository hooks must run in this sandbox, just like its build/cache units.
         self.site = dataclasses.replace(config.load_site(), root=self.root, repo="acme/books", base_url="",
-                                        pdf_release_only=False)
+                                        pdf_release_only=False, film_release_only=False)
 
     def film(self) -> film.Film:
         return film.get(self.book, self.dir.name)
@@ -619,6 +619,26 @@ class VideoUnitTest(unittest.TestCase):
         self.assertFalse(any(label.endswith("/poster.jpg") or "/out/" in label for label in labels))
         npm = dict(unit.inputs.parts)["<npm>"]
         self.assertNotEqual(npm, film.buildcache.Inputs().text("npm", {}).parts[0][1])  # package-lock.json was read
+
+    def test_release_collects_mp4_with_a_separate_cache_key(self):
+        site = dataclasses.replace(self.sb.site, film_release_only=True)
+        item = self.sb.film()
+        web = film.video_unit(site, item)
+        mp4 = film.video_unit(self.sb.site, item)
+        self.assertNotEqual(web.key, mp4.key)
+        self.assertNotEqual(web.outputs, mp4.outputs)
+        stage = self.sb.root / "release"
+        stage.mkdir()
+        mp4.outputs[0].mkdir(parents=True)
+        (mp4.outputs[0] / item.output("narrated_720p")).write_bytes(b"mp4")
+        with mock.patch.object(film, "build_videos") as build:
+            self.assertEqual(film.collect_release(self.sb.site, self.sb.book, stage), [])
+            build.assert_not_called()
+            names = film.collect_release(site, self.sb.book, stage)
+            self.assertFalse(build.call_args.args[0].film_release_only)
+            self.assertEqual(build.call_args.kwargs, {"mode": "require"})
+        self.assertEqual(names, [item.output("narrated_720p")])
+        self.assertEqual((stage / names[0]).read_bytes(), b"mp4")
 
     def test_unrelated_changes_keep_the_key(self):
         key = self.sb.key()
@@ -862,7 +882,7 @@ class BuildVideosTest(unittest.TestCase):
         self.assertNotIn(f.output("music_only"), page)
         reg = json.loads((out / "films.json").read_text(encoding="utf-8"))["films"][0]
         self.assertEqual(sorted(reg["videos"]), sorted(["narrated", "narrated_720p", "music_only_720p", "cover"]))
-        items = film.items(self.sb.book)
+        items = film.items(self.sb.book, site=self.sb.site)
         self.assertEqual(items[0]["download_url"], f"films/{f.id}/{f.output('narrated')}")
         self.assertEqual(items[0]["watch_url"], f"films/{f.id}/{f.output('narrated_720p')}")
 

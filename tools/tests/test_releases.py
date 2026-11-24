@@ -27,13 +27,18 @@ class ReleaseAssetsTest(unittest.TestCase):
                      release("v2", "2026-01-02", new, asset("v2", "incomplete.pdf", "starter"),
                              asset("v2", "book.epub")),
                      release(preview_tag, "2026-01-05", asset(preview_tag, "book.pdf"),
-                             asset(preview_tag, "preview.pdf"), prerelease=True),
+                             asset(preview_tag, "preview.pdf"), asset(preview_tag, "film.mp4"), prerelease=True),
                      release(main_preview_tag, "2026-01-06", asset(main_preview_tag, "book.pdf"),
                              asset(main_preview_tag, "main-preview.pdf"), prerelease=True),
                      release(beta_tag, "2026-01-04", beta, prerelease=True)]]
+        releases._published.cache_clear()
+        self.addCleanup(releases._published.cache_clear)
+        self.addCleanup(releases.film_assets.cache_clear)
         self.addCleanup(releases.pdf_assets.cache_clear)
         with patch.object(releases.subprocess, "check_output", return_value=json.dumps(response)) as run:
             self.assertEqual(releases.pdf_assets("owner/books"),
                              {"book.pdf": releases.PdfAsset(new["browser_download_url"], 42),
                               "beta.pdf": releases.PdfAsset(beta["browser_download_url"], 42)})
+            self.assertIn("film.mp4", releases.film_assets("owner/books"))
+            self.assertEqual(run.call_count, 1)
             self.assertIn("--paginate", run.call_args.args[0])

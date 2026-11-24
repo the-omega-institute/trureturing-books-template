@@ -1,0 +1,18 @@
+<main id="stage">
+  <canvas id="c" width="1920" height="1080"></canvas>
+  <img id="cover" src="poster.jpg" alt="">
+  <media-controller tabindex="0">
+    <audio slot="media" preload="metadata" src="audio.mp3"></audio>
+    <media-play-button slot="centered-chrome" id="start"></media-play-button>
+    <media-control-bar>
+      <media-play-button></media-play-button>
+      <media-time-display showduration></media-time-display>
+      <media-time-range></media-time-range>
+      <media-mute-button></media-mute-button>
+      <media-volume-range></media-volume-range>
+      <media-playback-rate-button rates="0.5 0.75 1 1.25 1.5 2"></media-playback-rate-button>
+      <media-fullscreen-button></media-fullscreen-button>
+    </media-control-bar>
+  </media-controller>
+  <p id="error" role="alert" hidden></p>
+</main>
