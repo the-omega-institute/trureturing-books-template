@@ -60,6 +60,7 @@ skills/                   内置 agent skills（.claude/skills → ../skills）
 | `[site.title]`、`[site.tagline]` | 站名与标语，每种语言一行 |
 | `[site] logo`、`[site] branch` | 可选：站点品牌（§6）；“建议修改”链接指向的分支（§5） |
 | `[site] pdf_release_only` | 设为 `true` 后随 Release 导出并发布 PDF。Pages 使用已发布的附件链接。默认关闭 |
+| `[site] epub_release_only` | 设为 `true` 后随 Release 导出并发布 EPUB。Pages 使用已发布的附件链接。默认关闭 |
 | `[trureturing] repo`、`branch` | 形式化仓库；`./tbook pin` 跟随、`./tbook check` 核对的分支（默认 `dev`） |
 | `[books] order` | 书库首页的顺序；未列出的书按目录名排在后面 |
 | `[books] hide` | 隐藏的书：glob 模式的列表，默认 `[]`（不隐藏）；书库用 `["example-*"]` 隐藏模板附带的示例书 |

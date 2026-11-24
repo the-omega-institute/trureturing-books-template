@@ -589,18 +589,19 @@ def units(site: config.Site, books: Iterable[config.Book]) -> list[Unit]:
     for book in books:
         out.extend(cover.units(site, book))
         out.extend(viz_units(book))
+        pdf = book.outputs_pdf if site.build_release_pdfs else ()
+        epub = book.outputs_epub and site.build_release_epubs
         for ed in book.editions:
             if book.outputs_html:
                 out.append(html_unit(site, book, ed.lang, build.html_dir(book.slug, ed.lang)))
-            pdf = book.outputs_pdf if site.build_release_pdfs else ()
-            if pdf or book.outputs_epub:
+            if pdf or epub:
                 out.append(pandoc_unit(site, book, ed.lang, pandoc.stage_dir_for(book, ed)))
             if pdf:
                 out.append(typst_unit(site, book, ed.lang, pandoc.stage_dir_for(book, ed) / "main.typ"))
             for variant in pdf:
                 out.append(pdf_unit(site, book, ed.lang, variant,
                                     build.dist_dir(book.slug) / book.artifact(ed.lang, "pdf", variant)))
-            if book.outputs_epub:
+            if epub:
                 out.append(epub_unit(site, book, ed.lang, build.dist_dir(book.slug) / book.artifact(ed.lang, "epub")))
         if slides.deck_names(book):
             out.append(slides_unit(site, book, build.slides_dir(book.slug)))

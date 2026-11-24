@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.22.0] - 2026-11-25
+
+- 书库可在 `site.toml` 的 `[site]` 中开启 `epub_release_only = true`。常规 CI 与 Pages 跳过 EPUB 导出，Release 构建复用缓存并附上 EPUB，Pages 按书籍版本和语言链接已发布的版本发行附件。
+
 ## [1.21.1] - 2026-11-25
 
 - 启用影片 Release 模式时，空书库可离线组装站点。渲染独立影片卡片时使用发布环节提供的下载链接。

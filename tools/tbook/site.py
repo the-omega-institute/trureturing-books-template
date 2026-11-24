@@ -410,7 +410,8 @@ def _items(part: str, book: config.Book, site: config.Site) -> list[dict]:
 
 def collect(site: config.Site, book: config.Book, bdir: Path, lock: lean.Lock | None,
             models: dict[str, EditionModel] | None = None, *,
-            release_pdfs: dict[str, releases.PdfAsset] | None = None) -> BookView:
+            release_pdfs: dict[str, releases.PdfAsset] | None = None,
+            release_epubs: dict[str, releases.ReleaseAsset] | None = None) -> BookView:
     """What exists for ``book`` under ``bdir`` (``<out>/<slug>``), for the pages and the manifest."""
     view = BookView(book=book, bdir=bdir, models=models if models is not None else load_book_models(book),
                     lock=lock, release_pdfs=release_pdfs)
@@ -420,10 +421,12 @@ def collect(site: config.Site, book: config.Book, bdir: Path, lock: lean.Lock | 
         if (bdir / cover).is_file():
             view.covers[ed.lang] = cover
         found = []
-        for kind, variant in [("pdf", v) for v in config.PDF_VARIANTS] + [("epub", "")]:
+        formats = [("pdf", v, v in book.outputs_pdf, release_pdfs) for v in config.PDF_VARIANTS]
+        formats.append(("epub", "", book.outputs_epub, release_epubs))
+        for kind, variant, enabled, assets in formats:
             name = book.artifact(ed.lang, kind, variant)
-            if kind == "pdf" and release_pdfs is not None:
-                asset = release_pdfs.get(name) if variant in book.outputs_pdf else None
+            if assets is not None:
+                asset = assets.get(name) if enabled else None
                 if asset:
                     found.append(Download(kind, variant, name, asset.size, asset.url))
                 continue
@@ -601,7 +604,8 @@ def publish_html(book: config.Book, bdir: Path, build_root: Path) -> None:
                 printed.write_text(fix_print_media(printed.read_text(encoding="utf-8")), encoding="utf-8")
 
 
-def publish_downloads(book: config.Book, bdir: Path, build_root: Path, *, include_pdf: bool = True) -> None:
+def publish_downloads(book: config.Book, bdir: Path, build_root: Path, *,
+                      include_pdf: bool = True, include_epub: bool = True) -> None:
     src = build_root / "dist" / book.slug
     dst = bdir / "downloads"
     if dst.exists():
@@ -609,7 +613,8 @@ def publish_downloads(book: config.Book, bdir: Path, build_root: Path, *, includ
     if not src.is_dir():
         return
     files = [f for f in sorted(src.iterdir()) if f.is_file() and not f.name.startswith(".")
-             and (include_pdf or f.suffix.lower() != ".pdf")]
+             and (include_pdf or f.suffix.lower() != ".pdf")
+             and (include_epub or f.suffix.lower() != ".epub")]
     if not files:
         return
     dst.mkdir(parents=True)
@@ -1510,7 +1515,8 @@ def _generated_at() -> str:
 
 
 def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None,
-             release_pdfs: dict[str, releases.PdfAsset] | None = None) -> dict:
+             release_pdfs: dict[str, releases.PdfAsset] | None = None,
+             release_epubs: dict[str, releases.ReleaseAsset] | None = None) -> dict:
     """``manifest.json`` (schema ``trureturing-books.site.v1``)."""
     name, version = _template_info()
     books = []
@@ -1561,6 +1567,8 @@ def manifest(site: config.Site, views: list[BookView], lock: lean.Lock | None,
     return {
         "schema": SCHEMA,
         **({"release_pdf_digest": releases.pdf_digest(release_pdfs)} if release_pdfs is not None else {}),
+        **({"release_epub_digest": releases.asset_digest(release_epubs)} if release_epubs is not None
+           and any(v.book.outputs_epub for v in views) else {}),
         **({"release_film_digest": releases.asset_digest(releases.film_assets(site.repo))} if site.film_release_only
            and any(v.media.get("films") for v in views) else {}),
         "generated_at": _generated_at(),
@@ -1633,6 +1641,9 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
     release_pdfs = None
     if site.pdf_release_only:
         release_pdfs = releases.pdf_assets(site.repo) if site_books else {}
+    release_epubs = None
+    if site.epub_release_only:
+        release_epubs = releases.epub_assets(site.repo) if any(book.outputs_epub for book in site_books) else {}
     lock = _load_lock()
     if parts is None:
         _reset(out)
@@ -1649,7 +1660,8 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
         models = load_book_models(book)
         if parts is None:
             publish_html(book, bdir, build_root)
-            publish_downloads(book, bdir, build_root, include_pdf=not site.pdf_release_only)
+            publish_downloads(book, bdir, build_root,
+                              include_pdf=not site.pdf_release_only, include_epub=not site.epub_release_only)
             publish_covers(site, book, bdir, models, lock)
         for part in MEDIA_PARTS:
             if book.slug in rebuilt and (parts is None or part in parts):
@@ -1658,7 +1670,8 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
                     problems.append(err)
         if book.slug in rebuilt and (parts is None or "films" in parts):
             publish_film_marks(book, bdir)
-        views.append(collect(site, book, bdir, lock, models, release_pdfs=release_pdfs))
+        views.append(collect(site, book, bdir, lock, models,
+                             release_pdfs=release_pdfs, release_epubs=release_epubs))
     langs = list(site.languages) or ["zh", "en"]
     book_slugs = {book.slug for book in site_books} | set(config.book_slugs())
     route_langs = tuple(lang for lang in langs if lang not in book_slugs) if len(langs) > 1 else ()
@@ -1681,8 +1694,8 @@ def build(site, books, out_dir: Path, only: set[str] | None = None, *, build_roo
             (landing / "index.html").write_text(landing_html(frame, v, lang), encoding="utf-8")
     (out / "404.html").write_text(not_found_html(site), encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
-    (out / "manifest.json").write_text(json.dumps(manifest(site, views, lock, release_pdfs), ensure_ascii=False, indent=2) + "\n",
-                                       encoding="utf-8")
+    data = manifest(site, views, lock, release_pdfs, release_epubs)
+    (out / "manifest.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if problems:
         raise SiteError(f"site written to {out} with {len(problems)} problem(s):\n  " + "\n  ".join(problems))
     post_build(site, out)

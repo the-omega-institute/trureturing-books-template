@@ -51,7 +51,8 @@ class PagesScheduleTests(unittest.TestCase):
         spec = lean.BranchLock("owner/lean", "dev")
         manifest = {"trureturing": dict(repo=spec.repo, branch=spec.branch, commit="a" * 40),
                     "release_pdf_digest": releases.pdf_digest({})}
-        with (patch.object(pages_schedule.config, "load_site", return_value=Mock(pdf_release_only=True)),
+        with (patch.object(pages_schedule.config, "load_site", return_value=Mock(
+                  pdf_release_only=True, epub_release_only=False, film_release_only=False)),
               patch.object(lean.Lock, "read_spec", return_value=spec),
               patch.object(pages_schedule.pin, "branch_head", return_value="b" * 40),
               patch.object(releases, "pdf_assets", return_value={})):
@@ -59,6 +60,16 @@ class PagesScheduleTests(unittest.TestCase):
             manifest["trureturing"]["commit"] = "b" * 40
             self.assertFalse(self.due(self.head, "schedule", "17 5 * * *", manifest))
             manifest["release_pdf_digest"] = "previous"
+            self.assertTrue(self.due(self.head, "schedule", "34 * * * *", manifest))
+
+    def test_hourly_refresh_detects_a_new_epub_attachment(self):
+        self.live = self.head
+        opts = Mock(pdf_release_only=False, epub_release_only=True, film_release_only=False)
+        manifest = {"release_epub_digest": releases.asset_digest({})}
+        with (patch.object(pages_schedule.config, "load_site", return_value=opts),
+              patch.object(releases, "epub_assets", return_value={}) as fetch):
+            self.assertFalse(self.due(self.head, "schedule", "34 * * * *", manifest))
+            fetch.return_value = {"book-1.0.0-en.epub": releases.ReleaseAsset("https://example.org/book.epub", 42)}
             self.assertTrue(self.due(self.head, "schedule", "34 * * * *", manifest))
 
     def test_legacy_registration_and_new_publication_cache_producers(self):

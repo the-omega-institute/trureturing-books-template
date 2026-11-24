@@ -29,6 +29,8 @@ EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动�
 
 在 `site.toml` 的 `[site]` 中设置 `pdf_release_only = true`，常规 CI 和 Pages 构建便会跳过书籍及演示文稿 PDF 导出。Pages 的下载链接直接指向已发布的 GitHub Release 附件（含公开预发布）。书籍按当前 `book.toml` 版本匹配文件名，演示文稿采用最近发布的同名附件。没有对应附件时隐藏该下载链接。Pages 每小时检查已发布附件并刷新主干站点的下载链接。组装站点时需要可访问仓库的 GitHub CLI（`gh`）。本地仍可显式执行 `./tbook build pdf`，或用 `TBOOK_BUILD_RELEASE=1 ./tbook build slides` 导出演示文稿 PDF。
 
+在 `[site]` 中设置 `epub_release_only = true` 后，常规 CI 与 Pages 跳过 EPUB 导出，Release 构建按输入复用缓存并为启用 EPUB 的书籍附上各语言版本。Pages 按当前 `book.toml` 版本和语言查找最新的同名版本发行附件，包含公开的版本预发布。缺少对应附件时隐藏该下载链接。每日预览的 EPUB 从对应的 GitHub Release 下载。Pages 每小时检查附件变动。本地可运行 `./tbook build epub` 显式导出，或设置 `TBOOK_BUILD_RELEASE=1` 让 `./tbook build all` 包含 EPUB。
+
 在 `[site]` 中设置 `film_release_only = true` 后，常规 CI 与 Pages 按影片合成旁白和配乐，写入 `build/film-players/<slug>/<name>/`。网页从本站加载 MP3、字体、镜头与所需的三维模型。Media Chrome 提供播放、拖动、音量、倍速和全屏，Canvas 根据音轨时间绘制画面和字幕。日常构建跳过逐帧编码。发书籍或整站 Release（含每日预览）时，工作流把所选书籍的 `film.json` 中列出的每个 MP4 作为独立附件上传。影片页按片名和版本规格链接最近一次已发布的相应附件，首次发布前仍可在线播放。关闭此项可恢复同源 MP4 模式。外部影片引用沿用其来源链接。
 
 本地预览：`./tbook serve`（默认端口 8765，自动挂在 Pages 子路径下；支持按字节范围请求，Safari 也能播放视频；`TBOOK_SERVE_HOST=0.0.0.0` 允许其他设备访问，例如用 iPhone 查看）。
@@ -232,7 +234,7 @@ GitHub Actions 每天 03:17 UTC 检查指定分支。该分支须包含支持此
 
 每个 UTC 日最多发布一次，每个提交最多预览一次。tag 为 `preview-<完整提交 SHA>`，`dev` 分支继续使用 `preview-dev-<完整提交 SHA>`。当日已发布、提交已有预览或分支尚未建立时，工作流会跳过构建。
 
-在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用启动时预览分支的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在对应的 Releases 页面下载预览。官网的 PDF 下载页从版本发行附件生成链接。
+在 Actions 的 **Release** 页面可从默认分支手动触发同一流程。构建使用启动时预览分支的确切提交，按 §6.3 检查并生成所有可见书籍的 PDF、EPUB、幻灯片 PDF 与构建缓存。附件齐全后发布为 GitHub pre-release。读者在对应的 Releases 页面下载预览。启用相应的 Release 发布选项后，官网的 PDF 和 EPUB 下载链接来自版本发行附件。
 
 ## 7. 学术报告 PDF
 

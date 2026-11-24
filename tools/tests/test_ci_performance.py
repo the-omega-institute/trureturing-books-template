@@ -604,6 +604,14 @@ class AffectedPlanTest(unittest.TestCase):
                 self.assert_markdown_publication(result, path)
                 self.assertFalse(result["publish"])
 
+    def test_epub_release_only_does_not_schedule_regular_epub_exports(self):
+        self.write("site.toml", '[site]\nlanguages=["zh","en"]\nepub_release_only=true\n')
+        self.commit()
+        result = self.impact()
+        self.assertTrue(result["site"])
+        self.assertEqual({(item["target"], item["variant"]) for item in result["exports"]},
+                         {("html", ""), ("pdf", "screen")})
+
     def test_chapter_cap_inputs_select_structure_validation(self):
         paths = {
             "books/one/book.toml": '[book]\ntitle = "test"\nmax_chapters = 1\n[outputs]\npdf = ["screen"]\n',

@@ -46,8 +46,7 @@ def due(root, repo, sha, event, schedule, *, get=api, read_live=live_manifest):
         return False
     daily = schedule == "17 5 * * *"
     site = config.load_site()
-    pdf = site.pdf_release_only
-    if not daily and not pdf and not site.film_release_only:
+    if not daily and not (site.pdf_release_only or site.epub_release_only or site.film_release_only):
         return False
     manifest = read_live(get(f"repos/{repo}/pages")["html_url"])
     if daily:
@@ -57,11 +56,14 @@ def due(root, repo, sha, event, schedule, *, get=api, read_live=live_manifest):
             if (deployed.get("repo"), deployed.get("branch"), deployed.get("commit")) != (
                     spec.repo, spec.branch, pin.branch_head(spec)):
                 return True
-    if site.film_release_only and "release_film_digest" in manifest:
-        if manifest["release_film_digest"] != releases.asset_digest(releases.film_assets(repo)):
+    for enabled, key, assets in (
+        (site.pdf_release_only, "release_pdf_digest", releases.pdf_assets),
+        (site.epub_release_only, "release_epub_digest", releases.epub_assets),
+        (site.film_release_only, "release_film_digest", releases.film_assets),
+    ):
+        if enabled and key in manifest and manifest[key] != releases.asset_digest(assets(repo)):
             return True
-    return (pdf and "release_pdf_digest" in manifest and
-            manifest["release_pdf_digest"] != releases.pdf_digest(releases.pdf_assets(repo)))
+    return False
 
 
 if __name__ == "__main__":
