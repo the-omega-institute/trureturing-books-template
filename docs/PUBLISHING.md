@@ -27,7 +27,7 @@ EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动�
 
 `_site/` 是 GitHub Pages 的产物：书库首页（每本书一张卡片：封面、简介、在线阅读、下载）、每本书的落地页（目录、下载、验证摘要、可视化/视频/幻灯片）、mdBook 页面、下载文件与 `manifest.json`（机器可读清单：版本、文件、sha256、所钉的 trureturing 提交）。站内使用相对链接，站点可以挂在 `/<repo>/` 之下。
 
-在 `site.toml` 的 `[site]` 中设置 `pdf_release_only = true`，常规 CI 和 Pages 构建便会跳过书籍及演示文稿 PDF 导出。Pages 的下载链接直接指向已发布的 GitHub Release 附件（含公开预发布）。书籍按当前 `book.toml` 版本匹配文件名，演示文稿采用最近发布的同名附件。没有对应附件时隐藏该下载链接。Pages 会在已通过 CI 的主干上按发布节奏刷新下载链接。组装站点时需要可访问仓库的 GitHub CLI（`gh`）。本地仍可显式执行 `./tbook build pdf`，或用 `TBOOK_BUILD_RELEASE=1 ./tbook build slides` 导出演示文稿 PDF。
+在 `site.toml` 的 `[site]` 中设置 `pdf_release_only = true`，常规 CI 和 Pages 构建便会跳过书籍及演示文稿 PDF 导出。Pages 的下载链接直接指向已发布的 GitHub Release 附件（含公开预发布）。书籍按当前 `book.toml` 版本匹配文件名，演示文稿采用最近发布的同名附件。没有对应附件时隐藏该下载链接。Pages 每小时检查已发布附件并刷新主干站点的下载链接。组装站点时需要可访问仓库的 GitHub CLI（`gh`）。本地仍可显式执行 `./tbook build pdf`，或用 `TBOOK_BUILD_RELEASE=1 ./tbook build slides` 导出演示文稿 PDF。
 
 本地预览：`./tbook serve`（默认端口 8765，自动挂在 Pages 子路径下；支持按字节范围请求，Safari 也能播放视频；`TBOOK_SERVE_HOST=0.0.0.0` 允许其他设备访问，例如用 iPhone 查看）。
 
@@ -41,8 +41,8 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 
 | 工作流 | 触发 | 作用 |
 | --- | --- | --- |
-| `ci.yml` | PR、推送到 main、手动、被调用、每周 | 先由仅需标准库的 `tools/ci/plan.py` 生成计划，再启动选中的结构／Lean、theme、unit、manifest、静态媒体、模板兼容检查族，以及按书籍启用格式展开的导出、精确 suite、film 和 slide 集合；空集合不开 runner；同一导出格式合并所选书籍，复用一次安装。viz 最多 8 片。CI 与 Pages 的 film 最多 16 片，所选影片每部恰执行一次，选中 16 部以内时每部独占一片。稳定必需检查名仍为 **Check**，移到末尾用 `always()` 核对全部计划任务，失败、取消和意外跳过均不通过。调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
-| `pages.yml` | `main` 推送、CI 成功、每 5 分钟检查、手动 | 自动发布尝试间隔至少 20 分钟。每次从主干历史中选择比线上更新且已通过同提交 CI 的最新版本，从线上版本到该提交的净差异涉及出版输入时才组装，并在组装前再次核对。以最近成功部署为构建基准，`./tbook build all` 恢复未变单元、补建缺失单元、清理删除内容后部署。手动运行另做 `./tbook check`，可直接触发。Pages 未启用时只构建并提示。构建缓存见 §5 |
+| `ci.yml` | PR、手动、被调用、每周 | 先由仅需标准库的 `tools/ci/plan.py` 生成计划，再启动选中的结构／Lean、theme、unit、manifest、静态媒体、模板兼容检查族，以及按书籍启用格式展开的导出、精确 suite、film 和 slide 集合；空集合不开 runner；同一导出格式合并所选书籍，复用一次安装。viz 最多 8 片。CI 与 Pages 的 film 最多 16 片，所选影片每部恰执行一次，选中 16 部以内时每部独占一片。稳定必需检查名仍为 **Check**，移到末尾用 `always()` 核对全部计划任务，失败、取消和意外跳过均不通过。调用者须授予 `contents: read`、`actions: read` 与 `pages: read` |
+| `pages.yml` | `main` 推送、手动、定时刷新 | 每次推送直接进入独占发布队列，当前发布完成后立即处理最新的待发提交。按线上版本到该提交的累计差异选择出版输入，执行 `./tbook check`、组装整站并部署。每个滚动小时最多启动十次出版。缓存见 §5 |
 | `release.yml` | tag `<slug>-v<version>`（单本，须等于 `book.toml` 的 version）或 `v*`（全部书，仅下游书库，如 `v2026.11.08`、`v3.0.0`）或启用后的每日预览（§6.6） | 构建整个站点（含视频），创建 GitHub Release，附所选书的 PDF、EPUB 与幻灯片 PDF（`<slug>-<deck>-<lang>.pdf`），以及全站的构建缓存（`cache-*.tar` 与 `build-cache.json`，§5）；Release 先建为草稿，附件全部上传后才发布，已发布的 Release 不再改动附件；tag 发版中，只有语义化版本的预发布（`book.toml` 的 `1.0.0-rc.1`，或 tag `v3.0.0-rc.1`）标为 pre-release；以日期开头的版本（`YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零）无论后面跟什么都是正式发布，如同一天的第二次发布 `v2026.11.08-2`；以 `film-` 开头、不指向任何书的 tag（旧的逐片视频 tag）只给出提示并跳过，不发布任何东西，可以删除；`site.toml` 的 `[books] hide` 隐藏的书不发布：`v*` 不含它们，指向它们的 `<slug>-v*` 失败并说明原因 |
 | `lean-verify.yml` | 每周、手动、可被 Release 调用 | Lake 工程深度验证被引用定理的公理闭包 |
 | `trureturing-bump.yml` | 每周、手动 | 把所钉的 trureturing 提交升级到最新并开 PR；标题前缀 `[refused]`（目标提交不在 `site.toml` 的分支上或无法核实）、`[unresolved]`（有引用无法解析）、`[pin failed]`、`[check fails]`、`[review statements]` 提示需要处理的情况；前三种 PR 不改锁文件，与 `[check fails]` 一样以草稿开出 |
@@ -51,7 +51,7 @@ EPUB 按 Apple Books 的要求生成：EPUB 3、MathML 数学、PNG 封面、导
 
 `ci.yml` 的选择检查从 JSON 文件读取完整计划；CI 与 Pages 的汇总从另一份 JSON 文件读取完整 `needs`，并直接使用其中的 `plan.outputs.plan`，没有第二份计划副本。工作流用带引号的 here-document 接收 `toJSON` 编码的数据，由运行器先写脚本再落盘；计划和汇总载荷不进入进程参数或环境变量，字符串中的换行与 shell 语法不会被执行。矩阵、检查条件、精确浏览器报告核对与覆盖来源保持原有契约；缺少计划、作业结果或执行报告仍使汇总失败。
 
-**仅修改书稿也运行 CI。** `books/<slug>/<lang>/*.md`（含子目录与 `SUMMARY.md`）属于出版输入，选择所属书的结构／多语言检查与启用的导出格式；没有浏览器套件读取该章，也不能省略这些工作。工程文档 `docs/` 与根目录说明的轻量规则不适用于书稿。推送普通工作分支尚未开 PR 时不会自动运行 CI；创建 PR、更新 PR 提交或合入 `main` 才会触发，编辑 PR 标题／正文只重跑命名检查。排查时先在 Actions 中按工作流和提交 SHA 找运行，再看 **Plan affected work** 的 `coverage.normal.paths` 与 `tasks`：没有运行、任务按计划跳过、排队和旧提交的 Pages 被跳过是不同情况；稳定的 **Check** 必须等所有已选任务成功。
+**仅修改书稿也运行 CI。** `books/<slug>/<lang>/*.md`（含子目录与 `SUMMARY.md`）属于出版输入，选择所属书的结构／多语言检查与启用的导出格式；没有浏览器套件读取该章，也不能省略这些工作。工程文档 `docs/` 与根目录说明的轻量规则不适用于书稿。推送普通工作分支尚未开 PR 时不会自动运行 CI；创建或更新 PR 时触发 CI，合入 `main` 时触发 Pages，编辑 PR 标题／正文只重跑命名检查。排查时先在 Actions 中按工作流和提交 SHA 找运行，再看 **Plan affected work** 的 `coverage.normal.paths` 与 `tasks`：没有运行、任务按计划跳过、排队和旧提交的 Pages 被跳过是不同情况；稳定的 **Check** 必须等所有已选任务成功。
 
 检查与构建作业（`ci.yml`、`pages.yml`、`release.yml` 的构建、`trureturing-bump.yml`）通过组合动作 `.github/actions/setup` 安装工具链（Python 3.12 + requirements、Node 22 + `npm ci`、按需安装 Chromium、mdBook 0.5.4、CJK 字体；`films: 'true'` 且有（未隐藏的）书带视频时另装 ffmpeg 与备用字体，运行 `theme/film/setup.sh` 安装 `theme/film/requirements.txt` 并下载 Kokoro 模型到 `.cache/film/models`）。
 
@@ -130,7 +130,9 @@ CI 精确项为 `books/<slug>/viz/tests/<id>.test.mjs#<part>`，未分部仍为�
 
 **慢帧复查（`viz-slow`）。** `--slow` 令 `VIZ_SLOW_FRAMES=1000`，用于发现固定等待时间造成的偶发失败。每周三的本工作流定时入口只选择 slow profile；手动运行由默认关闭的 `slow_frames` 控制，调用者也可明确传入。slow 使用独立成功基准：相同输入、运行时与检查定义已经覆盖时不开 runner；首次或基准失效按实际 Git 差异选择，无法比较时明确失败；不因覆盖工件缺失而全量慢帧复测。共享运行时、测试工具或 suite 改动后的本地复查仍见 [book-viz](../skills/book-viz/SKILL.md)。
 
-开发分支在 PR 上运行选择后的 CI，不再因分支 push 重复运行；尚未开 PR 时可手动运行。同一 PR 的更新提交会取代先前 CI，每次主干推送按提交各自排队并可并行执行，保留各推送范围的验证。Pages 串行保存缓存并部署。默认分支名称若不是 main，需同步调整两个工作流的 push 分支过滤。分支保护要求稳定的 **Check** 与 **PR conventions**，后者校验标题和源分支，启用步骤见 [贡献与协作规范](../CONTRIBUTING.md)；媒体分片数量现在动态变化；若曾将单个矩阵检查设为必需检查，维护者须改为 Check。
+开发分支在 PR 上运行选择后的 CI。同一 PR 的新提交取代先前的检查。主干推送直接进入 Pages，整个工作流共用 `pages` 并发组。运行中到达的推送合并为一个待发版本，其中包含自线上版本以来的所有出版改动。默认分支采用其他名称时，请调整 `pages.yml` 的 push 分支过滤。分支保护要求稳定的 **Check** 与 **PR conventions**，见[贡献与协作规范](../CONTRIBUTING.md)。
+
+推送、手动运行和定时刷新共用滚动 60 分钟的十次启动额度。工作流在 `tbook-pages-build` 环境记录启动时间，失败的出版也占一格。额度用尽时，当前工作流等到最早一格到期后继续。每小时检查 Release 下载链接，每日 05:17 UTC 检查上游冻结声明。无出版变化的自动检查直接结束。Pages 未启用时，首次构建仍提供站点工件。
 
 ## 5. 构建缓存
 

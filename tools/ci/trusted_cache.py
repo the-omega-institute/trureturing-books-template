@@ -22,7 +22,7 @@ def pages_producer(run):
     if run.get("event") == "push":
         return not title.startswith(PAGES_PUSH_TITLE) or int(run.get("run_attempt", 1)) > 1
     if run.get("event") == "schedule":
-        return title == PAGES_REFRESH_TITLE
+        return title == PAGES_REFRESH_TITLE or title.startswith("Pages · ")
     return run.get("event") in ("workflow_dispatch", "workflow_run") and title != PAGES_SCHEDULER_TITLE
 
 

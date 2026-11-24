@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.18.1",
+  "version": "1.20.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -48,7 +48,7 @@
       "mode": "100644"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "3061c29a916cafbfe3ae8d248c2b7b7c7f91dcdc01a950c9a806e82e0d9d52cf",
+      "sha256": "1e22da0d5071d12add95ee4240f4e0e5095cbbb92dc5326f9b9c00c23c46a3b9",
       "mode": "100644"
     },
     ".github/workflows/lean-verify.yml": {
@@ -56,7 +56,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "ae1ca64c2805d02f3e2976f365a62560b30714bd2b995da953d9005c46398b05",
+      "sha256": "ef6550ed248a28ca681f6f00ab25dfd86450f8edc258143e628254f97cbfb954",
       "mode": "100644"
     },
     ".github/workflows/pr-conventions.yml": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "2cebbcac8a7140ebcef278d2b73beab195b058c4a85fd93d497d60532648fca1",
+      "sha256": "a970acd7b4b244795a70c3e23d015ff548e2ae121c51c81dc369c284202e66f7",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -124,11 +124,11 @@
       "mode": "100644"
     },
     "docs/PUBLISHING.md": {
-      "sha256": "0a0b5db766543c586fd7891f274628d76b77a440bbc60f31fa904f7a5667f6cd",
+      "sha256": "b4973b55f2d55cac200b02e3b724bf1378fb463bc46296fed0c8062a8368866b",
       "mode": "100644"
     },
     "docs/SOURCE-ONLY.md": {
-      "sha256": "05759061f665d12974d3c9ae69d6df7547bd764e9d81e22b5ab101e384ef1b08",
+      "sha256": "64e2758951e7a52a34dc13ef1f8b2b3f99124c5cced7a14da425379de081dea1",
       "mode": "100644"
     },
     "docs/UPGRADING.md": {
@@ -136,7 +136,7 @@
       "mode": "100644"
     },
     "docs/VERIFICATION.md": {
-      "sha256": "cf7bf0e12049af806991b025086319087a7244b781545f94de4c84bddb073a7b",
+      "sha256": "2260df166c81350a59426af0237d6986c841581d88a2b8ca569fce5db421e7a0",
       "mode": "100644"
     },
     "package-lock.json": {
@@ -168,7 +168,7 @@
       "mode": "100644"
     },
     "skills/book-release/SKILL.md": {
-      "sha256": "c28153f58a4bc297fbfbaa6de9c8e0167a61791033e81b29dc2e8795fe68156a",
+      "sha256": "a0876e61299c2e6069c20e66bc5be58d56725403cd7b9934d0390e2ab0db877f",
       "mode": "100644"
     },
     "skills/book-slides/SKILL.md": {
@@ -571,8 +571,12 @@
       "sha256": "ef9fa79e244a6081a53fb657521c9c80894df2e69f513b220f0edee7cb2982f6",
       "mode": "100644"
     },
+    "tools/ci/pages_rate.py": {
+      "sha256": "6c0e667d8c40ef2dd2fec3b5a7d7710fd9ab53fa085f55b9dce103dd13b3eef3",
+      "mode": "100644"
+    },
     "tools/ci/pages_schedule.py": {
-      "sha256": "791c0e3f994039909dfe1a7771dbdce8bd47aa94a49328bb2090495b2ba0b730",
+      "sha256": "b2f3515da8636a0e58216516cce12e30b5de1aa915e9c08fd4456206b05c4388",
       "mode": "100644"
     },
     "tools/ci/plan.py": {
@@ -596,7 +600,7 @@
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
-      "sha256": "9e6b3d0f826471573349514192a9a532a8a0047a928005cddf612e11a16fddb1",
+      "sha256": "118a1527e7888a1438cde710e87d869371068c78b7a104fdd634e930783a91f7",
       "mode": "100644"
     },
     "tools/ci/viz_budget.py": {
@@ -944,7 +948,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "1ce175e9920d94d5d67ae3230b30b4af6fd6aa10f504a65477bf5276f6ac6221",
+      "sha256": "6dd74877c2c69bfa3c77dbcf31c91e5d1f6086ced6a726772e3c37d784c633b2",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {
@@ -1056,7 +1060,7 @@
       "mode": "100644"
     },
     "tools/tests/test_pages_schedule.py": {
-      "sha256": "5659bce1bc2ce4abfc9763667e1a4975c04370f8982cd3c2ba5149fa210a4905",
+      "sha256": "76d29f1883e31bc2faa23f07c03c092def4e573c39b8b59f8bec4c192fa8c19d",
       "mode": "100644"
     },
     "tools/tests/test_pandoc.py": {
@@ -1120,7 +1124,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "1a4a030e4d317899ecef65c57980cbe035c097bf568efe7ef74a12b1cd9214ee",
+      "sha256": "9bbe12af9b94b0983d82a854a508156c9ccbdd6129a1aab8564bcfbb104a6f30",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {

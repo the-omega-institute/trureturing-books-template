@@ -5,25 +5,17 @@
 # Until then the probe job warns and the site is built but not deployed.
 #
 # Build cache (docs/PUBLISHING.md §5): a unit whose inputs did not change is restored, from the Actions
-# cache that successful default-branch CI/Pages runs saved or from published releases. Automatic Pages
-# waits for CI's prepared exports; film shards prepare missing videos before site assembly. The group
-# "pages" runs one publication at a time.
+# cache and published releases. One publisher holds the group through deployment; GitHub
+# keeps the latest pending update while the current publication completes.
 name: Pages
-run-name: >-
-  ${{ github.event_name == 'push' && format('Publish Pages for {0}', github.sha) ||
-      github.event.schedule == '17 5 * * *' && 'Refresh trureturing on Pages' ||
-      github.event_name == 'workflow_dispatch' && 'Pages' || 'Select a Pages update' }}
+run-name: ${{ format('Pages · {0}', github.sha) }}
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '4-59/5 * * * *'
+    - cron: '34 * * * *'
     - cron: '17 5 * * *'
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       selection_mode:
@@ -31,58 +23,20 @@ on:
         type: choice
         options: [auto, full]
         default: auto
-      release_refresh_sha:
-        description: Verified default-branch commit for a scheduled refresh of Release download links
-        type: string
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: >-
-    ${{ (github.event_name == 'workflow_run' || (github.event_name == 'schedule' && github.event.schedule != '17 5 * * *')) && 'pages-scheduler' ||
-        (github.event_name == 'push' && github.run_attempt == 1) && format('pages-register-{0}', github.sha) || 'pages' }}
+  group: pages
   cancel-in-progress: false
 
 env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
-  register:
-    name: Register pushed commit
-    if: github.event_name == 'push' && github.run_attempt == 1
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - run: printf 'Registered %s for automatic Pages selection.\n' "$GITHUB_SHA"
-
-  schedule:
-    name: Select a verified Pages update
-    if: >-
-      (github.event_name == 'schedule' && github.event.schedule != '17 5 * * *') ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
-    permissions:
-      actions: write
-      contents: read
-      deployments: read
-      pages: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Apply the publication cadence
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: PYTHONPATH=tools python3 -m ci.pages_schedule schedule
-
   plan:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.run_attempt > 1) || github.event.schedule == '17 5 * * *'
     name: Plan affected work
     permissions:
       contents: read
@@ -103,37 +57,53 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Recheck the live site before publication
-        if: github.event_name == 'push'
+      - name: Compare this queued commit with the live site
         id: eligible
         env:
           GH_TOKEN: ${{ github.token }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: PYTHONPATH=tools python3 -m ci.pages_schedule verify
+          PAGES_SCHEDULE: ${{ github.event.schedule }}
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        run: PYTHONPATH=tools python3 -m ci.pages_schedule
       - name: Resolve the trureturing branch
-        if: github.event_name != 'push' || steps.eligible.outputs.publish == 'true'
+        if: steps.eligible.outputs.publish == 'true'
         id: lock
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
-            sha="$(PYTHONPATH=tools python3 -m ci.pages_schedule refresh)"
-          else
-            sha="$(./tbook resolve-lock --branch-head)"
-          fi
+          sha="$(./tbook resolve-lock --branch-head)"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - name: Select before installing or downloading caches
-        if: github.event_name == 'workflow_dispatch' || steps.eligible.outputs.publish == 'true' || steps.lock.outputs.sha != ''
+        if: steps.eligible.outputs.publish == 'true'
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_REFRESH_SHA: ${{ inputs.release_refresh_sha }}
+          RELEASE_REFRESH_SHA: ${{ github.event_name == 'schedule' && github.sha || '' }}
           CI_WORKFLOW_REF: ${{ github.workflow_ref }}
           SELECTION_MODE: ${{ inputs.selection_mode || 'auto' }}
           TBOOK_TRURETURING_SHA: ${{ steps.lock.outputs.sha }}
         run: python3 tools/ci/plan.py --workflow pages
+
+  admit:
+    name: Reserve a Pages publication slot
+    needs: plan
+    if: needs.plan.outputs.site == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: read
+      deployments: write
+    outputs:
+      attempt: ${{ steps.slot.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply the rolling hourly limit
+        id: slot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PYTHONPATH=tools python3 -m ci.pages_rate
+          echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
   probe:
     needs: plan
@@ -174,7 +144,7 @@ jobs:
 
   films:
     name: Prepare publication films (${{ matrix.shard }})
-    needs: [plan, probe]
+    needs: [plan, admit, probe]
     if: needs.plan.outputs.films == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -233,9 +203,11 @@ jobs:
           retention-days: 1
 
   build:
+    outputs:
+      attempt: ${{ steps.attempt.outputs.number }}
     name: Build the site
-    needs: [plan, probe, films]
-    if: always() && !cancelled() && (needs.films.result == 'success' || needs.films.result == 'skipped') && needs.plan.outputs.site == 'true'
+    needs: [plan, admit, probe, films]
+    if: always() && !cancelled() && needs.admit.result == 'success' && needs.probe.result == 'success' && (needs.films.result == 'success' || needs.films.result == 'skipped') && needs.plan.outputs.site == 'true'
     runs-on: ubuntu-24.04
     # Rendering a film that no cache holds takes long (frames, narration, encoding). The build step has a
     # shorter limit of its own: a step that runs out of time fails, while a job that does is cancelled and
@@ -244,6 +216,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      deployments: write
       # actions/configure-pages reads the Pages configuration (GET /repos/{owner}/{repo}/pages), which
       # private and internal repositories refuse without this scope.
       pages: read
@@ -252,6 +225,15 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v5
+        with:
+          fetch-depth: ${{ needs.admit.outputs.attempt != github.run_attempt && '0' || '1' }}
+      - name: Reserve a slot for a retried build
+        if: needs.admit.outputs.attempt != github.run_attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: PYTHONPATH=tools python3 -m ci.pages_rate --retry
+      - id: attempt
+        run: echo "number=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/resolve-lock
         env:
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
@@ -298,7 +280,6 @@ jobs:
         run: python3 tools/ci/cache_store.py merge --prefer-imported "$RUNNER_TEMP"/prepared-film-shards/*
 
       - name: Check
-        if: github.event_name == 'workflow_dispatch' || needs.plan.outputs.trureturing_sha != ''
         env:
           # check asks GitHub's compare API whether the pinned trureturing commit is on the site.toml branch
           # (no trureturing checkout here); in GitHub Actions an unanswered question is an error.
@@ -400,19 +381,31 @@ jobs:
     # A skipped optional film job must not propagate through the successful build.
     if: "!cancelled() && needs.build.result == 'success' && needs.plan.outputs.site == 'true' && needs.probe.outputs.enabled == 'true'"
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 80
     permissions:
+      contents: read
+      deployments: write
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Check out the publication guard for a retry
+        if: github.run_attempt > 1
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Recheck the live revision and the reservation before deploying a retry
+        if: github.run_attempt > 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: PYTHONPATH=tools python3 -m ci.pages_rate --retry
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          artifact_name: github-pages-${{ github.run_attempt }}
+          artifact_name: github-pages-${{ needs.build.outputs.attempt }}
 
   coverage:
     name: Confirm deployment coverage

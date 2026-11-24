@@ -1587,39 +1587,16 @@ class ExactRunnerTest(unittest.TestCase):
 
 
 class DeploymentCoverageTest(unittest.TestCase):
-    def test_book_markdown_is_not_filtered_out_of_pr_or_main_push_events(self):
-        import re
-        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
-        events = re.search(r"^on:\n(.*?)^permissions:", workflow.read_text(), re.M | re.S).group(1)
-        for name in ("pull_request", "push"):
-            block = re.search(rf"^  {name}:\n(.*?)(?=^  \w|\Z)", events, re.M | re.S).group(1)
+    def test_main_push_queues_pages_and_prs_keep_ci(self):
+        workflows = Path(__file__).resolve().parents[2] / ".github/workflows"
+        events = {name: (workflows / name).read_text().split("\non:\n")[1].split("\npermissions:")[0]
+                  for name in ("ci.yml", "pages.yml")}
+        self.assertIn("  pull_request:\n", events["ci.yml"])
+        self.assertNotIn("  push:\n", events["ci.yml"])
+        self.assertIn("  push:\n    branches: [main]", events["pages.yml"])
+        self.assertNotIn("workflow_run:", events["pages.yml"])
+        for block in events.values():
             self.assertNotRegex(block, r"(?m)^    (?:paths|paths-ignore):")
-            if name == "push":
-                self.assertIn("branches: [main]", block)
-
-    def test_pages_cadence_selects_only_own_successful_ci_or_schedule_events(self):
-        import re
-        from test_verification import gha_if
-        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/pages.yml"
-        condition = " ".join(re.search(r"    name: Select a verified Pages update\n    if: >-\n(.*?)^    permissions:",
-                                       workflow.read_text(), re.M | re.S).group(1).split())
-        context = {"github.event.workflow_run.conclusion": "success",
-                   "github.event.workflow_run.event": "push",
-                   "github.event.workflow_run.head_repository.full_name": "owner/books",
-                   "github.event.schedule": "",
-                   "github.repository": "owner/books"}
-        self.assertTrue(gha_if(condition, event="workflow_run", ref="refs/heads/main", context=context))
-        for change in ({"github.event.workflow_run.conclusion": "cancelled"},
-                       {"github.event.workflow_run.conclusion": "failure"},
-                       {"github.event.workflow_run.event": "pull_request"},
-                       {"github.event.workflow_run.head_repository.full_name": "fork/books"}):
-            with self.subTest(change=change):
-                self.assertFalse(gha_if(condition, event="workflow_run", ref="refs/heads/main",
-                                        context={**context, **change}))
-        self.assertTrue(gha_if(condition, event="schedule", ref="refs/heads/main",
-                               context={name: "" for name in context}))
-        self.assertFalse(gha_if(condition, event="schedule", ref="refs/heads/main",
-                                context={**context, "github.event.schedule": "17 5 * * *"}))
 
     def test_only_superseded_pull_requests_cancel_running_ci(self):
         import re
