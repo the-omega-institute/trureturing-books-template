@@ -34,6 +34,7 @@
 #   clip       a short silent preview: clip [start s] [seconds] [WxH] → out/clip.mp4
 #   shot       stills for review: shot <t1> <t2> … [--size WxH] [--poster] → out/shots/
 #   serve      preview at http://127.0.0.1:<port>/index.html?play (or ?t=12.5, ?poster)
+#   player     narrated MP3 audio plus the timed canvas scene, fonts and optional 3D assets for Pages
 #   all        all [<output key> …]: tts, music, mix, frames, mux, cover for the requested outputs (default:
 #              what film.json lists, i.e. what the build publishes; run setup first)
 #
@@ -94,6 +95,14 @@ case "$STEP" in
     PORT="${PORT:-$("$PYTHON" -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')}"
     echo "film: http://127.0.0.1:$PORT/index.html?play  (?t=12.5 for one frame, ?poster for the poster)"
     exec "$PYTHON" -m http.server "$PORT" --bind 127.0.0.1 --directory "$OUT" ;;
+  player)
+    export FILM_OUTPUTS=narrated_720p FILM_STRICT=1
+    py tts.py "$FILM"
+    py music.py "$FILM"
+    py mix.py "$FILM"
+    DURATION="$("$PYTHON" -c 'import json,sys;print(json.load(open(sys.argv[1]))["duration"])' "$OUT/timeline.json")"
+    "$(ffmpeg_bin)" -hide_banner -loglevel error -y -i "$OUT/mix_voice.wav" -t "$DURATION" -vn -c:a libmp3lame -b:a 160k "$OUT/audio.mp3"
+    py build.py "$FILM" --player ;;
   all)
     # the requested outputs: the arguments, else $FILM_OUTPUTS, else film.json's (plan.py checks the keys)
     if [ $# -gt 0 ]; then export FILM_OUTPUTS="$*"; else export FILM_OUTPUTS="${FILM_OUTPUTS:-}"; fi

@@ -31,11 +31,14 @@ def build_one(site: config.Site, item: film.Film) -> str:
     unit = film.video_unit(site, item)
 
     def render():
-        missing = film.toolchain_missing()
+        missing = film.toolchain_missing(canvas=True) if site.film_release_only else film.toolchain_missing()
         if missing:
             raise film.FilmError("the film toolchain is incomplete: " + "; ".join(missing))
         print(f"film {unit.name}: rendering (key {unit.key[:12]})", flush=True)
-        film.render_videos(item, unit.outputs[0])
+        if site.film_release_only:
+            film.render_videos(item, unit.outputs[0], canvas=True)
+        else:
+            film.render_videos(item, unit.outputs[0])
 
     return buildcache.run(unit, render, repo=site.repo or None)
 

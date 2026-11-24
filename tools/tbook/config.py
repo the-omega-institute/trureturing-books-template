@@ -284,6 +284,7 @@ class Site:
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
     book_hide: list[str] = field(default_factory=list)
     pdf_release_only: bool = False
+    film_release_only: bool = False
     trureturing_mode: str = "frozen-state"
     trureturing_source_root: str = ""
 
@@ -364,6 +365,9 @@ def load_site() -> Site:
     pdf_release_only = site.get("pdf_release_only", False)
     if not isinstance(pdf_release_only, bool):
         raise ConfigError("site.toml: site.pdf_release_only must be a boolean")
+    film_release_only = site.get("film_release_only", False)
+    if not isinstance(film_release_only, bool):
+        raise ConfigError("site.toml: site.film_release_only must be a boolean")
     return Site(
         root=paths.ROOT,
         repo=repo,
@@ -377,6 +381,7 @@ def load_site() -> Site:
         raw=raw,
         book_hide=hide_patterns(books.get("hide")),
         pdf_release_only=pdf_release_only,
+        film_release_only=film_release_only,
         trureturing_mode=mode,
         trureturing_source_root=source_root,
     )

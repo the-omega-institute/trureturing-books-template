@@ -371,7 +371,7 @@ jobs:
           import sys
           from pathlib import Path
 
-          from tbook import build, config, lean, model
+          from tbook import build, config, film, lean, model
 
           # Release-note strings not in theme/i18n (zh / en).
           LOCAL = {
@@ -446,6 +446,8 @@ jobs:
                       row.append(f"{config.s(lang, 'ui.slides')} `{name}`")
                   if row:
                       notes.append(f"  - {config.s(lang, 'meta.name') or lang}: " + ", ".join(row))
+              for name in film.collect_release(site, book, assets):
+                  notes.append(f"  - MP4 `{name}`")
               notes.append("")
           if lock:
               notes += ["---", "",

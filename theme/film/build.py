@@ -183,7 +183,7 @@ def solid_assets(film, out: Path) -> dict | None:
     return {"core": "solid/solid-core.js"}
 
 
-def build(film_dir: Path, *, strict: bool = False) -> Path:
+def build(film_dir: Path, *, strict: bool = False, player: bool = False) -> Path:
     film = load(film_dir)
     issues = tfilm.check_film(film, tfilm._lock())
     for i in issues:
@@ -218,12 +218,29 @@ def build(film_dir: Path, *, strict: bool = False) -> Path:
     data["fontText"] = "".join(sorted(chr(c) for c in chars))
     title = f"{film.title('en')} · {film.title('zh')}"
     bg = tokens["film"].get("bg", "#000")
+    stage = '<canvas id="c" width="1920" height="1080"></canvas>'
+    head = ""
+    start = """<script>
+window.ready = boot().then(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.has('poster')) poster();
+  else if (q.has('play')) { const t0 = performance.now() - 1000 * (+q.get('play') || 0); const tick = () => { renderAt(((performance.now() - t0) / 1000) % DATA.timeline.duration); requestAnimationFrame(tick); }; tick(); }
+  else renderAt(+(q.get('t') || 0));
+  return true;
+}, e => { FILM_ERRORS.push('boot: ' + e); throw e; });
+</script>"""
+    if player:
+        stage = (HERE / "site" / "player.html").read_text(encoding="utf-8")
+        head = ('<meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<link rel="stylesheet" href="../assets/tokens.css">'
+                '<link rel="stylesheet" href="../assets/player.css">')
+        start = '<script src="../assets/media-chrome.js"></script><script src="../assets/player.js"></script>'
     html = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>{title.replace('<', '&lt;')}</title>
 <meta name="generator" content="trureturing books · theme/film/build.py"><link rel="icon" href="data:,">
 <style>{faces}
-html,body{{margin:0;background:{bg};overflow:hidden}}canvas{{display:block;width:min(100vw,177.78vh);height:auto;margin:0 auto}}</style></head>
-<body><canvas id="c" width="1920" height="1080"></canvas>
+html,body{{margin:0;background:{bg};overflow:hidden}}canvas{{display:block;width:min(100vw,177.78vh);height:auto;margin:0 auto}}</style>{head}</head>
+<body>{stage}
 <script>window.FILM_ERRORS=[];addEventListener('error',e=>FILM_ERRORS.push(String(e.message)+' ('+(e.filename||'').split('/').pop()+':'+(e.lineno||0)+')'));</script>
 <script>window.FILM_TOKENS={_safe_json(tokens)};window.DATA={_safe_json(data)};</script>
 <script>
@@ -232,18 +249,10 @@ html,body{{margin:0;background:{bg};overflow:hidden}}canvas{{display:block;width
 {shared}<script>
 {scenes}
 </script>
-<script>
-window.ready = boot().then(() => {{
-  const q = new URLSearchParams(location.search);
-  if (q.has('poster')) poster();
-  else if (q.has('play')) {{ const t0 = performance.now() - 1000 * (+q.get('play') || 0); const tick = () => {{ renderAt(((performance.now() - t0) / 1000) % DATA.timeline.duration); requestAnimationFrame(tick); }}; tick(); }}
-  else renderAt(+(q.get('t') || 0));
-  return true;
-}}, e => {{ FILM_ERRORS.push('boot: ' + e); throw e; }});
-</script>
+{start}
 </body></html>
 """
-    page = out / "index.html"
+    page = out / ("player.html" if player else "index.html")
     page.write_text(html, encoding="utf-8")
     kind = "provisional" if provisional else "narrated"
     print(f"film: wrote {page} ({len(html) // 1024} KB, {kind} timeline {tl['duration']:.1f}s, "
@@ -271,7 +280,7 @@ def main(argv: list[str]) -> int:
     if "--timeline-only" in argv:
         write_provisional(film_dir)
         return 0
-    build(film_dir, strict="--strict" in argv or os.environ.get("FILM_STRICT") == "1")
+    build(film_dir, player="--player" in argv, strict="--strict" in argv or os.environ.get("FILM_STRICT") == "1")
     return 0
 
 

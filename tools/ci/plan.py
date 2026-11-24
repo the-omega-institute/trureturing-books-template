@@ -325,6 +325,8 @@ def film_reads(tree, slug, film, meta):
     where = f"books/{slug}/films/{film.split('/')[1]}"
     scopes = (*film_inputs.video_files(where), *film_inputs.extra_files(meta["scripts"], meta["solid"]))
     sources = set(film_inputs.engine_sources(slug))
+    if tree.toml("site.toml").get("site", {}).get("film_release_only"):
+        sources.add("theme/film/site/player.html")
     scripts = [*meta["scripts"], where + "/scenes.js"]
     closure = imports(tree, *scripts)
     uncertain = any(re.search(r"\bimport\s*(?:\(|['\"{*]|[\w$]+\s*(?:,|from\b))|\bexport\s+.*\bfrom\s*['\"]", tree.read(p))

@@ -19,7 +19,7 @@
 
 EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动，保留完整内容和阅读字号；页面本身应随阅读栏宽度重排。EPUBCheck 验证结构，不能代替已知版面问题处的阅读检查；浏览器原生 MathML 的检查也不等于 Apple Books 实测认证。
 
-视频与其他产物一样随站点构建：站点在 `_site/<slug>/films/<name>/<文件>` 同源托管视频（Content-Type 与按字节范围请求都正确，iOS Safari 需要这两点；Release 附件的地址在那里不能播放），不再为单个视频发 Release；视频计入 GitHub Pages 站点 1 GB 的上限。只构建、托管 `film.json` 的 `outputs` 所列的文件：默认只有 720p 旁白版与封面，50 秒的示例视频共约 6.5 MB（视频 6.1 MB、封面 0.5 MB，另有提交的海报 0.16 MB），约合每分钟 8 MB；同时列出 1080p 旁白版、1080p 与 720p 纯配乐时约 70 MB（每分钟约 84 MB）。渲染视频需要视频工具链（`bash theme/film/setup.sh` 与系统的 ffmpeg）。环境变量 `TBOOK_FILMS` 决定缓存未命中时怎么办：`auto`（默认）有工具链就渲染，没有则警告，站点不含该视频；`require` 无法渲染即构建失败；`skip` 从不渲染。三种情况下缓存命中的视频都照常恢复。
+默认情况下，视频与其他产物一样随站点构建：站点在 `_site/<slug>/films/<name>/<文件>` 同源托管视频（Content-Type 与按字节范围请求都正确，iOS Safari 需要这两点；Release 附件的地址在那里不能播放），不再为单个视频发 Release；视频计入 GitHub Pages 站点 1 GB 的上限。只构建、托管 `film.json` 的 `outputs` 所列的文件：默认只有 720p 旁白版与封面，50 秒的示例视频共约 6.5 MB（视频 6.1 MB、封面 0.5 MB，另有提交的海报 0.16 MB），约合每分钟 8 MB；同时列出 1080p 旁白版、1080p 与 720p 纯配乐时约 70 MB（每分钟约 84 MB）。渲染视频需要视频工具链（`bash theme/film/setup.sh` 与系统的 ffmpeg）。环境变量 `TBOOK_FILMS` 决定缓存未命中时怎么办：`auto`（默认）有工具链就渲染，没有则警告，站点不含该视频；`require` 无法渲染即构建失败；`skip` 从不渲染。三种情况下缓存命中的视频都照常恢复。
 
 学术预印本的官方技术要求与项目版式选择见 [PDF-TYPOGRAPHY.md](PDF-TYPOGRAPHY.md)。
 
@@ -28,6 +28,8 @@ EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动�
 `_site/` 是 GitHub Pages 的产物：书库首页（每本书一张卡片：封面、简介、在线阅读、下载）、每本书的落地页（目录、下载、验证摘要、可视化/视频/幻灯片）、mdBook 页面、下载文件与 `manifest.json`（机器可读清单：版本、文件、sha256、所钉的 trureturing 提交）。站内使用相对链接，站点可以挂在 `/<repo>/` 之下。
 
 在 `site.toml` 的 `[site]` 中设置 `pdf_release_only = true`，常规 CI 和 Pages 构建便会跳过书籍及演示文稿 PDF 导出。Pages 的下载链接直接指向已发布的 GitHub Release 附件（含公开预发布）。书籍按当前 `book.toml` 版本匹配文件名，演示文稿采用最近发布的同名附件。没有对应附件时隐藏该下载链接。Pages 每小时检查已发布附件并刷新主干站点的下载链接。组装站点时需要可访问仓库的 GitHub CLI（`gh`）。本地仍可显式执行 `./tbook build pdf`，或用 `TBOOK_BUILD_RELEASE=1 ./tbook build slides` 导出演示文稿 PDF。
+
+在 `[site]` 中设置 `film_release_only = true` 后，常规 CI 与 Pages 按影片合成旁白和配乐，写入 `build/film-players/<slug>/<name>/`。网页从本站加载 MP3、字体、镜头与所需的三维模型。Media Chrome 提供播放、拖动、音量、倍速和全屏，Canvas 根据音轨时间绘制画面和字幕。日常构建跳过逐帧编码。发书籍或整站 Release（含每日预览）时，工作流把所选书籍的 `film.json` 中列出的每个 MP4 作为独立附件上传。影片页按片名和版本规格链接最近一次已发布的相应附件，首次发布前仍可在线播放。关闭此项可恢复同源 MP4 模式。外部影片引用沿用其来源链接。
 
 本地预览：`./tbook serve`（默认端口 8765，自动挂在 Pages 子路径下；支持按字节范围请求，Safari 也能播放视频；`TBOOK_SERVE_HOST=0.0.0.0` 允许其他设备访问，例如用 iPhone 查看）。
 

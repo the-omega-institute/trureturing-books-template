@@ -1,0 +1,21 @@
+html, body, #stage { width: 100%; height: 100%; }
+#stage { position: relative; background: var(--tr-stage); }
+#stage canvas, #cover, media-controller {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#stage canvas, #cover { object-fit: contain; }
+media-controller {
+  --media-background-color: transparent;
+  --media-range-bar-color: var(--tr-cyan);
+}
+media-control-bar { width: 100%; }
+media-time-range { flex: 1; min-width: 2em; }
+media-volume-range { max-width: 5em; }
+#start { border-radius: 50%; padding: .7em; }
+media-controller[mediahasplayed] #start { display: none; }
+#error { position: absolute; inset: 0 0 auto; margin: 0; padding: 1em; background: var(--tr-stage); color: var(--tr-white); font: 1rem system-ui; }
+@media (max-width: 480px) { media-volume-range { display: none; } }
+@media (max-width: 340px) { media-time-display { display: none; } }

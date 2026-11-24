@@ -59,7 +59,7 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 
    `--film`（可重复）只渲染或恢复这几部，本书其他视频只从缓存恢复、不渲染；`build site`、`build all` 不接受它。
 
-   每部视频是一个构建单元（`./tbook cache status` 中目标为 `films`）：输入未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链时用它取得视频）；都没有时运行 `film.sh <dir> all`（`FILM_STRICT=1`：只用 TTS 实测的时间轴与自托管字体），只编码并复制 `outputs` 所列的文件到 `build/films/<slug>/<name>/`（默认不做 1080p 母版，720p 由帧直接缩放编码；50 秒的示例约 80 秒、成片约 6 MB）。构建不写任何入库文件；`poster.jpg` 只由第 4 步手工更新。渲染后若实际时长与 `film.json` 的 `duration` 不同，构建会警告，按提示更新。
+   默认模式下，每部视频是一个构建单元（`./tbook cache status` 中目标为 `films`）：输入未变时从本地缓存恢复，设置 `TBOOK_CACHE_REMOTE=1` 时也从已发布的整站 Release 恢复（本机没有视频工具链时用它取得视频）；都没有时运行 `film.sh <dir> all`（`FILM_STRICT=1`：只用 TTS 实测的时间轴与自托管字体），只编码并复制 `outputs` 所列的文件到 `build/films/<slug>/<name>/`（默认不做 1080p 母版，720p 由帧直接缩放编码；50 秒的示例约 80 秒、成片约 6 MB）。构建不写任何入库文件；`poster.jpg` 只由第 4 步手工更新。渲染后若实际时长与 `film.json` 的 `duration` 不同，构建会警告，按提示更新。
    `TBOOK_FILMS`：`auto`（默认）缓存未命中且工具链齐全时渲染，否则警告并在站点上只显示海报与“视频未构建”；`require` 缺工具链时失败；`skip` 从不渲染（命中缓存仍恢复）。`./tbook build site` 与 `./tbook build all` 同样会渲染或恢复视频。
 6. 嵌入章节——**所有语言版本都要加**，`src` 相同，只翻译图注：
 
@@ -69,7 +69,9 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
    :::
    ```
 
-   本书的视频：HTML 中为 `<video>`，播放站内 `films/<name>/` 的 720p 旁白版，海报为提交的 `poster.jpg`，附 `outputs` 所列视频的下载（默认只有 720p）与视频页链接；站点没有该视频（未构建）时改为显示海报与“视频未构建”。PDF/EPUB 中为海报、图注与站点视频页地址（`site.toml` 没有 `base_url` 时只有海报与图注）。
+   开启 `[site].film_release_only` 后，章节与视频页嵌入同源 Media Chrome 播放器。用实片检查拖动后字幕与旁白的位置、倍速、全屏和窄屏控件。Pages 合成 MP3，发版时再按 `outputs` 编码 MP4。
+
+   默认模式下，本书的视频：HTML 中为 `<video>`，播放站内 `films/<name>/` 的 720p 旁白版，海报为提交的 `poster.jpg`，附 `outputs` 所列视频的下载（默认只有 720p）与视频页链接；站点没有该视频（未构建）时改为显示海报与“视频未构建”。PDF/EPUB 中为海报、图注与站点视频页地址（`site.toml` 没有 `base_url` 时只有海报与图注）。
 
    外部视频（trureturing-film 的 Release）：`::: {.film src="trureturing-film:film-<NNN>-v<k>"}`。HTML 中为 `<video>`，直接播放该 Release 的旁白版附件 `TRURETURING_<NNN>_narrated_EN_subs_ZH-EN.mp4`，海报为其 `TRURETURING_<NNN>_cover.jpg`，附“观看”（视频文件）与“下载”（Release 页）链接；不经站点托管，也不显示“视频未构建”。Release 附件的地址在 iOS Safari 中不能播放，需要所有读者都能看的视频请做成本书的视频。PDF/EPUB 中没有海报，为标题“trureturing-film 的视频 · film-<NNN>-v<k>”、图注与该 Release 页的地址（不依赖 `base_url`）。
 7. `./tbook build site --book <book> && ./tbook serve` 查看视频页 `<slug>/films/` 与章节中的播放器（手机宽度、深浅主题）。`./tbook serve` 支持按字节范围请求，Safari 也能在本地播放；用 iPhone 查看时设置 `TBOOK_SERVE_HOST=0.0.0.0`，从同一网络访问。
