@@ -269,9 +269,23 @@ def citation_inputs(tree, slug, ident):
                 if isinstance(node, mdscan.Div) and model.kind_of(node) == "viz":
                     data.setdefault((node.attrs.get("src") or "").strip(), set()).add(p)
         tree._citation_inputs[slug] = data
-    # A changed reading order may add/remove the chapter from publication.
-    summaries = [p for p in tree.files if p.startswith(f"books/{slug}/") and p.endswith("/SUMMARY.md")]
-    return sorted(tree._citation_inputs[slug].get(ident, set())) + summaries
+    return sorted(tree._citation_inputs[slug].get(ident, ()))
+
+
+def published_citation_chapters(tree, slug, ident, toc):
+    """Ordered chapters in this edition that supply the suite's published embeds."""
+    from tbook import summary
+    if tree is None or toc not in tree.files:
+        return []
+    if not hasattr(tree, "_summary_chapters"):
+        tree._summary_chapters = {}
+    if toc not in tree._summary_chapters:
+        path = PurePosixPath(toc)
+        tree._summary_chapters[toc] = [
+            str(path.parent / name) for name in summary.parse_summary(Path(toc), text=tree.read(toc)).files()
+        ]
+    cited = set(citation_inputs(tree, slug, ident))
+    return [path for path in tree._summary_chapters[toc] if path in cited]
 
 
 def execution_inventory(tree, *, with_workloads=False):
@@ -539,6 +553,12 @@ def impact(current, previous, paths, *, full=False, template=False):
                 if suite in all_suites and (p in closure or any(fnmatch.fnmatchcase(p, pat) for pat in patterns)):
                     matched_suites.add(suite)
             for slug, book in books.items():
+                if PurePosixPath(p).match(f"books/{slug}/*/SUMMARY.md"):
+                    for suite in book["suites"]:
+                        if suite in all_suites and "@citations" in book["deps"].get(suite, []):
+                            ident = PurePosixPath(suite).name.removesuffix(".test.mjs")
+                            if published_citation_chapters(current, slug, ident, p) != published_citation_chapters(previous, slug, ident, p):
+                                matched_suites.add(suite)
                 if p == f'books/{slug}/viz/visualizations.json':
                     for suite in book['suites']:
                         ident = PurePosixPath(suite).name.removesuffix('.test.mjs')

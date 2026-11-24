@@ -1,9 +1,28 @@
 name: Resolve trureturing branch lock
 description: Provide a resolved lock to all subsequent commands in this job.
+inputs:
+  artifact-id:
+    description: Immutable resolved lock from the CI plan in this run
+    required: false
 runs:
   using: composite
   steps:
+    - name: Download the planned lock
+      if: inputs.artifact-id != ''
+      uses: actions/download-artifact@v7
+      with:
+        artifact-ids: ${{ inputs.artifact-id }}
+        path: ${{ runner.temp }}/planned-lock
+        merge-multiple: true
+    - name: Use the planned lock
+      if: inputs.artifact-id != ''
+      shell: bash
+      run: |
+        snapshot="$RUNNER_TEMP/planned-lock/trureturing-lock.json"
+        jq -e --arg sha "$TBOOK_TRURETURING_SHA" '.commit == $sha' "$snapshot" >/dev/null
+        echo "TBOOK_LOCK_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
     - name: Materialize the lock
+      if: inputs.artifact-id == ''
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}

@@ -60,11 +60,12 @@ jobs:
   plan:
     name: Plan affected work
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
       plan_attempt: ${{ github.run_attempt }}
       plan: ${{ steps.plan.outputs.plan }}
       trureturing_sha: ${{ steps.lock.outputs.sha }}
+      lock_artifact: ${{ steps.share.outputs.artifact-id }}
       site: ${{ steps.plan.outputs.site }}
       publish: ${{ steps.plan.outputs.publish }}
       validate: ${{ steps.plan.outputs.validate }}
@@ -97,14 +98,27 @@ jobs:
           SLOW_FRAMES: ${{ inputs.slow_frames }}
         run: python3 tools/ci/plan.py
 
-      - name: Resolve the trureturing branch
+      - name: Resolve the branch lock once for selected jobs
+        if: contains(fromJSON(steps.plan.outputs.plan).tasks.*, true)
         id: lock
         env:
           GH_TOKEN: ${{ github.token }}
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
         run: |
-          sha="$(./tbook resolve-lock --branch-head)"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          snapshot="$RUNNER_TEMP/trureturing-lock.json"
+          ./tbook resolve-lock --branch-only > "$snapshot"
+          if [[ -s "$snapshot" ]]; then
+            sha="$(jq -er .commit "$snapshot")"
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Share the resolved lock with this run
+        if: steps.lock.outputs.sha != ''
+        id: share
+        uses: actions/upload-artifact@v6
+        with:
+          name: tbook-ci-lock-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/trureturing-lock.json
+          if-no-files-found: error
 
   validate:
     name: Validate selected inputs
@@ -118,8 +132,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
 
       - name: Materialize the complete selected plan
         # toJSON escapes string newlines; the quoted here-document keeps data inert.
@@ -277,8 +292,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
       - name: Materialize the selected plan and browser shard
         run: |
           cat <<'TBOOK_PLAN_JSON' > "$RUNNER_TEMP/ci-plan.json"
@@ -317,8 +333,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
       - name: Set up capture tools
         uses: ./.github/actions/setup
         with:
@@ -370,8 +387,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -487,8 +505,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -527,8 +546,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -568,8 +588,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
 
       - name: Materialize the complete selected plan
         # toJSON escapes string newlines; the quoted here-document keeps data inert.
@@ -671,8 +692,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
       - uses: ./.github/actions/resolve-lock
-        env:
-          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+        if: needs.plan.outputs.trureturing_sha != ''
+        with:
+          artifact-id: ${{ needs.plan.outputs.lock_artifact }}
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
