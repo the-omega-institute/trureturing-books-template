@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "8c1f20a46119b885029c12a5897ae99c28d15f47b71e173bd5f53fc6c7c364de",
+      "sha256": "d2e8efa29a3771920132f314d331a9f8ad2ae9cc62d0b51f3af08a124de9ef17",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -400,7 +400,7 @@
       "mode": "100644"
     },
     "theme/site/site.css": {
-      "sha256": "08db59336185ef7f1958fc2b017d222b2c0e60dceca0f7612e2cceefe61e3833",
+      "sha256": "5a4b17b8baedea872f44d1d63adfa528f48278f6efcd0738cbc9a72e1978767a",
       "mode": "100644"
     },
     "theme/site/site.js": {
@@ -868,7 +868,7 @@
       "mode": "100644"
     },
     "tools/tbook/site.py": {
-      "sha256": "95b34eea95301abb9a27f215871f132085934e6e0e40ed02f1bf1362ffa9e3e5",
+      "sha256": "91274c15aa7dfb77e9c5721a781689d60a34df4f40637ec34101350cbf5a7b94",
       "mode": "100644"
     },
     "tools/tbook/slides.py": {
@@ -876,7 +876,7 @@
       "mode": "100644"
     },
     "tools/tbook/stats.py": {
-      "sha256": "6b8c742849148f5e9f1308cd04da15fe7798895fb720e61128d4eae82ad15a4f",
+      "sha256": "7deff470b70e7e87ae2b0930f2a09c43719f5ac9b49e48d83960831fd45a68d3",
       "mode": "100644"
     },
     "tools/tbook/summary.py": {
@@ -1088,7 +1088,7 @@
       "mode": "100644"
     },
     "tools/tests/test_site.py": {
-      "sha256": "c371ef5ebf524daf04352f33febe4f685d9b6261535a8672c7652921f4b035a6",
+      "sha256": "bee7dec9278d76bda48fb9f4dfc6e835d65f67bafddc1bf134296b503d26f393",
       "mode": "100644"
     },
     "tools/tests/test_site_post_build.py": {
