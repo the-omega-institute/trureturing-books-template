@@ -209,6 +209,26 @@ class SelectionTests(unittest.TestCase):
         selected = planner.impact(head, head, [path])
         self.assertEqual(selected["suites"], ["books/one/viz/tests/b.test.mjs"])
 
+    def test_summary_selects_changed_citation_order_and_explicit_readers(self):
+        book = "books/one/"
+        toc = book + "zh/SUMMARY.md"
+        self.write(book + "viz/tests/dependencies.json", json.dumps({"schema": planner.DEPENDENCIES, "suites": {
+            "a.test.mjs": ["@citations"], "b.test.mjs": [book + "zh/SUM*.md"]}}))
+        self.write(book + "zh/next.md", '::: {.viz src="a" preset="next"}\n:::\n')
+        self.write(book + "zh/text.md", "# Text\n")
+        first = "- [First](chapter.md)\n"
+        second = "- [Second](next.md)\n"
+        self.write(toc, first + second)
+        self.base = self.commit()
+        for summary_text, expected in ((first + "- [Text](text.md)\n" + second, ["b"]),
+                                       (second + first, ["a", "b"]), (second, ["a", "b"])):
+            with self.subTest(summary_text=summary_text):
+                self.write(toc, summary_text)
+                head, old = self.views()
+                selected = planner.impact(head, old, [toc])
+                self.assertEqual(selected["suites"], [book + f"viz/tests/{s}.test.mjs" for s in expected])
+                self.assertTrue(selected["exports"])
+
     def test_new_summary_does_not_replay_unchanged_readers_but_keeps_changed_inputs(self):
         dep = "books/one/viz/tests/dependencies.json"
         (self.root / dep).unlink()
