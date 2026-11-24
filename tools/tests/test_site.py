@@ -172,7 +172,8 @@ class SiteCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="tbook-site-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self.site = replace(config.load_site(), pdf_release_only=False, film_release_only=False)
+        self.site = replace(config.load_site(), pdf_release_only=False,
+                            epub_release_only=False, film_release_only=False)
         self.build_root = self.tmp / "build"
         self.out = self.tmp / "out"
 
@@ -245,14 +246,17 @@ class SiteHelpersTest(unittest.TestCase):
 
 class SiteBuildTest(SiteCase):
     def test_empty_release_only_site_needs_no_github_access(self):
-        self.site = replace(self.site, pdf_release_only=True, film_release_only=True)
+        self.site = replace(self.site, pdf_release_only=True, epub_release_only=True, film_release_only=True)
         with (mock.patch.object(releases, "pdf_assets") as fetch_assets,
+              mock.patch.object(releases, "epub_assets") as fetch_epubs,
               mock.patch.object(releases, "film_assets") as fetch_films):
             out = self.run_build([])
         fetch_assets.assert_not_called()
+        fetch_epubs.assert_not_called()
         fetch_films.assert_not_called()
         manifest = json.loads((out / "manifest.json").read_text())
         self.assertEqual(manifest["release_pdf_digest"], releases.pdf_digest({}))
+        self.assertNotIn("release_epub_digest", manifest)
 
     def test_release_only_downloads_use_assets_and_ignore_local_pdfs(self):
         book = make_book(self.tmp)
@@ -282,6 +286,30 @@ class SiteBuildTest(SiteCase):
                 manifest = json.loads((out / "manifest.json").read_text())
                 self.assertEqual(manifest["release_pdf_digest"], releases.pdf_digest(available))
                 self.assertNotIn("pdf", {f["kind"] for f in manifest["books"][0]["files"]})
+
+    def test_release_only_epub_uses_the_current_edition_asset(self):
+        book = make_book(self.tmp)
+        fake_build(self.build_root, book)
+        self.site = replace(self.site, epub_release_only=True)
+        name = book.artifact("zh", "epub")
+        other_version = replace(book, version="0.0.1").artifact("en", "epub")
+        url = "https://example.org/releases/download/"
+        assets = {name: releases.ReleaseAsset(url + name, 42),
+                  other_version: releases.ReleaseAsset(url + other_version, 42)}
+        with mock.patch.object(releases, "epub_assets", return_value=assets):
+            out = self.run_build([book])
+
+        self.assertEqual(list(out.rglob("*.epub")), [])
+        for page in (out / "index.html", out / book.slug / "index.html"):
+            html = page.read_text()
+            self.assertIn(url + name, html)
+            self.assertNotIn("downloads/" + name, html)
+            self.assertNotIn(other_version, html)
+            self.assertNotIn(book.artifact("en", "epub"), html)
+            self.assertIn("downloads/" + book.artifact("zh", "pdf", "screen"), html)
+        manifest = json.loads((out / "manifest.json").read_text())
+        self.assertEqual(manifest["release_epub_digest"], releases.asset_digest(assets))
+        self.assertNotIn("epub", {f["kind"] for f in manifest["books"][0]["files"]})
 
     def test_full_build(self):
         book = make_book(self.tmp)

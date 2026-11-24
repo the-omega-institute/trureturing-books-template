@@ -52,6 +52,11 @@ def pdf_assets(repo: str) -> dict[str, ReleaseAsset]:
 
 
 @lru_cache(maxsize=1)
+def epub_assets(repo: str) -> dict[str, ReleaseAsset]:
+    return _assets(repo, ".epub", previews=False)
+
+
+@lru_cache(maxsize=1)
 def film_assets(repo: str) -> dict[str, ReleaseAsset]:
     return _assets(repo, ".mp4", previews=True)
 

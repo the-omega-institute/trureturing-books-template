@@ -96,6 +96,9 @@ def inventory(tree):
     pdf_release_only = site.get("site", {}).get("pdf_release_only", False)
     if not isinstance(pdf_release_only, bool):
         raise ValueError("site.toml: site.pdf_release_only must be a boolean")
+    epub_release_only = site.get("site", {}).get("epub_release_only", False)
+    if not isinstance(epub_release_only, bool):
+        raise ValueError("site.toml: site.epub_release_only must be a boolean")
     hide = site.get("books", {}).get("hide", [])
     if not isinstance(hide, list) or not all(isinstance(x, str) and x for x in hide):
         raise ValueError("site.toml: invalid books.hide")
@@ -154,8 +157,9 @@ def inventory(tree):
         declared = viz_budget.parts(tree.json(parts_path), [PurePosixPath(s).name for s in suites]) if parts_path in tree.files else {}
         has_viz = any(f.startswith(prefix + "viz/") for f in tree.files)
         books[slug] = dict(has_viz=has_viz, suites=suites, parts=declared, films=films, slides=sorted(decks), deps=deps,
-                           outputs=[*( ["html"] if outputs.get("html", True) else []),
-                                    *("pdf-" + v for v in pdf if not pdf_release_only), *( ["epub"] if outputs.get("epub", True) else [])])
+                           outputs=[*(["html"] if outputs.get("html", True) else []),
+                                    *("pdf-" + v for v in pdf if not pdf_release_only),
+                                    *(["epub"] if outputs.get("epub", True) and not epub_release_only else [])])
     return books
 
 
