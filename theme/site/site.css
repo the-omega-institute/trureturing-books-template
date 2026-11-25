@@ -358,6 +358,8 @@ details.more-items > summary { cursor: pointer; color: var(--tr-cyan); font-fami
 /* media: visualizations, films and slides share a row; a section with many items spans it */
 .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; align-items: start; }
 .media > .wide { grid-column: 1 / -1; }
+.sec .film-group-title { margin: 0; }
+.sec .mgrid + .film-group-title { margin-top: 12px; }
 .mgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .wide .mgrid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
 .sec-head a.aside { color: var(--tr-dim); text-decoration: none; border-bottom: 1px dotted var(--hot); }
@@ -380,9 +382,9 @@ details.more-items > summary { cursor: pointer; color: var(--tr-cyan); font-fami
 }
 .mcard:hover .thumb img, .mcard:focus-within .thumb img { transform: scale(1.03); filter: saturate(1.2) brightness(1.06); }
 .mcard .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
-.mcard h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; font-family: var(--tr-font-body); letter-spacing: 0; }
-.mcard h3 a { color: var(--tr-ink); text-decoration: none; }
-.mcard h3 a:hover { color: var(--tr-cyan); }
+.mcard :is(h3, h4) { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; font-family: var(--tr-font-body); letter-spacing: 0; }
+.mcard :is(h3, h4) a { color: var(--tr-ink); text-decoration: none; }
+.mcard :is(h3, h4) a:hover { color: var(--tr-cyan); }
 .mcard .sum {
   margin: 0; color: var(--tr-dim); font-size: 13px;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden;

@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.25.0] - 2026-11-26
+
+- 可在每本书的 `book.toml` 中用 `[films].long_form` 指定长篇影片。书籍首页与影片索引将长篇置于独立分区，并保留原有片名链接。
+
 ## [1.24.0] - 2026-11-25
 
 - 启用 `film_release_only` 的书库发版时，MP4 改由新增的 `films` 任务按片长均衡分成至多十个并行分片渲染，每部影片先从最近发布的 Release 恢复。构建缓存改在收集附件之后导出，并包含 MP4 单元（`TBOOK_BUILD_RELEASE=1` 时 `./tbook cache export` 列出），下一次发版只渲染改动过的影片。此前全部 MP4 在构建任务里串行渲染且从不进入缓存，影片总时长较大时会超出 240 分钟的任务时限。

@@ -24,6 +24,8 @@ description: 为书做讲解视频时使用：按 trureturing-film 方案新建�
 
 7. **视频只用具体片名，不编号**：目录用片名的 kebab-case 写法（如 `golden-deficit`），`film.json` 只填双语标题等内容元数据，不另填视频 `id` 或所属章节。各端显示片名，不从目录提取序号。
 
+在 `book.toml` 的 `[films].long_form` 中列出长篇影片的目录名。书籍首页与影片索引会将这些影片放在独立的长篇分区。
+
 ## 流程
 
 ```bash
