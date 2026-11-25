@@ -37,7 +37,7 @@ tag 是什么、哪种 tag 触发发版、推送后发生什么、与“从 Rele
    发布全部书时用 `v<日期或版本>`，例如 `v2026.11.08`、`v2026-11-08` 或 `v3.0.0`（模板仓库自身除外——那里的 `v*` 是模板版本）。
    只有语义化版本的预发布才标为 GitHub pre-release：单本书看 `book.toml` 的 `version`（如 `1.0.0-rc.1`），全部书看 tag 中 `v` 之后的部分（如 `v3.0.0-rc.1`）；其他形式都是正式发布。日期写成 `YYYY.MM.DD`、`YYYY-MM-DD` 或 `YYYYMMDD`，月、日补零：以这样的日期开头的版本无论后面跟什么都是正式发布，同一天再发一次可用 `v2026.11.08-2`。不补零的 `v2026.1.5-2` 恰好是语义化版本的预发布，会标为 pre-release。
 5. `release.yml` 校验 tag 与 `book.toml` 版本一致，构建整个站点（未变的单元从缓存恢复，视频也在其中），先建草稿 Release，上传所选书的 PDF（屏幕版、印刷版）、EPUB、幻灯片 PDF 与全站的构建缓存（`cache-*.tar`、`build-cache.json`），全部上传后才发布；说明中列出所钉的 trureturing 提交与定理数。
-   开启 `[site].film_release_only` 时，工作流会渲染所选书的影片，在同一 Release 上传 `film.json` 列出的每种 MP4。Pages 播放同源 MP3，Canvas 按音轨时钟绘制画面。
+   开启 `[site].film_release_only` 时，工作流会渲染所选书的影片，在同一 Release 上传 `film.json` 列出的每种 MP4。MP4 由 `films` 任务按片长分成至多十个并行分片渲染，没改动的影片从上一次 Release 恢复。Pages 播放同源 MP3，Canvas 按音轨时钟绘制画面。
 6. 检查 Release 附件（读者下载与 `build-cache.json` 都在）与 Pages 上的下载链接和视频。
 7. （建议，只需一次）在 Settings → General → Releases 启用不可变 Release，发布后的附件与 tag 不能再改（`docs/VERIFICATION.md` §2）。
 

@@ -697,6 +697,22 @@ class VideoUnitTest(unittest.TestCase):
         self.assertEqual(names, [item.output("narrated_720p")])
         self.assertEqual((stage / names[0]).read_bytes(), b"mp4")
 
+    def test_release_build_exports_the_mp4_units(self):
+        """A release build of a site with film_release_only lists each film's MP4 unit beside its live unit
+        (release_unit: the key collect_release renders under), so the release's cache export carries it."""
+        site = dataclasses.replace(self.sb.site, film_release_only=True)
+        plain = dataclasses.replace(self.sb.site, film_release_only=False)
+        item = self.sb.film()
+        live, mp4 = film.video_unit(site, item), film.release_unit(site, item)
+        self.assertEqual(mp4.key, film.video_unit(plain, item).key)
+        self.assertNotEqual(live.key, mp4.key)
+        with mock.patch.dict(os.environ, {"TBOOK_BUILD_RELEASE": ""}):
+            self.assertEqual([u.key for u in film.units(site, self.sb.book)], [live.key])
+        with mock.patch.dict(os.environ, {"TBOOK_BUILD_RELEASE": "1"}):
+            self.assertEqual([u.key for u in film.units(site, self.sb.book)], [live.key, mp4.key])
+            # Without film_release_only the build renders the MP4 itself: one unit, as before.
+            self.assertEqual([u.key for u in film.units(plain, self.sb.book)], [mp4.key])
+
     def test_unrelated_changes_keep_the_key(self):
         key = self.sb.key()
         (self.sb.book.dir / "zh" / "ch01.md").write_text("# 第一章\n\n新的一段。\n", encoding="utf-8")

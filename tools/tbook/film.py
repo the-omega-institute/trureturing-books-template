@@ -1710,6 +1710,14 @@ def _release_urls(site: config.Site, film: Film) -> dict[str, str]:
             and (asset := assets.get(release_name(film, key)))}
 
 
+def release_unit(site: config.Site, film: Film) -> buildcache.Unit:
+    """The unit of a film's MP4 renditions on a site that plays its films live (``film_release_only``):
+    :func:`video_unit` of the site without that setting. The release renders it (``collect_release``,
+    and the parallel shards of ``tools/ci/films.py --release``) and attaches it to the build cache it
+    exports, so the next release restores every film that did not change instead of rendering it again."""
+    return video_unit(replace(site, film_release_only=False), film)
+
+
 def collect_release(site: config.Site, book: config.Book, dest: Path) -> list[str]:
     """Render or restore the selected book's MP4 renditions and stage reader downloads."""
     names = []
@@ -1725,8 +1733,14 @@ def collect_release(site: config.Site, book: config.Book, dest: Path) -> list[st
 
 
 def units(site: config.Site, book: config.Book) -> list[buildcache.Unit]:
-    """One build unit per film of ``book`` (:func:`video_unit`), for :func:`tbook.buildcache.units`."""
-    return [video_unit(site, f) for f in films(book) if f.meta is not None]
+    """One build unit per film of ``book`` (:func:`video_unit`), for :func:`tbook.buildcache.units`. In a
+    release build (``TBOOK_BUILD_RELEASE=1``) of a site with ``film_release_only``, also the unit of each
+    film's MP4 renditions (:func:`release_unit`), so that the release's cache export carries them."""
+    current = [f for f in films(book) if f.meta is not None]
+    out = [video_unit(site, f) for f in current]
+    if site.film_release_only and os.environ.get("TBOOK_BUILD_RELEASE") == "1":
+        out += [release_unit(site, f) for f in current]
+    return out
 
 
 def toolchain_missing(*, canvas: bool = False) -> list[str]:

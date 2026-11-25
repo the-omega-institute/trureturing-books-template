@@ -1368,7 +1368,7 @@ class BuildCacheWorkflowTests(unittest.TestCase):
         pages.yml saves after building; CI saves only after the successful aggregate merges shards."""
         jobs = self.building_jobs()
         self.assertEqual(set(jobs), {("ci.yml", "build"), ("ci.yml", "media"), ("ci.yml", "films"), ("pages.yml", "build"),
-                                     ("release.yml", "build"), ("template-release.yml", "site")})
+                                     ("release.yml", "films"), ("release.yml", "build"), ("template-release.yml", "site")})
         for (wf, job), steps in jobs.items():
             where = f"{wf}, job {job}"
             builds = [i for i, s in enumerate(steps) if re.search(r"^(?:\./tbook build\b|python tools/ci/films.py\b|python tools/ci/run.py slides(?:\s|$))", s.get("run", ""), re.M)]
