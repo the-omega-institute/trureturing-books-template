@@ -2,6 +2,10 @@
 
 本文件记录 trureturing-books-template 的版本变化，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。下游升级时请阅读跨越的所有版本，处理标为“需要手动操作”的条目。
 
+## [1.25.1] - 2026-11-26
+
+- 兼容 trureturing A14.2 冻结记录中实测完整的标准三公理集合，保留排序、唯一性与许可集合核验。
+
 ## [1.25.0] - 2026-11-26
 
 - 可在每本书的 `book.toml` 中用 `[films].long_form` 指定长篇影片。书籍首页与影片索引将长篇置于独立分区，并保留原有片名链接。

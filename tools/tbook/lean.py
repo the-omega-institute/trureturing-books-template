@@ -715,13 +715,13 @@ def github_branch_contains(repo: str, branch: str, commit: str) -> Ancestry:
 
 
 def frozen_axioms(row: dict, gid: str) -> list[str] | None:
-    """A14.2 records a measured proper subset. An omitted field gives only the allowed upper bound."""
+    """A14.2 records the measured standard-axiom closure. An omitted field gives only the allowed upper bound."""
     if "axioms" not in row:
         return None
     values = row["axioms"]
     if (not isinstance(values, list) or any(v not in STD_AXIOMS for v in values)
-            or values != sorted(set(values)) or len(values) == len(STD_AXIOMS)):
-        raise LeanError(f"{gid}: frozen axioms must be a sorted, unique proper subset of {STD_AXIOMS}")
+            or values != sorted(set(values))):
+        raise LeanError(f"{gid}: frozen axioms must be a sorted, unique subset of {STD_AXIOMS}")
     return values
 
 

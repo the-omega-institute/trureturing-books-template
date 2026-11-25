@@ -771,8 +771,13 @@ class LeanTests(unittest.TestCase):
             self.assertEqual(lock.get(gid).axioms, expected)
         del rows[1]["axioms"]
         self.assertNotIn("axioms", lean.resolve(led, COMMIT, GID_INT).to_lock())
+        rows[1]["axioms"] = sorted(lean.STD_AXIOMS)
+        resolved = lean.resolve(led, COMMIT, GID_INT)
+        self.assertEqual(resolved.axiom_status, "depends")
+        self.assertEqual(make_lock({GID_INT: resolved.to_lock()}).get(GID_INT).axioms,
+                         sorted(lean.STD_AXIOMS))
         for invalid in (None, {}, "propext", ["sorryAx"], ["propext", "propext"],
-                        ["propext", "Quot.sound"], sorted(lean.STD_AXIOMS)):
+                        ["propext", "Quot.sound"]):
             rows[1]["axioms"] = invalid
             with self.subTest(invalid=invalid), self.assertRaises(lean.LeanError):
                 lean.resolve(led, COMMIT, GID_INT)
