@@ -59,7 +59,14 @@ Source layout (``books/<slug>/films/``)::
     {"voice": "af_heart", "speed": 0.94, "say": {"word": "pronunciation"}?, "music": {"bpm": 80,
      "progression": "a-minor"}?, "scenes": [{"id": "zeck", "name": "ZECKENDORF"?, "lead": 1.5, "tail": 0.6,
      "lines": [["English narration", "中文字幕"], …], "music": [pad, bass, arp, kick, hat]?,
-     "cues": [{"line": 0, "at": 2.5, "kind": "stamp" | "chime"}]?}]}
+     "cues": [{"line": 0, "at": 2.5, "kind": "stamp" | "chime"}]?,
+     "chapter": {"en": "Part I · Point to line", "zh": "第一部 · 从点到线"}?}]}
+
+A scene with ``chapter`` opens a chapter that runs until the next one (a long film's parts or volumes); once any
+scene opens one, the first scene must too, so the chapters cover the whole film. The build times them by the
+measured timeline (:func:`chapter_marks`): the player page gets ``chapters.vtt`` (a ``kind="chapters"`` track the
+time range shows and a chapter menu) and the videos get the same chapters as MP4 metadata
+(:func:`chapters_ffmetadata`).
 
 Embedding in a chapter: ``::: {.film src="golden-deficit"}`` (a film of this book) or
 ``src="trureturing-film:film-<NNN>-v<k>"`` (a release of the-omega-institute/trureturing-film).
@@ -515,6 +522,57 @@ def timeline_matches(timeline: dict, script: dict) -> str | None:
     return None
 
 
+def chapter_marks(script: dict | None, timeline: dict | None) -> list[dict]:
+    """``[{start, end, en, zh}]`` for the scenes of ``script`` that open a chapter, in order, timed by ``timeline``
+    (from tts.py, or the provisional one): a chapter starts with its scene and ends where the next one starts, the
+    last one at the end of the film. Scenes the timeline does not have are skipped."""
+    starts = {s.get("id"): s.get("start") for s in (timeline or {}).get("scenes") or [] if isinstance(s, dict)}
+    marks: list[dict] = []
+    for sc in (script or {}).get("scenes") or []:
+        ch = sc.get("chapter") if isinstance(sc, dict) else None
+        if not isinstance(ch, dict) or sc.get("id") not in starts:
+            continue
+        en, zh = str(ch.get("en") or "").strip(), str(ch.get("zh") or "").strip()
+        if en and zh:
+            marks.append({"start": round(float(starts[sc["id"]]), 3), "en": en, "zh": zh})
+    duration = float((timeline or {}).get("duration") or 0)
+    for i, m in enumerate(marks):
+        m["end"] = marks[i + 1]["start"] if i + 1 < len(marks) else round(max(duration, m["start"]), 3)
+    return marks
+
+
+def _chapter_title(m: dict) -> str:
+    return f"{m['en']} · {m['zh']}"
+
+
+def _vtt_time(seconds: float) -> str:
+    ms = int(round(seconds * 1000))
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+
+
+def chapters_vtt(marks: list[dict]) -> str:
+    """A WebVTT chapters track for :func:`chapter_marks` (one cue per chapter, titled in English and Chinese)."""
+    out = ["WEBVTT", ""]
+    for i, m in enumerate(marks, 1):
+        title = _chapter_title(m).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        out += [str(i), f"{_vtt_time(m['start'])} --> {_vtt_time(m['end'])}", title, ""]
+    return "\n".join(out)
+
+
+def chapters_ffmetadata(marks: list[dict]) -> str:
+    """The same chapters as an FFMETADATA file, for ffmpeg's ``-map_chapters`` (milliseconds; ``=;#\\`` and line
+    breaks escaped)."""
+    out = [";FFMETADATA1"]
+    for m in marks:
+        title = re.sub(r"([=;#\\\n])", r"\\\1", _chapter_title(m))
+        out += ["[CHAPTER]", "TIMEBASE=1/1000", f"START={int(round(m['start'] * 1000))}",
+                f"END={int(round(m['end'] * 1000))}", f"title={title}"]
+    return "\n".join(out) + "\n"
+
+
 def format_duration(seconds: float) -> str:
     s = int(round(seconds))
     return f"{s // 60}:{s % 60:02d}"
@@ -688,6 +746,7 @@ def validate_script(script: dict) -> list[tuple[str, str]]:
         err("script.json: scenes must be a non-empty list")
         return out
     seen: set[str] = set()
+    chapters = 0
     for k, sc in enumerate(scenes):
         where = f"script.json: scene {k + 1}"
         if not isinstance(sc, dict):
@@ -721,6 +780,14 @@ def validate_script(script: dict) -> list[tuple[str, str]]:
         if levels is not None and (not isinstance(levels, list) or len(levels) != MUSIC_LAYERS
                                    or not all(isinstance(x, (int, float)) and 0 <= x <= 1.5 for x in levels)):
             err(f"{where}: music must list {MUSIC_LAYERS} levels [pad, bass, arp, kick, hat] between 0 and 1.5")
+        chapter = sc.get("chapter")
+        if chapter is not None:
+            if (not isinstance(chapter, dict) or set(chapter) != {"en", "zh"}
+                    or not all(isinstance(chapter[k], str) and chapter[k].strip() and "\n" not in chapter[k]
+                               for k in ("en", "zh"))):
+                err(f"{where}: chapter must be {{\"en\": \"…\", \"zh\": \"…\"}} (two non-empty single-line strings)")
+            else:
+                chapters += 1
         cues = sc.get("cues")
         if cues is not None:
             if not isinstance(cues, list):
@@ -732,6 +799,8 @@ def validate_script(script: dict) -> list[tuple[str, str]]:
                             or not isinstance(c.get("at", 0), (int, float)) or c.get("kind") not in CUE_KINDS):
                         err(f"{where}: cue {c!r} must be {{\"line\": <index>, \"at\": <seconds>, "
                             f"\"kind\": {'|'.join(CUE_KINDS)}}}")
+    if chapters and not (isinstance(scenes[0], dict) and scenes[0].get("chapter") is not None):
+        err("script.json: the first scene must open a chapter once any scene does (chapters cover the whole film)")
     return out
 
 
@@ -1722,6 +1791,8 @@ def render_videos(film: Film, dest: Path, *, canvas: bool = False) -> None:
         shutil.copytree(film.out / "fonts", tmp / "fonts")
         if film.solid:
             shutil.copytree(film.out / "solid", tmp / "solid")
+        if (film.out / "chapters.vtt").is_file():
+            shutil.copy2(film.out / "chapters.vtt", tmp / "chapters.vtt")
     shutil.rmtree(dest, ignore_errors=True)
     tmp.rename(dest)
     try:
