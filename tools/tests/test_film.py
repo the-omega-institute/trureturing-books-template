@@ -427,6 +427,61 @@ class TimelineTest(unittest.TestCase):
         self.assertIsNone(film.parse_duration("6:61"))
 
 
+class ChaptersTest(unittest.TestCase):
+    SCRIPT = {"voice": "af_heart", "speed": 1.0, "scenes": [
+        {"id": "one", "lead": 1.5, "tail": 0.5, "lines": [["One two three.", "一"]],
+         "chapter": {"en": "Part I", "zh": "第一部"}},
+        {"id": "two", "lead": 0.5, "tail": 0.5, "lines": [["Four five six.", "二"]]},
+        {"id": "three", "lead": 0.5, "tail": 1.0, "lines": [["Seven = eight; #9.", "三"]],
+         "chapter": {"en": "A=B; #c <d>", "zh": "第二部"}},
+    ]}
+
+    @staticmethod
+    def script_errors(script: dict) -> list[str]:
+        return [message for severity, message in film.validate_script(script) if severity == "error"]
+
+    def test_valid_chapters(self):
+        self.assertEqual(self.script_errors((self.SCRIPT)), [])
+
+    def test_chapter_errors(self):
+        bad = json.loads(json.dumps(self.SCRIPT))
+        bad["scenes"][2]["chapter"] = {"en": "", "zh": "第二部"}
+        self.assertTrue(any("chapter must be" in e for e in self.script_errors((bad))))
+        bad["scenes"][2]["chapter"] = {"en": "Two\nlines", "zh": "第二部"}
+        self.assertTrue(any("chapter must be" in e for e in self.script_errors((bad))))
+        bad["scenes"][2]["chapter"] = {"en": "Part II", "zh": "第二部", "fr": "x"}
+        self.assertTrue(any("chapter must be" in e for e in self.script_errors((bad))))
+        late = json.loads(json.dumps(self.SCRIPT))
+        del late["scenes"][0]["chapter"]
+        self.assertTrue(any("first scene must open a chapter" in e for e in self.script_errors((late))))
+        none = json.loads(json.dumps(self.SCRIPT))
+        for sc in none["scenes"]:
+            sc.pop("chapter", None)
+        self.assertEqual(self.script_errors((none)), [])
+
+    def test_marks_follow_the_timeline(self):
+        tl = film.provisional_timeline(self.SCRIPT, wps=2.0)
+        marks = film.chapter_marks(self.SCRIPT, tl)
+        three = next(s for s in tl["scenes"] if s["id"] == "three")
+        self.assertEqual([m["en"] for m in marks], ["Part I", "A=B; #c <d>"])
+        self.assertEqual(marks[0]["start"], 0.0)
+        self.assertEqual(marks[0]["end"], marks[1]["start"])
+        self.assertAlmostEqual(marks[1]["start"], three["start"], places=3)
+        self.assertAlmostEqual(marks[1]["end"], tl["duration"], places=3)
+        self.assertEqual(film.chapter_marks(self.SCRIPT, {"scenes": [], "duration": 0}), [])
+        self.assertEqual(film.chapter_marks(None, tl), [])
+
+    def test_vtt_and_ffmetadata(self):
+        marks = [{"start": 0.0, "end": 61.5, "en": "Part I", "zh": "第一部"},
+                 {"start": 61.5, "end": 3725.25, "en": "A=B; #c <d>", "zh": "第二部"}]
+        vtt = film.chapters_vtt(marks)
+        self.assertTrue(vtt.startswith("WEBVTT\n\n1\n00:00:00.000 --> 00:01:01.500\nPart I · 第一部\n"))
+        self.assertIn("00:01:01.500 --> 01:02:05.250\nA=B; #c &lt;d&gt; · 第二部", vtt)
+        meta = film.chapters_ffmetadata(marks)
+        self.assertTrue(meta.startswith(";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=61500\n"))
+        self.assertIn("START=61500\nEND=3725250\ntitle=A\\=B\\; \\#c <d> · 第二部\n", meta)
+
+
 class NamesTest(unittest.TestCase):
     def test_video_names_and_places(self):
         outs = film.default_outputs("example-monograph", "golden-deficit")
@@ -1253,6 +1308,42 @@ class PipelineTest(unittest.TestCase):
         finally:
             shutil.rmtree(tmp)
 
+    @needs_example
+    def test_player_page_carries_the_chapters(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            book = temp_book(tmp)
+            d = copy_example(book)
+            script = json.loads((d / "script.json").read_text(encoding="utf-8"))
+            script["scenes"][0]["chapter"] = {"en": "Digits", "zh": "数位"}
+            script["scenes"][-1]["chapter"] = {"en": "The ledger", "zh": "账本"}
+            (d / "script.json").write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+            with mock.patch.object(film, "_lock", return_value=fake_lock()), \
+                    redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                page = self.build.build(d, player=True)
+            html = page.read_text(encoding="utf-8")
+            self.assertIn('src="audio.mp3"><track kind="chapters" src="chapters.vtt" srclang="en" label="Chapters" '
+                          'default></audio>', html)
+            data = json.loads(html.split("window.DATA=", 1)[1].split(";</script>", 1)[0].replace("<\\/", "</"))
+            self.assertEqual([(m["en"], m["zh"]) for m in data["chapters"]], [("Digits", "数位"), ("The ledger", "账本")])
+            self.assertEqual(data["chapters"][0]["start"], 0.0)
+            self.assertEqual(data["chapters"][-1]["end"], data["timeline"]["duration"])
+            self.assertIn("The ledger · 账本", (d / "out" / "chapters.vtt").read_text(encoding="utf-8"))
+            self.assertIn("title=Digits · 数位", (d / "out" / "chapters.ffmeta").read_text(encoding="utf-8"))
+            for sc in script["scenes"]:
+                sc.pop("chapter", None)
+            (d / "script.json").write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+            with mock.patch.object(film, "_lock", return_value=fake_lock()), \
+                    redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                page = self.build.build(d, player=True)
+            html = page.read_text(encoding="utf-8")
+            self.assertNotIn('kind="chapters"', html)
+            self.assertNotIn('"chapters"', html.split("window.DATA=", 1)[1].split(";</script>", 1)[0])
+            self.assertFalse((d / "out" / "chapters.vtt").exists())
+            self.assertFalse((d / "out" / "chapters.ffmeta").exists())
+        finally:
+            shutil.rmtree(tmp)
+
     @unittest.skipUnless(NODE, "node not available")
     def test_javascript_syntax(self):
         files = [THEME_FILM / "engine.js", paths.TEMPLATES / "film" / "scenes.js"]
@@ -1261,7 +1352,7 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(film.js_syntax_errors(files), {})
         import subprocess
 
-        for name in ("lib.js", "render.js", "poster.js", "shot.js", "site/films.js"):
+        for name in ("lib.js", "render.js", "poster.js", "shot.js", "site/films.js", "site/player.js"):
             r = subprocess.run([NODE, "--check", str(THEME_FILM / name)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, f"{name}: {r.stderr}")
 

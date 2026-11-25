@@ -86,6 +86,7 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 - `lead` / `tail`：场景开头、结尾的静默秒数；同一场景内相邻两句之间固定 0.6 秒。
 - `lines`：`[英文旁白, 中文字幕]`，各一行；字幕自动换行。英文自然，中文准确，不逐字硬译。
 - `say`：发音修正（只影响合成，不影响字幕）；`music`：节拍与和声；场景 `music`：五层音量 `[pad, bass, arp, kick, hat]`；`cues`：音效点（`stamp`、`chime`、`impact`、`glitch`）。
+- `chapter`（可选）：`{"en": "Part I · From point to line", "zh": "第一部 · 从点到线"}`，该场景开启一章，到下一章开头为止。用于按部或卷分章的长片：只要有一个场景开章，第一个场景就必须开章，各章覆盖全片。构建按 TTS 实测的时间轴给各章计时：播放页挂上 `chapters.vtt`（时间条按章分段、悬停显示章名），控件条出现章节菜单，点击跳到该章；Release 的 MP4 带同样的章节元数据（`mux.sh` 读 `out/chapters.ffmeta`）。普通短片不写 `chapter`，播放页与视频都不变。
 
 ## scenes.js
 

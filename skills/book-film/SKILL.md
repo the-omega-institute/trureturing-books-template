@@ -35,6 +35,7 @@ theme/film/setup.sh                  # 每台机器一次：视频 venv（.cache
 `setup.sh` 把 `theme/film/requirements.txt` 中钉死的包装进独立的视频 venv（Python 3.12 或 3.13），不装进 tbook 的 `.venv`；设置 `PYTHON` 时改为装进该解释器。ffmpeg 来自系统（`apt-get install ffmpeg` 或 `FFMPEG`），Chromium 来自 Playwright 或 `PW_CHROMIUM_PATH`。
 
 1. 写 `script.json`：每个场景 `id`、`name`、`lead`/`tail`、`lines: [[英文旁白, 中文字幕], …]`，可选 `music`、`cues`；发音修正写在 `say`。
+   - 长片（例如一本书一部、按部或卷分段）在每部或每卷的第一个场景写 `"chapter": {"en": "…", "zh": "…"}`（第一个场景必须开章）：播放器出现章节菜单，时间条按章分段，Release 的 MP4 带章节。规则见 README 的 script.json 一节。
 2. 写 `scenes.js`：每个场景 `SCENES.<id> = S => { … }`，用 `at(S, k, dur)` / `Q(S, k, '短语')` 与旁白对齐，用 `panel`、`chip`、`stamp`、`leanList`、`closingCard` 等绘制（见 README 的 scenes.js 一节）。
    - 实体镜头（见 README 的“实体镜头”）：`film.json` 加 `"solid": true`；场景里 `const sh = solid('key', { x, y, w, h, yaw, pitch, zoom })`，`sh.begin()` … `sh.surface/poly/glass/tube/line/arrow/ring/bead/fan(…)` … `sh.end(a)`，之后用 `sh.anchor(v)` 放二维标签（`hidden` 时变淡）。与可视化页面共用造型时，把造型写成 `viz/<id>/model.js`，页面在 `main.js` 前加载，`film.json` 写 `"scripts": ["viz/<id>/model.js"]`。每帧按 `S.u` 从头描述，不用时钟与随机数。
    - 引用定理按完整 GID：`leanCite(gid)`；不要按 `short` 查（两条引用可能同短名）。`leanList` 与视频页显示的名字是 Lean 全名，命名空间会被读成别的模块时显示 GID。

@@ -197,6 +197,9 @@ def build(film_dir: Path, *, strict: bool = False, player: bool = False) -> Path
         (out / "timeline.provisional.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1), encoding="utf-8")
     data = tfilm.engine_data(film)
     data["timeline"] = tl
+    marks = write_chapters(film, tl, out)
+    if marks:
+        data["chapters"] = marks
     data["data"] = {}
     data_dir = film_dir / "data"
     if data_dir.is_dir():
@@ -231,6 +234,12 @@ window.ready = boot().then(() => {
 </script>"""
     if player:
         stage = (HERE / "site" / "player.html").read_text(encoding="utf-8")
+        if marks:
+            audio = '<audio slot="media" preload="metadata" src="audio.mp3"></audio>'
+            if audio not in stage:
+                fail("theme/film/site/player.html: the <audio> element the chapters track attaches to has changed")
+            stage = stage.replace(audio, audio.replace(
+                "</audio>", '<track kind="chapters" src="chapters.vtt" srclang="en" label="Chapters" default></audio>'))
         head = ('<meta name="viewport" content="width=device-width, initial-scale=1">'
                 '<link rel="stylesheet" href="../assets/tokens.css">'
                 '<link rel="stylesheet" href="../assets/player.css">')
@@ -260,6 +269,30 @@ html,body{{margin:0;background:{bg};overflow:hidden}}canvas{{display:block;width
     return page
 
 
+def write_chapters(film, tl: dict, out: Path) -> list[dict]:
+    """out/chapters.vtt (the player's chapters track) and out/chapters.ffmeta (the videos' chapters, see mux.sh) from
+    the scenes of script.json that open a chapter, timed by ``tl``; removes both when the film has no chapters."""
+    marks = tfilm.chapter_marks(film.script, tl)
+    for name, text in (("chapters.vtt", tfilm.chapters_vtt), ("chapters.ffmeta", tfilm.chapters_ffmetadata)):
+        path = out / name
+        if marks:
+            path.write_text(text(marks), encoding="utf-8")
+        elif path.exists():
+            path.unlink()
+    return marks
+
+
+def chapters_only(film_dir: Path) -> None:
+    """``build.py <film> --chapters``: only the chapter files, timed by the measured timeline (mux.sh runs it)."""
+    film = load(film_dir)
+    if film.script is None:
+        fail(f"{film.id}: script.json is unreadable")
+    tl, _ = timeline(film, allow_provisional=False)
+    marks = write_chapters(film, tl, out_dir(film_dir))
+    if marks:
+        print(f"film: {len(marks)} chapter(s) → out/chapters.vtt, out/chapters.ffmeta")
+
+
 def write_provisional(film_dir: Path) -> Path:
     """out/timeline.provisional.json from script.json alone (preview timing before TTS)."""
     film = load(film_dir)
@@ -279,6 +312,9 @@ def main(argv: list[str]) -> int:
     film_dir = film_dir_arg([a for a in argv if not a.startswith("--")])
     if "--timeline-only" in argv:
         write_provisional(film_dir)
+        return 0
+    if "--chapters" in argv:
+        chapters_only(film_dir)
         return 0
     build(film_dir, player="--player" in argv, strict="--strict" in argv or os.environ.get("FILM_STRICT") == "1")
     return 0
