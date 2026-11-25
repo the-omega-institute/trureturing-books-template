@@ -28,6 +28,12 @@
 # unit and build-cache.json, which are attached beside the downloads. A build that has no cache
 # (TBOOK_CACHE_REMOTE=1) restores from the newest published releases instead of building again.
 #
+# A site with [site].film_release_only plays its films live and attaches their MP4 renditions to the
+# release. The films job renders those in parallel shards balanced by the films' durations
+# (tools/ci/films.py --release), each film restored from an earlier release when it did not change, and
+# the build job merges the shards into its store before it collects the downloads. The cache export then
+# carries the MP4 units too (TBOOK_BUILD_RELEASE=1), so the next release renders only the films that changed.
+#
 # The release is created as a draft, every file is uploaded, and only then is it published, so a published
 # release is complete; repositories with immutable releases require this (a published release takes no new
 # files). A release that is already published is left as it is: tag a new version.
@@ -135,6 +141,8 @@ jobs:
       books: ${{ steps.plan.outputs.books }}
       title: ${{ steps.plan.outputs.title }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
+      films: ${{ steps.films.outputs.films }}
+      film_matrix: ${{ steps.films.outputs.matrix }}
     steps:
       - &preview-check
         name: Check whether a preview is due
@@ -273,6 +281,18 @@ jobs:
           sha="$(./tbook resolve-lock --branch-head)"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+      - name: Plan the release videos
+        # The MP4 renditions of a site with film_release_only, in up to ten shards balanced by duration.
+        if: steps.preview.outputs.skip != 'true' && steps.plan.outputs.skip != 'true'
+        id: films
+        run: |
+          set -euo pipefail
+          matrix="$(python3 tools/ci/films.py --release --matrix 10)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          if [ "$(jq '.include | length' <<< "$matrix")" -gt 0 ]; then films=true; else films=false; fi
+          echo "films=$films" >> "$GITHUB_OUTPUT"
+          jq -r '.include[] | "\(.shard): \(.items | join(", "))"' <<< "$matrix"
+
   lean-verify:
     name: Lean deep verification
     needs: plan
@@ -282,12 +302,88 @@ jobs:
       trureturing_sha: ${{ needs.plan.outputs.trureturing_sha }}
     secrets: inherit
 
-  build:
-    name: Build the site and export the build cache
-    needs: [plan, lean-verify]
+  films:
+    name: Release videos (${{ matrix.shard }})
+    needs: plan
     if: >-
       !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' &&
-      (needs.lean-verify.result == 'success' || needs.lean-verify.result == 'skipped')
+      needs.plan.outputs.films == 'true'
+    runs-on: ubuntu-24.04
+    # One shard renders its films one after another; the longest film sets the shard's time.
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      actions: read
+      pages: read
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan.outputs.film_matrix) }}
+    env:
+      TBOOK_TRURETURING_SHA: ${{ needs.plan.outputs.trureturing_sha }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+      - uses: ./.github/actions/resolve-lock
+        env:
+          TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+        with:
+          browsers: 'true'
+          # The system fonts of the build job, which rendered the videos before the shards did.
+          fonts: 'true'
+          mdbook: 'false'
+          films: 'true'
+
+      - name: Configure Pages
+        # The same address as the build job (and pages.yml), as every building job uses.
+        id: pages
+        continue-on-error: true
+        uses: actions/configure-pages@v6
+
+      - name: Restore the build cache (and use the Pages URL)
+        uses: ./.github/actions/build-cache
+        with:
+          mode: restore
+          scope: films
+          pages-url: ${{ steps.pages.outputs.base_url }}
+
+      - name: Snapshot the build store
+        run: python3 tools/ci/cache_store.py snapshot "$RUNNER_TEMP/build-cache-before.json"
+
+      - name: Render or restore the shard's videos
+        env:
+          # A film that did not change is restored from the newest published releases.
+          TBOOK_CACHE_REMOTE: '1'
+          GITHUB_TOKEN: ${{ github.token }}
+          # A release never goes out without a film: one that cannot be rendered fails the shard.
+          TBOOK_FILMS: require
+          CI_ITEMS: ${{ toJSON(matrix.items) }}
+        run: python tools/ci/films.py --release --selection-env CI_ITEMS
+
+      - name: Export the shard's entries
+        # What the shard added: the MP4 units it rendered or restored from a release (the live film units
+        # the store already held stay out; the build job restores those itself).
+        run: python3 tools/ci/cache_store.py export --baseline "$RUNNER_TEMP/build-cache-before.json" --out "$RUNNER_TEMP/release-videos"
+
+      - name: Upload the shard's entries
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-videos-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/release-videos
+          include-hidden-files: true
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 1
+
+  build:
+    name: Build the site and export the build cache
+    needs: [plan, lean-verify, films]
+    if: >-
+      !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' &&
+      (needs.lean-verify.result == 'success' || needs.lean-verify.result == 'skipped') &&
+      (needs.films.result == 'success' || needs.films.result == 'skipped')
     runs-on: ubuntu-24.04
     # Rendering a film that no cache holds takes long (frames, narration, encoding).
     timeout-minutes: 240
@@ -336,6 +432,24 @@ jobs:
           film-baseline: 'true'
           pages-url: ${{ steps.pages.outputs.base_url }}
 
+      - name: Download the release videos
+        if: needs.plan.outputs.films == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: release-videos-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/release-videos
+
+      - name: Add the release videos to the build store
+        # A video missing here is rendered by the assets step below, as before the shards.
+        if: needs.plan.outputs.films == 'true'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          shards=("$RUNNER_TEMP"/release-videos/*)
+          if [ ${#shards[@]} -gt 0 ]; then
+            python3 tools/ci/cache_store.py merge --prefer-imported "${shards[@]}"
+          fi
+
       - name: Check
         env:
           # check asks GitHub's compare API whether the pinned trureturing commit is on the site.toml branch
@@ -353,11 +467,6 @@ jobs:
           # A release never goes out without a film: one that cannot be rendered fails the build.
           TBOOK_FILMS: require
         run: ./tbook build all
-
-      - name: Export the build cache
-        # Every unit of the site, not only the released books', so that this release alone restores a build.
-        # Fails when a unit is missing from the store.
-        run: ./tbook cache export release/cache
 
       - name: Collect assets and write the release notes
         env:
@@ -465,6 +574,12 @@ jobs:
               print("::error title=Release::no files to release")
               sys.exit(1)
           PY
+
+      - name: Export the build cache
+        # Every unit of the site, not only the released books', so that this release alone restores a build;
+        # after the assets, so that it carries the MP4 units the films job and the assets step stored.
+        # Fails when a unit is missing from the store.
+        run: ./tbook cache export release/cache
 
       - name: Upload the release files
         uses: actions/upload-artifact@v6

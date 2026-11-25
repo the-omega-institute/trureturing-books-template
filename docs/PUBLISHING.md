@@ -31,7 +31,7 @@ EPUB 保留原生 MathML。超宽公式与表格在各自容器内横向滚动�
 
 在 `[site]` 中设置 `epub_release_only = true` 后，常规 CI 与 Pages 跳过 EPUB 导出，Release 构建按输入复用缓存并为启用 EPUB 的书籍附上各语言版本。Pages 按当前 `book.toml` 版本和语言查找最新的同名版本发行附件，包含公开的版本预发布。缺少对应附件时隐藏该下载链接。每日预览的 EPUB 从对应的 GitHub Release 下载。Pages 每小时检查附件变动。本地可运行 `./tbook build epub` 显式导出，或设置 `TBOOK_BUILD_RELEASE=1` 让 `./tbook build all` 包含 EPUB。
 
-在 `[site]` 中设置 `film_release_only = true` 后，常规 CI 与 Pages 按影片合成旁白和配乐，写入 `build/film-players/<slug>/<name>/`。网页从本站加载 MP3、字体、镜头与所需的三维模型。Media Chrome 提供播放、拖动、音量、倍速和全屏，Canvas 根据音轨时间绘制画面和字幕。日常构建跳过逐帧编码。发书籍或整站 Release（含每日预览）时，工作流把所选书籍的 `film.json` 中列出的每个 MP4 作为独立附件上传。影片页按片名和版本规格链接最近一次已发布的相应附件，首次发布前仍可在线播放。关闭此项可恢复同源 MP4 模式。外部影片引用沿用其来源链接。
+在 `[site]` 中设置 `film_release_only = true` 后，常规 CI 与 Pages 按影片合成旁白和配乐，写入 `build/film-players/<slug>/<name>/`。网页从本站加载 MP3、字体、镜头与所需的三维模型。Media Chrome 提供播放、拖动、音量、倍速和全屏，Canvas 根据音轨时间绘制画面和字幕。日常构建跳过逐帧编码。发书籍或整站 Release（含每日预览）时，工作流把所选书籍的 `film.json` 中列出的每个 MP4 作为独立附件上传。Release 的 `films` 任务按片长均衡分成至多十个并行分片渲染这些 MP4（`tools/ci/films.py --release`），每部影片先从最近发布的 Release 恢复，没有改动的影片不再重渲；构建任务合并各分片后收集附件，再导出构建缓存，缓存中包含 MP4 单元，供下一次发版恢复。影片页按片名和版本规格链接最近一次已发布的相应附件，首次发布前仍可在线播放。关闭此项可恢复同源 MP4 模式。外部影片引用沿用其来源链接。
 
 本地预览：`./tbook serve`（默认端口 8765，自动挂在 Pages 子路径下；支持按字节范围请求，Safari 也能播放视频；`TBOOK_SERVE_HOST=0.0.0.0` 允许其他设备访问，例如用 iPhone 查看）。
 

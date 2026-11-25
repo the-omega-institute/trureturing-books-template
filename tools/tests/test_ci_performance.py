@@ -1594,6 +1594,60 @@ class ExactRunnerTest(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0)
 
 
+class ReleaseFilmShardTest(unittest.TestCase):
+    """tools/ci/films.py --release --matrix: the release's MP4 shards, balanced by the films' durations."""
+
+    def setUp(self):
+        import importlib.util
+        script = Path(__file__).parents[1] / "ci/films.py"
+        spec = importlib.util.spec_from_file_location("ci_release_films", script)
+        self.films = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.films)
+
+    def test_duration_reads_film_json(self):
+        from types import SimpleNamespace as F
+        seconds = self.films.seconds
+        self.assertEqual(seconds(F(meta={"duration": "28:31"})), 1711)
+        self.assertEqual(seconds(F(meta={"duration": "1:02:03"})), 3723)
+        for meta in ({}, {"duration": ""}, {"duration": "soon"}, {"duration": "-1:00"}, {"duration": "0:00"}, None):
+            self.assertEqual(seconds(F(meta=meta)), self.films.DEFAULT_SECONDS, meta)
+
+    def test_longest_films_get_their_own_shards(self):
+        balanced = self.films.balanced
+        self.assertEqual(balanced({"long": 1711, "other": 1377, "a": 130, "b": 120, "c": 100}, 3),
+                         [["long"], ["other"], ["a", "b", "c"]])
+        shards = balanced({f"f{i:02}": 100 + i for i in range(20)}, 4)
+        self.assertEqual(sorted(n for s in shards for n in s), [f"f{i:02}" for i in range(20)])
+        loads = [sum(100 + int(n[1:]) for n in s) for s in shards]
+        self.assertLessEqual(max(loads) - min(loads), 19)
+
+    def test_matrix_has_no_more_shards_than_films(self):
+        from types import SimpleNamespace as F
+        items = {("b", "x"): F(meta={"duration": "2:00"}), ("a", "y"): F(meta={"duration": "9:00"})}
+        self.assertEqual(self.films.matrix(items, 10), {"include": [
+            {"shard": "1/2", "items": ["a/y"]}, {"shard": "2/2", "items": ["b/x"]}]})
+        self.assertEqual(self.films.matrix(items, 1), {"include": [{"shard": "1/1", "items": ["a/y", "b/x"]}]})
+        self.assertEqual(self.films.matrix({}, 10), {"include": []})
+
+    def test_release_workflow_merges_the_shards_before_the_assets_and_exports_after(self):
+        import re
+        from test_verification import workflow_jobs
+        path = Path(__file__).resolve().parents[2] / ".github/workflows/release.yml"
+        text = path.read_text(encoding="utf-8")
+        jobs = workflow_jobs(path)
+        self.assertRegex(text, r"(?m)^  build:\n(?:    .*\n)*?    needs: \[plan, lean-verify, films\]$")
+        self.assertRegex(text, r"(?m)^  TBOOK_BUILD_RELEASE: '1'$", "the export lists the MP4 units")
+        shard = [s.get("run", "") for s in jobs["films"]]
+        self.assertTrue(any("tools/ci/films.py --release --selection-env CI_ITEMS" in r for r in shard))
+        names = [s.get("name", "") for s in jobs["build"]]
+        merge = names.index("Add the release videos to the build store")
+        assets = names.index("Collect assets and write the release notes")
+        export = names.index("Export the build cache")
+        self.assertLess(merge, names.index("Build everything"))
+        self.assertLess(assets, export, "the export carries the MP4 units the assets step restored")
+        self.assertTrue(re.search(r"films\.py --release --matrix", text), "the plan job shards the release videos")
+
+
 class DeploymentCoverageTest(unittest.TestCase):
     def test_main_push_queues_pages_and_prs_keep_ci(self):
         workflows = Path(__file__).resolve().parents[2] / ".github/workflows"
