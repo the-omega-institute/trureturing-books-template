@@ -26,6 +26,15 @@ This directory is the starting point of `./tbook film new`. Every film follows t
 
 流水线的工作文件都在 `<dir>/out/`（已被 `.gitignore` 忽略），构建把成片复制到 `build/films/<slug>/<name>/`。The pipeline works in `<dir>/out/` (git-ignored); the build copies the videos to `build/films/<slug>/<name>/`.
 
+## 长篇分区 · Long-form films
+
+在 `books/<slug>/book.toml` 中列出要放在长篇分区的影片目录名。书籍首页与影片索引都将长篇排在其他影片前。List film directory names in `books/<slug>/book.toml` to put long-form films first in a separate section on the book landing page and the films index.
+
+```toml
+[films]
+long_form = ["film-name"]
+```
+
 ## film.json
 
 ```json

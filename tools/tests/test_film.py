@@ -23,7 +23,7 @@ from unittest import mock
 
 from example_support import example_shown
 
-from tbook import config, film, lean, mdscan, paths, render
+from tbook import config, film, lean, mdscan, paths, render, site
 
 NODE = film.node_executable()
 EXAMPLE = paths.BOOKS / "example-monograph"
@@ -1136,6 +1136,47 @@ class SiteHostingTest(unittest.TestCase):
         films_html = landing.split('id="films"', 1)[1].split("</section>", 1)[0]
         self.assertIn(f'href="films/golden-deficit/{v720}"', films_html)
         self.assertNotIn(film.t("zh", "unbuilt"), films_html)
+
+
+class FilmGroupsTest(unittest.TestCase):
+    def test_configured_films_appear_first_in_both_indexes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            book = temp_book(Path(tmp))
+            film.scaffold(book, "a-short-film", "短片", "Short Film")
+            film.scaffold(book, "z-long-film", "长片", "Long Film")
+            book_path = book.dir / "book.toml"
+            original = book_path.read_text(encoding="utf-8")
+            site_config = dataclasses.replace(config.load_site(), film_release_only=False)
+            out = Path(tmp) / "out"
+
+            def pages(book):
+                film.build(site_config, book, out / "films", videos=False)
+                view = site.BookView(book, out, {}, None, media={"films": film.items(book, site=site_config)})
+                return (
+                    (out / "films" / "index.html").read_text(encoding="utf-8"),
+                    site.films_section(site.Bi(["zh", "en"]), view),
+                )
+
+            for page in pages(book):
+                self.assertNotIn("Long-form films", page)
+                self.assertNotIn("Other films", page)
+
+            book_path.write_text(original + '\n[films]\nlong_form = ["z-long-film"]\n', encoding="utf-8")
+            hub, landing = pages(config.load_book(book.dir))
+            for page in (hub, landing):
+                self.assertIn("长篇视频", page)
+                self.assertIn("其他视频", page)
+                long_group, other_group = page.split("Other films", 1)
+                self.assertIn("Long-form films", long_group)
+                self.assertIn("z-long-film", long_group)
+                self.assertNotIn("a-short-film", long_group)
+                self.assertIn("a-short-film", other_group)
+            self.assertIn('id="z-long-film"', hub)
+            self.assertIn('href="films/index.html#z-long-film"', landing)
+
+            book_path.write_text(original + '\n[films]\nlong_form = ["missing"]\n', encoding="utf-8")
+            with self.assertRaisesRegex(config.ConfigError, "films.long_form names an unknown film"):
+                config.load_book(book.dir)
 
 
 @needs_example

@@ -1242,7 +1242,10 @@ def films_section(bi: Bi, view: BookView, prefix: str = "") -> str:
     if not items:
         return ""
     langs = view.book.languages
-    cards = []
+    long_form = view.book.long_form_films
+    grouped = any(it.get("id") in long_form for it in items)
+    heading_tag = "h4" if grouped else "h3"
+    long_cards, other_cards = [], []
     for it in items:
         page_link = _loc(it.get("href"), bi.langs[0], langs)
         page_link = page_link if page_link and _exists(view.bdir, page_link) else ""
@@ -1276,18 +1279,27 @@ def films_section(bi: Bi, view: BookView, prefix: str = "") -> str:
 
         watch = bi.span(action)
         thumb_target = page_link or watch_link(bi.langs[0])
+        cards = long_cards if it.get("id") in long_form else other_cards
         cards.append(
             '<article class="mcard panel">'
             + (f'<a class="thumb{"" if img else " blank"}" href="{esc(_media_url(prefix, thumb_target))}" tabindex="-1" aria-hidden="true">{img}'
                f'<span class="code">{esc(it.get("code") or it.get("id") or "")}</span></a>' if thumb_target else "")
-            + f'<div class="body"><h3>{heading}</h3>{summary_html}'
+            + f'<div class="body"><{heading_tag}>{heading}</{heading_tag}>{summary_html}'
             + (f'<span class="meta-line">{meta}</span>' if meta else "")
             + f'{_lean_chips(it.get("lean"))}<div class="actions">{watch}</div></div></article>')
     hub = str(items[0].get("hub") or "films/")
     more = f'<a class="aside" href="{esc(_media_url(prefix, hub))}">{bi.t("hub_films")} ▸</a>' if _exists(view.bdir, hub) else ""
+    if grouped:
+        sections = "".join(
+            f'<h3 class="film-group-title">{bi.s(label)}</h3><div class="mgrid">{"".join(cards)}</div>'
+            for label, cards in (("ui.long_form_films", long_cards), ("ui.other_films", other_cards))
+            if cards
+        )
+    else:
+        sections = f'<div class="mgrid">{"".join(other_cards)}</div>'
     return (f'<section id="films" class="sec panel{_wide(items)}" aria-labelledby="films-title">'
             f'<div class="sec-head"><h2 id="films-title">{bi.s("ui.films")}</h2>{more}</div>'
-            f'<div class="mgrid">{"".join(cards)}</div></section>')
+            f'{sections}</section>')
 
 
 def slides_section(bi: Bi, view: BookView, prefix: str = "") -> str:

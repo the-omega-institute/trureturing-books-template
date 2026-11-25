@@ -48,6 +48,8 @@ a.pill:hover { border-color: var(--tr-cyan); color: var(--tr-cyan); }
 .hero p { margin: 0; color: var(--tr-dim); max-width: 78ch; font-size: 14px; }
 
 .films { display: flex; flex-direction: column; gap: 22px; }
+.films + .films { margin-top: 14px; }
+.film-group-title { margin: 0; font-family: var(--tr-font-display); font-size: clamp(17px, 2vw, 22px); }
 .film { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 0; scroll-margin-top: 16px; }
 .film:target { border-color: var(--tr-amber); box-shadow: var(--tr-fx-glow-amber); }
 .player { position: relative; background: var(--tr-stage); border-right: 1px solid var(--tr-panel-edge); aspect-ratio: 16 / 9; }

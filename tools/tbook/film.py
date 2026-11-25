@@ -1410,9 +1410,21 @@ def hub_html(site: config.Site, book: config.Book, lock: lean.Lock | None = None
     title_zh, title_en = config.pick(book.title, "zh", book.languages), config.pick(book.title, "en", book.languages)
     films_zh, films_en = config.s("zh", "ui.films"), config.s("en", "ui.films")
     fonts = _google_fonts()
-    cards = "\n".join(_film_card(site, f, lock, f.id in built,
-                                 _release_urls(site, f) if site.film_release_only else None)
-                      for f in all_films) or f'<p class="note">{_pair("none")}</p>'
+    long_cards, other_cards = [], []
+    for f in all_films:
+        cards = long_cards if f.id in book.long_form_films else other_cards
+        cards.append(_film_card(site, f, lock, f.id in built,
+                                _release_urls(site, f) if site.film_release_only else None))
+    if long_cards:
+        sections = "\n".join(
+            f'<section class="films"><h2 class="film-group-title">{_ui_pair(label)}</h2>\n'
+            + "\n".join(cards) + "\n</section>"
+            for label, cards in (("ui.long_form_films", long_cards), ("ui.other_films", other_cards))
+            if cards
+        )
+    else:
+        cards_html = "\n".join(other_cards) or f'<p class="note">{_pair("none")}</p>'
+        sections = f'<section class="films" aria-label="{esc(films_zh)} {esc(films_en)}">\n{cards_html}\n</section>'
     pin = ""
     if lock:
         pin = (f'<a class="pill" href="{esc(lock.tree_url)}" target="_blank" rel="noopener">LEAN '
@@ -1459,9 +1471,7 @@ def hub_html(site: config.Site, book: config.Book, lock: lean.Lock | None = None
     <p>{lede}</p>
   </section>
 
-  <section class="films" aria-label="{esc(films_zh)} {esc(films_en)}">
-{cards}
-  </section>
+  {sections}
 
   <footer class="foot">
     <span>{_pair("foot", slug=book.slug)}</span>
