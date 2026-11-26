@@ -1,8 +1,10 @@
-// Media Chrome owns the transport and fullscreen controls. Sample the audio
+// Media Chrome owns the transport controls. Sample the audio
 // clock directly so a seek, stall or rate change always lands on the same frame.
 (() => {
   const controller = document.querySelector('media-controller');
-  controller.fullscreenElement = document.getElementById('stage');
+  const stage = document.getElementById('stage');
+  controller.fullscreenElement = stage;
+  setupFullscreen();
   const audio = document.querySelector('audio');
   const cover = document.getElementById('cover');
   const alert = document.getElementById('error');
@@ -10,6 +12,101 @@
   let sceneReady = false;
   let lastFrame = -1;
   let animation;
+
+  function setupFullscreen() {
+    const button = controller.querySelector('media-fullscreen-button');
+    const rotate = document.createElement('button');
+    rotate.id = 'rotate';
+    rotate.type = 'button';
+    rotate.title = /^zh/i.test(navigator.language) ? '旋转画面 90°' : 'Rotate picture 90°';
+    rotate.setAttribute('aria-label', rotate.title);
+    rotate.setAttribute('aria-pressed', 'false');
+    rotate.textContent = '↻';
+    button.before(rotate);
+
+    let viewportStyle;
+    const frame = window.frameElement;
+    const host = frame?.ownerDocument || document;
+    function sync() {
+      const native = document.fullscreenElement || document.webkitFullscreenElement;
+      const active = native === stage || Boolean(viewportStyle);
+      stage.classList.toggle('fullscreen', active);
+      button.mediaIsFullscreen = active;
+      if (!active) {
+        stage.classList.remove('turned');
+        rotate.setAttribute('aria-pressed', 'false');
+      }
+    }
+    rotate.addEventListener('click', () => {
+      rotate.setAttribute('aria-pressed', String(stage.classList.toggle('turned')));
+    });
+
+    // Keep the live iframe in place: moving it into a dialog reloads its audio and canvas.
+    function enterViewport() {
+      if (viewportStyle || (!frame && window !== window.top)) return;
+      viewportStyle = host.createElement('style');
+      viewportStyle.textContent = `
+        html, body { overflow: hidden !important; }
+        :has(iframe.tr-film-viewport) { clip-path: none !important; transform: none !important; }
+        iframe.tr-film-viewport {
+          position: fixed !important; inset: 0 !important; z-index: 2147483647 !important;
+          width: 100% !important; height: 100% !important; height: 100dvh !important;
+          max-width: none !important; max-height: none !important; aspect-ratio: auto !important;
+          margin: 0 !important; padding: 0 !important; border: 0 !important; box-sizing: border-box;
+        }`;
+      host.head.append(viewportStyle);
+      frame?.classList.add('tr-film-viewport');
+      if (frame) host.addEventListener('keydown', escape);
+      if (frame?.showPopover) {
+        frame.popover = 'manual';
+        frame.showPopover();
+      }
+      button.focus({ preventScroll: true });
+      sync();
+    }
+    function exitViewport() {
+      if (!viewportStyle) return;
+      if (frame?.popover === 'manual') {
+        frame.hidePopover();
+        frame.removeAttribute('popover');
+      }
+      if (frame) host.removeEventListener('keydown', escape);
+      frame?.classList.remove('tr-film-viewport');
+      viewportStyle.remove();
+      viewportStyle = null;
+      sync();
+    }
+
+    // Handle both the control and Media Chrome's F shortcut at their common request.
+    async function toggle(event) {
+      event.stopPropagation();
+      if (viewportStyle) return exitViewport();
+      const native = document.fullscreenElement || document.webkitFullscreenElement;
+      if (native === stage) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        return exit.call(document);
+      }
+      const request = stage.requestFullscreen || stage.webkitRequestFullscreen;
+      if (request) {
+        try {
+          await request.call(stage);
+          return;
+        } catch { /* The browser may expose the API but decline the request. */ }
+      }
+      enterViewport();
+    }
+    for (const name of ['mediaenterfullscreenrequest', 'mediaexitfullscreenrequest']) {
+      stage.addEventListener(name, toggle, true);
+    }
+    for (const name of ['fullscreenchange', 'webkitfullscreenchange']) {
+      document.addEventListener(name, sync);
+    }
+    function escape(event) {
+      if (viewportStyle && event.key === 'Escape' && !event.defaultPrevented) exitViewport();
+    }
+    document.addEventListener('keydown', escape);
+    window.addEventListener('pagehide', exitViewport);
+  }
 
   function fail(error) {
     sceneReady = false;
