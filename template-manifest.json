@@ -1,7 +1,7 @@
 {
   "schema": "trureturing-books.template-manifest.v1",
   "template": "trureturing-books-template",
-  "version": "1.25.1",
+  "version": "1.26.0",
   "files": {
     ".claude/skills": {
       "sha256": "c1aefaccb300698f4b7ae764e1fa857f93c0609ba47b078e4806d926f289c23b",
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "2b279214529730f8f495681753eedd2c789ebe9de16504e18bfba0f5a27d2586",
+      "sha256": "95bf7cbda4cab93ab540f6bfc22e5827844e54de8d45d365e47ef08523dee7cd",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -368,7 +368,7 @@
       "mode": "100644"
     },
     "theme/film/site/player.css": {
-      "sha256": "e9f2419fb21b523c93e8ab98e5571fe8338b07dcf49e10745fb588d1e66012aa",
+      "sha256": "3bb5992919fdd664824b3674b195c345da74fa2c12a896e408ce7e84c817ff2d",
       "mode": "100644"
     },
     "theme/film/site/player.html": {
@@ -376,7 +376,7 @@
       "mode": "100644"
     },
     "theme/film/site/player.js": {
-      "sha256": "04c380484e5fb872ab9ad149ec789b37903242d5dd3c0cf28a649c99e34181c0",
+      "sha256": "7072651a54a3b47d715a654526aeb191233bc5dfe21300070c14a51cbc1a1505",
       "mode": "100644"
     },
     "theme/film/tts.py": {
