@@ -37,6 +37,8 @@
 
 协作遵循 [CONTRIBUTING.md](CONTRIBUTING.md)：Issue 与 PR 使用 `type(scope): 摘要`，普通分支使用 `<type>/<lowercase-topic>`；自动模板升级与钉版保留规范中列出的专用分支。所有修改通过 PR 合入 `main`，不得直接推送。
 
+等待 PR 的 GitHub Actions CI 时，用 `gh pr checks <PR> --json name,link` 查看当前检查，从 Actions 链接的 `/actions/runs/<run-id>/` 取得工作流运行 ID。对适用的运行执行 `gh run watch <run-id> --interval 300 --exit-status`，每五分钟刷新一次，直到运行结束。根据退出状态处理失败。合并前核对当前 PR 提交的必需检查。
+
 ## 常用命令
 
 ```bash
