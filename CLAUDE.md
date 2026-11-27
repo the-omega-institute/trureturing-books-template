@@ -37,7 +37,12 @@
 
 协作遵循 [CONTRIBUTING.md](CONTRIBUTING.md)：Issue 与 PR 使用 `type(scope): 摘要`，普通分支使用 `<type>/<lowercase-topic>`；自动模板升级与钉版保留规范中列出的专用分支。所有修改通过 PR 合入 `main`，不得直接推送。
 
-推送后等待 GitHub Actions CI 时，用 `gh run list --event push --branch <branch> --commit <sha> --json databaseId,workflowName` 按本次推送的分支和完整提交 SHA 找到对应 CI 的运行 ID。执行 `gh run watch <run-id> --interval 300 --exit-status`，每五分钟刷新一次，等待结束并检查退出状态。
+选择要等待的 GitHub Actions CI 时，根据触发事件定位运行。
+
+- 推送后，用 `gh run list --event push --branch <branch> --commit <sha> --json databaseId,workflowName` 按推送目标分支与完整提交 SHA 取得对应 CI 的运行 ID。
+- 等待 PR 时，仓库提供 `pr-open`、`pr-watch` 入口的，使用仓库原有流程。缺少这套入口时，用 `gh pr checks <PR> --json name,link` 查看当前 PR 提交的检查，从对应 Actions 链接的 `/actions/runs/<run-id>/` 取得运行 ID。合并前核对当前 PR 提交的全部必需检查。
+
+使用 GitHub CLI 等待上述运行时，执行 `gh run watch <run-id> --interval 300 --exit-status`，每五分钟刷新一次，等待结束并检查退出状态。
 
 ## 常用命令
 
