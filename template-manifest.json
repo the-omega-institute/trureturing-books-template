@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "da62051cb17613d8855b286b9e467b68f19e5e54d830dbc04fedc59a3dbb58ec",
+      "sha256": "409ce14d2efe263938368b9d5561ab5e77f11a534d71632a170bfc4910c72004",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -612,7 +612,7 @@
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
-      "sha256": "118a1527e7888a1438cde710e87d869371068c78b7a104fdd634e930783a91f7",
+      "sha256": "7e24d23f7a3e4c9cc7c11f9a0f1add0c8e9d7998471655f3dcd52fcad2c28154",
       "mode": "100644"
     },
     "tools/ci/viz_budget.py": {
@@ -964,7 +964,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "564b801fc2b9db6fdf6bad21dfdfb3103743b2f419fb9b998b2a4b5f478fdc42",
+      "sha256": "8a76b3c663b98453afcc8996f9fa3853c17e943c35d8bc38e26fdd2e0f7799cd",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {

@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 查找大批影片缓存时批量核对近期成功的工作流，旧运行按 ID 核对，以减少 GitHub API 请求。
+
 - CI 优先用公开 API 验证形式化申请，减少书库 GitHub Actions 安装令牌的配额消耗。
 
 - Pages 默认分支跨运行复用 Release 附件清单。新鲜清单可直接命中，GitHub API 限流时可回退到最近一次成功的清单。
