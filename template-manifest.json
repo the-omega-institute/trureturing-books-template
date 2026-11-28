@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "4e3e2b4859facab11ef051c4ad10dc70c463a6a2658da9ef9996d2fbb91c4b73",
+      "sha256": "c119c876fc418c323d54d13e126f888cf1e0c3d0fef344c9f06fcb6358dca57c",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -136,7 +136,7 @@
       "mode": "100644"
     },
     "docs/VERIFICATION.md": {
-      "sha256": "2260df166c81350a59426af0237d6986c841581d88a2b8ca569fce5db421e7a0",
+      "sha256": "e448f004e2aaabe2bb37b82e9c4d867c5c23e28be4471c06308dfe0190ed9116",
       "mode": "100644"
     },
     "package-lock.json": {
@@ -824,7 +824,7 @@
       "mode": "100644"
     },
     "tools/tbook/lean.py": {
-      "sha256": "74bf0664313fc8234702fc7bfaee2d949eee0cabefb6c7ffa18b19575c836ba0",
+      "sha256": "fddfe172026d0ab8f98bacbd122beec71310ddee0412cd056223ccd30c377848",
       "mode": "100644"
     },
     "tools/tbook/leanverify.py": {
@@ -1136,7 +1136,7 @@
       "mode": "100644"
     },
     "tools/tests/test_verification.py": {
-      "sha256": "fcb5113920ad18007f4e514fa4a2d27e0a133167db40934b2b7c677088b4d952",
+      "sha256": "aeee36c7f549ddef4533d0b3fd1e1164839ee000d2f1b97394f28b014db8c267",
       "mode": "100644"
     },
     "tools/tests/test_viz.py": {
