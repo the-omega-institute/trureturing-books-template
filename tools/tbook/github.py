@@ -12,7 +12,7 @@ def rate_limited(stderr: str) -> bool:
     return "rate limit" in message or "http 429" in message
 
 
-def _rate_limit_delay() -> float | None:
+def _rate_limit_delay(max_wait: int) -> float | None:
     quota = subprocess.run(["gh", "api", "rate_limit"], capture_output=True, text=True, timeout=10)
     if quota.returncode:
         return None
@@ -21,10 +21,10 @@ def _rate_limit_delay() -> float | None:
         delay = max(1, core["reset"] - time.time() + 2) if core["remaining"] == 0 else 60
     except (KeyError, TypeError, ValueError):
         return None
-    return delay if delay <= 180 else None
+    return delay if delay <= max_wait else None
 
 
-def read_json(endpoint: str, *, paginate: bool = False, timeout: int = 45):
+def read_json(endpoint: str, *, paginate: bool = False, timeout: int = 45, max_rate_limit_wait: int = 180):
     """Read one response or a slurped list of pages through the configured gh client."""
     command = ["gh", "api"]
     if paginate:
@@ -33,7 +33,7 @@ def read_json(endpoint: str, *, paginate: bool = False, timeout: int = 45):
     result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
     if result.returncode and os.environ.get("GITHUB_ACTIONS") == "true" and rate_limited(result.stderr):
         try:
-            delay = _rate_limit_delay()
+            delay = _rate_limit_delay(max_rate_limit_wait)
         except subprocess.TimeoutExpired:
             delay = None
         if delay is not None:

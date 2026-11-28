@@ -56,7 +56,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "7227b321df650bcca2b37808b164c4212deefeadd0fcf1a9e3745a59942933c9",
+      "sha256": "4102c8cfd442278e11025e665d8185cc2c1269141b3419a6b9c8d76e62fb42a6",
       "mode": "100644"
     },
     ".github/workflows/pr-conventions.yml": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "46c9b7804d0d5bc4da349daec5fb4377c37c7e6c13896a705217c2edced6a114",
+      "sha256": "f0c78017cd48df727daf9b9a531b8b053aea22f414c513be9160749d3d3504af",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -588,7 +588,7 @@
       "mode": "100644"
     },
     "tools/ci/pages_schedule.py": {
-      "sha256": "a282d1c531d2b206bf36e07c66914172f75fa43c53c9348f53a8d880f66d6655",
+      "sha256": "9e4bfc0f648d9991c8275a40ed9ef0d1d010d2658cb9a5f5bbbc3689d242c142",
       "mode": "100644"
     },
     "tools/ci/plan.py": {
@@ -820,7 +820,7 @@
       "mode": "100644"
     },
     "tools/tbook/github.py": {
-      "sha256": "2ead98dc0d87b996ba90b14c15c31160bdfe4efdd4a853869dd1f5611744671c",
+      "sha256": "492dd1980bc307072d30d61264e27083602e040ff47b88d0eed74c21bcd12f77",
       "mode": "100644"
     },
     "tools/tbook/html.py": {
@@ -1036,7 +1036,7 @@
       "mode": "100644"
     },
     "tools/tests/test_github.py": {
-      "sha256": "363d3fdd05145e7a8624bfe938ca4cb2102ee43b1cf53809ef60a94b30804183",
+      "sha256": "dc21f3afff1ae0c3961a9b33e3032ab4e42c89c44073d72e4105929fe7c84c38",
       "mode": "100644"
     },
     "tools/tests/test_heading_checks.py": {

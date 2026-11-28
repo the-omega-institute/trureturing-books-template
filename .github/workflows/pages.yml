@@ -44,7 +44,7 @@ jobs:
       deployments: read
       pages: read
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 75
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
       trureturing_sha: ${{ steps.lock.outputs.sha }}
@@ -110,7 +110,7 @@ jobs:
     if: needs.plan.outputs.site == 'true'
     name: Is GitHub Pages enabled?
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 65
     permissions:
       contents: read
       pages: read
