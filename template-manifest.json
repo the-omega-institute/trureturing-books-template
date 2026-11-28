@@ -56,7 +56,7 @@
       "mode": "100644"
     },
     ".github/workflows/pages.yml": {
-      "sha256": "ef6550ed248a28ca681f6f00ab25dfd86450f8edc258143e628254f97cbfb954",
+      "sha256": "60350da3f4ddb9bc411c7da65129305c23512c89fae297559339acc018c7c7b3",
       "mode": "100644"
     },
     ".github/workflows/pr-conventions.yml": {
@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "c119c876fc418c323d54d13e126f888cf1e0c3d0fef344c9f06fcb6358dca57c",
+      "sha256": "a9e7fb5a1981f288ea06eed5e1ae3691736c114022edd6556f8e1770f7513e23",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -592,7 +592,7 @@
       "mode": "100644"
     },
     "tools/ci/plan.py": {
-      "sha256": "2791138f1d238e7e7e5fb107a2ae9f9809983b6d576bacc7f6d49182fa69b033",
+      "sha256": "75eafb5e94304a8e014a2476afb34083efe95fd8ee0ed6b401ff3af8ab52ee94",
       "mode": "100644"
     },
     "tools/ci/pr_conventions.py": {
@@ -819,6 +819,10 @@
       "sha256": "8081a8c466e3982660232d3bf0c5c3d252ce75059cf9d5617be85422a1947eb0",
       "mode": "100644"
     },
+    "tools/tbook/github.py": {
+      "sha256": "2ead98dc0d87b996ba90b14c15c31160bdfe4efdd4a853869dd1f5611744671c",
+      "mode": "100644"
+    },
     "tools/tbook/html.py": {
       "sha256": "3e293c64232ecdd61465abec4690018c939ce615b6865bccfc1cbba8c2be2b5c",
       "mode": "100644"
@@ -868,7 +872,7 @@
       "mode": "100644"
     },
     "tools/tbook/releases.py": {
-      "sha256": "7c61e096620a89fd837421d00f332581a532a51d5ebe33424d1822c52a6d5693",
+      "sha256": "e5bc04ac8c10a96ef2faaf2e7fad8d5913be94a3e99680717ea531d3b3a90e03",
       "mode": "100644"
     },
     "tools/tbook/render.py": {
@@ -1031,6 +1035,10 @@
       "sha256": "44795368da18fff283c55b7767d551ffd160cf0a1e6391cf266afcf0c88bf5cb",
       "mode": "100644"
     },
+    "tools/tests/test_github.py": {
+      "sha256": "363d3fdd05145e7a8624bfe938ca4cb2102ee43b1cf53809ef60a94b30804183",
+      "mode": "100644"
+    },
     "tools/tests/test_heading_checks.py": {
       "sha256": "545c7811c572f3b56b20e16f80a92efd4987a2b4c3a339a3578c3135468d106d",
       "mode": "100644"
@@ -1096,7 +1104,7 @@
       "mode": "100644"
     },
     "tools/tests/test_releases.py": {
-      "sha256": "bcb55a90747442be165eda506e0366d53662410130704245f7dad459836ec2c6",
+      "sha256": "71ab819fb48d87c3258419b6a40dd7edef3ce2508d1057b2fb5cfa0cb297b716",
       "mode": "100644"
     },
     "tools/tests/test_serve.py": {

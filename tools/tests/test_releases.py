@@ -1,6 +1,8 @@
 """Release download links depend on actual uploaded, published attachments."""
 
-import json
+import os
+import subprocess
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -8,6 +10,29 @@ from tbook import releases
 
 
 class ReleaseAssetsTest(unittest.TestCase):
+    def test_catalog_is_reused_across_runs_and_only_falls_back_for_rate_limits(self):
+        pages = [[{"tag_name": "v1"}]]
+        with (TemporaryDirectory() as directory,
+              patch.dict(os.environ, {"TBOOK_RELEASE_CACHE": directory}),
+              patch.object(releases.time, "time", return_value=1000),
+              patch.object(releases, "read_json", return_value=pages) as fetch):
+            self.assertEqual(releases._release_pages("owner/books"), pages)
+            self.assertEqual(releases._release_pages("owner/books"), pages)
+            self.assertEqual(fetch.call_count, 1)
+            failure = subprocess.CalledProcessError(1, ["gh"], stderr="API rate limit exceeded")
+            with patch.object(releases.time, "time", return_value=1500):
+                fetch.side_effect = failure
+                self.assertEqual(releases._release_pages("owner/books"), pages)
+                with self.assertRaises(subprocess.CalledProcessError):
+                    releases._release_pages("owner/other-books")
+                fetch.side_effect = subprocess.CalledProcessError(1, ["gh"], stderr="Forbidden")
+                with self.assertRaises(subprocess.CalledProcessError):
+                    releases._release_pages("owner/books")
+            with patch.object(releases.time, "time", return_value=100000):
+                fetch.side_effect = failure
+                with self.assertRaises(subprocess.CalledProcessError):
+                    releases._release_pages("owner/books")
+
     def test_newest_uploaded_asset_wins_and_drafts_and_daily_previews_do_not_count(self):
         def asset(tag, name, state="uploaded"):
             return dict(state=state, name=name, size=42,
@@ -37,12 +62,11 @@ class ReleaseAssetsTest(unittest.TestCase):
         self.addCleanup(releases.film_assets.cache_clear)
         self.addCleanup(releases.pdf_assets.cache_clear)
         self.addCleanup(releases.epub_assets.cache_clear)
-        with patch.object(releases.subprocess, "check_output", return_value=json.dumps(response)) as run:
+        with patch.object(releases, "read_json", return_value=response) as run:
             self.assertEqual(releases.pdf_assets("owner/books"),
                              {"book.pdf": releases.PdfAsset(new["browser_download_url"], 42),
                               "beta.pdf": releases.PdfAsset(beta["browser_download_url"], 42)})
             self.assertEqual(releases.epub_assets("owner/books"),
                              {"book.epub": releases.ReleaseAsset(asset("v2", "book.epub")["browser_download_url"], 42)})
             self.assertIn("film.mp4", releases.film_assets("owner/books"))
-            self.assertEqual(run.call_count, 1)
-            self.assertIn("--paginate", run.call_args.args[0])
+            run.assert_called_once_with("repos/owner/books/releases?per_page=100", paginate=True, timeout=90)
