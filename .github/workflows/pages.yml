@@ -288,6 +288,17 @@ jobs:
           TRURETURING_TOKEN: ${{ secrets.TRURETURING_TOKEN }}
         run: ./tbook check
 
+      - name: Restore the GitHub Release catalog
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/cache/restore@v5
+        with:
+          path: .cache/github-release-catalog
+          key: pages-release-catalog-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: pages-release-catalog-v1-
+      - name: Record the restored catalog digest
+        id: release-catalog
+        run: echo "digest=${{ hashFiles('.cache/github-release-catalog/*.json') }}" >> "$GITHUB_OUTPUT"
+
       - name: Build everything
         id: build
         # Below the job's limit, so that the save below still runs: what was built is kept, and a re-run
@@ -296,10 +307,21 @@ jobs:
         env:
           # Units missing from the Actions cache are looked up in the newest published releases.
           TBOOK_CACHE_REMOTE: '1'
+          TBOOK_RELEASE_CACHE: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && '.cache/github-release-catalog' || '' }}
           GITHUB_TOKEN: ${{ github.token }}
           # The site never goes out without a film: one that cannot be rendered fails the build.
           TBOOK_FILMS: require
         run: ./tbook build all
+
+      - name: Save the GitHub Release catalog
+        if: >-
+          ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          hashFiles('.cache/github-release-catalog/*.json') != '' &&
+          hashFiles('.cache/github-release-catalog/*.json') != steps.release-catalog.outputs.digest }}
+        uses: actions/cache/save@v5
+        with:
+          path: .cache/github-release-catalog
+          key: pages-release-catalog-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Save the build cache
         # Also after a failed build: every unit that was built is stored complete (a film rendered before

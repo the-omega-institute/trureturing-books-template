@@ -23,6 +23,7 @@ import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tbook import buildcache, film_inputs, page_lines, template as template_metadata
 from ci import viz_budget, testing, trusted_cache
+from tbook.github import read_json
 
 VERSION = 6
 SCHEMA = "tbook-ci-coverage-v1"
@@ -850,7 +851,7 @@ def signature(tree, runtime):
 
 
 def api(endpoint):
-    return json.loads(subprocess.check_output(["gh", "api", endpoint], timeout=45))
+    return read_json(endpoint)
 
 
 def ancestor(root, base, head):
