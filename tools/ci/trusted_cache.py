@@ -31,6 +31,41 @@ def api(endpoint: str):
     return json.loads(result.stdout)
 
 
+def _media_artifacts(repo, branch, artifact_name, get):
+    query = urlencode({"name": artifact_name, "per_page": 100})
+    endpoint = f"repos/{repo}/actions/artifacts?{query}"
+    data = get(f"{endpoint}&page=1")
+    pages = max(1, (int(data["total_count"]) + 99) // 100)
+    for page in range(1, pages + 1):
+        if page > 1:
+            data = get(f"{endpoint}&page={page}")
+        for artifact in data.get("artifacts", []):
+            if artifact.get("name") != artifact_name or artifact.get("expired", True):
+                continue
+            run = artifact["workflow_run"]
+            if run.get("head_branch", branch) == branch:
+                yield int(run["id"]), int(artifact["id"])
+
+
+def _recent_runs(repo, branch, workflows, wanted, get):
+    """Batch recent successful runs before resolving older artifact producers by ID."""
+    indexed = {}
+    query = urlencode({"branch": branch, "status": "success", "per_page": 100})
+    for workflow in workflows.values():
+        for page in range(1, 4):
+            try:
+                data = get(f"repos/{repo}/actions/workflows/{workflow}/runs?{query}&page={page}")
+            except (OSError, ValueError, subprocess.SubprocessError):
+                break
+            runs = data["workflow_runs"]
+            indexed.update((run["id"], run) for run in runs if run["id"] in wanted)
+            if indexed.keys() == wanted:
+                return indexed
+            if len(runs) < 100:
+                break
+    return indexed
+
+
 def find_media(repo: str, branch: str, artifact_name: str, get=api) -> tuple[int, int] | None:
     """Find retained media stores directly, independent of unrelated successful runs.
 
@@ -47,30 +82,25 @@ def find_media(repo: str, branch: str, artifact_name: str, get=api) -> tuple[int
             continue
         if workflow.get("path") == f".github/workflows/{name}":
             workflows[workflow["id"]] = name
-    query = urlencode({"name": artifact_name, "per_page": 100})
-    endpoint = f"repos/{repo}/actions/artifacts?{query}"
-    data = get(f"{endpoint}&page=1")
-    pages = max(1, (int(data["total_count"]) + 99) // 100)
+    artifacts = _media_artifacts(repo, branch, artifact_name, get)
     runs, candidates = {}, []
-    for page in range(1, pages + 1):
-        if page > 1:
-            data = get(f"{endpoint}&page={page}")
-        for artifact in data.get("artifacts", []):
-            if artifact.get("name") != artifact_name or artifact.get("expired", True):
-                continue
-            run_id = int(artifact["workflow_run"]["id"])
-            if run_id not in runs:
-                runs[run_id] = get(f"repos/{repo}/actions/runs/{run_id}")
-            run = runs[run_id]
-            name = workflows.get(run.get("workflow_id"))
-            own_event = pages_producer(run) if name == "pages.yml" else run.get("event") in ("push", "workflow_dispatch", "schedule")
-            if (name and run.get("head_repository", {}).get("full_name") == repo and
-                    run.get("head_branch") == branch and own_event and
-                    run.get("status") == "completed" and run.get("conclusion") == "success"):
-                artifact_id = int(artifact["id"])
-                if artifact_name == "tbook-image-store":
-                    return run_id, artifact_id
-                candidates.append((run.get("updated_at") or run.get("created_at", ""), run_id, artifact_id))
+    if artifact_name == "tbook-film-store":
+        artifacts = list(artifacts)
+        wanted = {run_id for run_id, _ in artifacts}
+        if len(wanted) > 20:
+            runs = _recent_runs(repo, branch, workflows, wanted, get)
+    for run_id, artifact_id in artifacts:
+        if run_id not in runs:
+            runs[run_id] = get(f"repos/{repo}/actions/runs/{run_id}")
+        run = runs[run_id]
+        name = workflows.get(run.get("workflow_id"))
+        own_event = pages_producer(run) if name == "pages.yml" else run.get("event") in ("push", "workflow_dispatch", "schedule")
+        if (name and run.get("head_repository", {}).get("full_name") == repo and
+                run.get("head_branch") == branch and own_event and
+                run.get("status") == "completed" and run.get("conclusion") == "success"):
+            if artifact_name == "tbook-image-store":
+                return run_id, artifact_id
+            candidates.append((run.get("updated_at") or run.get("created_at", ""), run_id, artifact_id))
     return max(candidates)[1:] if candidates else None
 
 

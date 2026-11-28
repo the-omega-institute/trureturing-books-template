@@ -60,13 +60,25 @@ def collect(editions) -> list[dict]:
     return sorted(groups.values(), key=lambda g: (-g["book_count"], -g["result_count"], g["request"]))
 
 
-def _api(path: str):
+def _read_public_registry(path: str, token: str | None = None):
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "tbook"}
-    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = "Bearer " + token
-    with urlopen(Request("https://api.github.com/repos/" + evidence.REQUEST_REPO + path, headers=headers), timeout=20) as r:
-        return json.load(r)
+    with urlopen(Request("https://api.github.com/repos/" + evidence.REQUEST_REPO + path, headers=headers), timeout=20) as response:
+        return json.load(response)
+
+
+def _api(path: str):
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        # The formalization registry is public. Keep its reads out of the repository's Actions quota.
+        try:
+            return _read_public_registry(path)
+        except HTTPError as error:
+            if not token or error.code not in (403, 429):
+                raise
+            error.close()
+    return _read_public_registry(path, token)
 
 
 def registration(doi: str, source: str, repository: str = "", book_repository: str = "") -> str:

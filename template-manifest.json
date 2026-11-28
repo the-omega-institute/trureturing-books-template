@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "a9e7fb5a1981f288ea06eed5e1ae3691736c114022edd6556f8e1770f7513e23",
+      "sha256": "409ce14d2efe263938368b9d5561ab5e77f11a534d71632a170bfc4910c72004",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -612,7 +612,7 @@
       "mode": "100644"
     },
     "tools/ci/trusted_cache.py": {
-      "sha256": "118a1527e7888a1438cde710e87d869371068c78b7a104fdd634e930783a91f7",
+      "sha256": "7e24d23f7a3e4c9cc7c11f9a0f1add0c8e9d7998471655f3dcd52fcad2c28154",
       "mode": "100644"
     },
     "tools/ci/viz_budget.py": {
@@ -880,7 +880,7 @@
       "mode": "100644"
     },
     "tools/tbook/requests.py": {
-      "sha256": "08f6f3581c4743e6bb706dc72c6a077e9d39fe5ef52780cdc40698ff2391202e",
+      "sha256": "976f1742ccbf4bfa79ac63d486ac661d01c2cd193c4b5b7d8affcdd8a9cb6c28",
       "mode": "100644"
     },
     "tools/tbook/serve.py": {
@@ -964,7 +964,7 @@
       "mode": "100644"
     },
     "tools/tests/test_ci_performance.py": {
-      "sha256": "564b801fc2b9db6fdf6bad21dfdfb3103743b2f419fb9b998b2a4b5f478fdc42",
+      "sha256": "8a76b3c663b98453afcc8996f9fa3853c17e943c35d8bc38e26fdd2e0f7799cd",
       "mode": "100644"
     },
     "tools/tests/test_ci_stills.py": {
@@ -1164,7 +1164,7 @@
       "mode": "100644"
     },
     "tools/tests/test_written_proof.py": {
-      "sha256": "1bee585a0d97dc1f59b6bd51dfcb7cb8faeebca74d9f90cd7b18835734985961",
+      "sha256": "15f97dc157e5541e6a25aa0a11a369e055937558a9874bc871d2d60740b8265a",
       "mode": "100644"
     },
     "tools/tests/viz_hud_harness.mjs": {

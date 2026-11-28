@@ -175,6 +175,29 @@ class TrustedCacheTest(unittest.TestCase):
         self.assertEqual(calls.count("repos/owner/books/actions/runs/20"), 1)
         self.assertFalse(any("/runs?" in call for call in calls), "unrelated run volume cannot hide films")
 
+    def test_large_film_inventory_batches_runs_and_checks_older_producers(self):
+        self.artifact["name"] = "tbook-film-store"
+        self.run["updated_at"] = "2026-11-17T03:00:00Z"
+        recent = [dict(self.run, id=i, updated_at="2026-11-17T02:00:00Z") for i in range(100, 120)]
+        wrong_branch = dict(self.artifact, id=90, workflow_run={"id": 90, "head_branch": "feature"})
+        calls = []
+
+        def api(endpoint):
+            calls.append(endpoint)
+            if "/actions/artifacts?" in endpoint:
+                artifacts = [dict(self.artifact, id=run["id"], workflow_run={"id": run["id"]})
+                             for run in recent]
+                older = dict(self.artifact, workflow_run={"id": 17})
+                return {"total_count": 22, "artifacts": [*artifacts, wrong_branch, older]}
+            if "/workflows/" in endpoint and "/runs?" in endpoint:
+                return {"workflow_runs": recent if "/pages.yml/" in endpoint else []}
+            return self.api(endpoint)
+
+        self.assertEqual(trusted_cache.find("owner/books", "main", api,
+                                           artifact_name="tbook-film-store"), (17, 42))
+        self.assertEqual([call for call in calls if "/actions/runs/" in call],
+                         ["repos/owner/books/actions/runs/17"])
+
     def test_named_film_artifacts_keep_all_producer_and_expiry_checks(self):
         self.artifact["name"] = "tbook-film-store"
         for changes in ({"event": "pull_request"}, {"head_branch": "feature"},
