@@ -1,6 +1,8 @@
 """Decide whether a queued Pages run has publication inputs to build."""
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -66,9 +68,44 @@ def due(root, repo, sha, event, schedule, *, get=api, read_live=live_manifest):
     return False
 
 
-if __name__ == "__main__":
+def pages_configuration(repo, get=api):
+    try:
+        pages = get(f"repos/{repo}/pages")
+    except subprocess.CalledProcessError as error:
+        if "(HTTP 404)" not in (error.stderr or ""):
+            raise
+        return "", "GitHub Pages is disabled. Enable it in Settings → Pages → Source: GitHub Actions."
+    if pages.get("build_type") != "workflow":
+        return "", "Set Settings → Pages → Source: GitHub Actions to enable deployment."
+    base_url = pages["html_url"].rstrip("/")
+    if not base_url or len(base_url.splitlines()) != 1 or base_url != base_url.strip():
+        raise ValueError("GitHub returned an invalid Pages URL")
+    return base_url, ""
+
+
+def probe():
+    base_url, message = pages_configuration(os.environ["GITHUB_REPOSITORY"])
+    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+        print(f"enabled={str(bool(base_url)).lower()}", file=output)
+        print(f"base_url={base_url}", file=output)
+    if base_url:
+        print("GitHub Pages is enabled with source: GitHub Actions.")
+    else:
+        print(f"::warning title=GitHub Pages not deployed::{message}")
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+            print(f"### GitHub Pages not deployed\n\n{message}\n\nThe workflow still builds the site.", file=summary)
+
+
+def schedule():
     selected = due(Path.cwd(), os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"],
                    os.environ["GITHUB_EVENT_NAME"], os.environ.get("PAGES_SCHEDULE", ""))
     print("Publication is due." if selected else "No Pages update is due.")
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"publish={str(selected).lower()}\n")
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--probe"]:
+        probe()
+    else:
+        schedule()

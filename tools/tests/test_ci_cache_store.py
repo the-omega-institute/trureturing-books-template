@@ -242,6 +242,15 @@ class CacheTransferWorkflowTest(unittest.TestCase):
             pages_url = next(s for s in steps if "TBOOK_BASE_URL" in s.get("run", ""))
             self.assertTrue(gha_if(pages_url["if"], event=event, ref=ref, context=context))
 
+    def test_pages_film_shards_reuse_the_probed_url(self):
+        jobs = workflow_jobs(GITHUB_DIR / "workflows" / "pages.yml")
+        probe = next(s for s in jobs["probe"] if s.get("id") == "pages")
+        self.assertIn("ci.pages_schedule --probe", probe["run"])
+        for job in ("films", "build"):
+            self.assertFalse(any(s.get("uses", "").startswith("actions/configure-pages@") for s in jobs[job]))
+            restore = next(s for s in jobs[job] if s.get("with", {}).get("mode") == "restore")
+            self.assertEqual(restore["with"]["pages-url"], "${{ needs.probe.outputs.base_url }}")
+
     def test_pages_publishes_stills_separately_from_the_complete_archive(self):
         steps = workflow_jobs(GITHUB_DIR / "workflows" / "pages.yml")["build"]
         upload = next(s for s in steps if s.get("with", {}).get("name") == "tbook-image-store")

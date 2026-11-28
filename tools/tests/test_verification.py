@@ -1399,11 +1399,16 @@ class BuildCacheWorkflowTests(unittest.TestCase):
             self.assertEqual(len(restores), 1, where)
             self.assertLess(restores[0], builds[0], where)
             pages = [i for i, s in enumerate(steps) if s.get("uses", "").startswith("actions/configure-pages@")]
-            self.assertEqual(len(pages), 1, where)
-            self.assertEqual(steps[pages[0]].get("id"), "pages", where)
-            self.assertLess(pages[0], restores[0], where)
-            self.assertEqual(steps[restores[0]]["with"].get("pages-url"), "${{ steps.pages.outputs.base_url }}", where)
-            if wf != "pages.yml":  # pages.yml asks only when its probe found Pages enabled
+            if wf == "pages.yml":
+                self.assertEqual(pages, [], where)
+                self.assertEqual(steps[restores[0]]["with"].get("pages-url"),
+                                 "${{ needs.probe.outputs.base_url }}", where)
+            else:
+                self.assertEqual(len(pages), 1, where)
+                self.assertEqual(steps[pages[0]].get("id"), "pages", where)
+                self.assertLess(pages[0], restores[0], where)
+                self.assertEqual(steps[restores[0]]["with"].get("pages-url"),
+                                 "${{ steps.pages.outputs.base_url }}", where)
                 self.assertEqual(steps[pages[0]].get("continue-on-error"), "true", where)
             films, film_if = False, ""
             for i in builds:
