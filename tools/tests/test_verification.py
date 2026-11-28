@@ -300,6 +300,27 @@ class LedgerAncestryTests(unittest.TestCase):
         lean.Ledger(TRU).branch_contains(OLD_COMMIT, "dev")
         self.assertIsNone(gh.requests[0].get_header("Authorization"))
 
+    def test_rate_limited_api_accepts_only_proven_git_ancestors(self):
+        h = self.h
+        url_config = f"url.{h.dir.as_uri()}.insteadOf"
+        git(h.dir, "config", "uploadpack.allowFilter", "true")
+        limit = (403, None, "HTTP 403 API rate limit exceeded for installation")
+        with mock.patch.dict(os.environ, {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": url_config,
+            "GIT_CONFIG_VALUE_0": UPSTREAM,
+        }):
+            with mock.patch.object(lean, "github_api", return_value=limit):
+                yes = lean.github_branch_contains(TRU, "dev", h.a)
+                self.assertIs(yes.on_branch, True)
+                self.assertIn("Git transport", yes.detail)
+                unknown = lean.github_branch_contains(TRU, "dev", h.c)
+                self.assertIsNone(unknown.on_branch)
+                self.assertIn("rate limit", unknown.detail)
+            branch = (200, {"name": "dev", "commit": {"sha": h.b}}, "")
+            with mock.patch.object(lean, "github_api", side_effect=[branch, limit]):
+                self.assertIs(lean.github_branch_contains(TRU, "dev", h.a).on_branch, True)
+
     def test_github_overrides_a_stale_checkout_and_a_checkout_no_stands_alone(self):
         h = self.h
         git(h.dir, "update-ref", "refs/remotes/origin/dev", h.a)  # stale: dev has moved to B since the last fetch

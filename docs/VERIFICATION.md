@@ -76,12 +76,14 @@ trureturing 的冻结律（其 `CLAUDE.md` §1.3）规定：**模块的状态片
 2. 本地 checkout 的 `git merge-base --is-ancestor <commit> <ref>`，`<ref>` 依次取指向该仓库的远程的跟踪分支、`origin/<branch>`、本地 `<branch>`，且只取确实存在的同名 ref（`git show-ref --verify`）。一个都没有时，本地无法判定。
 3. 联网时问 GitHub：先 `repos/<repo>/branches/<branch>`，取回答中的分支头提交 `<head>`，再问 `repos/<repo>/compare/<head>...<commit>`，状态为 `behind` 或 `identical` 才算在分支上。比较的基准是分支头的完整 SHA 而不是名字，GitHub 对名字的其他读法因此不起作用。分支端点回答 404 时再问 `repos/<repo>`：仓库可读，就确定没有这个分支；仓库也读不到（例如私有仓库而没有令牌）则无法判定。
 
+GitHub API 明确限流时，工具尝试浅取指定分支的 Git 提交历史，并只接受 `git merge-base --is-ancestor` 给出的肯定结果。若不能确认，仍按无法判定处理。
+
 本地 checkout 已确认在分支上时不再问 GitHub；否则 GitHub 的确定回答优先于可能过期的 checkout，GitHub 答不出时 checkout 的“不在分支上”仍然有效。只有肯定结果会被缓存。访问 API 时依次使用 `$TRURETURING_TOKEN`、`$GITHUB_TOKEN`、`$GH_TOKEN`（未设置时匿名，每小时 60 次）。CI 中没有 trureturing checkout，各工作流的检查步骤因此把 `github.token` 作为 `GITHUB_TOKEN` 传入（`trureturing-bump.yml` 用作业的 `GH_TOKEN`）。
 
 **缓存在 CI 中的信任边界。** GitHub Actions 的缓存按 ref 隔离，但一个 PR 的运行会恢复同一 PR 之前的运行保存的缓存，而那些运行执行的是 PR 自己的代码：第一次推送改动工具、把伪造的状态片和“在分支上”的结论写进 `.cache/trureturing`，第二次推送撤回改动，最终 diff 看起来干净，检查却读到伪造的缓存。因此：
 
 - 工作流只在可信的 ref 上恢复和保存 `.cache/trureturing`：`ci.yml` 在默认分支的 push（及手动运行）与 tag 上（包括 tag 工作流通过 `workflow_call` 调用时），`pages.yml` 与 `trureturing-bump.yml` 在默认分支上（定时运行总在默认分支上），`release.yml` 在 tag 上。PR 与其他分支的运行不使用这份缓存。
-- `tbook` 自身也做纵深防御：`$GITHUB_EVENT_NAME` 为 `pull_request`、`pull_request_target`、`pull_request_review` 或 `pull_request_review_comment` 时，不从 `.cache/trureturing` 读取状态片和分支结论（仍会写入），状态片从 `raw.githubusercontent.com` 读取，分支可达性每次都问 GitHub 的分支端点与 compare API（用 `GITHUB_TOKEN`）。所以 PR 的检查需要网络；`--offline` 下这些项目只是警告。
+- `tbook` 自身也做纵深防御：`$GITHUB_EVENT_NAME` 为 `pull_request`、`pull_request_target`、`pull_request_review` 或 `pull_request_review_comment` 时，不从 `.cache/trureturing` 读取状态片和分支结论（仍会写入），状态片从 `raw.githubusercontent.com` 读取，分支可达性每次向 GitHub 重新核对（通常用分支端点与 compare API）。所以 PR 的检查需要网络；`--offline` 下这些项目只是警告。
 - 本地运行时，缓存是开发者自己的，照常读取。
 - 工具链缓存（`.github/actions/setup` 中的 pip 缓存、Playwright 的 Chromium、`.cache/fonts`、视频用的 Kokoro 模型 `.cache/film/models`）在 PR 事件（`github.event_name` 以 `pull_request` 开头）中既不恢复也不保存，PR 的运行每次从 PyPI、Playwright 的下载站和 GitHub 重新下载。只是不保存还不够：PR 的运行执行的是 PR 自己的工作流和 action 文件，第一次推送可以去掉保存条件（或另加一个 `actions/cache/save` 步骤），把篡改过的包或 Chromium 存进该 PR 的缓存作用域；第二次推送恢复原样，最终 diff 干净，恢复步骤却会先在 PR 自己的作用域里找到那份缓存，找不到才去目标分支和默认分支。跳过恢复的条件写在最终版本的文件里，早先推送的改动左右不了它。其他事件照常恢复和保存（`actions/cache/restore` + `actions/cache/save`；不用会在 PR 中保存的 `actions/cache` 与 setup-python 自带缓存），作用域是所在分支，找不到时回落到默认分支。
 - `lean-verify.yml` 的 pip 缓存与 Lake 工作区缓存（`build/lean-verify/.lake`，公理检查读的正是其中已构建的 `.olean`）按同样的规则处理：PR 事件中既不恢复也不保存，其他事件用 `actions/cache/restore` + `actions/cache/save`，恢复未精确命中时才保存，Lake 工作区还要等构建成功。本仓库只在定时、手动运行与 `release.yml`（tag）中运行它，但它可以经 `workflow_call` 被调用，书库若从自己的 PR 工作流调用它，这条规则同样生效。

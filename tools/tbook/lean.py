@@ -37,6 +37,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -665,6 +666,32 @@ def github_api(path: str, timeout: float = 30.0) -> tuple[int, object, str]:
     return code, None, err
 
 
+def _rate_limited_ancestry(repo: str, branch: str, commit: str, detail: str) -> Ancestry:
+    """Prove reachability over Git transport when the API quota is exhausted."""
+    if not re.fullmatch(r"[A-Za-z0-9-]+/[A-Za-z0-9_.-]+", repo) or not SHA_RE.fullmatch(commit):
+        return Ancestry(None, detail)
+    with tempfile.TemporaryDirectory(prefix="tbook-ancestry-") as checkout:
+        git = ["git", "-C", checkout, "-c", "credential.helper="]
+        env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+        branch_ref = f"refs/heads/{branch}"
+        upstream = "refs/heads/trureturing-ancestry"
+        try:
+            subprocess.run([*git, "init", "--quiet", "--bare", "--template="],
+                           env=env, capture_output=True, timeout=5, check=True)
+            subprocess.run([*git, "fetch", "--quiet", "--no-tags", "--no-recurse-submodules",
+                            "--filter=tree:0", "--depth=128", f"https://github.com/{repo}.git",
+                            f"{branch_ref}:{upstream}"],
+                           env=env, capture_output=True, timeout=45, check=True)
+            result = subprocess.run([*git, "merge-base", "--is-ancestor", commit, upstream],
+                                    env=env, capture_output=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return Ancestry(None, f"{detail}; Git branch fetch unavailable")
+    if result.returncode == 0:
+        return Ancestry(True, f"Git transport: {commit[:12]} is an ancestor of {repo}@{branch}")
+    # Shallow history can prove reachability, but it cannot rule it out.
+    return Ancestry(None, f"{detail}; shallow Git history did not establish reachability")
+
+
 def github_branch_contains(repo: str, branch: str, commit: str) -> Ancestry:
     """Ancestry from GitHub's API: the branch's head commit, then the compare API.
 
@@ -677,6 +704,7 @@ def github_branch_contains(repo: str, branch: str, commit: str) -> Ancestry:
     answer for another branch (GitHub redirects a renamed branch to its new name). ``compare``:
     ``behind`` or ``identical`` means the branch contains the commit (and the answer is small: no
     commits, no files); ``ahead`` or ``diverged`` means the commit has history the branch does not.
+    An explicit rate limit triggers a shallow Git fetch of the exact branch as a positive-only fallback.
     """
     what = f"GitHub branch {branch!r}"
     problem = branch_problem(branch, commit)
@@ -685,6 +713,8 @@ def github_branch_contains(repo: str, branch: str, commit: str) -> Ancestry:
     missing = f"GitHub: {repo} has no branch {branch!r}"
     fix = "; [trureturing] branch in site.toml must name an existing branch (default dev)"
     code, data, err = github_api(f"repos/{repo}/branches/{urllib.parse.quote(branch, safe='/')}")
+    if code == 429 or (code == 403 and "rate limit" in err.lower()):
+        return _rate_limited_ancestry(repo, branch, commit, f"{what}: {err}")
     if code == 404:
         if github_api(f"repos/{repo}")[0] == 200:
             return Ancestry(False, missing + fix, no_branch=True)
@@ -699,6 +729,8 @@ def github_branch_contains(repo: str, branch: str, commit: str) -> Ancestry:
                         no_branch=True)
     what = f"GitHub compare {head[:12]} (head of {branch})...{commit[:12]}"
     code, data, err = github_api(f"repos/{repo}/compare/{head}...{commit}")
+    if code == 429 or (code == 403 and "rate limit" in err.lower()):
+        return _rate_limited_ancestry(repo, branch, commit, f"{what}: {err}")
     if code == 200 and isinstance(data, dict):
         status = data.get("status")
         if status in ("behind", "identical"):
