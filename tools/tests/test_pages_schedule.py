@@ -82,6 +82,24 @@ class PagesScheduleTests(unittest.TestCase):
             self.assertTrue(trusted_cache.pages_producer(dict(event=event, display_title="Pages · " + self.head)))
 
 
+class PagesConfigurationTests(unittest.TestCase):
+    def test_workflow_site_returns_the_canonical_publication_url(self):
+        get = Mock(return_value={"build_type": "workflow", "html_url": "https://example.org/books/"})
+        self.assertEqual(pages_schedule.pages_configuration("owner/books", get), ("https://example.org/books", ""))
+        get.assert_called_once_with("repos/owner/books/pages")
+
+    def test_disabled_or_branch_publishing_does_not_supply_a_url(self):
+        get = Mock(return_value={"build_type": "legacy", "html_url": "https://example.org/books/"})
+        self.assertEqual(pages_schedule.pages_configuration("owner/books", get)[0], "")
+        get.side_effect = subprocess.CalledProcessError(1, ["gh"], stderr="gh: Not Found (HTTP 404)")
+        self.assertEqual(pages_schedule.pages_configuration("owner/books", get)[0], "")
+
+    def test_rate_limit_stays_a_workflow_error(self):
+        get = Mock(side_effect=subprocess.CalledProcessError(1, ["gh"], stderr="API rate limit exceeded (HTTP 403)"))
+        with self.assertRaises(subprocess.CalledProcessError):
+            pages_schedule.pages_configuration("owner/books", get)
+
+
 class PagesRateTests(unittest.TestCase):
     def test_ten_immediate_starts_then_wait_once_even_across_the_hour(self):
         now = datetime(2026, 11, 24, 9, 56, tzinfo=timezone.utc)
