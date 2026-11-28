@@ -3,11 +3,17 @@ import json
 import os
 import subprocess
 import sys
+from functools import partial
 from pathlib import Path
 from urllib.request import Request, urlopen
 
 from ci.plan import Tree, ancestor, api, changed_paths, impact
 from tbook import config, lean, pin, releases
+from tbook.github import read_json
+
+
+# Authoritative Pages reads can wait through a full hourly GitHub quota reset.
+read_pages = partial(read_json, max_rate_limit_wait=3605)
 
 
 def live_commit(repo, get=api):
@@ -84,7 +90,7 @@ def pages_configuration(repo, get=api):
 
 
 def probe():
-    base_url, message = pages_configuration(os.environ["GITHUB_REPOSITORY"])
+    base_url, message = pages_configuration(os.environ["GITHUB_REPOSITORY"], get=read_pages)
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         print(f"enabled={str(bool(base_url)).lower()}", file=output)
         print(f"base_url={base_url}", file=output)
@@ -98,7 +104,7 @@ def probe():
 
 def schedule():
     selected = due(Path.cwd(), os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"],
-                   os.environ["GITHUB_EVENT_NAME"], os.environ.get("PAGES_SCHEDULE", ""))
+                   os.environ["GITHUB_EVENT_NAME"], os.environ.get("PAGES_SCHEDULE", ""), get=read_pages)
     print("Publication is due." if selected else "No Pages update is due.")
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"publish={str(selected).lower()}\n")
