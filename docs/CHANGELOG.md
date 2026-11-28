@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- CI 优先用公开 API 验证形式化申请，减少书库 GitHub Actions 安装令牌的配额消耗。
+
 - Pages 默认分支跨运行复用 Release 附件清单。新鲜清单可直接命中，GitHub API 限流时可回退到最近一次成功的清单。
 
 - CI 计划与 Release 附件读取在短时 GitHub API 限流后按重置时间重试。限流持续超出等待窗口时，保留原错误。

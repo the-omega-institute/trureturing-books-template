@@ -294,6 +294,24 @@ class WrittenProofEvidenceTests(unittest.TestCase):
         for title in ('A result', '[形式化] X | DOI:10.1000/a | Theorem 1', f'[Formalization]  | DOI:{DOI} | {SOURCE}', '[Formalization] X | DOI:not-a-doi | Theorem 1', '[Formalization] X | No DOI | '):
             self.assertIsNone(evidence.parse_request_title(title))
 
+    def test_actions_reads_public_registry_without_using_installation_quota(self):
+        from urllib.error import HTTPError
+
+        issue = {"title": "Public issue"}
+        with mock.patch.dict("os.environ", {"GITHUB_ACTIONS": "true", "GH_TOKEN": "ci-token"}):
+            with mock.patch.object(requests, "_read_public_registry", return_value=issue) as read:
+                self.assertEqual(requests._api("/issues/12"), issue)
+                read.assert_called_once_with("/issues/12")
+            limited = HTTPError("url", 429, "rate limited", {}, None)
+            with mock.patch.object(requests, "_read_public_registry", side_effect=[limited, issue]) as read:
+                self.assertEqual(requests._api("/issues/12"), issue)
+                self.assertEqual(read.call_args_list, [mock.call("/issues/12"), mock.call("/issues/12", "ci-token")])
+            missing = HTTPError("url", 404, "missing", {}, None)
+            with mock.patch.object(requests, "_read_public_registry", side_effect=missing) as read:
+                with self.assertRaises(HTTPError):
+                    requests._api("/issues/12")
+                read.assert_called_once_with("/issues/12")
+
     def test_existing_issue_requires_registration_of_this_book_and_source(self):
         with CoreRepo() as repo:
             edition = self.edition(repo)

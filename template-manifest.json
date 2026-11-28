@@ -108,7 +108,7 @@
       "mode": "100644"
     },
     "docs/CHANGELOG.md": {
-      "sha256": "a9e7fb5a1981f288ea06eed5e1ae3691736c114022edd6556f8e1770f7513e23",
+      "sha256": "da62051cb17613d8855b286b9e467b68f19e5e54d830dbc04fedc59a3dbb58ec",
       "mode": "100644"
     },
     "docs/CONTAINERS.md": {
@@ -880,7 +880,7 @@
       "mode": "100644"
     },
     "tools/tbook/requests.py": {
-      "sha256": "08f6f3581c4743e6bb706dc72c6a077e9d39fe5ef52780cdc40698ff2391202e",
+      "sha256": "976f1742ccbf4bfa79ac63d486ac661d01c2cd193c4b5b7d8affcdd8a9cb6c28",
       "mode": "100644"
     },
     "tools/tbook/serve.py": {
@@ -1164,7 +1164,7 @@
       "mode": "100644"
     },
     "tools/tests/test_written_proof.py": {
-      "sha256": "1bee585a0d97dc1f59b6bd51dfcb7cb8faeebca74d9f90cd7b18835734985961",
+      "sha256": "15f97dc157e5541e6a25aa0a11a369e055937558a9874bc871d2d60740b8265a",
       "mode": "100644"
     },
     "tools/tests/viz_hud_harness.mjs": {
